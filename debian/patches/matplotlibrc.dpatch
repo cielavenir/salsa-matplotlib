@@ -1,0 +1,69 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## matplotlibrc.dpatch by Marco Presi (Zufus) <zufus@debian.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+@DPATCH@
+diff -urNad matplotlib-0.82~/lib/matplotlib/__init__.py matplotlib-0.82/lib/matplotlib/__init__.py
+--- matplotlib-0.82~/lib/matplotlib/__init__.py	2005-06-15 14:27:37.000000000 -0400
++++ matplotlib-0.82/lib/matplotlib/__init__.py	2005-10-17 16:00:58.000000000 -0400
+@@ -161,8 +161,9 @@
+ 
+   - HOME/.matplotlibrc if HOME is defined
+ 
+-  - PATH/.matplotlibrc where PATH is the return value of
+-    get_data_path()
++  - /etc/matplotlibrc in order to make it compliant with
++    Debian Policy Manual
++  
+ """
+ 
+ import sys, os
+@@ -637,30 +638,30 @@
+      * current working dir
+      * environ var MATPLOTLIBRC
+      * HOME/.matplotlibrc
+-     * MATPLOTLIBDATA/.matplotlibrc
++     * /etc/matplotlibrc
+      
+     """
+ 
+-    fname = os.path.join( os.getcwd(), '.matplotlibrc')
++    fname = os.path.join( os.getcwd(), 'matplotlibrc')
+     if os.path.exists(fname): return fname
+ 
+     if os.environ.has_key('MATPLOTLIBRC'):
+         path =  os.environ['MATPLOTLIBRC']
+         if os.path.exists(path):
+-            fname = os.path.join(path, '.matplotlibrc')
++            fname = os.path.join(path, 'matplotlibrc')
+             if os.path.exists(fname):
+                 return fname
+ 
+     home = get_home()
+     if home is not None:
+-        fname = os.path.join(home, '.matplotlibrc')
++        fname = os.path.join(home, 'matplotlibrc')
+         if os.path.exists(fname):
+             return fname
+ 
+-    path =  get_data_path() # guaranteed to exist or raise
+-    fname = os.path.join(path, '.matplotlibrc')
++    path = '/etc'
++    fname = os.path.join(path, 'matplotlibrc')
+     if not os.path.exists(fname):
+-        warnings.warn('Could not find .matplotlibrc; using defaults')
++        warnings.warn('Could not find matplotlibrc; using defaults')
+     return fname
+ 
+ 
+@@ -699,7 +700,7 @@
+         key = key.strip()
+         if key in deprecated_map.keys():
+             alt = deprecated_map[key]
+-            warnings.warn('%s is deprecated in .matplotlibrc - use %s instead.' % (key, alt))
++            warnings.warn('%s is deprecated in matplotlibrc - use %s instead.' % (key, alt))
+             key = alt
+             
+         if not defaultParams.has_key(key):

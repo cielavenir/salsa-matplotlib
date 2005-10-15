@@ -1,0 +1,8 @@
+python-matplotlib documentation
+-------------------------------
+
+You can find the latest version of matplotlib's docs here:
+
+  * users guide: <http://matplotlib.sourceforge.net/users_guide_0.83.2.pdf>
+  * pydoc documentation: <http://matplotlib.sourceforge.net/classdocs.html>
+  * pylab commands: <http://matplotlib.sourceforge.net/pylab_commands.html>

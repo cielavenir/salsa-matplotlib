@@ -1,0 +1,145 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+#pd  := python-matplotlib-doc
+p   := python-matplotlib
+#p22 := python2.2-matplotlib
+p23 := python2.3-matplotlib
+p24 := python2.4-matplotlib
+pdata := python-matplotlib-data
+
+# Include dpatch stuff.
+include /usr/share/dpatch/dpatch.make
+
+#users_guide := $(shell wget http://matplotlib.sourceforge.net/index.html && grep 'users_guide_.*\.pdf' index.html | sed s/'.*\(users_guide_.*\.pdf\).*'/'\1'/; rm -f index.html)
+
+# build
+build: patch-stamp build-arch build-indep
+
+build-indep: build-indep-stamp
+build-indep-stamp:
+	dh_testdir
+	## Building documentation...
+	## works only if python-matplotlib is already installed :(
+	##mkdir -p doc
+	##sh -c "cd doc; pydoc -w ../lib; pydoc -w matplotlib; cd -;"
+	#wget http://matplotlib.sourceforge.net/$(users_guide)
+	touch build-indep-stamp
+
+#build-arch: build22-stamp build23-stamp build24-stampa
+build-arch:build23-stamp build24-stamp
+# build22-stamp:
+# 	dh_testdir
+# 	python2.2 ./setup.py build $(PY_BUILD_FLAGS)
+# 	touch build22-stamp
+
+
+build23-stamp:
+	dh_testdir
+	python2.3 ./setup.py build $(PY_BUILD_FLAGS)
+	touch build23-stamp
+
+build24-stamp:
+	dh_testdir
+	python2.4 ./setup.py build $(PY_BUILD_FLAGS)
+	touch build24-stamp
+
+# clean
+clean: clean-patched unpatch
+clean-patched: 
+	dh_testdir
+	dh_testroot
+# 	python2.2 ./setup.py clean --all
+	python2.3 ./setup.py clean --all
+	python2.4 ./setup.py clean --all
+	-rm -f *-stamp
+	-rm -rf build *.pyc *.pyo *.pdf
+	dh_clean
+	sh $(CURDIR)/debian/mkcopyright.sh
+
+# install
+install-arch: build-arch
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+# 	python2.2 ./setup.py install_lib \
+# 		-d $(CURDIR)/debian/$(p22)/usr/lib/python2.2/site-packages/ --no-compile
+# 	#python2.2 ./setup.py install_scripts \
+# 		-d $(CURDIR)/debian/$(p22)/usr/lib/python2.2/site-packages/
+# 	dh_install -p$(p22) lib/dateutil usr/lib/python2.2/site-packages/
+# 	dh_install -p$(p22) lib/pytz usr/lib/python2.2/site-packages/
+
+	python2.3 ./setup.py install_lib \
+		-d $(CURDIR)/debian/$(p23)/usr/lib/python2.3/site-packages/ --no-compile
+	#python2.3 ./setup.py install_scripts \
+		-d $(CURDIR)/debian/$(p23)/usr/lib/python2.3/site-packages/
+	dh_install -p$(p23) lib/dateutil usr/lib/python2.3/site-packages/
+	dh_install -p$(p23) lib/pytz usr/lib/python2.3/site-packages/
+
+	python2.4 ./setup.py install_lib \
+		-d $(CURDIR)/debian/$(p24)/usr/lib/python2.4/site-packages/ --no-compile
+	#python2.4 ./setup.py install_scripts \
+		-d $(CURDIR)/debian/$(p24)/usr/lib/python2.4/site-packages/
+	dh_install -p$(p24) lib/dateutil usr/lib/python2.4/site-packages/
+	dh_install -p$(p24) lib/pytz usr/lib/python2.4/site-packages/
+
+install-indep: build-indep
+	dh_testdir -i
+	dh_testroot -i
+	dh_clean -k
+	python ./setup.py install_data -d $(CURDIR)/debian/$(pdata)/usr/
+	rm $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/Vera*.ttf
+	# make svg images not executable:
+	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/*.svg
+	# move .matplotlibrc to /etc
+	mkdir $(CURDIR)/debian/$(pdata)/etc/
+	mv $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/.matplotlibrc \
+		$(CURDIR)/debian/$(pdata)/etc/matplotlibrc
+
+# binary
+binary-indep: build-indep install-indep
+	dh_testdir -i
+	dh_testroot -i
+	dh_installchangelogs -i CHANGELOG
+	dh_installdocs -p$(p) -i
+	#dh_installdocs -p$(pd) -i
+	#dh_installexamples -p$(pd) -i examples/*
+	#dh_install -p$(pd) $(users_guide) usr/share/doc/$(pd)
+	#dh_compress -i -Xexamples -Xexamples/data -X$(users_guide)
+	dh_compress -i
+	dh_fixperms -i
+	dh_installdeb -i
+	dh_gencontrol -i
+	dh_md5sums -i
+	dh_builddeb -i
+
+binary-arch: build-arch install-arch
+	dh_testdir -a
+	dh_testroot -a
+	dh_installchangelogs -a CHANGELOG
+	dh_installdocs -p$(p) -a README debian/README.debian TODO API_CHANGES NUMARRAY_ISSUES KNOWN_BUGS
+	# make python scripts starting with '#!' executable
+	for i in `find debian -mindepth 2 -type f ! -perm 755`; do \
+	  if head -1 $$i | grep -q '^#!'; then \
+	    chmod 755 $$i; \
+	    echo "made executable: $$i"; \
+	  fi; \
+	done
+	dh_link -a
+	dh_strip -a
+	dh_compress -a
+	dh_fixperms -a
+	dh_python -a
+	dh_installdeb -a
+	dh_shlibdeps -a
+	dh_gencontrol -a
+	dh_md5sums -a
+	dh_builddeb -a
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install
