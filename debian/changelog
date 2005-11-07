@@ -1,3 +1,13 @@
+matplotlib (0.82-2) unstable; urgency=low
+
+  [Marco Presi]
+  
+  * Included patch by Aurelien Jarno <aurel32@debian.org> to fix build on
+    GNU/kFreeBSD. Closes: #336953
+  * Added latex as Suggested dependency. Closes: #337361
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Sun,  6 Nov 2005 21:49:45 -0500
+
 matplotlib (0.82-1) unstable; urgency=low
 
   * New upstream release
