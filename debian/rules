@@ -51,7 +51,7 @@ build24-stamp:
 
 # clean
 clean: clean-patched unpatch
-clean-patched: 
+clean-patched: patch
 	dh_testdir
 	dh_testroot
 # 	python2.2 ./setup.py clean --all

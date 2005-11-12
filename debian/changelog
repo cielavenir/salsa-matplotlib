@@ -1,3 +1,11 @@
+matplotlib (0.82-4) unstable; urgency=low
+
+  * Fixed FTBFS on hppa: added patch to build on systems without X server 
+    (autobuilders) also in the clean stage. Closes: 338423.
+  * The same patch fix the build also on GNU/kFreeBSD. Closes: #336953
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Fri, 11 Nov 2005 20:51:08 -0500
+
 matplotlib (0.82-3) unstable; urgency=low
 
   * Fixed deps on python-matplotlib (was depending on 0.82-1)
