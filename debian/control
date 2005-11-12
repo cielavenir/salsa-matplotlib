@@ -3,12 +3,12 @@ Section: python
 Priority: optional
 Maintainer: Vittorio Palmisano <vpalmisano@gmail.com>
 Uploaders: Marco Presi (Zufus) <zufus@debian.org>, Alexandre Fayolle <afayolle@debian.org>
-Build-Depends: debhelper(>=4.1.67), dpatch, python-dev, python2.3-dev, python2.4-dev, python-gtk2-dev, python2.3-numeric, python2.4-numeric, python2.3-numarray, python2.4-numarray, libgtk2.0-dev, libfreetype6-dev, zlib1g-dev, libpng-dev, tk8.4-dev, python2.3-tk, python2.4-tk, tcl8.4-dev 
+Build-Depends: debhelper(>=4.1.67), dpatch, python-dev, python2.3-dev, python2.4-dev, python-gtk2-dev, python2.3-numeric, python2.4-numeric, python2.3-numarray, python2.4-numarray, libgtk2.0-dev, libfreetype6-dev, zlib1g-dev, libpng-dev, tk8.4-dev, python2.3-tk, python2.4-tk, tcl8.4-dev, python-epydoc
 Standards-Version: 3.6.2.1
 
 Package: python-matplotlib
 Architecture: all
-Depends: ${python:Depends}, python2.3-matplotlib(=0.82-4)
+Depends: ${python:Depends}, python2.3-matplotlib(=0.82-5)
 Suggests: ipython(>=0.6.3), latex
 Description: python based plotting system in a style similar to Matlab
  Matplotlib is a pure python plotting library designed to bring publication 
@@ -34,9 +34,21 @@ Description: python based plotting system (data package)
  .
  This package contains datas for python-matplotlib
 
+Package: python-matplotlib-doc
+Architecture: all
+Description: python based plotting system (documentation package)
+ Matplotlib is a pure python plotting library designed to bring publication 
+ quality plotting to python with a syntax familiar to Matlab users. Although 
+ the goal of publication quality is not yet attained, the library does produce 
+ high quality 2D plots. All of the plotting commands can be accessed either via 
+ a functional interface familiar to Matlab users or an object oriented interface
+ familiar to python users
+ .
+ This package contains documentation for python-matplotlib
+
 Package: python2.3-matplotlib
 Architecture: any
-Depends: ${python:Depends}, ttf-bitstream-vera, python2.3-numeric | python2.3-numarray, python2.3-gd(>=0.52) | python-pypaint | python2.3-gtk2 | libwxgtk2.4-python | python2.3-qt3, python2.3-numeric-ext | python2.3-numarray-ext, python2.3-dev, dvipng, python-matplotlib-data(=0.82-4)
+Depends: ${python:Depends}, ttf-bitstream-vera, python2.3-numeric | python2.3-numarray, python2.3-gd(>=0.52) | python-pypaint | python2.3-gtk2 | libwxgtk2.4-python | python2.3-qt3, python2.3-numeric-ext | python2.3-numarray-ext, python2.3-dev, dvipng, python-matplotlib-data(=0.82-5)
 Suggests: ipython(>=0.6.3), latex
 Description: python based plotting system (Python 2.3 version)
  Matplotlib is a pure python plotting library designed to bring publication 
@@ -50,7 +62,7 @@ Description: python based plotting system (Python 2.3 version)
 
 Package: python2.4-matplotlib
 Architecture: any
-Depends: ${python:Depends}, ttf-bitstream-vera, python2.4-numeric | python2.4-numarray, python2.4-gd(>=0.52) | python-pypaint | python2.4-gtk2 | libwxgtk2.4-python | python2.4-qt3, python2.4-numeric-ext | python2.4-numarray-ext, python2.4-dev, dvipng, python-matplotlib-data(=0.82-4)
+Depends: ${python:Depends}, ttf-bitstream-vera, python2.4-numeric | python2.4-numarray, python2.4-gd(>=0.52) | python-pypaint | python2.4-gtk2 | libwxgtk2.4-python | python2.4-qt3, python2.4-numeric-ext | python2.4-numarray-ext, python2.4-dev, dvipng, python-matplotlib-data(=0.82-5)
 Suggests: ipython(>=0.6.3), latex
 Description: python based plotting system (Python 2.4 version)
  Matplotlib is a pure python plotting library designed to bring publication 

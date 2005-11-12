@@ -6,9 +6,8 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-#pd  := python-matplotlib-doc
+pd  := python-matplotlib-doc
 p   := python-matplotlib
-#p22 := python2.2-matplotlib
 p23 := python2.3-matplotlib
 p24 := python2.4-matplotlib
 pdata := python-matplotlib-data
@@ -25,19 +24,12 @@ build-indep: build-indep-stamp
 build-indep-stamp:
 	dh_testdir
 	## Building documentation...
-	## works only if python-matplotlib is already installed :(
-	##mkdir -p doc
-	##sh -c "cd doc; pydoc -w ../lib; pydoc -w matplotlib; cd -;"
+	mkdir -p doc
+	sh -c "cd doc; epydoc -n matplotlib ../lib/matplotlib/*; cd -;"
 	#wget http://matplotlib.sourceforge.net/$(users_guide)
 	touch build-indep-stamp
 
-#build-arch: build22-stamp build23-stamp build24-stampa
 build-arch:build23-stamp build24-stamp
-# build22-stamp:
-# 	dh_testdir
-# 	python2.2 ./setup.py build $(PY_BUILD_FLAGS)
-# 	touch build22-stamp
-
 
 build23-stamp:
 	dh_testdir
@@ -54,11 +46,11 @@ clean: clean-patched unpatch
 clean-patched: patch
 	dh_testdir
 	dh_testroot
-# 	python2.2 ./setup.py clean --all
 	python2.3 ./setup.py clean --all
 	python2.4 ./setup.py clean --all
 	-rm -f *-stamp
-	-rm -rf build *.pyc *.pyo *.pdf
+	-rm -rf build *.pyc *.pyo *.pdf doc
+	find ./lib -name '*.pyc' -exec rm {} \;
 	dh_clean
 	sh $(CURDIR)/debian/mkcopyright.sh
 
@@ -67,12 +59,6 @@ install-arch: build-arch
 	dh_testdir
 	dh_testroot
 	dh_clean -k
-# 	python2.2 ./setup.py install_lib \
-# 		-d $(CURDIR)/debian/$(p22)/usr/lib/python2.2/site-packages/ --no-compile
-# 	#python2.2 ./setup.py install_scripts \
-# 		-d $(CURDIR)/debian/$(p22)/usr/lib/python2.2/site-packages/
-# 	dh_install -p$(p22) lib/dateutil usr/lib/python2.2/site-packages/
-# 	dh_install -p$(p22) lib/pytz usr/lib/python2.2/site-packages/
 
 	python2.3 ./setup.py install_lib \
 		-d $(CURDIR)/debian/$(p23)/usr/lib/python2.3/site-packages/ --no-compile
@@ -107,11 +93,10 @@ binary-indep: build-indep install-indep
 	dh_testroot -i
 	dh_installchangelogs -i CHANGELOG
 	dh_installdocs -p$(p) -i
-	#dh_installdocs -p$(pd) -i
-	#dh_installexamples -p$(pd) -i examples/*
-	#dh_install -p$(pd) $(users_guide) usr/share/doc/$(pd)
-	#dh_compress -i -Xexamples -Xexamples/data -X$(users_guide)
-	dh_compress -i
+	dh_installdocs -p$(pd) -i
+	dh_installexamples -p$(pd) -i examples/*
+	dh_install -p$(pd) doc/* usr/share/doc/$(pd)
+	dh_compress -i -Xexamples -Xexamples/data
 	dh_fixperms -i
 	dh_installdeb -i
 	dh_gencontrol -i

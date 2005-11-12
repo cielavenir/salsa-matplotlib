@@ -1,3 +1,10 @@
+matplotlib (0.82-5) unstable; urgency=low
+
+  * Added documentation package. Closes: #338622
+  * Added python-epydoc dependency for documentation generation.
+
+ -- Vittorio Palmisano <vpalmisano@gmail.com>  Sat, 12 Nov 2005 21:26:16 +0100
+
 matplotlib (0.82-4) unstable; urgency=low
 
   * Fixed FTBFS on hppa: added patch to build on systems without X server 
