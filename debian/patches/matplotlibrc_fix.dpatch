@@ -1,0 +1,32 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## build_fix.dpatch by Marco Presi (Zufus) <zufus@debian.org>
+##                  and Vittorio Palmisano <vpalmisano@gmail.com>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+@DPATCH@
+
+diff -Nuard matplotlib-0.86.2_orig/lib/matplotlib/__init__.py matplotlib-0.86.2_new/lib/matplotlib/__init__.py
+--- matplotlib-0.86.2_orig/lib/matplotlib/__init__.py	2006-01-24 13:56:45.000000000 +0100
++++ matplotlib-0.86.2_new/lib/matplotlib/__init__.py	2006-01-28 19:50:01.000000000 +0100
+@@ -938,8 +938,8 @@
+         if os.path.exists(fname):
+             return fname
+ 
+-    path =  get_data_path() # guaranteed to exist or raise
+-    fname = os.path.join(path, '.matplotlibrc')
++    path =  '/etc' # guaranteed to exist or raise
++    fname = os.path.join(path, 'matplotlibrc')
+     if not os.path.exists(fname):
+         warnings.warn('Could not find .matplotlibrc; using defaults')
+     return fname
+@@ -992,7 +992,7 @@
+     if os.path.exists(fname): return fname
+ 
+ 
+-    path =  get_data_path() # guaranteed to exist or raise
++    path =  '/etc' # guaranteed to exist or raise
+     fname = os.path.join(path, 'matplotlibrc')
+     if not os.path.exists(fname):
+         warnings.warn('Could not find matplotlibrc; using defaults')

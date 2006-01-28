@@ -4,7 +4,7 @@ financial data.   User contributions welcome!
 
 """
 #from __future__ import division  
-import time, warnings
+import os, time, warnings, md5
 from urllib import urlopen
 
 
@@ -12,49 +12,39 @@ try: import datetime
 except ImportError:
     raise SystemExit('The finance module requires datetime support (python2.3)')
 
-from matplotlib import verbose
+from matplotlib import verbose, get_configdir
 from artist import Artist
 from dates import date2num, num2date
+from matplotlib.cbook import Bunch
 from matplotlib.collections import LineCollection, PolyCollection
 from matplotlib.colors import colorConverter
 from lines import Line2D, TICKLEFT, TICKRIGHT
 from patches import Rectangle
+import matplotlib.numerix as nx
 from matplotlib.transforms import scale_transform, Value, zero, one, \
      scale_sep_transform, blend_xy_sep_transform
 
 from pylab import gca
 
 
-def quotes_historical_yahoo(ticker, date1, date2):
+configdir = get_configdir()
+cachedir = os.path.join(configdir, 'finance.cache')
 
+
+def parse_yahoo_historical(fh, asobject=False, adjusted=True):
     """
-    Get historical data for ticker between date1 and date2.  date1 and
-    date2 are datetime instances
-    
-    results are a list of
+    Parse the historical data in file handle fh from yahoo finance and return
+    results as a list of
 
     d, open, close, high, low, volume
     
     where d is a floating poing representation of date, as returned by date2num
+
+    if adjust=True, use adjusted prices
     """
-
-
-    d1 = (date1.month-1, date1.day, date1.year)
-    d2 = (date2.month-1, date2.day, date2.year)    
-
-
-    urlFmt = 'http://table.finance.yahoo.com/table.csv?a=%d&b=%d&c=%d&d=%d&e=%d&f=%d&s=%s&y=0&g=d&ignore=.csv'
-    url =  urlFmt % (d1[0], d1[1], d1[2],
-                     d2[0], d2[1], d2[2], ticker)
-
-    ticker = ticker.upper()
-
     results = []
-    try:
-        lines = urlopen(url).readlines()
-    except IOError, exc:
-        warnings.warn('urlopen() failure\n' + url + '\n' + exc.strerror[1])
-        return None
+
+    lines = fh.readlines()
     for line in lines[1:]:
 
         vals = line.split(',')
@@ -64,11 +54,85 @@ def quotes_historical_yahoo(ticker, date1, date2):
         d = date2num(dt)
         open, high, low, close =  [float(val) for val in vals[1:5]]
         volume = int(vals[5])
+        if adjusted:
+            aclose = float(vals[6])
+            m = aclose/close
+            open *= m
+            high *= m
+            low *= m
+            close = aclose
 
         results.append((d, open, close, high, low, volume))
     results.reverse()
-    return results
+    if asobject:
+        date, open, close, high, low, volume = map(nx.asarray, zip(*results))
+        return Bunch(date=date, open=open, close=close, high=high, low=low, volume=volume)
+    else:
 
+        return results
+    
+def quotes_historical_yahoo(ticker, date1, date2, asobject=False, adjusted=True):
+    """
+    Get historical data for ticker between date1 and date2.  date1 and
+    date2 are datetime instances
+    
+    results are a list of tuples
+
+      (d, open, close, high, low, volume)
+    
+    where d is a floating poing representation of date, as returned by date2num
+
+    if asobject is True, the return val is an object with attrs date,
+    open, close, high, low, volume, which are equal length arrays
+
+    if adjust=True, use adjusted prices
+
+    Ex:
+    sp = f.quotes_historical_yahoo('^GSPC', d1, d2, asobject=True, adjusted=True)
+    returns = (sp.open[1:] - sp.open[:-1])/sp.open[1:]
+    [n,bins,patches] = hist(returns, 100)
+    mu = mean(returns)
+    sigma = std(returns)
+    x = normpdf(bins, mu, sigma)
+    plot(bins, x, color='red', lw=2)
+    """
+
+
+    
+    d1 = (date1.month-1, date1.day, date1.year)
+    d2 = (date2.month-1, date2.day, date2.year)    
+
+
+    urlFmt = 'http://table.finance.yahoo.com/table.csv?a=%d&b=%d&c=%d&d=%d&e=%d&f=%d&s=%s&y=0&g=d&ignore=.csv'
+        
+    
+    url =  urlFmt % (d1[0], d1[1], d1[2],
+                     d2[0], d2[1], d2[2], ticker)
+
+
+    cachename = os.path.join(cachedir, md5.md5(url).hexdigest())
+    if os.path.exists(cachename):
+        fh = file(cachename)
+        verbose.report('Using cachefile %s for %s'%(cachename, ticker))
+    else:
+        if not os.path.isdir(cachedir): os.mkdir(cachedir)
+        fh = file(cachename, 'w')
+        fh.write(urlopen(url).read())
+        fh.close()
+        verbose.report('Saved %s data to cache file %s'%(ticker, cachename))
+        fh = file(cachename, 'r')
+        
+
+        
+        
+    ticker = ticker.upper()
+
+    try: ret = parse_yahoo_historical(fh, asobject, adjusted)
+    except IOError, exc:
+        warnings.warn('urlopen() failure\n' + url + '\n' + exc.strerror[1])
+        return None
+
+    return ret
 
         
 def plot_day_summary(ax, quotes, ticksize=3,
@@ -250,7 +314,7 @@ def plot_day_summary2(ax, opens, closes, highs, lows, ticksize=4,
     colord = { True : colorup,
                False : colordown,
                }
-    colors = [colord[open>=close] for open, close in zip(opens, closes) if open!=-1 and close !=-1]
+    colors = [colord[open<close] for open, close in zip(opens, closes) if open!=-1 and close !=-1]
 
     assert(len(rangeSegments)==len(offsetsOpen))
     assert(len(offsetsOpen)==len(offsetsClose))
@@ -342,7 +406,7 @@ def candlestick2(ax, opens, closes, highs, lows, width=4,
     colord = { True : colorup,
                False : colordown,
                }
-    colors = [colord[open>=close] for open, close in zip(opens, closes) if open!=-1 and close !=-1]
+    colors = [colord[open<close] for open, close in zip(opens, closes) if open!=-1 and close !=-1]
 
 
     assert(len(barVerts)==len(rangeSegments))
@@ -408,7 +472,7 @@ def volume_overlay(ax, opens, closes, volumes,
     colord = { True : colorup,
                False : colordown,
                }
-    colors = [colord[open>=close] for open, close in zip(opens, closes) if open!=-1 and close !=-1]
+    colors = [colord[open<close] for open, close in zip(opens, closes) if open!=-1 and close !=-1]
 
     right = width/2.0
     left = -width/2.0
@@ -507,3 +571,4 @@ def index_bar(ax, vals,
     return barCollection
 
     
+

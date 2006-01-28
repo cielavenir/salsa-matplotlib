@@ -1,3 +1,23 @@
+matplotlib (0.86.2-1) unstable; urgency=low
+
+  * New upstream release. Closes: #341730
+  * Added ${shlibs:Depends}. Closes: #345366
+  * python-matplotlib-doc is suggested by python-matplotlib and enhances it. 
+    Closes: #341610
+  * Replaced latex dependency with tetex-extra. Closes: #337361
+  * subplot() behavior fixed. Closes: #346285
+  * Added users_guide in -doc package. Closes: #341399
+  
+ -- Vittorio Palmisano <vpalmisano@gmail.com>  Sat, 28 Jan 2006 19:29:15 +0100
+
+matplotlib (0.85-1) unstable; urgency=low
+
+  * New upstream release. Closes: #341730
+
+  * Added ipython among Enhanced packages.
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Sat, 10 Dec 2005 22:53:24 -0500
+
 matplotlib (0.82-5) unstable; urgency=low
 
   * Added documentation package. Closes: #338622

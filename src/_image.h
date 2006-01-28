@@ -4,7 +4,7 @@
 
 #ifndef _IMAGE_H
 #define _IMAGE_H
-
+#include <utility>
 #include "Python.h"
 
 #include "agg_trans_affine.h"
@@ -26,19 +26,24 @@ public:
   Py::Object apply_rotation(const Py::Tuple& args);
   Py::Object apply_scaling(const Py::Tuple& args);
   Py::Object apply_translation(const Py::Tuple& args);
-  Py::Object as_str(const Py::Tuple& args);
+  Py::Object as_rgba_str(const Py::Tuple& args, const Py::Dict& kwargs);
   Py::Object buffer_argb32(const Py::Tuple& args);
   Py::Object buffer_rgba(const Py::Tuple& args);
   Py::Object reset_matrix(const Py::Tuple& args);
   Py::Object resize(const Py::Tuple& args, const Py::Dict& kwargs);
   Py::Object get_aspect(const Py::Tuple& args);
   Py::Object get_size(const Py::Tuple& args);
+  Py::Object get_size_out(const Py::Tuple& args);
   Py::Object get_interpolation(const Py::Tuple& args);
   Py::Object set_interpolation(const Py::Tuple& args);
   Py::Object set_aspect(const Py::Tuple& args);
   Py::Object write_png(const Py::Tuple& args);
   Py::Object set_bg(const Py::Tuple& args);
+  Py::Object flipud_out(const Py::Tuple& args);
+  Py::Object flipud_in(const Py::Tuple& args);
 
+
+  std::pair<agg::int8u*, bool> _get_output_buffer();
   enum {NEAREST,
 	BILINEAR,
         BICUBIC,
@@ -76,22 +81,24 @@ private:
   Py::Dict __dict__;
   agg::trans_affine srcMatrix, imageMatrix;
 
-
   static char apply_rotation__doc__[];
   static char apply_scaling__doc__[];
   static char apply_translation__doc__[];
-  static char as_str__doc__[];
+  static char as_rgba_str__doc__[];
   static char buffer_argb32__doc__[];
   static char buffer_rgba__doc__[];
   static char reset_matrix__doc__[];
   static char resize__doc__[];
   static char get_aspect__doc__[];
   static char get_size__doc__[];
+  static char get_size_out__doc__[];
   static char get_interpolation__doc__[];
   static char set_interpolation__doc__[];
   static char set_aspect__doc__[];
   static char write_png__doc__[];
   static char set_bg__doc__[];
+  static char flipud_out__doc__[];
+  static char flipud_in__doc__[];
 
 };
 
@@ -123,6 +130,8 @@ public:
 		       "readpng");
     add_varargs_method("from_images", &_image_module::from_images, 
 		       "from_images");
+    add_varargs_method("pcolor", &_image_module::pcolor,
+               "pcolor");
     initialize( "The _image module" );
   }
   
@@ -133,13 +142,15 @@ private:
   Py::Object frombuffer (const Py::Tuple &args);
   Py::Object fromarray (const Py::Tuple &args);
   Py::Object fromarray2 (const Py::Tuple &args);
+  Py::Object pcolor (const Py::Tuple &args);
   Py::Object readpng (const Py::Tuple &args);
   Py::Object from_images (const Py::Tuple &args);
+
   static char _image_module_fromarray__doc__[];
+  static char _image_module_pcolor__doc__[];
   static char _image_module_fromarray2__doc__[];
   static char _image_module_frombyte__doc__[];
   static char _image_module_frombuffer__doc__[];
-
 };
 
 

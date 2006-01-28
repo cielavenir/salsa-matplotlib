@@ -1,51 +1,42 @@
 from __future__ import division
 
-import math, os, warnings
+import math
+import os
 import sys
+import warnings
 def fn_name(): return sys._getframe(1).f_code.co_name
 
+import gobject
+import gtk; gdk = gtk.gdk
+import pango
+pygtk_version_required = (2,0,0)
+if gtk.pygtk_version < pygtk_version_required:
+    raise SystemExit ("PyGTK %d.%d.%d is installed\n"
+                      "PyGTK %d.%d.%d or later is required"
+                      % (gtk.pygtk_version + pygtk_version_required))
+del pygtk_version_required
+
 import matplotlib
-
-import matplotlib.numerix as numerix
-from matplotlib.numerix import asarray, fromstring, UInt8, zeros, \
-     where, transpose, nonzero, indices, ones, nx
-
 from matplotlib._pylab_helpers import Gcf
 from matplotlib.backend_bases import RendererBase, GraphicsContextBase, \
      FigureManagerBase, FigureCanvasBase
 from matplotlib.cbook import is_string_like, enumerate
 from matplotlib.figure import Figure
-from matplotlib.font_manager import fontManager
 from matplotlib.mathtext import math_parse_s_ft2font
+import matplotlib.numerix as numerix
+from matplotlib.numerix import asarray, fromstring, UInt8, zeros, \
+     where, transpose, nonzero, indices, ones, nx
 
-pygtk_version_required = (1,99,16)
-try:
-    import pygtk
-    if not matplotlib.FROZEN:
-        pygtk.require('2.0')
-except:
-    print >> sys.stderr, sys.exc_info()[1]
-    raise SystemExit('PyGTK version %d.%d.%d or greater is required to run the GTK Matplotlib backends'
-                     % pygtk_version_required)
-
-import gtk, pango
-from gtk import gdk
-if gtk.pygtk_version < pygtk_version_required:
-    raise SystemExit ("PyGTK %d.%d.%d is installed\n"
-                      "PyGTK %d.%d.%d or later is required"
-                      % (gtk.pygtk_version + pygtk_version_required))
-backend_version = "%d.%d.%d" % gtk.pygtk_version
-del pygtk_version_required
-
-# do after gtk else get "pygtk.require() must be called before importing gtk"
-# errors
 if numerix.which[0] == "numarray":
-    from matplotlib._na_backend_gdk import pixbuf_get_pixels_array
+    from matplotlib.backends._na_backend_gdk import pixbuf_get_pixels_array
+elif numerix.which[0] == "numeric":
+    from matplotlib.backends._nc_backend_gdk import pixbuf_get_pixels_array
 else:
-    from matplotlib._nc_backend_gdk import pixbuf_get_pixels_array
+    from matplotlib.backends._ns_backend_gdk import pixbuf_get_pixels_array
 
 
-DEBUG = False
+backend_version = "%d.%d.%d" % gtk.pygtk_version
+_debug = False
 
 # Image formats that this backend supports - for FileChooser and print_figure()
 IMAGE_FORMAT  = ['eps', 'jpg', 'png', 'ps', 'svg'] + ['bmp'] # , 'raw', 'rgb']
@@ -80,16 +71,17 @@ class RendererGDK(RendererBase):
     rotated = {}  # a map from text prop tups to rotated text pixbufs
 
     def __init__(self, gtkDA, dpi):
-        # gtkDA is used in '<widget>.create_pango_layout(s)' (and cmap line
-        # below) only
+        # widget gtkDA is used for:
+        #  '<widget>.create_pango_layout(s)'
+        #  cmap line below)
         self.gtkDA = gtkDA
         self.dpi   = dpi
         self._cmap = gtkDA.get_colormap()
-        
-    def _set_pixmap (self, gdkDrawable):
-        self.gdkDrawable = gdkDrawable
 
-    def _set_width_height (self, width, height):
+    def set_pixmap (self, pixmap):
+        self.gdkDrawable = pixmap
+
+    def set_width_height (self, width, height):
         """w,h is the figure w,h not the pixmap w,h
         """
         self.width, self.height = width, height
@@ -98,7 +90,7 @@ class RendererGDK(RendererBase):
         x, y = int(x-0.5*width), self.height-int(y+0.5*height)
         w, h = int(width)+1, int(height)+1
         a1, a2 = int(angle1*64), int(angle2*64)
-        
+
         if rgbFace:
             saveColor = gc.gdkGC.foreground
             gc.gdkGC.foreground = gc.rgb_to_gdk_color(rgbFace)
@@ -107,15 +99,15 @@ class RendererGDK(RendererBase):
         self.gdkDrawable.draw_arc(gc.gdkGC, False, x, y, w, h, a1, a2)
 
 
-    def draw_image(self, x, y, im, origin, bbox):
+    def draw_image(self, x, y, im, bbox):
         if bbox != None:
             l,b,w,h = bbox.get_bounds()
             #rectangle = (int(l), self.height-int(b+h),
             #             int(w), int(h))
             # set clip rect?
 
-        flipud = origin=='lower'
-        rows, cols, image_str = im.as_str(flipud)
+        im.flipud_out()
+        rows, cols, image_str = im.as_rgba_str()
 
         image_array = fromstring(image_str, UInt8)
         image_array.shape = rows, cols, 4
@@ -129,8 +121,8 @@ class RendererGDK(RendererBase):
 
         gc = self.new_gc()
 
-        if flipud:
-            y = self.height-y-rows
+
+        y = self.height-y-rows
 
         try: # new in 2.2
             # can use None instead of gc.gdkGC, if don't need clipping
@@ -143,17 +135,20 @@ class RendererGDK(RendererBase):
                                   int(x), int(y), cols, rows,
                                   gdk.RGB_DITHER_NONE, 0, 0)
 
-            
+        # unflip
+        im.flipud_out()
+
+
     def draw_line(self, gc, x1, y1, x2, y2):
         self.gdkDrawable.draw_line(gc.gdkGC, int(x1), self.height-int(y1),
                                    int(x2), self.height-int(y2))
 
 
-    def draw_lines(self, gc, x, y):
+    def draw_lines(self, gc, x, y, transform=None):
         x = x.astype(nx.Int16)
-        y = self.height - y.astype(nx.Int16)  
+        y = self.height - y.astype(nx.Int16)
         self.gdkDrawable.draw_lines(gc.gdkGC, zip(x,y))
-        
+
 
     def draw_point(self, gc, x, y):
         self.gdkDrawable.draw_point(gc.gdkGC, int(x), self.height-int(y))
@@ -202,7 +197,7 @@ class RendererGDK(RendererBase):
             l, b, w, h = inkRect
             self.gdkDrawable.draw_layout(gc.gdkGC, x, y-h-b, layout)
 
-        
+
     def _draw_mathtext(self, gc, x, y, s, prop, angle):
         size = prop.get_size_in_points()
         width, height, fonts = math_parse_s_ft2font(
@@ -212,7 +207,7 @@ class RendererGDK(RendererBase):
             width, height = height, width
             x -= width
         y -= height
-        
+
         imw, imh, image_str = fonts[0].image_as_str()
         N = imw*imh
 
@@ -223,7 +218,7 @@ class RendererGDK(RendererBase):
             if angle == 90:
                 font.horiz_image_to_vert_image() # <-- Rotate
             imw, imh, image_str = font.image_as_str()
-            Xall[:,i] = fromstring(image_str, UInt8)  
+            Xall[:,i] = fromstring(image_str, UInt8)
 
         # get the max alpha at each pixel
         Xs = numerix.mlab.max(Xall,1)
@@ -252,8 +247,8 @@ class RendererGDK(RendererBase):
             pixbuf.render_to_drawable(self.gdkDrawable, gc.gdkGC, 0, 0,
                                   int(x), int(y), imw, imh,
                                   gdk.RGB_DITHER_NONE, 0, 0)
-            
-        
+
+
     def _draw_rotated_text(self, gc, x, y, s, prop, angle):
         """
         Draw the text rotated 90 degrees, other angles are not supported
@@ -317,7 +312,7 @@ class RendererGDK(RendererBase):
         # problem? - cache gets bigger and bigger, is never cleared out
         # two (not one) layouts are created for every text item s (then they
         # are cached) - why?
-        
+
         key = self.dpi.get(), s, hash(prop)
         value = self.layoutd.get(key)
         if value != None:
@@ -333,9 +328,9 @@ class RendererGDK(RendererBase):
         font.set_weight(self.fontweights[prop.get_weight()])
 
         layout = self.gtkDA.create_pango_layout(s)
-        layout.set_font_description(font)    
+        layout.set_font_description(font)
         inkRect, logicalRect = layout.get_pixel_extents()
-        
+
         self.layoutd[key] = layout, inkRect, logicalRect
         return layout, inkRect, logicalRect
 
@@ -380,7 +375,7 @@ class GraphicsContextGDK(GraphicsContextBase):
         'round'      : gdk.CAP_ROUND,
         }
 
-              
+
     def __init__(self, renderer):
         GraphicsContextBase.__init__(self)
         self.renderer = renderer
@@ -394,7 +389,7 @@ class GraphicsContextGDK(GraphicsContextBase):
         return an allocated gtk.gdk.Color
         """
         try:
-            return self._cached[rgb] 
+            return self._cached[rgb]
         except KeyError:
             color = self._cached[rgb] = \
                     self._cmap.alloc_color(
@@ -417,7 +412,7 @@ class GraphicsContextGDK(GraphicsContextBase):
                      int(w), int(h))
         #rectangle = (int(l), self.renderer.height-int(b+h),
         #             int(w+1), int(h+2))
-        self.gdkGC.set_clip_rectangle(rectangle)        
+        self.gdkGC.set_clip_rectangle(rectangle)
 
 
     def set_dashes(self, dash_offset, dash_list):
@@ -440,7 +435,7 @@ class GraphicsContextGDK(GraphicsContextBase):
     def set_graylevel(self, frac):
         GraphicsContextBase.set_graylevel(self, frac)
         self.gdkGC.foreground = self.rgb_to_gdk_color(self.get_rgb())
-        
+
 
     def set_joinstyle(self, js):
         GraphicsContextBase.set_joinstyle(self, js)
@@ -452,7 +447,7 @@ class GraphicsContextGDK(GraphicsContextBase):
         pixels = self.renderer.points_to_pixels(w)
         self.gdkGC.line_width = max(1, int(round(pixels)))
 
-                                               
+
 def new_figure_manager(num, *args, **kwargs):
     """
     Create a new figure manager instance
@@ -466,72 +461,47 @@ def new_figure_manager(num, *args, **kwargs):
     return manager
 
 
-class FigureCanvasGDK(FigureCanvasBase):
+class FigureCanvasGDK (FigureCanvasBase):
     def __init__(self, figure):
         FigureCanvasBase.__init__(self, figure)
-        self._pixmap_width  = -1
-        self._pixmap_height = -1
-        
+
         self._renderer_init()
 
     def _renderer_init(self):
         self._renderer = RendererGDK (gtk.DrawingArea(), self.figure.dpi)
 
-        
-    def _render_figure(self, width, height):
-        """Render the figure to a gdk.Pixmap, is used for
-           - rendering the pixmap to display        (pylab.draw)
-           - rendering the pixmap to save to a file (pylab.savefig)
-        """
-        if DEBUG: print 'FigureCanvasGDK.%s' % fn_name()
-        create_pixmap = False
-        if width > self._pixmap_width:
-            # increase the pixmap in 10%+ (rather than 1 pixel) steps
-            self._pixmap_width  = max (int (self._pixmap_width  * 1.1), width)
-            create_pixmap = True
-
-        if height > self._pixmap_height:
-            self._pixmap_height = max (int (self._pixmap_height * 1.1), height)
-            create_pixmap = True
-
-        if create_pixmap:
-            if DEBUG: print 'FigureCanvasGTK.%s new pixmap' % fn_name()
-            self._pixmap = gtk.gdk.Pixmap (None, self._pixmap_width,
-                                           self._pixmap_height, depth=24)
-            # gtk backend must use self.window
-            self._renderer._set_pixmap (self._pixmap)
-
-        self._renderer._set_width_height (width, height)
+    def _render_figure(self, pixmap, width, height):
+        self._renderer.set_pixmap (pixmap)
+        self._renderer.set_width_height (width, height)
         self.figure.draw (self._renderer)
-
 
     def print_figure(self, filename, dpi=150, facecolor='w', edgecolor='w',
                      orientation='portrait'):
-        root, ext = os.path.splitext(filename)       
+        root, ext = os.path.splitext(filename)
         ext = ext[1:]
         if ext == '':
             ext      = IMAGE_FORMAT_DEFAULT
-            filename = filename + '.' + ext        
+            filename = filename + '.' + ext
 
-        self.figure.dpi.set(dpi)        
+        self.figure.dpi.set(dpi)
         self.figure.set_facecolor(facecolor)
         self.figure.set_edgecolor(edgecolor)
 
         ext = ext.lower()
         if ext in ('jpg', 'png'):          # native printing
-            width, height = self.figure.get_width_height()
-            width, height = int(width), int(height)
-            self._render_figure(width, height)
+            width, height = self.get_width_height()
+            pixmap = gtk.gdk.Pixmap (None, width, height, depth=24)
+            self._render_figure(pixmap, width, height)
 
             # jpg colors don't match the display very well, png colors match
             # better
             pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, 0, 8,
                                     width, height)
-            pixbuf.get_from_drawable(self._pixmap, self._renderer._cmap,
+            pixbuf.get_from_drawable(pixmap, pixmap.get_colormap(),
                                      0, 0, 0, 0, width, height)
-        
+
             # pixbuf.save() recognises 'jpeg' not 'jpg'
-            if ext == 'jpg': ext = 'jpeg' 
+            if ext == 'jpg': ext = 'jpeg'
 
             pixbuf.save(filename, ext)
 
@@ -541,11 +511,11 @@ class FigureCanvasGDK(FigureCanvasBase):
             else:
                 from backend_ps  import FigureCanvasPS  as FigureCanvas
 
-            
+
             fc = self.switch_backends(FigureCanvas)
             fc.print_figure(filename, dpi, facecolor, edgecolor, orientation)
         elif ext in ('bmp', 'raw', 'rgb',):
-            
+
             from backend_agg import FigureCanvasAgg  as FigureCanvas
             fc = self.switch_backends(FigureCanvas)
             fc.print_figure(filename, dpi, facecolor, edgecolor, orientation)

@@ -49,7 +49,7 @@ clean-patched: patch
 	python2.3 ./setup.py clean --all
 	python2.4 ./setup.py clean --all
 	-rm -f *-stamp
-	-rm -rf build *.pyc *.pyo *.pdf doc
+	-rm -rf build *.pyc *.pyo *.pdf doc/html/
 	find ./lib -name '*.pyc' -exec rm {} \;
 	dh_clean
 	sh $(CURDIR)/debian/mkcopyright.sh
@@ -63,14 +63,14 @@ install-arch: build-arch
 	python2.3 ./setup.py install_lib \
 		-d $(CURDIR)/debian/$(p23)/usr/lib/python2.3/site-packages/ --no-compile
 	#python2.3 ./setup.py install_scripts \
-		-d $(CURDIR)/debian/$(p23)/usr/lib/python2.3/site-packages/
+	#	-d $(CURDIR)/debian/$(p23)/usr/lib/python2.3/site-packages/
 	dh_install -p$(p23) lib/dateutil usr/lib/python2.3/site-packages/
 	dh_install -p$(p23) lib/pytz usr/lib/python2.3/site-packages/
 
 	python2.4 ./setup.py install_lib \
 		-d $(CURDIR)/debian/$(p24)/usr/lib/python2.4/site-packages/ --no-compile
 	#python2.4 ./setup.py install_scripts \
-		-d $(CURDIR)/debian/$(p24)/usr/lib/python2.4/site-packages/
+	#	-d $(CURDIR)/debian/$(p24)/usr/lib/python2.4/site-packages/
 	dh_install -p$(p24) lib/dateutil usr/lib/python2.4/site-packages/
 	dh_install -p$(p24) lib/pytz usr/lib/python2.4/site-packages/
 
@@ -78,13 +78,16 @@ install-indep: build-indep
 	dh_testdir -i
 	dh_testroot -i
 	dh_clean -k
-	python ./setup.py install_data -d $(CURDIR)/debian/$(pdata)/usr/
-	rm $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/Vera*.ttf
+	python ./setup.py install_data -d $(CURDIR)/debian/$(pdata)/usr/share
+
+	rm $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/Vera*.ttf
+
 	# make svg images not executable:
-	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/*.svg
+	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/*.svg
+
 	# move .matplotlibrc to /etc
 	mkdir $(CURDIR)/debian/$(pdata)/etc/
-	mv $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/.matplotlibrc \
+	mv $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/matplotlibrc \
 		$(CURDIR)/debian/$(pdata)/etc/matplotlibrc
 
 # binary

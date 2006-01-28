@@ -6,7 +6,8 @@ A PostScript backend, which can produce both PostScript .ps and
 from __future__ import division
 import glob, math, md5, os, shutil, sys, time
 def _fn_name(): return sys._getframe(1).f_code.co_name
-    
+
+from tempfile import gettempdir
 from cStringIO import StringIO
 from matplotlib import verbose, __version__, rcParams, get_data_path
 from matplotlib._pylab_helpers import Gcf
@@ -146,6 +147,7 @@ class RendererPS(RendererBase):
         self.linedash = None
         self.fontname = None
         self.fontsize = None
+        self.hatch = None
 
     def set_color(self, r, g, b, store=1):
         if (r,g,b) != self.color:
@@ -193,6 +195,57 @@ class RendererPS(RendererBase):
             self.fontname = fontname
             self.fontsize = fontsize
 
+    def set_hatch(self, hatch):
+        """
+        hatch can be one of:
+        /   - diagonal hatching
+        \   - back diagonal
+        |   - vertical
+        -   - horizontal
+        #   - crossed
+        X   - crossed diagonal
+        letters can be combined, in which case all the specified
+        hatchings are done
+        if same letter repeats, it increases the density of hatching
+        in that direction
+        """
+        hatches = {'horiz':0, 'vert':0, 'diag1':0, 'diag2':0}
+ 
+        for letter in hatch:
+            if   (letter == '/'):    hatches['diag2'] += 1
+            elif (letter == '\\'):   hatches['diag1'] += 1
+            elif (letter == '|'):    hatches['vert']  += 1
+            elif (letter == '-'):    hatches['horiz'] += 1
+            elif (letter == '+'):
+                hatches['horiz'] += 1
+                hatches['vert'] += 1
+            elif (letter == 'x'):
+                hatches['diag1'] += 1
+                hatches['diag2'] += 1
+ 
+        def do_hatch(angle, density):
+            if (density == 0): return ""
+            return """\
+  gsave
+   eoclip %s rotate 0.0 0.0 0.0 0.0 setrgbcolor 0 setlinewidth
+   /hatchgap %d def
+   pathbbox /hatchb exch def /hatchr exch def /hatcht exch def /hatchl exch def
+   hatchl cvi hatchgap idiv hatchgap mul
+   hatchgap
+   hatchr cvi hatchgap idiv hatchgap mul
+   {hatcht moveto 0 hatchb hatcht sub rlineto}
+   for
+   stroke
+  grestore
+ """ % (angle, 12/density)
+        self._pswriter.write("gsave\n")
+        self._pswriter.write(do_hatch(0, hatches['horiz']))
+        self._pswriter.write(do_hatch(90, hatches['vert']))
+        self._pswriter.write(do_hatch(45, hatches['diag1']))
+        self._pswriter.write(do_hatch(-45, hatches['diag2']))
+        self._pswriter.write("grestore\n")
+ 
+
     def get_canvas_width_height(self):
         'return the canvas width and height in display coords'
         return self.width, self.height
@@ -211,6 +264,11 @@ class RendererPS(RendererBase):
             #print s, w, h
             return w, h
 
+        if ismath:
+            width, height, pswriter = math_parse_s_ps(
+                s, 72, prop.get_size_in_points())
+            return width, height
+
         if rcParams['ps.useafm']:
             if ismath: s = s[1:-1]
             font = self._get_font_afm(prop)
@@ -220,12 +278,6 @@ class RendererPS(RendererBase):
             w *= 0.001*fontsize
             h *= 0.001*fontsize
             return w, h
-
-            
-        if ismath:
-            width, height, pswriter = math_parse_s_ps(
-                s, 72, prop.get_size_in_points())
-            return width, height
 
         font = self._get_font_ttf(prop)
         font.set_text(s, 0.0)
@@ -273,18 +325,19 @@ class RendererPS(RendererBase):
                                          0.5*width, 0.5*height, x, y)
         self._draw_ps(ps, gc, rgbFace, "arc")
 
-    def _rgba(self, im, flipud):
-        return im.as_str(fliud)
+    def _rgba(self, im):
+        return im.as_rgba_str()
     
-    def _rgb(self, im, flipud):
-        rgbat = im.as_str(flipud)
-        rgba = fromstring(rgbat[2], UInt8)
-        rgba.shape = (rgbat[0], rgbat[1], 4)
+    def _rgb(self, im):
+        h,w,s = im.as_rgba_str()
+        
+        rgba = fromstring(s, UInt8)
+        rgba.shape = (h, w, 4)
         rgb = rgba[:,:,:3]
-        return rgbat[0], rgbat[1], rgb.tostring()
+        return h, w, rgb.tostring()
 
-    def _gray(self, im, flipud, rc=0.3, gc=0.59, bc=0.11):
-        rgbat = im.as_str(flipud)
+    def _gray(self, im, rc=0.3, gc=0.59, bc=0.11):
+        rgbat = im.as_rgba_str()
         rgba = fromstring(rgbat[2], UInt8)
         rgba.shape = (rgbat[0], rgbat[1], 4)
         rgba_f = rgba.astype(Float32)
@@ -303,26 +356,23 @@ class RendererPS(RendererBase):
             lines.append(s[i:limit])
         return lines
 
-    def draw_image(self, x, y, im, origin, bbox):
+    def draw_image(self, x, y, im, bbox):
         """
         Draw the Image instance into the current axes; x is the
-        distance in pixels from the left hand side of the canvas. y is
-        the distance from the origin.  That is, if origin is upper, y
-        is the distance from top.  If origin is lower, y is the
-        distance from bottom
-
-        origin is 'upper' or 'lower'
+        distance in pixels from the left hand side of the canvas and y
+        is the distance from bottom
 
         bbox is a matplotlib.transforms.BBox instance for clipping, or
         None
         """
 
-        flipud = origin=='lower'
+        im.flipud_out()
+
         if im.is_grayscale:
-            h, w, bits = self._gray(im, flipud)
+            h, w, bits = self._gray(im)
             imagecmd = "image"
         else:
-            h, w, bits = self._rgb(im, flipud)
+            h, w, bits = self._rgb(im)
             imagecmd = "false 3 colorimage"
         hexlines = '\n'.join(self._hex_lines(bits))
 
@@ -330,10 +380,11 @@ class RendererPS(RendererBase):
 
         figh = self.height*72
         #print 'values', origin, flipud, figh, h, y
+
         if bbox is not None:
             clipx,clipy,clipw,cliph = bbox.get_bounds()
             clip = '%s clipbox' % _nums_to_str(clipw, cliph, clipx, clipy)
-        if not flipud: y = figh-(y+h)
+        #y = figh-(y+h)
         ps = """gsave
 %(clip)s
 %(x)s %(y)s translate
@@ -347,7 +398,10 @@ currentfile DataString readhexstring pop
 grestore
 """ % locals()
         self._pswriter.write(ps)
-    
+
+        # unflip
+        im.flipud_out()
+
     def draw_line(self, gc, x0, y0, x1, y1):
         """
         Draw a single line from x0,y0 to x1,y1
@@ -608,7 +662,13 @@ grestore
         if debugPS:
             write("% text\n")
 
-        if rcParams['ps.useafm']:
+        if ismath=='TeX':
+            return self.tex(gc, x, y, s, prop, angle)
+
+        elif ismath:
+            return self.draw_mathtext(gc, x, y, s, prop, angle)
+
+        elif rcParams['ps.useafm']:
             if ismath: s = s[1:-1]
             font = self._get_font_afm(prop)
 
@@ -642,12 +702,6 @@ show
 grestore
     """ % locals()
             self._draw_ps(ps, gc, None)
-
-        elif ismath=='TeX':
-            return self.tex(gc, x, y, s, prop, angle)
-
-        elif ismath:
-            return self.draw_mathtext(gc, x, y, s, prop, angle)
 
         elif isinstance(s, unicode):
             return self.draw_unicode(gc, x, y, s, prop, angle)
@@ -762,6 +816,7 @@ grestore
         cint = {'butt':0, 'round':1, 'projecting':2}[gc.get_capstyle()]
         self.set_linecap(cint)
         self.set_linedash(*gc.get_dashes())
+
         if cliprect:
             x,y,w,h=cliprect
             write('gsave\n%1.3f %1.3f %1.3f %1.3f clipbox\n' % (w,h,x,y))
@@ -773,6 +828,10 @@ grestore
             write("gsave\n")
             self.set_color(store=0, *rgbFace)
             write("fill\ngrestore\n")
+
+        hatch = gc.get_hatch()
+        if (hatch):
+            self.set_hatch(hatch)
 
         write("stroke\n")
         if cliprect:
@@ -935,14 +994,18 @@ class FigureCanvasPS(FigureCanvasBase):
                 # need to make some temporary files so latex can run without
                 # writing over something important.
                 m = md5.md5(outfile)
-                tmpname = m.hexdigest()
+                tempdir = gettempdir()
+                os.environ['TEXMFOUTPUT'] = tempdir
+                tmpname = os.path.join(tempdir, m.hexdigest())
                 epsfile = tmpname + '.eps'
                 psfile = tmpname + '.ps'
                 texfile = tmpname + '.tex'
                 dvifile = tmpname + '.dvi'
                 latexh = file(texfile, 'w')
                 fh = file(epsfile, 'w')
-            else: fh = file(outfile, 'w')
+            else:
+                fh = file(outfile, 'w')
+            
             isEPSF = ext.lower().startswith('.ep') or rcParams['text.usetex']
             needsClose = True
             title = outfile
@@ -1076,43 +1139,89 @@ class FigureCanvasPS(FigureCanvasBase):
 \end{center}
 \end{figure}
 \end{document}
-"""% (fontpackage, pw, ph, pw-2, ph-2, pw, ph, '\n'.join(renderer.psfrag), epsfile)
-
+"""% (fontpackage, pw, ph, pw-2, ph-2, pw, ph, '\n'.join(renderer.psfrag),
+                os.path.split(epsfile)[-1])
             latexh.close()
-
-            command = "latex -interaction=nonstopmode '%s'" % texfile
+            curdir = os.getcwd()
+            os.chdir(tempdir)
+            command = 'latex -interaction=nonstopmode "%s"' % texfile
+            verbose.report(command, 'debug-annoying')
             stdin, stdout, stderr = os.popen3(command)
-            verbose.report(''.join(stdout.readlines()), 'debug-annoying')
-            verbose.report(''.join(stderr.readlines()), 'helpful')
-            command = 'dvips -R -T %fin,%fin -o %s %s' % (pw, ph, psfile, dvifile)
+            verbose.report(stdout.read(), 'debug-annoying')
+            verbose.report(stderr.read(), 'helpful')
+            command = 'dvips -R -T %fin,%fin -o "%s" "%s"' % (pw, ph, psfile, dvifile)
+            verbose.report(command, 'debug-annoying')
             stdin, stdout, stderr = os.popen3(command)
-            verbose.report(''.join(stdout.readlines()), 'debug-annoying')
-            verbose.report(''.join(stderr.readlines()), 'helpful')
+            verbose.report(stdout.read(), 'debug-annoying')
+            verbose.report(stderr.read(), 'helpful')
             os.remove(epsfile)
-            if ext.startswith('.ep'):
-                dpi = rcParams['ps.distiller.res']
-                command = 'gs -dBATCH -dNOPAUSE -dSAFER -r%d -sDEVICE=epswrite '% dpi + \
-                          '-dLanguageLevel=2 -dEPSFitPage -sOutputFile=%s %s'% (epsfile, psfile)
-                stdin, stdout, stderr = os.popen3(command)
-                verbose.report(''.join(stdout.readlines()), 'debug-annoying')
-                verbose.report(''.join(stderr.readlines()), 'helpful')
-                shutil.move(epsfile, outfile)
-            else: shutil.move(psfile, outfile)
-            cleanup = glob.glob(tmpname+'.*')
-            for fname in cleanup: os.remove(fname)
-                
-        if rcParams['ps.usedistiller']:
-            dpi = rcParams['ps.distiller.res']
-            m = md5.md5(outfile)
-            tmpfile = m.hexdigest()
-            if ext.startswith('ep'):
-                command = 'eps2eps -dSAFER -r%d %s %s'% (dpi, outfile, tmpfile)
+            os.chdir(curdir)
+            
+            if rcParams['ps.usedistiller'] == 'xpdf':
+                pdffile = tmpname + '.pdf'
+                if ext.startswith('.ep'):
+                    command = 'ps2pdf "%s" "%s"'% (psfile, pdffile)
+                    os.system(command)
+                    command = 'pdftops -level2 "%s" "%s"'% (pdffile, psfile)
+                    os.system(command)
+                    os.remove(pdffile)
+                    command = 'ps2eps -l "%s"'% psfile
+                    stdin, stderr = os.popen4(command)
+                    verbose.report(stderr.read(), 'helpful')
+                    shutil.move(epsfile, outfile)
+                else:
+                    command = 'ps2pdf "%s" "%s"'% (psfile, pdffile)
+                    stdin, stderr = os.popen4(command)
+                    verbose.report(stderr.read(), 'helpful')
+                    os.remove(psfile)
+                    command = 'pdftops -paperw %d -paperh %d -level2 "%s" "%s"'% \
+                                (int(pw*72), int(ph*72), pdffile, psfile)
+                    os.system(command)
+                    shutil.move(psfile, outfile)
             else:
-                command = 'ps2ps -dSAFER -r%d %s %s'% (dpi, outfile, tmpfile)
-            stdin, stdout, stderr = os.popen3(command)
-            verbose.report(''.join(stdout.readlines()), 'debug-annoying')
-            verbose.report(''.join(stderr.readlines()), 'helpful')
-            shutil.move(tmpfile, outfile)
+                if ext.startswith('.ep'):
+                    dpi = rcParams['ps.distiller.res']
+                    if sys.platform == 'win32':
+                        command = 'gswin32c -dBATCH -dNOPAUSE -dSAFER -r%d \
+                          -sDEVICE=epswrite -dLanguageLevel=2 -dEPSFitPage \
+                          -sOutputFile="%s" "%s"'% (dpi, epsfile, psfile)
+                    else:
+                        command = 'gs -dBATCH -dNOPAUSE -dSAFER -r%d \
+                        -sDEVICE=epswrite -dLanguageLevel=2 -dEPSFitPage \
+                        -sOutputFile="%s" "%s"'% (dpi, epsfile, psfile)
+                    verbose.report(command, 'debug-annoying')
+                    stdin, stdout, stderr = os.popen3(command)
+                    verbose.report(stdout.read(), 'debug-annoying')
+                    verbose.report(stderr.read(), 'helpful')
+                    shutil.move(epsfile, outfile)
+                else: # for standard postscript:
+                    if rcParams['ps.usedistiller'] == 'ghostscript':
+                        command = 'ps2ps -dSAFER -r%d "%s" "%s"'% (dpi, psfile, outfile)
+                        verbose.report(command, 'debug-annoying')
+                        stdin, stdout, stderr = os.popen3(command)
+                        verbose.report(stdout.read(), 'debug-annoying')
+                        verbose.report(stderr.read(), 'helpful')
+                    else:
+                        shutil.move(psfile, outfile)
+
+            for fname in glob.glob(tmpname+'.*'):
+                os.remove(fname)
+                
+        elif not rcParams['text.usetex']:
+            if rcParams['ps.usedistiller'] == 'ghostscript':
+                dpi = rcParams['ps.distiller.res']
+                m = md5.md5(outfile)
+                tmpfile = m.hexdigest()
+                if ext.startswith('ep'):
+                    command = 'eps2eps -dSAFER -r%d "%s" "%s"'% (dpi, outfile, tmpfile)
+                else:
+                    command = 'ps2ps -dSAFER -r%d "%s" "%s"'% (dpi, outfile, tmpfile)
+                verbose.report(command, 'debug-annoying')
+                stdin, stdout, stderr = os.popen3(command)
+                verbose.report(stdout.read(), 'debug-annoying')
+                verbose.report(stderr.read(), 'helpful')
+                shutil.move(tmpfile, outfile)
+
 
 class FigureManagerPS(FigureManagerBase):
     pass

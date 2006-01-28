@@ -149,7 +149,11 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
 
     def draw(self):
         FigureCanvasAgg.draw(self)
-        tkagg.blit(self._tkphoto, self.renderer._renderer, 2)
+        tkagg.blit(self._tkphoto, self.renderer._renderer, colormode=2)
+        self._master.update_idletasks()
+
+    def blit(self, bbox=None):
+        tkagg.blit(self._tkphoto, self.renderer._renderer, bbox=bbox, colormode=2)
         self._master.update_idletasks()
 
     show = draw
@@ -608,6 +612,33 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
         canvas.get_tk_widget().pack(side=Tk.TOP, fill=Tk.BOTH, expand=1)
 
     def save_figure(self):
+        from tkFileDialog import asksaveasfilename
+
+        fname = asksaveasfilename(
+            master=self.window,
+            title='Save the figure',
+            filetypes=[
+            ('Portable Network Graphics','*.png'),
+            ('Encapsulated Postscript File','*.eps'),
+            ('Scalable Vector Graphics','*.svg'),
+
+            ])
+
+        if fname == "" :
+            return
+        else:
+            bname, fext = os.path.splitext(fname)
+            if fext == '': # No extension provided
+                fext = '.png' # Assume png
+                fname += fext
+            if (fext.lower()=='.png'):
+                self.canvas.print_figure(fname, dpi=300)
+            elif (fext.lower()=='.eps'):
+                self.canvas.print_figure(fname)
+            elif (fext.lower()=='.svg'):
+                self.canvas.print_figure(fname)
+
+    def _save_figure(self):
         fs = FileDialog.SaveFileDialog(master=self.window,
                                        title='Save the figure')
         try:

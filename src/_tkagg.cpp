@@ -1,6 +1,6 @@
 /*
  * The Python Imaging Library.
- * $Id: _tkagg.cpp,v 1.6 2004/05/28 17:05:48 jaytmiller Exp $ 
+ * $Id: _tkagg.cpp,v 1.12 2005/12/06 18:33:17 efiring Exp $
  *
  */
 
@@ -12,7 +12,9 @@
 #include <Python.h>
 #include <stdlib.h>
 
+#include "agg_basics.h"
 #include "_backend_agg.h"
+#include "_transforms.h"
 
 extern "C" {
 #ifdef __APPLE__
@@ -20,10 +22,10 @@ extern "C" {
 #     include <Tcl/tcl.h>
 #     include <Tk/tk.h>
 #  else
-#     include <tk.h> 
+#     include <tk.h>
 #  endif
 #else
-#  include <tk.h> 
+#  include <tk.h>
 #endif
 };
 
@@ -42,9 +44,16 @@ PyAggImagePhoto(ClientData clientdata, Tcl_Interp* interp,
     Tk_PhotoImageBlock block;
     PyObject* aggo;
 
+    // vars for blitting
+    PyObject* bboxo;
+    Bbox* bbox;
+    agg::int8u *destbuffer;
+    double l,b,r,t;
+    int destx, desty, destwidth, destheight, deststride;
+
     long mode;
     long nval;
-    if (argc != 4) {
+    if (argc != 5) {
         Tcl_AppendResult(interp, "usage: ", argv[0],
                          " destPhoto srcImage", (char *) NULL);
         return TCL_ERROR;
@@ -59,6 +68,9 @@ PyAggImagePhoto(ClientData clientdata, Tcl_Interp* interp,
     /* get array (or object that can be converted to array) pointer */
     aggo = (PyObject*)atol(argv[2]);
     RendererAgg *aggRenderer = (RendererAgg *)aggo;
+    int srcstride = aggRenderer->get_width()*4;
+    int srcwidth = (int)aggRenderer->get_width();
+    int srcheight = (int)aggRenderer->get_height();
 
     /* XXX insert aggRenderer type check */
 
@@ -67,6 +79,40 @@ PyAggImagePhoto(ClientData clientdata, Tcl_Interp* interp,
     if ((mode != 0) && (mode != 1) && (mode != 2)) {
         Tcl_AppendResult(interp, "illegal image mode", (char *) NULL);
         return TCL_ERROR;
+    }
+
+    /* check for bbox/blitting */
+    bboxo = (PyObject*)atol(argv[4]);
+    if (bboxo != Py_None) {
+      bbox = (Bbox*)bboxo;
+      l = bbox->ll_api()->x_api()->val();
+      b = bbox->ll_api()->y_api()->val();
+      r = bbox->ur_api()->x_api()->val();
+      t = bbox->ur_api()->y_api()->val();
+
+      destx = (int)l;
+      desty = srcheight-(int)t;
+      destwidth = (int)(r-l);
+      destheight = (int)(t-b);
+      deststride = 4*destwidth;
+
+      destbuffer = new agg::int8u[deststride*destheight];
+      if (destbuffer == NULL) {
+	throw Py::MemoryError("_tkagg could not allocate memory for destbuffer");
+      }
+
+      agg::rendering_buffer destrbuf;
+      destrbuf.attach(destbuffer, destwidth, destheight, deststride);
+      pixfmt destpf(destrbuf);
+      renderer_base destrb(destpf);
+
+      agg::rect_base<int> region(destx, desty, (int)r, srcheight-(int)b);
+      destrb.copy_from(*aggRenderer->renderingBuffer, &region,
+		       -destx, -desty);
+    } else {
+      bbox = NULL;
+      destbuffer = NULL;
+      destx = desty = destwidth = destheight = deststride = 0;
     }
 
     /* setup tkblock */
@@ -87,16 +133,29 @@ PyAggImagePhoto(ClientData clientdata, Tcl_Interp* interp,
             block.pixelSize = 4;
             nval = 4;
         }
-    }    
-    block.width  = aggRenderer->get_width();
-    block.height = aggRenderer->get_height();
-    //std::cout << "w,h: " << block.width << " " << block.height << std::endl;
-    block.pitch = block.width * nval;
-    block.pixelPtr =  aggRenderer->pixBuffer;
-    /* Clear current contents */
-    Tk_PhotoBlank(photo);
-    /* Copy opaque block to photo image, and leave the rest to TK */
-    Tk_PhotoPutBlock(photo, &block, 0, 0, block.width, block.height);
+    }
+
+    if (bbox) {
+
+      block.width  = destwidth;
+      block.height = destheight;
+      block.pitch = deststride;
+      block.pixelPtr = destbuffer;
+
+      Tk_PhotoPutBlock(photo, &block, destx, desty, destwidth, destheight);
+      delete [] destbuffer;
+
+    } else {
+      block.width  = aggRenderer->get_width();
+      block.height = aggRenderer->get_height();
+      block.pitch = block.width * nval;
+      block.pixelPtr =  aggRenderer->pixBuffer;
+
+      /* Clear current contents */
+      Tk_PhotoBlank(photo);
+      /* Copy opaque block to photo image, and leave the rest to TK */
+      Tk_PhotoPutBlock(photo, &block, 0, 0, block.width, block.height);
+    }
 
     return TCL_OK;
 }
@@ -111,7 +170,7 @@ _pyobj_addr(PyObject* self, PyObject* args)
   return Py_BuildValue("l", (long) pyobj);
 }
 
-static PyObject* 
+static PyObject*
 _tkinit(PyObject* self, PyObject* args)
 {
     Tcl_Interp* interp;
@@ -133,7 +192,7 @@ _tkinit(PyObject* self, PyObject* args)
 
     /* This will bomb if interp is invalid... */
 
-    Tcl_CreateCommand(interp, "PyAggImagePhoto", 
+    Tcl_CreateCommand(interp, "PyAggImagePhoto",
 		      (Tcl_CmdProc *) PyAggImagePhoto,
                       (ClientData) 0, (Tcl_CmdDeleteProc*) NULL);
 

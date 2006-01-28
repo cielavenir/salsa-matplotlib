@@ -2,17 +2,15 @@
 Render to gtk from agg
 """
 from __future__ import division
-
 import os
+
 import matplotlib
 from matplotlib.figure import Figure
-
 from backend_agg import FigureCanvasAgg
 from backend_gtk import gtk, FigureManagerGTK, FigureCanvasGTK,\
      show, draw_if_interactive,\
      error_msg_gtk, NavigationToolbar, PIXELS_PER_INCH, backend_version, \
      NavigationToolbar2GTK
-
 from _gtkagg import agg_to_gtk_drawable
 
 
@@ -43,11 +41,12 @@ def new_figure_manager(num, *args, **kwargs):
     thisFig = Figure(*args, **kwargs)
     canvas = FigureCanvasGTKAgg(thisFig)
     return FigureManagerGTKAgg(canvas, num)
-
+    if DEBUG: print 'backend_gtkagg.new_figure_manager done'
 
 class FigureCanvasGTKAgg(FigureCanvasGTK, FigureCanvasAgg):
 
     def configure_event(self, widget, event=None):
+
         if DEBUG: print 'FigureCanvasGTKAgg.configure_event'
         if widget.window is None:
             return 
@@ -63,39 +62,36 @@ class FigureCanvasGTKAgg(FigureCanvasGTK, FigureCanvasAgg):
         winch = w/dpival
         hinch = h/dpival
         self.figure.set_figsize_inches(winch, hinch)
-        self._draw_pixmap = True
-        
+        self._need_redraw = True
+        self.resize_event()
         if DEBUG: print 'FigureCanvasGTKAgg.configure_event end'        
         return True
     
-
-    def _render_figure(self, width, height):
-        """Render the figure to a gdk.Pixmap, used by expose_event().
-        """
-        if DEBUG: print 'FigureCanvasGTKAgg._render_figure'
-        create_pixmap = False
-        if width > self._pixmap_width:
-            # increase the pixmap in 10%+ (rather than 1 pixel) steps
-            self._pixmap_width  = max (int (self._pixmap_width  * 1.1), width)
-            create_pixmap = True
-
-        if height > self._pixmap_height:
-            self._pixmap_height = max (int (self._pixmap_height * 1.1), height)
-            create_pixmap = True
-
-        if create_pixmap:
-            if DEBUG: print 'FigureCanvasGTK._render_figure new pixmap'
-            self._pixmap = gtk.gdk.Pixmap (self.window, self._pixmap_width,
-                                           self._pixmap_height)
-
+    def _render_figure(self, pixmap, width, height):
+        if DEBUG: print 'FigureCanvasGTKAgg.render_figure'
         FigureCanvasAgg.draw(self)
-        agg_to_gtk_drawable(self._pixmap, self.renderer._renderer)
+        if DEBUG: print 'FigureCanvasGTKAgg.render_figure pixmap', pixmap
+        #agg_to_gtk_drawable(pixmap, self.renderer._renderer, None)
 
-    def blit(self):
-        agg_to_gtk_drawable(self._pixmap, self.renderer._renderer)
-        self.window.set_back_pixmap (self._pixmap, False)
-        self.window.clear()  # draw pixmap as the gdk.Window's bg
-        self._draw_pixmap = False
+        buf = self.buffer_rgba(0,0)
+        ren = self.get_renderer()
+        w = int(ren.width)
+        h = int(ren.height)
+        pixbuf = gtk.gdk.pixbuf_new_from_data(
+            buf, gtk.gdk.COLORSPACE_RGB,  True, 8, w, h, w*4)
+        pixmap.draw_pixbuf(pixmap.new_gc(), pixbuf, 0, 0, 0, 0, w, h, gtk.gdk.RGB_DITHER_NONE, 0, 0)
+        if DEBUG: print 'FigureCanvasGTKAgg.render_figure done'
+
+    def blit(self, bbox=None):
+        if DEBUG: print 'FigureCanvasGTKAgg.blit'
+        if DEBUG: print 'FigureCanvasGTKAgg.blit', self._pixmap
+        agg_to_gtk_drawable(self._pixmap, self.renderer._renderer, bbox)
+
+        x, y, w, h = self.allocation
+
+        self.window.draw_drawable (self.style.fg_gc[self.state], self._pixmap,
+                                   0, 0, 0, 0, w, h)
+        if DEBUG: print 'FigureCanvasGTKAgg.done'
 
     def print_figure(self, filename, dpi=150,
                      facecolor='w', edgecolor='w',
@@ -111,8 +107,21 @@ class FigureCanvasGTKAgg(FigureCanvasGTK, FigureCanvasAgg):
             
         else:
             agg = self.switch_backends(FigureCanvasAgg)
-            try: agg.print_figure(filename, dpi, facecolor, edgecolor, orientation)
+            try:
+                agg.print_figure(filename, dpi, facecolor, edgecolor, orientation)
             except IOError, msg:
                 error_msg_gtk('Failed to save\nError message: %s'%(msg,), self)
 
         self.figure.set_canvas(self)
+        if DEBUG: print 'FigureCanvasGTKAgg.print_figure done'
+
+
+
+"""\
+Traceback (most recent call last):
+  File "/home/titan/johnh/local/lib/python2.3/site-packages/matplotlib/backends/backend_gtk.py", line 304, in expose_event
+    self._render_figure(self._pixmap, w, h)
+  File "/home/titan/johnh/local/lib/python2.3/site-packages/matplotlib/backends/backend_gtkagg.py", line 77, in _render_figure
+    pixbuf = gtk.gdk.pixbuf_new_from_data(
+ValueError: data length (3156672) is less then required by the other parameters (3160608)
+"""

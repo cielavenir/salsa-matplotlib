@@ -11,7 +11,7 @@
     was written by following the Python "Extending and Embedding"
     tutorial.
 
-  $Id: cntr.c,v 1.3 2005/06/02 22:02:32 jdh2358 Exp $
+  $Id: cntr.c,v 1.8 2006/01/20 18:36:58 cmoad Exp $
  */
 
 #include <Python.h>
@@ -22,7 +22,11 @@
 #ifdef NUMARRAY
 #include "numarray/arrayobject.h"
 #else
+#ifdef NUMERIC
 #include "Numeric/arrayobject.h"
+#else
+#include "numpy/arrayobject.h"
+#endif
 #endif
 
 
@@ -1373,7 +1377,7 @@ build_cntr_list_v(long *np, double *xp, double *yp, int nparts, long ntotal)
 */
 
 PyObject *
-cntr_trace(Csite *site, double levels[], int nlevels, int points)
+cntr_trace(Csite *site, double levels[], int nlevels, int points, long nchunk)
 {
     PyObject *c_list;
     double *xp0;
@@ -1381,7 +1385,7 @@ cntr_trace(Csite *site, double levels[], int nlevels, int points)
     long *nseg0;
     int iseg;
 
-    long nchunk = 30; /* hardwired for now */
+    /* long nchunk = 30; was hardwired */
     long n;
     long nparts = 0;
     long ntotal = 0;
@@ -1621,16 +1625,17 @@ Cntr_trace(Cntr *self, PyObject *args, PyObject *kwds)
     double levels[2] = {0.0, -1e100};
     int nlevels = 2;
     int points = 0;
-    static char *kwlist[] = {"level0", "level1", "points", NULL};
+    long nchunk = 0L;
+    static char *kwlist[] = {"level0", "level1", "points", "nchunk", NULL};
 
-    if (! PyArg_ParseTupleAndKeywords(args, kwds, "d|di", kwlist,
-                                      levels, levels+1, &points))
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "d|dil", kwlist,
+                                      levels, levels+1, &points, &nchunk))
     {
         return NULL;
     }
     if (levels[1] == -1e100 || levels[1] <= levels[0])
         nlevels = 1;
-    return cntr_trace(self->site, levels, nlevels, points);
+    return cntr_trace(self->site, levels, nlevels, points, nchunk);
 }
 
 static PyMethodDef Cntr_methods[] = {
@@ -1642,6 +1647,8 @@ static PyMethodDef Cntr_methods[] = {
      "        the levels.\n"
      "    Optional argument: points; if 0 (default), return a list of\n"
      "        vector pairs; otherwise, return a list of lists of points.\n"
+     "    Optional argument: nchunk; approximate number of grid points\n"
+     "        per chunk. 0 (default) for no chunking.\n"
     },
     {NULL}  /* Sentinel */
 };
@@ -1694,7 +1701,11 @@ static PyMethodDef module_methods[] = {
 
 
 #ifdef NUMARRAY
+#if PY_MINOR_VERSION > 2
 PyMODINIT_FUNC
+#else
+DL_EXPORT(void)
+#endif
 init_na_cntr(void)
 {
     PyObject* m;
@@ -1712,9 +1723,13 @@ init_na_cntr(void)
     Py_INCREF(&CntrType);
     PyModule_AddObject(m, "Cntr", (PyObject *)&CntrType);
 }
-
-#else
+#endif
+#ifdef NUMERIC
+#if PY_MINOR_VERSION > 2
 PyMODINIT_FUNC
+#else
+DL_EXPORT(void)
+#endif
 init_nc_cntr(void)
 {
     PyObject* m;
@@ -1732,7 +1747,31 @@ init_nc_cntr(void)
     Py_INCREF(&CntrType);
     PyModule_AddObject(m, "Cntr", (PyObject *)&CntrType);
 }
+#endif
 
+#ifdef SCIPY
+#if PY_MINOR_VERSION > 2
+PyMODINIT_FUNC
+#else
+DL_EXPORT(void)
+#endif
+init_ns_cntr(void)
+{
+    PyObject* m;
+
+    if (PyType_Ready(&CntrType) < 0)
+        return;
+
+    m = Py_InitModule3("_ns_cntr", module_methods,
+                       "Contouring engine as an extension type (Scipy).");
+
+    if (m == NULL)
+      return;
+
+    import_array();
+    Py_INCREF(&CntrType);
+    PyModule_AddObject(m, "Cntr", (PyObject *)&CntrType);
+}
 #endif
 
 

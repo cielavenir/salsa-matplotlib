@@ -33,11 +33,12 @@ License   : matplotlib license (PSF compatible)
             see license/LICENSE_TTFQUERY.
 """
 
-import os, sys, glob, warnings
+import os, sys, glob, warnings, shutil
 import matplotlib
 from matplotlib import afm
 from matplotlib import ft2font
-from matplotlib import rcParams, get_data_path, get_home
+from matplotlib import rcParams, get_data_path, get_home, get_configdir
+
 
 verbose = matplotlib.verbose
 
@@ -61,11 +62,12 @@ MSFontDirectories   = [
 X11FontDirectories  = [
     # what seems to be the standard installation point
     "/usr/X11R6/lib/X11/fonts/TTF/",
+    # documented as a good place to install new fonts...
+    "/usr/share/fonts/",
     # common application, not really useful
     "/usr/lib/openoffice/share/fonts/truetype/",
-    # documented as a good place to install new fonts...
-    "/usr/share/fonts/"]
-    
+    ]
+
 OSXFontDirectories = [
     "/Library/Fonts/",
     "/Network/Library/Fonts/",
@@ -126,7 +128,7 @@ returned by default with AFM fonts as an option.
                     continue
                 except WindowsError:
                     continue
-                        
+
             return items.keys()
         finally:
             _winreg.CloseKey(local)
@@ -150,7 +152,7 @@ def OSXInstalledFonts(directory=None, fontext=None):
     """Get list of font files on OS X - ignores font suffix by default"""
     if directory is None:
         directory = OSXFontDirectory()
-    
+
     files = []
     for path in directory:
         if fontext is None:
@@ -163,24 +165,17 @@ def OSXInstalledFonts(directory=None, fontext=None):
 
 def x11FontDirectory():
     """Return the system font directories for X11."""
+    fontpaths = []
+    def add(arg,directory,files):
+        fontpaths.append(directory)
 
-    chkfont = '/usr/sbin/chkfontpath'
-    if os.path.isfile(chkfont):
-        fontpaths = os.popen(chkfont).readlines()
-        return [p.split(':')[1].strip() for p in fontpaths if \
-                p.find(': /') >= 0]
-    else:
-        fontpaths = []
-        #def add(arg, directory, files):
-        def add(arg,directory,files):
-            fontpaths.append(directory)
-        for fontdir in X11FontDirectories:
-            try:
-                if os.path.isdir(fontdir):
-                    os.path.walk(fontdir, add, None)
-            except (IOError, OSError, TypeError, ValueError):
-                pass
-        return fontpaths
+    for fontdir in X11FontDirectories:
+        try:
+            if os.path.isdir(fontdir):
+                os.path.walk(fontdir, add, None)
+        except (IOError, OSError, TypeError, ValueError):
+            pass
+    return fontpaths
 
 def findSystemFonts(fontpaths=None, fontext='ttf'):
 
@@ -192,7 +187,7 @@ with AFM fonts as an option.
     fontfiles = {}
 
     if fontpaths is None:
-        
+
         if sys.platform == 'win32':
             fontdir = win32FontDirectory()
 
@@ -211,12 +206,13 @@ with AFM fonts as an option.
 
     elif isinstance(fontpaths, (str, unicode)):
         fontpaths = [fontpaths]
+
     for path in fontpaths:
         files = glob.glob(os.path.join(path, '*.'+fontext))
         files.extend(glob.glob(os.path.join(path, '*.'+fontext.upper())))
         for fname in files:
-
             fontfiles[os.path.abspath(fname)] = 1
+
     return [fname for fname in fontfiles.keys() if os.path.exists(fname)]
 
 def weight_as_number(weight):
@@ -290,7 +286,7 @@ def ttfFontProperty(font):
     else:
         style = 'normal'
 
-    
+
     #  Variants are: small-caps and normal (default)
 
     #  !!!!  Untested
@@ -332,7 +328,7 @@ def ttfFontProperty(font):
         stretch = 'expanded'
     else:
         stretch = 'normal'
-    
+
     #  Sizes can be absolute and relative.
     #  Absolute sizes are: xx-small, x-small, small, medium, large, x-large,
     #    and xx-large.
@@ -345,7 +341,7 @@ def ttfFontProperty(font):
         size = 'scalable'
     else:
         size = str(float(font.get_fontsize()))
-    
+
     #  !!!!  Incomplete
     size_adjust = None
 
@@ -439,6 +435,7 @@ dictionary can optionally be created.
     #  Add fonts from list of known font files.
     seen = {}
     for fpath in fontfiles:
+        verbose.report('createFontDict: %s' % (fpath), 'debug')
         fname = fpath.split('/')[-1]
         if seen.has_key(fname):  continue
         else: seen[fname] = 1
@@ -455,7 +452,12 @@ dictionary can optionally be created.
             except RuntimeError:
                 warnings.warn("Could not open font file %s"%fpath)
                 continue
-            prop = ttfFontProperty(font)
+            except UnicodeError:
+                warnings.warn("Cannot handle unicode filenames %s"%fpath)
+                continue
+            try: prop = ttfFontProperty(font)
+            except: continue
+
         add_filename(fontdict, prop, fpath)
 
         #  !!!!  Default font algorithm needs improvement
@@ -472,7 +474,7 @@ dictionary can optionally be created.
             prop.name = 'fantasy'
             add_filename(fontdict, prop, fpath)
         elif prop.name.lower() in ['bitstream vera sans mono', 'courier']:
-            prop.name = 'monospace' 
+            prop.name = 'monospace'
             add_filename(fontdict, prop, fpath)
 
     return fontdict
@@ -607,7 +609,7 @@ Examples:
         self.__size    = size
         self.__parent_size = fontManager.get_default_size()
         self.fname = fname
-        
+
     def __hash__(self):
         return hash( (
             tuple(self.__family), self.__style, self.__variant,
@@ -678,7 +680,7 @@ set_family() method.
         msg = "Font name '%s' is a font family. It is being deleted from the list."
         font_family = ['serif', 'sans-serif', 'cursive', 'fantasy',
                        'monospace']
-        
+
         if isinstance(names, str):
             names = [names]
 
@@ -790,7 +792,7 @@ font dictionary can act like a font cache.
 
         verbose.report('font search path %s'%(str(paths)))
         #  Load TrueType fonts and create font dictionary.
-        
+
         self.ttffiles = findSystemFonts(paths) + findSystemFonts()
 
         for fname in self.ttffiles:
@@ -801,14 +803,21 @@ font dictionary can act like a font cache.
         else:
             # use anything
             self.defaultFont = self.ttffiles[0]
-        
+
         cache_message = \
 """Saving TTF font cache for non-PS backends to %s.
 Delete this file to have matplotlib rebuild the cache."""
-        
-        ttfpath = get_home()
-        if ttfpath is None: ttfpath = get_data_path()
-        ttfcache = os.path.join(ttfpath, '.ttffont.cache')
+
+
+
+        oldcache = os.path.join(get_home(), 'ttffont.cache')
+        ttfcache = os.path.join(get_configdir(), 'ttffont.cache')
+        if os.path.exists(oldcache):
+            print >> sys.stderr, 'Moving old ttfcache location "%s" to new location "%s"'%(oldcache, ttfcache)
+            shutil.move(oldcache, ttfcache)
+
+
+
         try:
             import cPickle as pickle
         except ImportError:
@@ -819,7 +828,7 @@ Delete this file to have matplotlib rebuild the cache."""
             self.ttfdict = createFontDict(self.ttffiles)
             pickle.dump(self.ttfdict, file(ttfcache, 'w'))
             verbose.report(cache_message % ttfcache)
-            
+
         try:
             self.ttfdict = pickle.load(file(ttfcache))
         except:
@@ -831,7 +840,7 @@ Delete this file to have matplotlib rebuild the cache."""
                     rebuild()
                     break
             verbose.report('loaded ttfcache file %s'%ttfcache)
-            
+
 
 
         #self.ttfdict = createFontDict(self.ttffiles)
@@ -866,7 +875,7 @@ Currently not implemented."""
         #  !!!!  Needs implementing
         raise NotImplementedError
 
-    
+
     def findfont(self, prop, fontext='ttf'):
 
         """Search the font dictionary for a font that exactly or closely
@@ -890,11 +899,10 @@ Delete this file to have matplotlib rebuild the cache."""
             fname = prop.fname
             verbose.report('findfont returning %s'%fname, 'debug')
             return fname
-        
+
         if fontext == 'afm':
             if len(self.afmdict) == 0:
-                afmpath = os.environ.get('HOME', get_data_path())
-                afmcache = os.path.join(afmpath, '.afmfont.cache')
+                afmcache = os.path.join(get_configdir(), '.afmfont.cache')
                 try:
                     import cPickle as pickle
                 except ImportError:
@@ -932,7 +940,7 @@ Delete this file to have matplotlib rebuild the cache."""
             else:
                 verbose.report('\tfindfont failed %(name)s'%locals(), 'debug')
                 continue
-                
+
             if font.has_key(style):
                 font = font[style]
             elif style == 'italics' and font.has_key('oblique'):
@@ -950,7 +958,7 @@ Delete this file to have matplotlib rebuild the cache."""
             if not font.has_key(weight):
                 setWeights(font)
             font = font[weight]
-            
+
             # !!!!  need improvement
             if font.has_key(stretch):
                 font = font[stretch]
@@ -963,14 +971,14 @@ Delete this file to have matplotlib rebuild the cache."""
             elif font.has_key(size):
                 fname = font[size]
             else:
-                verbose.report('\tfindfont failed %(name)s, %(style)s, %(variant)s %(weight)s, %(stretch)s, %(size)s'%locals(), 'debug')                
+                verbose.report('\tfindfont failed %(name)s, %(style)s, %(variant)s %(weight)s, %(stretch)s, %(size)s'%locals(), 'debug')
                 continue
 
             fontkey = FontKey(name, style, variant, weight, stretch, size)
             add_filename(fontdict, fontkey, fname)
             verbose.report('\tfindfont found %(name)s, %(style)s, %(variant)s %(weight)s, %(stretch)s, %(size)s'%locals(), 'debug')
             verbose.report('findfont returning %s'%fname, 'debug')
-                
+
             return fname
 
         fontkey = FontKey(name, style, variant, weight, stretch, size)

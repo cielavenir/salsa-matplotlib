@@ -69,14 +69,14 @@ class FigureCanvasQTAgg( FigureCanvasQT, FigureCanvasAgg ):
         
         FigureCanvasQT.paintEvent( self, e )
         if DEBUG: print 'FigureCanvasQtAgg.paintEvent: ', \
-           self.figure.get_width_height()
+           self.get_width_height()
 
         p = qt.QPainter( self )
         FigureCanvasAgg.draw( self )
 
         # only replot data when needed
         if ( self.replot ):
-            stringBuffer = str( self.buffer_rgba() )
+            stringBuffer = str( self.buffer_rgba(0,0) )
             
 
             # matplotlib is in rgba byte order.

@@ -75,7 +75,7 @@ Date formatters
   DateIndexFormatter - date plots with implicit x indexing.
 
 """
-import sys, re, time
+import sys, re, time, math
 import locale
 
 import matplotlib
@@ -84,13 +84,14 @@ try: import datetime
 except ImportError:
     raise ValueError('matplotlib %s date handling requires python2.3' % matplotlib.__version__)
 
-from cbook import iterable
+from cbook import iterable, is_string_like
 from pytz import timezone
 from numerix import arange, asarray
 from ticker import Formatter, Locator, Base
 from dateutil.rrule import rrule, MO, TU, WE, TH, FR, SA, SU, YEARLY,\
      MONTHLY, WEEKLY, DAILY, HOURLY, MINUTELY, SECONDLY
 from dateutil.relativedelta import relativedelta
+import dateutil.parser
 
 UTC = timezone('UTC')
 
@@ -163,6 +164,18 @@ def _from_ordinalf(x, tz=None):
 
     return dt
 
+def datestr2num(d):
+    """
+    Convert a date string to a datenum using dateutil.parser.parse
+    d can be a single string or a sequence of strings
+    """
+    if is_string_like(d):
+        dt = dateutil.parser.parse(d)
+        return date2num(dt)
+    else:
+        return date2num([dateutil.parser.parse(s) for s in d])
+    
+    
 def date2num(d):
     """
     d is either a datetime instance or a sequence of datetimes
@@ -301,7 +314,7 @@ class IndexDateFormatter(Formatter):
 
     def __call__(self, x, pos=0):
         'Return the label for time x at position pos'
-        ind = int(x)
+        ind = int(round(x))
         if ind>=len(self.t) or ind<=0: return ''
 
         dt = num2date(self.t[ind], self.tz)
@@ -346,6 +359,18 @@ class DateLocator(Locator):
         vmin, vmax = self.viewInterval.get_bounds()
         return num2date(vmin, self.tz), num2date(vmax, self.tz)
 
+    def _get_unit(self):
+        """
+        return how many days a unit of the locator is; use for
+        intelligent autoscaling
+        """
+        return 1
+        
+    def nonsingular(self, vmin, vmax):
+        unit = self._get_unit()
+        vmin -= 2*unit
+        vmax += 2*unit
+        return vmin, vmax
 
 class RRuleLocator(DateLocator):
     # use the dateutil rrule instance
@@ -357,7 +382,12 @@ class RRuleLocator(DateLocator):
     def __call__(self):
         self.verify_intervals()
 
-        dmin, dmax = self.viewlim_to_dt()
+        # if no data have been set, this will tank with a ValueError
+        try: dmin, dmax = self.viewlim_to_dt()
+        except ValueError: return []
+        
+        if dmin>dmax:
+            dmax, dmin = dmin, dmax
         delta = relativedelta(dmax, dmin)
         self.rule.set(dtstart=dmin-delta, until=dmax+delta)
         dates = self.rule.between(dmin, dmax, True)
@@ -369,6 +399,9 @@ class RRuleLocator(DateLocator):
         """
         self.verify_intervals()
         dmin, dmax = self.datalim_to_dt()
+        if dmin>dmax:
+            dmax, dmin = dmin, dmax
+
         delta = relativedelta(dmax, dmin)
         self.rule.set(dtstart=dmin-delta, until=dmax+delta)
         dmin, dmax = self.datalim_to_dt()
@@ -382,6 +415,7 @@ class RRuleLocator(DateLocator):
 
         vmin = date2num(vmin)
         vmax = date2num(vmax)
+        
         return self.nonsingular(vmin, vmax)
 
 
@@ -415,6 +449,13 @@ class YearLocator(DateLocator):
                           }
 
 
+    def _get_unit(self):
+        """
+        return how many days a unit of the locator is; use for
+        intelligent autoscaling
+        """
+        return 365
+    
     def __call__(self):
         self.verify_intervals()
 
@@ -463,6 +504,14 @@ class MonthLocator(RRuleLocator):
                          interval=interval, **self.hms0d)
         RRuleLocator.__init__(self, o, tz)
 
+    def _get_unit(self):
+        """
+        return how many days a unit of the locator is; use for
+        intelligent autoscaling
+        """
+        return 30
+    
+
 class WeekdayLocator(RRuleLocator):
     """
     Make ticks on occurances of each weekday
@@ -483,6 +532,13 @@ class WeekdayLocator(RRuleLocator):
         o = rrulewrapper(DAILY, byweekday=byweekday, interval=interval, **self.hms0d)
         RRuleLocator.__init__(self, o, tz)
 
+    def _get_unit(self):
+        """
+        return how many days a unit of the locator is; use for
+        intelligent autoscaling
+        """
+        return 7
+
 
 class DayLocator(RRuleLocator):
     """
@@ -497,6 +553,13 @@ class DayLocator(RRuleLocator):
         if bymonthday is None: bymonthday=range(1,32)
         o = rrulewrapper(DAILY, bymonthday=bymonthday, interval=interval, **self.hms0d)
         RRuleLocator.__init__(self, o, tz)
+
+    def _get_unit(self):
+        """
+        return how many days a unit of the locator is; use for
+        intelligent autoscaling
+        """
+        return 1
 
 class HourLocator(RRuleLocator):
     """
@@ -515,6 +578,12 @@ class HourLocator(RRuleLocator):
                             byminute=0, bysecond=0)
         RRuleLocator.__init__(self, rule, tz)
 
+    def _get_unit(self):
+        """
+        return how many days a unit of the locator is; use for
+        intelligent autoscaling
+        """
+        return 1/24.
 
 class MinuteLocator(RRuleLocator):
     """
@@ -534,6 +603,13 @@ class MinuteLocator(RRuleLocator):
                             bysecond=0)
         RRuleLocator.__init__(self, rule, tz)
 
+    def _get_unit(self):
+        """
+        return how many days a unit of the locator is; use for
+        intelligent autoscaling
+        """
+        return 1./(24*60)
+
 class SecondLocator(RRuleLocator):
     """
     Make ticks on occurances of each second
@@ -550,6 +626,13 @@ class SecondLocator(RRuleLocator):
         if bysecond is None: bysecond=range(60)
         rule = rrulewrapper(SECONDLY, bysecond=bysecond, interval=interval)
         RRuleLocator.__init__(self, rule, tz)
+
+    def _get_unit(self):
+        """
+        return how many days a unit of the locator is; use for
+        intelligent autoscaling
+        """
+        return 1./(24*60*60)
 
 
 
@@ -610,10 +693,8 @@ if __name__=='__main__':
 
     #d1 = datetime.datetime( 2002, 1, 5, tzinfo=tz)
     #d2 = datetime.datetime( 2003, 12, 1, tzinfo=tz)
-    print d1, d2
     delta = datetime.timedelta(hours=6)
     dates = drange(d1, d2, delta)
-    print 'len dates', len(dates)
 
     #print 'orig', d1
     #print 'd2n and back', num2date(date2num(d1), tz)
@@ -637,12 +718,72 @@ if __name__=='__main__':
 
     fmt = '%Y-%m-%d %H:%M:%S %Z'
     formatter = DateFormatter(fmt, tz)
-    print 'DMIN', formatter(dmin)
-    print 'DMAX', formatter(dmax)
 
     #for t in  ticks: print formatter(t)
 
     for t in dates: print formatter(t)
+
+
+def date_ticker_factory(span, tz=None, numticks=5):
+    """
+    Create a date locator with numticks (approx) and a date formatter
+    for span in days.  Return value is (locator, formatter)
+
+
+    """
+    
+    if span==0: span = 1/24.
+
+    minutes = span*24*60
+    hours  = span*24
+    days   = span
+    weeks  = span/7.
+    months = span/31. # approx
+    years  = span/365.
+
+    if years>numticks:
+        locator = YearLocator(int(years/numticks), tz=tz)  # define
+        fmt = '%Y'
+    elif months>numticks:
+        locator = MonthLocator(tz=tz)
+        fmt = '%b %Y'
+    elif weeks>numticks:
+        locator = WeekdayLocator(tz=tz)
+        fmt = '%a, %b %d'
+    elif days>numticks:
+        locator = DayLocator(interval=int(math.ceil(days/numticks)), tz=tz)
+        fmt = '%b %d'
+    elif hours>numticks:
+        locator = HourLocator(interval=int(math.ceil(hours/numticks)), tz=tz)
+        fmt = '%H:%M\n%b %d'
+    elif minutes>numticks:
+        locator = MinuteLocator(interval=int(math.ceil(minutes/numticks)), tz=tz)
+        fmt = '%H:%M:%S'
+    else:
+        locator = MinuteLocator(tz=tz)
+        fmt = '%H:%M:%S'
+
+
+    formatter = DateFormatter(fmt, tz=tz)
+    return locator, formatter
+
+
+def seconds(s):
+    'return seconds as days'
+    return float(s)/SEC_PER_DAY
+
+def minutes(m):
+    'return minutes as days'
+    return float(m)/MINUTES_PER_DAY
+
+def hours(h):
+    'return hours as days'
+    return h/24.
+
+def weeks(w):
+    'return weeks as days'
+    return w*7.
+
 
 
 __all__ = ( 'date2num', 'num2date', 'drange', 'epoch2num',
@@ -652,4 +793,6 @@ __all__ = ( 'date2num', 'num2date', 'drange', 'epoch2num',
             'DayLocator', 'HourLocator', 'MinuteLocator',
             'SecondLocator', 'rrule', 'MO', 'TU', 'WE', 'TH', 'FR',
             'SA', 'SU', 'YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY',
-            'HOURLY', 'MINUTELY', 'SECONDLY', 'relativedelta')
+            'HOURLY', 'MINUTELY', 'SECONDLY', 'relativedelta',
+            'seconds', 'minutes', 'hours', 'weeks')
+

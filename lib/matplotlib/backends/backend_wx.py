@@ -92,7 +92,7 @@ Examples which work on this release:
  (3) - Clipping seems to be broken.
 """
 
-cvs_id = '$Id: backend_wx.py,v 1.29 2005/06/15 17:14:01 jdh2358 Exp $'
+cvs_id = '$Id: backend_wx.py,v 1.32 2005/09/02 20:45:36 jdh2358 Exp $'
 
 import sys, os, os.path, math, StringIO
 
@@ -823,6 +823,27 @@ The current aspect ration will be kept."""
         dlg.Destroy()
         return
 
+    def Printer_Setup2(self, event=None):
+        """set up figure for printing.  Using the standard wx Printer
+        Setup Dialog. """
+
+        if hasattr(self, 'printerData'):
+            data = wx.PageSetupDialogData()
+            data.SetPrintData(self.printerData)
+        else:
+            data = wx.PageSetupDialogData()
+        data.SetMarginTopLeft( (15, 15) )
+        data.SetMarginBottomRight( (15, 15) )
+
+        dlg = wx.PageSetupDialog(self, data)
+
+        if dlg.ShowModal() == wx.ID_OK:
+            data = dlg.GetPageSetupData()
+            tl = data.GetMarginTopLeft()
+            br = data.GetMarginBottomRight()
+        self.printerData = wx.PrintData(data.GetPrintData())
+        dlg.Destroy()
+
     def Printer_Preview(self, event=None):
         """ generate Print Preview with wx Print mechanism"""
         po1  = PrintoutWx(self, width=self.printer_width,
@@ -869,7 +890,7 @@ The current aspect ration will be kept."""
         self.gui_repaint()
 
 
-    def draw(self):
+    def draw(self, repaint=True):
         """
         Render the figure using RendererWx instance renderer, or using a
         previously defined renderer if none is specified.
@@ -877,7 +898,8 @@ The current aspect ration will be kept."""
         DEBUG_MSG("draw()", 1, self)
         self.renderer = RendererWx(self.bitmap, self.figure.dpi)
         self.figure.draw(self.renderer)
-        self.gui_repaint()
+        if repaint:
+            self.gui_repaint()
 
     def _get_imagesave_wildcards(self):
         'return the wildcard string for the filesave dialog'
@@ -890,16 +912,17 @@ The current aspect ration will be kept."""
                "PNG (*.png)|*.png|"  \
                "XPM (*.xpm)|*.xpm"
 
-    def gui_repaint(self):
+    def gui_repaint(self, drawDC=None):
         """
-        Performs update of the displayed image on the GUI canvas
-
-        MUST NOT be called during a Paint event
+        Performs update of the displayed image on the GUI canvas, using the
+        supplied device context.  If drawDC is None, a ClientDC will be used to
+        redraw the image.
         """
         DEBUG_MSG("gui_repaint()", 1, self)
-        drawDC=wx.ClientDC(self)
+        if drawDC is None:
+            drawDC=wx.ClientDC(self)
+
         drawDC.BeginDrawing()
-        #drawDC.Clear()
         drawDC.DrawBitmap(self.bitmap, 0, 0)
         drawDC.EndDrawing()
 
@@ -1022,27 +1045,9 @@ The current aspect ration will be kept."""
         if not self._isRealized:
             self.realize()
         # Render to the bitmap
-        self.draw()
-        # Must use wxPaintDC during paint event
-
-        l,b,w,h = self.figure.bbox.get_bounds()
-        w = int(math.ceil(w))
-        h = int(math.ceil(h))
-
-
-        # I decoupled this from GraphicsContextWx so it would play
-        # nice with wxagg
-        memDC =wx.MemoryDC()
-        memDC.SelectObject(self.bitmap)
-        memDC.SetPen(wx.Pen('BLACK', 1, wx.SOLID))
-
-        drawDC=wx.PaintDC(self)
-
-        drawDC.BeginDrawing()
-        drawDC.Clear()
-        drawDC.Blit(0, 0, w, h, memDC, 0, 0)
-        #drawDC.DrawBitmap(self.bitmap, 0, 0)
-        drawDC.EndDrawing()
+        self.draw(repaint=False)
+        # Update the display using a PaintDC
+        self.gui_repaint(drawDC=wx.PaintDC(self))
         evt.Skip()
 
     def _onSize(self, evt):
@@ -1318,8 +1323,9 @@ class FigureManagerWx(FigureManagerBase):
         FigureManagerBase.__init__(self, canvas, num)
         self.frame = frame
         self.window = frame
-        self.tb = frame.GetToolBar()
 
+        self.tb = frame.GetToolBar()
+        self.toolbar = self.tb  # consistent with other backends
         def notify_axes_change(fig):
             'this will be called whenever the current axes is changed'
             if self.tb != None: self.tb.update()

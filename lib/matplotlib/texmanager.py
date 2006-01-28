@@ -1,7 +1,7 @@
 """
 This module supports embedded TeX expressions in matplotlib via dvipng
 and dvips for the raster and postscript backends.  The tex and
-dvipng/dvips information is cached in ~/.tex.cache for reuse between
+dvipng/dvips information is cached in ~/.matplotlib/tex.cache for reuse between
 sessions
 
 Requirements:
@@ -26,13 +26,16 @@ as follows
   Z = self.texmanager.get_rgba(s, size=12, dpi=80, rgb=(1,0,0))
 
 To enable tex rendering of all text in your matplotlib figure, set
-text.usetex in your matplotlibrc file
-(http://matplotlib.sf.net/.matplotlibrc)
+text.usetex in your matplotlibrc file (http://matplotlib.sf.net/matplotlibrc)
+or include these two lines in your script:
+from matplotlib import rc
+rc('text', usetex=True)
 
 """
 
 import glob, os, sys, md5, shutil
-from matplotlib import get_home, get_data_path, rcParams, verbose
+from matplotlib import get_configdir, get_home, get_data_path, \
+     rcParams, verbose
 from matplotlib._image import readpng
 from matplotlib.numerix import ravel, where, array, \
      zeros, Float, absolute, nonzero, sqrt
@@ -44,23 +47,44 @@ class TexManager:
     Convert strings to dvi files using TeX, caching the results to a
     working dir
     """
-    path = get_home()
-    if path is None: path = get_data_path()
-    texcache = os.path.join(path, '.tex.cache')
-
     
+    oldpath = get_home()
+    if oldpath is None: oldpath = get_data_path()
+    oldcache = os.path.join(oldpath, '.tex.cache')
+
+    configdir = get_configdir()
+    texcache = os.path.join(configdir, 'tex.cache')
+
+    os.environ['TEXMFOUTPUT'] = texcache
+    if os.path.exists(oldcache):
+        print >> sys.stderr, """\
+WARNING: found a TeX cache dir in the deprecated location "%s".
+  Moving it to the new default location "%s"."""%(oldcache, texcache)
+        shutil.move(oldcache, texcache)
+
+    dvipngVersion = None
+
+    arrayd = {}
+    postscriptd = {}
+    pscnt = 0
+
     def __init__(self):
         if not os.path.isdir(self.texcache):
             os.mkdir(self.texcache)
-        self.arrayd = {}
-        self.postscriptd = {}
-        self.pscnt = 0
-        self.dvipngVersion = None
+
         
     def get_prefix(self, tex):
-        return md5.md5(tex).hexdigest()
+        s = tex
+        if rcParams['text.tex.engine'] == 'latex':
+            s+='latex font: %s'%rcParams['font.latex.package']
+        return md5.md5(s).hexdigest()
         
     def get_tex_command(self, tex, fname):
+
+        fontcmd = {'sans-serif' : r'{\sffamily %s}',
+                   'monospace'  : r'{\ttfamily %s}'}.get(
+            rcParams['font.family'], r'{\rmfamily %s}')
+        tex = fontcmd % tex
         fh = file(fname, 'w')
         if rcParams['text.tex.engine'] == 'latex':
             s = r"""\documentclass{article}
@@ -74,7 +98,7 @@ class TexManager:
 """ % (rcParams['font.latex.package'], tex)
             fh.write(s)
             fh.close()
-            command = "latex -interaction=nonstopmode '%s'"%fname
+            command = 'latex -interaction=nonstopmode "%s"'%fname
         else:
             s = r"""\def\frac#1#2{ {#1 \over #2} }
 \nopagenumbers
@@ -85,7 +109,7 @@ class TexManager:
 """ % tex
             fh.write(s)
             fh.close()
-            command = 'tex %s'%fname
+            command = 'tex "%s"'%fname
         return command
         
     def make_dvi(self, tex, force=0):
@@ -93,18 +117,24 @@ class TexManager:
         
         prefix = self.get_prefix(tex)
         fname = os.path.join(self.texcache, prefix+ '.tex')
-        dvitmp = prefix + '.dvi'
-        dvifile = os.path.join(self.texcache, dvitmp)
+        dvibase = prefix + '.dvi'
+        dvifile = os.path.join(self.texcache, dvibase)        
 
         if force or not os.path.exists(dvifile):
             command = self.get_tex_command(tex, fname)
+            verbose.report(command, 'debug-annoying')            
             stdin, stdout, stderr = os.popen3(command)
-            verbose.report(''.join(stdout.readlines()), 'debug-annoying')
-            err = ''.join(stderr.readlines())
+            verbose.report(stdout.read(), 'debug-annoying')
+            err = stderr.read()
             if err: verbose.report(err, 'helpful')
-            shutil.move(dvitmp, dvifile)
-            cleanup = glob.glob(prefix+'.*')
-            for fname in cleanup: os.remove(fname)
+
+        # tex will put it's output in the current dir if possible, and
+        # if not in TEXMFOUTPUT.  So check for existence in current
+        # dir and move it if necessary and then cleanup
+        if os.path.exists(dvibase):
+            shutil.move(dvibase, dvifile)
+            for fname in glob.glob(prefix+'*'):
+                os.remove(fname)
         return dvifile
         
     def make_png(self, tex, dpi, force=0):
@@ -114,8 +144,10 @@ class TexManager:
         prefix = self.get_prefix(tex)
         pngfile = os.path.join(self.texcache, '%s_%d.png'% (prefix, dpi))
 
-        
-        command = "dvipng -bg Transparent -fg 'rgb 0.0 0.0 0.0' -D %d -T tight -o %s %s"% (dpi, pngfile, dvifile)
+        self.get_dvipng_version()  # raises if dvipng is not up-to-date
+        #print 'makepng', prefix, dvifile, pngfile
+        #command = 'dvipng -bg Transparent -fg "rgb 0.0 0.0 0.0" -D %d -T tight -o "%s" "%s"'% (dpi, pngfile, dvifile)
+        command = 'dvipng -bg Transparent -D %d -T tight -o "%s" "%s"'% (dpi, pngfile, dvifile)        
 
         #assume white bg
         #command = "dvipng -bg 'rgb 1.0 1.0 1.0' -fg 'rgb 0.0 0.0 0.0' -D %d -T tight -o %s %s"% (dpi, pngfile, dvifile)
@@ -124,9 +156,10 @@ class TexManager:
 
         # see get_rgba for a discussion of the background
         if force or not os.path.exists(pngfile):
+            verbose.report(command, 'debug-annoying')
             stdin, stdout, stderr = os.popen3(command)
-            verbose.report(''.join(stdout.readlines()), 'debug-annoying')
-            err = ''.join(stderr.readlines())
+            verbose.report(stdout.read(), 'debug-annoying')
+            err = stderr.read()
             if err: verbose.report(err, 'helpful')
         return pngfile
 
@@ -138,10 +171,11 @@ class TexManager:
         psfile = os.path.join(self.texcache, '%s_%d.epsf'% (prefix, dpi))
 
         if not os.path.exists(psfile):
-            command = "dvips -q -E -D %d -o %s %s"% (dpi, psfile, dvifile)
+            command = 'dvips -q -E -D %d -o "%s" "%s"'% (dpi, psfile, dvifile)
+            verbose.report(command, 'debug-annoying')
             stdin, stdout, stderr = os.popen3(command)
-            verbose.report(''.join(stdout.readlines()), 'debug-annoying')
-            err = ''.join(stderr.readlines())
+            verbose.report(stdout.read(), 'debug-annoying')
+            err = stderr.read()
             if err: verbose.report(err, 'helpful')
 
         return psfile
@@ -243,6 +277,7 @@ class TexManager:
         """
         Return tex string as an rgba array
         """
+
         # dvipng assumes a constant background, whereas we want to
         # overlay these rasters with antialiasing over arbitrary
         # backgrounds that may have other figure elements under them.
@@ -270,30 +305,28 @@ class TexManager:
         r,g,b = rgb
         key = tex, dpi, tuple(rgb)
         Z = self.arrayd.get(key)
-
+        
         if Z is None:
             # force=True to skip cacheing while debugging
             pngfile = self.make_png(tex, dpi, force=False) 
             X = readpng(pngfile)
-
             vers = self.get_dvipng_version()
+            #print 'dvipng version', vers
             if vers<'1.6':
+                # hack the alpha channel as described in comment above
                 alpha = sqrt(1-X[:,:,0])
             else:
-                # 1.6 has the alpha channel right
-                alpha = sqrt(X[:,:,-1])
+                alpha = X[:,:,-1]
             
-            #from matplotlib.mlab import prctile
-            #print 'ptile', prctile(ravel(X[:,:,0])), prctile(ravel(X[:,:,-1]))
 
             Z = zeros(X.shape, Float)
             Z[:,:,0] = r
             Z[:,:,1] = g
             Z[:,:,2] = b
             Z[:,:,3] = alpha
-            #im = fromarray(Z, 1)
                
             self.arrayd[key] = Z
+
         return Z
 
     def get_dvipng_version(self):

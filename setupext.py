@@ -37,13 +37,15 @@ basedir = {
     'win32'  : ['win32_static',],
     'linux2' : ['/usr/local', '/usr',],
     'linux'  : ['/usr/local', '/usr',],
-    # Charles Moad recommends not putting in /usr/X11R6 for darwin
-    # because freetype in this dir is too old for mpl
-    'darwin' : ['/sw/lib/freetype219', '/usr/local', '/usr', '/sw'], 
+    'cygwin' : ['/usr/local', '/usr',],
+    'darwin' : ['/sw/lib/freetype2', '/sw/lib/freetype219', '/usr/local',
+                '/usr', '/sw'], 
     'freebsd4' : ['/usr/local', '/usr'],
     'freebsd5' : ['/usr/local', '/usr'],
     'freebsd6' : ['/usr/local', '/usr'],    
     'sunos5' : [os.getenv('MPLIB_BASE') or '/usr/local',],
+    'gnukfreebsd5' : ['/usr/local', '/usr'],
+    'gnukfreebsd6' : ['/usr/local', '/usr'],
 }
 
 import sys, os, stat
@@ -63,6 +65,7 @@ BUILT_FT2FONT   = False
 BUILT_GTKAGG    = False
 BUILT_IMAGE     = False
 BUILT_TKAGG     = False
+BUILT_WXAGG     = False
 BUILT_WINDOWING = False
 BUILT_CONTOUR   = False
 BUILT_ENTHOUGHT   = False
@@ -70,6 +73,10 @@ BUILT_CONTOUR   = False
 BUILT_GDK       = False
 
 AGG_VERSION = 'agg23'
+
+# for nonstandard installation/build with --prefix variable
+numeric_inc_dirs = []
+numarray_inc_dirs = []
 
 class CleanUpFile:
     """CleanUpFile deletes the specified filename when self is destroyed."""
@@ -97,8 +104,8 @@ def add_base_flags(module):
     libdirs = [os.path.join(p, 'lib')     for p in basedir[sys.platform]
                if os.path.exists(p)]
     module.include_dirs.extend(incdirs)
+    module.include_dirs.append('.')    
     module.library_dirs.extend(libdirs)
-
 
 def getoutput(s):
     'get the output of a system command'
@@ -106,7 +113,10 @@ def getoutput(s):
     ret =  os.popen(s).read().strip()
     return ret
 
-
+def add_numpy_flags(module):
+    "Add the modules flags to build extensions which use numpy"
+    import numpy 
+    module.include_dirs.append(numpy.get_numpy_include())
 
 def add_agg_flags(module):
     'Add the module flags to build extensions which use agg'
@@ -115,7 +125,9 @@ def add_agg_flags(module):
     module.libraries.append('png')
     module.libraries.append('z')
     add_base_flags(module)
-    module.include_dirs.extend(['src','%s/include'%AGG_VERSION, '.'])
+    module.include_dirs.extend(['src','swig', '%s/include'%AGG_VERSION, '.'])
+    
+
 
     # put these later for correct link order
     module.libraries.extend(['stdc++', 'm'])
@@ -162,6 +174,16 @@ def add_pygtk_flags(module):
         module.include_dirs.extend(
             ['win32_static/include/pygtk-2.0',
              'C:/GTK/include',
+             'C:/GTK/include/gobject',
+             'C:/GTK/include/gmodule',                          
+             'C:/GTK/include/glib',
+             'C:/GTK/include/pango',                          
+             'C:/GTK/include/atk',
+             'C:/GTK/include/X11',                          
+             'C:/GTK/include/cairo',             
+             'C:/GTK/include/gdk',
+             'C:/GTK/include/gdk-pixbuf',
+             'C:/GTK/include/gtk',                          
              ])
 
     add_base_flags(module)
@@ -186,6 +208,81 @@ def add_pygtk_flags(module):
     module.extra_link_args.extend(
         [flag for flag in linkerFlags if not
          (flag.startswith('-l') or flag.startswith('-L'))])
+
+
+def find_wx_config():
+    """If the WX_CONFIG environment variable has been set, returns it value.
+    Otherwise, search for `wx-config' in the PATH directories and return the
+    first match found.  Failing that, return None.
+    """
+
+    wxconfig = os.getenv('WX_CONFIG')
+    if wxconfig is not None:
+        return wxconfig
+
+    path = os.getenv('PATH') or ''
+    for dir in path.split(':'):
+        wxconfig = os.path.join(dir, 'wx-config')
+        if os.path.exists(wxconfig):
+            return wxconfig
+
+    return None
+
+
+def check_wxpython_headers(wxconfig):
+    """Determines if wxPython.h can be found in one of the wxWidgets include
+    directories.
+    """
+
+    flags = getoutput(wxconfig + ' --cppflags').split()
+    incdirs = [os.path.join(p, 'include') for p in basedir[sys.platform]
+               if os.path.exists(p)]
+
+    incdirs += [x[2:] for x in flags if x.startswith('-I')]
+    header = os.path.join('wx', 'wxPython', 'wxPython.h')
+
+    for d in incdirs:
+        if os.path.exists(os.path.join(d, header)):
+            return True
+    return False
+
+
+def add_wx_flags(module, wxconfig):
+    """
+    Add the module flags to build extensions which use wxPython.
+    """
+    
+    if sys.platform == 'win32': # just added manually
+        wxlibs = ['wxexpath', 'wxjpegh', 'wxmsw26uh',
+                  'wxmsw26uh_animate', 'wxmsw26uh_gizmos', 'wxmsw26uh_gizmos_xrc',
+                  'wxmsw26uh_gl', 'wxmsw26uh_stc', 'wxpngh', 'wxregexuh', 'wxtiffh', 'wxzlibh']
+        module.libraries.extend(wxlibs)
+        module.libraries.extend(wxlibs)
+        return
+
+    def getWX(fmt, *args):
+        return getoutput(wxconfig + ' ' + (fmt % args)).split()
+
+    wxFlags = getWX('--cppflags')
+    wxLibs = getWX('--libs')
+
+
+    add_base_flags(module)
+    module.include_dirs.extend(
+        [x[2:] for x in wxFlags if x.startswith('-I')])
+
+
+    module.define_macros.extend(
+        [(x[2:], None) for x in wxFlags if x.startswith('-D')])
+    module.undef_macros.extend(
+        [x[2:] for x in wxFlags if x.startswith('-U')])
+
+    module.libraries.extend(
+        [x[2:] for x in wxLibs if x.startswith('-l')])
+    module.library_dirs.extend(
+        [x[2:] for x in wxLibs if x.startswith('-L')])
+    module.extra_link_args.extend(
+        [x for x in wxLibs if not (x.startswith('-l') or x.startswith('-L'))])
 
 
 # Make sure you use the Tk version given by Tkinter.TkVersion
@@ -351,7 +448,7 @@ def build_ft2font(ext_modules, packages):
 def build_gtkagg(ext_modules, packages, numerix):
     global BUILT_GTKAGG
     if BUILT_GTKAGG: return # only build it if you you haven't already
-    deps = ['src/_gtkagg.cpp', 'src/mplutils.cpp']
+    deps = ['src/_gtkagg.cpp', 'src/mplutils.cpp']#, 'src/_transforms.cpp']
     deps.extend(glob.glob('CXX/*.cxx'))
     deps.extend(glob.glob('CXX/*.c'))
 
@@ -372,10 +469,15 @@ def build_gtkagg(ext_modules, packages, numerix):
     BUILT_GTKAGG = True
 
 def build_tkagg(ext_modules, packages, numerix):
+    # XXX doesn't need numerix arg
     global BUILT_TKAGG
     if BUILT_TKAGG: return # only build it if you you haven't already
+    deps = ['src/_tkagg.cpp']
+    deps.extend(glob.glob('CXX/*.cxx'))
+    deps.extend(glob.glob('CXX/*.c'))
+    
     module = Extension('matplotlib.backends._tkagg',
-                       ['src/_tkagg.cpp'],
+                       deps,
                        )
 
     # add agg flags before pygtk because agg only supports freetype1
@@ -384,8 +486,69 @@ def build_tkagg(ext_modules, packages, numerix):
     add_tk_flags(module) # do this first
     add_agg_flags(module)
     add_ft2font_flags(module)    
+
     ext_modules.append(module)    
     BUILT_TKAGG = True
+
+
+def build_wxagg(ext_modules, packages, numerix, abortOnFailure):
+     global BUILT_WXAGG
+     if BUILT_WXAGG:
+         return
+
+     wxconfig = find_wx_config()
+
+     # Avoid aborting the whole build process if `wx-config' can't be found and
+     # BUILD_WXAGG in setup.py is set to "auto"
+     if sys.platform == 'win32':
+         #pass # don't need config
+         return # TODO: Fix _wxagg build on windows (linking issues)
+     
+     elif wxconfig is None:
+         print """
+WXAgg's accelerator requires `wx-config'.
+
+The `wx-config\' executable could not be located in any directory of the
+PATH environment variable. If you want to build WXAgg, and wx-config is
+in some other location or has some other name, set the WX_CONFIG
+environment variable to the full path of the executable like so:
+
+export WX_CONFIG=/usr/lib/wxPython-2.6.1.0-gtk2-unicode/bin/wx-config
+"""
+         if not abortOnFailure:
+             print """Building MPL without wxAgg"""
+             BUILT_WXAGG = True
+             return
+         else:
+             sys.exit(1)
+     elif not check_wxpython_headers(wxconfig):
+         print 'WXAgg\'s accelerator requires the wxPython headers.'
+
+         if not abortOnFailure:
+             BUILT_WXAGG = True
+             return
+         else:
+             print """
+The wxPython header files could not be located in any of the standard
+include
+directories or include directories reported by `wx-config --cppflags'."""
+             sys.exit(1)
+
+
+     deps = ['src/_wxagg.cpp', 'src/mplutils.cpp']
+     deps.extend(glob.glob('CXX/*.cxx'))
+     deps.extend(glob.glob('CXX/*.c'))
+
+     module = Extension('matplotlib.backends._wxagg', deps)
+
+     add_agg_flags(module)
+     add_ft2font_flags(module)
+     add_wx_flags(module, wxconfig)
+
+     ext_modules.append(module)
+     BUILT_WXAGG = True
+
+
 
 
 def build_agg(ext_modules, packages, numerix):
@@ -393,7 +556,8 @@ def build_agg(ext_modules, packages, numerix):
     if BUILT_AGG: return # only build it if you you haven't already
 
 
-    agg = ('agg_trans_affine.cpp',
+    agg = (           
+           'agg_trans_affine.cpp',
            'agg_path_storage.cpp',
            'agg_bezier_arc.cpp',
            'agg_curves.cpp',
@@ -401,27 +565,28 @@ def build_agg(ext_modules, packages, numerix):
            'agg_vcgen_stroke.cpp',
            #'agg_vcgen_markers_term.cpp',
            'agg_rasterizer_scanline_aa.cpp',
+           'agg_image_filters.cpp',
            )
 
-    if numerix in ["numarray","both"]: # Build for numarray
+    if 'numarray' in numerix: # Build for numarray
         deps = ['%s/src/%s'%(AGG_VERSION,name) for name in agg]
-        deps.extend(('src/ft2font.cpp', 'src/mplutils.cpp'))
+        deps.extend(('src/_image.cpp', 'src/ft2font.cpp', 'src/mplutils.cpp'))
         deps.extend(glob.glob('CXX/*.cxx'))
         deps.extend(glob.glob('CXX/*.c'))
         temp_copy('src/_backend_agg.cpp', 'src/_na_backend_agg.cpp')
         deps.append('src/_na_backend_agg.cpp')
         module = Extension(
             'matplotlib.backends._na_backend_agg',
-            deps
-            ,
+            deps,
+            include_dirs=numarray_inc_dirs,
             )    
         module.extra_compile_args.append('-DNUMARRAY=1')
         add_agg_flags(module)
         add_ft2font_flags(module)
         ext_modules.append(module)    
-    if numerix in ["Numeric","both"]: # Build for Numeric
+    if 'Numeric' in numerix: # Build for Numeric
         deps = ['%s/src/%s'%(AGG_VERSION, name) for name in agg]
-        deps.extend(('src/ft2font.cpp', 'src/mplutils.cpp'))
+        deps.extend(('src/_image.cpp', 'src/ft2font.cpp', 'src/mplutils.cpp'))
         deps.extend(glob.glob('CXX/*.cxx'))
         deps.extend(glob.glob('CXX/*.c'))
 
@@ -429,10 +594,30 @@ def build_agg(ext_modules, packages, numerix):
         deps.append('src/_nc_backend_agg.cpp')
         module = Extension(
             'matplotlib.backends._nc_backend_agg',
-            deps
-            ,
+            deps,
+            include_dirs=numeric_inc_dirs,
             )
+
         module.extra_compile_args.append('-DNUMERIC=1')
+        add_agg_flags(module)
+        add_ft2font_flags(module)
+        ext_modules.append(module)    
+    if 'numpy' in numerix: # Build for numpy
+        deps = ['%s/src/%s'%(AGG_VERSION, name) for name in agg]
+        deps.extend(('src/_image.cpp', 'src/ft2font.cpp', 'src/mplutils.cpp'))
+        deps.extend(glob.glob('CXX/*.cxx'))
+        deps.extend(glob.glob('CXX/*.c'))
+
+        temp_copy('src/_backend_agg.cpp', 'src/_ns_backend_agg.cpp')
+        deps.append('src/_ns_backend_agg.cpp')
+        module = Extension(
+            'matplotlib.backends._ns_backend_agg',
+            deps,
+            include_dirs=numeric_inc_dirs,
+            )
+
+        add_numpy_flags(module)
+        module.extra_compile_args.append('-DSCIPY=1')
 
         add_agg_flags(module)
         add_ft2font_flags(module)
@@ -451,7 +636,7 @@ def build_image(ext_modules, packages, numerix):
            'agg_bezier_arc.cpp',
            )
 
-    if numerix in ["numarray","both"]: # Build for numarray
+    if 'numarray' in numerix: # Build for numarray
         temp_copy('src/_image.cpp', 'src/_na_image.cpp')
         deps = ['src/_na_image.cpp', 'src/mplutils.cpp'] 
         deps.extend(['%s/src/%s'%(AGG_VERSION, name) for name in agg])
@@ -459,14 +644,14 @@ def build_image(ext_modules, packages, numerix):
         deps.extend(glob.glob('CXX/*.c'))
         module = Extension(
             'matplotlib._na_image',
-            deps
-            ,
+            deps,
+            include_dirs=numarray_inc_dirs,
             )    
         module.extra_compile_args.append('-DNUMARRAY=1')
         add_agg_flags(module)
         ext_modules.append(module)    
 
-    if numerix in ["Numeric","both"]: # Build for Numeric
+    if 'Numeric' in numerix: # Build for Numeric
         temp_copy('src/_image.cpp', 'src/_nc_image.cpp')
         deps = ['src/_nc_image.cpp', 'src/mplutils.cpp'] 
         deps.extend(['%s/src/%s'%(AGG_VERSION,name) for name in agg])
@@ -475,10 +660,29 @@ def build_image(ext_modules, packages, numerix):
 
         module = Extension(
             'matplotlib._nc_image',
-            deps
-            ,
+            deps,
+            include_dirs=numeric_inc_dirs,
             )
+
         module.extra_compile_args.append('-DNUMERIC=1')
+        add_agg_flags(module)
+        ext_modules.append(module)
+
+    if 'numpy' in numerix: # Build for numpy
+        temp_copy('src/_image.cpp', 'src/_ns_image.cpp')
+        deps = ['src/_ns_image.cpp', 'src/mplutils.cpp'] 
+        deps.extend(['%s/src/%s'%(AGG_VERSION,name) for name in agg])
+        deps.extend(glob.glob('CXX/*.cxx'))
+        deps.extend(glob.glob('CXX/*.c'))
+
+        module = Extension(
+            'matplotlib._ns_image',
+            deps,
+            include_dirs=numeric_inc_dirs,
+            )
+
+        add_numpy_flags(module)
+        module.extra_compile_args.append('-DSCIPY=1')
         add_agg_flags(module)
         ext_modules.append(module)
 
@@ -509,7 +713,7 @@ def build_swigagg(ext_modules, packages):
     ext_modules.append(agg)
 
 def build_transforms(ext_modules, packages, numerix):
-    if numerix in ["numarray","both"]: # Build for numarray
+    if 'numarray' in numerix: # Build for numarray
         cxx = glob.glob('CXX/*.cxx')
         cxx.extend(glob.glob('CXX/*.c'))
         temp_copy("src/_transforms.cpp","src/_na_transforms.cpp")
@@ -517,14 +721,14 @@ def build_transforms(ext_modules, packages, numerix):
                              ['src/_na_transforms.cpp',
                               'src/mplutils.cpp'] + cxx,
                              libraries = ['stdc++', 'm'],
-                             include_dirs = ['src', '.'],
+                             include_dirs = ['src', '.']+numarray_inc_dirs,
                              )
         
         module.extra_compile_args.append("-DNUMARRAY=1")
         add_base_flags(module)
         ext_modules.append(module)
         
-    if numerix in ["Numeric","both"]:  # Build for Numeric
+    if 'Numeric' in numerix:  # Build for Numeric
         cxx = glob.glob('CXX/*.cxx')
         cxx.extend(glob.glob('CXX/*.c'))
         temp_copy("src/_transforms.cpp","src/_nc_transforms.cpp")
@@ -532,12 +736,31 @@ def build_transforms(ext_modules, packages, numerix):
                              ['src/_nc_transforms.cpp',
                               'src/mplutils.cpp'] + cxx,
                              libraries = ['stdc++', 'm'],
-                             include_dirs = ['src', '.'],
+                             include_dirs = ['src', '.']+numeric_inc_dirs,
                              )
+
+
+        
         module.extra_compile_args.append("-DNUMERIC=1")
         add_base_flags(module)
         ext_modules.append(module)
 
+    if 'numpy' in numerix:  # Build for numpy
+        cxx = glob.glob('CXX/*.cxx')
+        cxx.extend(glob.glob('CXX/*.c'))
+        temp_copy("src/_transforms.cpp","src/_ns_transforms.cpp")
+        module = Extension('matplotlib._ns_transforms',
+                             ['src/_ns_transforms.cpp',
+                              'src/mplutils.cpp'] + cxx,
+                             libraries = ['stdc++', 'm'],
+                             include_dirs = ['src', '.']+numeric_inc_dirs,
+                             )
+
+
+        add_numpy_flags(module)
+        module.extra_compile_args.append("-DSCIPY=1")
+        add_base_flags(module)
+        ext_modules.append(module)
 
 def build_enthought(ext_modules, packages):
     global BUILT_ENTHOUGHT
@@ -558,27 +781,42 @@ def build_contour(ext_modules, packages, numerix):
     global BUILT_CONTOUR
     if BUILT_CONTOUR: return # only build it if you you haven't already
 
-    if numerix in ["numarray","both"]: # Build for numarray
+    if 'numarray' in numerix: # Build for numarray
         temp_copy('src/cntr.c', 'src/_na_cntr.c')
         module = Extension(
             'matplotlib._na_cntr',
             [  'src/_na_cntr.c',],
             #libraries = ['stdc++'],
+            include_dirs=numarray_inc_dirs,
             )
         module.extra_compile_args.append('-DNUMARRAY=1')
         add_base_flags(module)
         ext_modules.append(module)    
 
-    if numerix in ["Numeric","both"]: # Build for Numeric
+    if 'Numeric' in numerix: # Build for Numeric        
         temp_copy('src/cntr.c', 'src/_nc_cntr.c')
         module = Extension(
             'matplotlib._nc_cntr',
             [ 'src/_nc_cntr.c'],
             #libraries = ['stdc++'],
+            include_dirs=numeric_inc_dirs,
             )
         module.extra_compile_args.append('-DNUMERIC=1')
         add_base_flags(module)
         ext_modules.append(module)
+    if 'numpy' in numerix: # Build for numpy
+        temp_copy('src/cntr.c', 'src/_ns_cntr.c')
+        module = Extension(
+            'matplotlib._ns_cntr',
+            [ 'src/_ns_cntr.c'],
+            #libraries = ['stdc++'],
+            include_dirs=numeric_inc_dirs,
+            )
+        add_numpy_flags(module)
+        module.extra_compile_args.append('-DSCIPY=1')
+        add_base_flags(module)
+        ext_modules.append(module)
+
 
     BUILT_CONTOUR = True
 
@@ -587,28 +825,44 @@ def build_gdk(ext_modules, packages, numerix):
     global BUILT_GDK
     if BUILT_GDK: return # only build it if you you haven't already
 
-    if numerix in ["numarray","both"]: # Build for numarray
+    if 'numarray' in numerix: # Build for numarray
         temp_copy('src/_backend_gdk.c', 'src/_na_backend_gdk.c')
         module = Extension(
-            'matplotlib._na_backend_gdk',
-		[ 'src/_na_backend_gdk.c',
-		],
-		libraries = [],
+            'matplotlib.backends._na_backend_gdk',
+            ['src/_na_backend_gdk.c', ],
+            libraries = [],
+            include_dirs=numarray_inc_dirs,
             )
         module.extra_compile_args.append('-DNUMARRAY=1')
         add_base_flags(module)
         add_pygtk_flags(module)        
         ext_modules.append(module)
 
-    if numerix in ["Numeric","both"]: # Build for Numeric
+    if 'Numeric' in numerix:# Build for Numeric
         temp_copy('src/_backend_gdk.c', 'src/_nc_backend_gdk.c')
         module = Extension(
-            'matplotlib._nc_backend_gdk',
-		[ 'src/_nc_backend_gdk.c',
-		],
-		libraries = [],
+            'matplotlib.backends._nc_backend_gdk',
+            ['src/_nc_backend_gdk.c', ],
+            libraries = [],
+            include_dirs=numeric_inc_dirs,            
             )
+
         module.extra_compile_args.append('-DNUMERIC=1')
+        add_base_flags(module)
+        add_pygtk_flags(module)        
+        ext_modules.append(module)
+
+    if 'numpy' in numerix:# Build for numpy 
+        temp_copy('src/_backend_gdk.c', 'src/_ns_backend_gdk.c')
+        module = Extension(
+            'matplotlib.backends._ns_backend_gdk',
+            ['src/_ns_backend_gdk.c', ],
+            libraries = [],
+            include_dirs=numeric_inc_dirs,            
+            )
+
+        add_numpy_flags(module)
+        module.extra_compile_args.append('-DSCIPY=1')
         add_base_flags(module)
         add_pygtk_flags(module)        
         ext_modules.append(module)

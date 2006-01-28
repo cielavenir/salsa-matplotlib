@@ -25,14 +25,14 @@ import sys, warnings
 from numerix import array, ones, Float
 
 
-from matplotlib import verbose
+from matplotlib import verbose, rcParams
 from artist import Artist
 from cbook import enumerate, is_string_like, iterable, silent_list
 from font_manager import FontProperties
 from lines import Line2D
 from mlab import linspace, segments_intersect
-from patches import Patch, Rectangle, Shadow, bbox_artist, draw_bbox
-from collections import LineCollection
+from patches import Patch, Rectangle, RegularPolygon, Shadow, bbox_artist, draw_bbox
+from collections import LineCollection, RegularPolyCollection, PatchCollection
 from text import Text
 from transforms import Bbox, Point, Value, get_bbox_transform, bbox_all,\
      unit_bbox, inverse_transform_bbox, lbwh_to_bbox
@@ -51,7 +51,7 @@ def line_cuts_bbox(line, bbox):
         return False
 
     if n == 1:
-        return bbox.contains(line[0])
+        return bbox.contains(line[0][0], line[0][1])        
     
     p1 = line[0]
     for p2 in line[1:]:
@@ -110,18 +110,18 @@ class Legend(Artist):
 
 
     def __init__(self, parent, handles, labels, loc,
-                 isaxes=True,
-                 numpoints = 4,      # the number of points in the legend line
-                 prop = FontProperties(size='smaller'),
-                 pad = 0.2,          # the fractional whitespace inside the legend border
-                 markerscale = 0.6,    # the relative size of legend markers vs. original
+                 isaxes= None,
+                 numpoints = None,      # the number of points in the legend line
+                 prop = None,
+                 pad = None,          # the fractional whitespace inside the legend border
+                 markerscale = None,    # the relative size of legend markers vs. original
                  # the following dimensions are in axes coords
-                 labelsep = 0.005,     # the vertical space between the legend entries
-                 handlelen = 0.05,     # the length of the legend lines
-                 handletextsep = 0.02, # the space between the legend line and legend text
-                 axespad = 0.02,       # the border between the axes and legend edge
+                 labelsep = None,     # the vertical space between the legend entries
+                 handlelen = None,     # the length of the legend lines
+                 handletextsep = None, # the space between the legend line and legend text
+                 axespad = None,       # the border between the axes and legend edge
 
-                 shadow=False,
+                 shadow= None,
                  ):
         """
   parent                # the artist that contains the legend
@@ -146,19 +146,19 @@ The following dimensions are in axes coords
             warnings.warn('Unrecognized location %s. Falling back on upper right; valid locations are\n%s\t' %(loc, '\n\t'.join(self.codes.keys())))
         if is_string_like(loc): loc = self.codes.get(loc, 1)
 
-        self.numpoints = numpoints
-        self.prop = prop
-        self.fontsize = prop.get_size_in_points()
-        self.pad = pad
-        self.markerscale = markerscale
-        self.labelsep = labelsep
-        self.handlelen = handlelen
-        self.handletextsep = handletextsep
-        self.axespad = axespad
-        self.shadow = shadow
+        proplist=[numpoints, pad, markerscale, labelsep, handlelen, handletextsep, axespad, shadow, isaxes]
+        propnames=['numpoints', 'pad', 'markerscale', 'labelsep', 'handlelen', 'handletextsep', 'axespad', 'shadow', 'isaxes']
+        for name, value in zip(propnames,proplist):
+            if value is None:
+                value=rcParams["legend."+name]
+            setattr(self,name,value)
+        if prop is None:
+            self.prop=FontProperties(size=rcParams["legend.fontsize"])
+        else:
+            self.prop=prop
+        self.fontsize = self.prop.get_size_in_points()
 
-        self.isaxes = isaxes
-        if isaxes:  # parent is an Axes
+        if self.isaxes:  # parent is an Axes
             self.set_figure(parent.figure)
         else:        # parent is a Figure
             self.set_figure(parent)
@@ -169,21 +169,26 @@ The following dimensions are in axes coords
 
         # make a trial box in the middle of the axes.  relocate it
         # based on it's bbox
-        left, upper = 0.5, 0.5
+        left, top = 0.5, 0.5
         if self.numpoints == 1:
             self._xdata = array([left + self.handlelen*0.5])
         else:
             self._xdata = linspace(left, left + self.handlelen, self.numpoints)
         textleft = left+ self.handlelen+self.handletextsep
-        self.texts = self._get_texts(labels, textleft, upper)
+        self.texts = self._get_texts(labels, textleft, top)
         self.legendHandles = self._get_handles(handles, self.texts)
 
-        left, top = self.texts[-1].get_position()
-        HEIGHT = self._approx_text_height()
+
+        if len(self.texts):
+            left, top = self.texts[-1].get_position()
+            HEIGHT = self._approx_text_height()*len(self.texts)
+        else:
+            HEIGHT = 0.2
+
         bottom = top-HEIGHT
         left -= self.handlelen + self.handletextsep + self.pad
         self.legendPatch = Rectangle(
-            xy=(left, bottom), width=0.5, height=HEIGHT*len(self.texts),
+            xy=(left, bottom), width=0.5, height=HEIGHT,
             facecolor='w', edgecolor='k',
             )
         self._set_artist_props(self.legendPatch)
@@ -208,6 +213,7 @@ The following dimensions are in axes coords
             self.legendPatch.draw(renderer)
 
 
+        if not len(self.legendHandles) and not len(self.texts): return
         for h in self.legendHandles:
             if h is not None:
 		h.draw(renderer)
@@ -252,7 +258,7 @@ The following dimensions are in axes coords
                 self._set_artist_props(legline) # after update
                 legline.set_clip_box(None)
                 legline.set_markersize(self.markerscale*legline.get_markersize())
-                legline.set_data_clipping(False)
+
                 ret.append(legline)
             elif isinstance(handle, Patch):
 
@@ -268,13 +274,25 @@ The following dimensions are in axes coords
                 legline = Line2D(self._xdata, ydata)
                 self._set_artist_props(legline)
                 legline.set_clip_box(None)
-                lw = handle.get_linewidths()[0]
+                lw = handle.get_linewidth()[0]
                 dashes = handle.get_dashes()
                 color = handle.get_colors()[0]
                 legline.set_color(color)
                 legline.set_linewidth(lw)
                 legline.set_dashes(dashes)
                 ret.append(legline)
+
+            elif isinstance(handle, RegularPolyCollection):
+
+                p = Rectangle(xy=(min(self._xdata), y-3/4*HEIGHT),
+                              width = self.handlelen, height=HEIGHT/2,
+                              )
+                p.set_facecolor(handle._facecolors[0])
+                if handle._edgecolors != 'None':
+                    p.set_edgecolor(handle._edgecolors[0])
+                self._set_artist_props(p)
+                p.set_clip_box(None)
+                ret.append(p)
 
 	    else:
 		ret.append(None)
@@ -301,6 +319,7 @@ The following dimensions are in axes coords
             handles = ax.lines
             handles.extend(ax.patches)
             handles.extend([c for c in ax.collections if isinstance(c, LineCollection)])
+
             return handles
 
         ax = self.parent
@@ -405,6 +424,8 @@ The following dimensions are in axes coords
             elif isinstance(h, Rectangle):
                 h.xy[0] = h.xy[0] + ox
                 h.xy[1] = h.xy[1] + oy
+            elif isinstance(h, RegularPolygon):
+                h.verts = [(x + ox, y + oy) for x, y in h.verts]
 
         x, y = self.legendPatch.get_x(), self.legendPatch.get_y()
         self.legendPatch.set_x(x+ox)
@@ -497,6 +518,7 @@ The following dimensions are in axes coords
         # called from renderer to allow more precise estimates of
         # widths and heights with get_window_extent
 
+        if not len(self.legendHandles) and not len(self.texts): return
         def get_tbounds(text):  #get text bounds in axes coords
             bbox = text.get_window_extent(renderer)
             bboxa = inverse_transform_bbox(self._transform, bbox)
