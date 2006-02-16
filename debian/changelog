@@ -1,3 +1,9 @@
+matplotlib (0.86.2-2) unstable; urgency=low
+
+  * Packages now depend both on python-numarray and python-numeric. Closes: #353043
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Thu, 16 Feb 2006 19:19:42 +0100
+
 matplotlib (0.86.2-1) unstable; urgency=low
 
   * New upstream release. Closes: #341730

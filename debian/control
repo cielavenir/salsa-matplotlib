@@ -50,7 +50,7 @@ Description: python based plotting system (documentation package)
 
 Package: python2.3-matplotlib
 Architecture: any
-Depends: ${python:Depends}, ${shlibs:Depends}, ttf-bitstream-vera, python2.3-numeric | python2.3-numarray, python2.3-gd(>=0.52) | python-pypaint | python2.3-gtk2 | libwxgtk2.4-python | python2.3-qt3, python2.3-numeric-ext | python2.3-numarray-ext, python2.3-dev, dvipng, python-matplotlib-data(=${Source-Version})
+Depends: ${python:Depends}, ${shlibs:Depends}, ttf-bitstream-vera, python2.3-numeric | python2.3-numarray, python2.3-gd(>=0.52) | python-pypaint | python2.3-gtk2 | libwxgtk2.4-python | python2.3-qt3, python2.3-numeric-ext, python2.3-numarray-ext, python2.3-dev, dvipng, python-matplotlib-data(=${Source-Version})
 Suggests: ipython(>=0.6.3), tetex-extra, python-matplotlib-doc
 Enhances: ipython
 Description: python based plotting system (Python 2.3 version)
@@ -65,7 +65,7 @@ Description: python based plotting system (Python 2.3 version)
 
 Package: python2.4-matplotlib
 Architecture: any
-Depends: ${python:Depends}, ${shlibs:Depends}, ttf-bitstream-vera, python2.4-numeric | python2.4-numarray, python2.4-gd(>=0.52) | python-pypaint | python2.4-gtk2 | libwxgtk2.4-python | python2.4-qt3, python2.4-numeric-ext | python2.4-numarray-ext, python2.4-dev, dvipng, python-matplotlib-data(=${Source-Version})
+Depends: ${python:Depends}, ${shlibs:Depends}, ttf-bitstream-vera, python2.4-numeric | python2.4-numarray, python2.4-gd(>=0.52) | python-pypaint | python2.4-gtk2 | libwxgtk2.4-python | python2.4-qt3, python2.4-numeric-ext, python2.4-numarray-ext, python2.4-dev, dvipng, python-matplotlib-data(=${Source-Version})
 Suggests: ipython(>=0.6.3), tetex-extra, python-matplotlib-doc
 Enhances: ipython
 Description: python based plotting system (Python 2.4 version)
