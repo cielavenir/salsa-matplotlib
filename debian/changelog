@@ -1,3 +1,10 @@
+matplotlib (0.86.2-2.1) unstable; urgency=high
+
+  * Non-maintainer upload.
+  * Fix FTBFS 'rm: cannot remove ...: No such file ... (Closes: #354370).
+
+ -- Luk Claes <luk@debian.org>  Thu, 16 Mar 2006 18:52:47 +0100
+
 matplotlib (0.86.2-2) unstable; urgency=low
 
   * Packages now depend both on python-numarray and python-numeric. Closes: #353043

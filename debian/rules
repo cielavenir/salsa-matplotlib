@@ -80,14 +80,14 @@ install-indep: build-indep
 	dh_clean -k
 	python ./setup.py install_data -d $(CURDIR)/debian/$(pdata)/usr/share
 
-	rm $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/Vera*.ttf
+	rm $(CURDIR)/debian/$(pdata)/usr/share/lib/python2.3/site-packages/matplotlib/mpl-data/Vera*.ttf
 
 	# make svg images not executable:
-	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/*.svg
+	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/lib/python2.3/site-packages/matplotlib/mpl-data/*.svg
 
 	# move .matplotlibrc to /etc
 	mkdir $(CURDIR)/debian/$(pdata)/etc/
-	mv $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/matplotlibrc \
+	mv $(CURDIR)/debian/$(pdata)/usr/share/lib/python2.3/site-packages/matplotlib/mpl-data/matplotlibrc \
 		$(CURDIR)/debian/$(pdata)/etc/matplotlibrc
 
 # binary
