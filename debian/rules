@@ -6,10 +6,9 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
+PYVERS:= $(shell pyversions -v -rdebian/control)
 pd  := python-matplotlib-doc
 p   := python-matplotlib
-p23 := python2.3-matplotlib
-p24 := python2.4-matplotlib
 pdata := python-matplotlib-data
 
 # Include dpatch stuff.
@@ -29,17 +28,13 @@ build-indep-stamp:
 	#wget http://matplotlib.sourceforge.net/$(users_guide)
 	touch build-indep-stamp
 
-build-arch:build23-stamp build24-stamp
+build-arch:$(PYVERS:%=build-stamp-%)
 
-build23-stamp:
+build-stamp-%:
 	dh_testdir
-	python2.3 ./setup.py build $(PY_BUILD_FLAGS)
-	touch build23-stamp
+	python$* ./setup.py build $(PY_BUILD_FLAGS)
+	touch $@
 
-build24-stamp:
-	dh_testdir
-	python2.4 ./setup.py build $(PY_BUILD_FLAGS)
-	touch build24-stamp
 
 # clean
 clean: clean-patched unpatch
@@ -48,31 +43,25 @@ clean-patched: patch
 	dh_testroot
 	python2.3 ./setup.py clean --all
 	python2.4 ./setup.py clean --all
-	-rm -f *-stamp
+	-rm -f *-stamp*
 	-rm -rf build *.pyc *.pyo *.pdf doc/html/
 	find ./lib -name '*.pyc' -exec rm {} \;
 	dh_clean
 	sh $(CURDIR)/debian/mkcopyright.sh
 
 # install
-install-arch: build-arch
+install-arch: build-arch $(PYVERS:%=install-stamp-%)
 	dh_testdir
 	dh_testroot
-	dh_clean -k
 
-	python2.3 ./setup.py install_lib \
-		-d $(CURDIR)/debian/$(p23)/usr/lib/python2.3/site-packages/ --no-compile
-	#python2.3 ./setup.py install_scripts \
-	#	-d $(CURDIR)/debian/$(p23)/usr/lib/python2.3/site-packages/
-	dh_install -p$(p23) lib/dateutil usr/lib/python2.3/site-packages/
-	dh_install -p$(p23) lib/pytz usr/lib/python2.3/site-packages/
-
-	python2.4 ./setup.py install_lib \
-		-d $(CURDIR)/debian/$(p24)/usr/lib/python2.4/site-packages/ --no-compile
-	#python2.4 ./setup.py install_scripts \
-	#	-d $(CURDIR)/debian/$(p24)/usr/lib/python2.4/site-packages/
-	dh_install -p$(p24) lib/dateutil usr/lib/python2.4/site-packages/
-	dh_install -p$(p24) lib/pytz usr/lib/python2.4/site-packages/
+install-stamp-%: build-stamp-%
+	dh_testdir
+	dh_testroot
+	python$* ./setup.py install_lib \
+		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/ --no-compile
+	dh_install -p$(p) lib/dateutil usr/lib/python$*/site-packages/
+	dh_install -p$(p) lib/pytz usr/lib/python$*/site-packages/
+	touch $@
 
 install-indep: build-indep
 	dh_testdir -i
@@ -95,7 +84,6 @@ binary-indep: build-indep install-indep
 	dh_testdir -i
 	dh_testroot -i
 	dh_installchangelogs -i CHANGELOG
-	dh_installdocs -p$(p) -i
 	dh_installdocs -p$(pd) -i
 	dh_installexamples -p$(pd) -i examples/*
 	dh_install -p$(pd) doc/* usr/share/doc/$(pd)
@@ -118,6 +106,8 @@ binary-arch: build-arch install-arch
 	    echo "made executable: $$i"; \
 	  fi; \
 	done
+	dh_pycentral -a
+	dh_python -a
 	dh_link -a
 	dh_strip -a
 	dh_compress -a

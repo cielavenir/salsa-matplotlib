@@ -1,3 +1,10 @@
+matplotlib (0.86.2-5) unstable; urgency=low
+
+  * Updated to new Python policy (closes: #373462)
+  * fixed dependency on python-numarray (closes: #373165)
+
+ -- Alexandre Fayolle <afayolle@debian.org>  Thu, 15 Jun 2006 18:27:18 +0200
+
 matplotlib (0.86.2-4) unstable; urgency=low
 
   * Added Build-Deps on python-setuputils. Closes: #358597
