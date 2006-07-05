@@ -6,7 +6,7 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-PYVERS:= $(shell pyversions -v -rdebian/control)
+PYVERS := $(shell pyversions -v -r debian/control)
 pd  := python-matplotlib-doc
 p   := python-matplotlib
 pdata := python-matplotlib-data

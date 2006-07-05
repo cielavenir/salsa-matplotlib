@@ -1,3 +1,12 @@
+matplotlib (0.86.2-6) unstable; urgency=low
+
+  * Added a note about numeric/numarray deps in README.debian. Closes: #376198
+  * Added PYVERS to debian/rules (Carlo Segre <segre@iit.edu> patch). Closes: #376239
+  * Modified Vittorio Palmisano e-mail address.
+  * Modified debian/watch entry (thanks to Carlo Segre <segre@iit.edu>). Closes: #376192
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Thu,  6 Jul 2006 00:20:49 +0200
+
 matplotlib (0.86.2-5) unstable; urgency=low
 
   * Updated to new Python policy (closes: #373462)
