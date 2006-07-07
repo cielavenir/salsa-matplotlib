@@ -60,7 +60,7 @@ install-stamp-%: build-stamp-%
 	python$* ./setup.py install_lib \
 		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/ --no-compile
 	dh_install -p$(p) lib/dateutil usr/lib/python$*/site-packages/
-	dh_install -p$(p) lib/pytz usr/lib/python$*/site-packages/
+	rm -rf debian/$(p)/usr/lib/python$*/site-packages/pytz
 	touch $@
 
 install-indep: build-indep

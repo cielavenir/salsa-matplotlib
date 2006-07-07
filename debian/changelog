@@ -1,3 +1,9 @@
+matplotlib (0.86.2-6.1) unstable; urgency=low
+
+  * Depend on python-tz, remove the pytz files. Closes: #376715.
+
+ -- Matthias Klose <doko@debian.org>  Fri,  7 Jul 2006 18:38:43 +0000
+
 matplotlib (0.86.2-6) unstable; urgency=low
 
   * Added a note about numeric/numarray deps in README.debian. Closes: #376198
