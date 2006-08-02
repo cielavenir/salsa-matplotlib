@@ -11,7 +11,7 @@
     was written by following the Python "Extending and Embedding"
     tutorial.
 
-  $Id: cntr.c,v 1.8 2006/01/20 18:36:58 cmoad Exp $
+  $Id: cntr.c 2546 2006-07-08 01:01:54Z teoliphant $
  */
 
 #include <Python.h>
@@ -25,7 +25,11 @@
 #ifdef NUMERIC
 #include "Numeric/arrayobject.h"
 #else
+#define PY_ARRAY_TYPES_PREFIX NumPy
 #include "numpy/arrayobject.h"
+#if (NDARRAY_VERSION >= 0x00090908)
+#include "numpy/oldnumeric.h"
+#endif
 #endif
 #endif
 
@@ -1348,8 +1352,8 @@ build_cntr_list_v(long *np, double *xp, double *yp, int nparts, long ntotal)
     for (i = 0; i < nparts; i++)
     {
         dims[0] = np[i];
-        xv = (PyArrayObject *) PyArray_FromDims(1, dims, 'd');
-        yv = (PyArrayObject *) PyArray_FromDims(1, dims, 'd');
+        xv = (PyArrayObject *) PyArray_FromDims(1, dims, PyArray_DOUBLE);
+        yv = (PyArrayObject *) PyArray_FromDims(1, dims, PyArray_DOUBLE);
         if (xv == NULL || yv == NULL)  goto error;
         for (j = 0; j < dims[0]; j++)
         {
@@ -1367,6 +1371,41 @@ build_cntr_list_v(long *np, double *xp, double *yp, int nparts, long ntotal)
     Py_XDECREF(all_contours);
     return NULL;
 }
+
+/* Build a list of XY 2-D arrays, shape (N,2) */
+static PyObject *
+build_cntr_list_v2(long *np, double *xp, double *yp, int nparts, long ntotal)
+{
+    PyObject *point, *all_contours;
+    PyArrayObject *xyv;
+    int dims[2];
+    int i;
+    long j, k;
+
+    all_contours = PyList_New(nparts);
+
+    k = 0;
+    for (i = 0; i < nparts; i++)
+    {
+        dims[0] = np[i];
+        dims[1] = 2;
+        xyv = (PyArrayObject *) PyArray_FromDims(2, dims, PyArray_DOUBLE);
+        if (xyv == NULL)  goto error;
+        for (j = 0; j < dims[0]; j++)
+        {
+            ((double *)xyv->data)[2*j] = xp[k];
+            ((double *)xyv->data)[2*j+1] = yp[k];
+            k++;
+        }
+        if (PyList_SetItem(all_contours, i, (PyObject *)xyv)) goto error;
+    }
+    return all_contours;
+
+    error:
+    Py_XDECREF(all_contours);
+    return NULL;
+}
+
 
 
 /* cntr_trace is called once per contour level or level pair.
@@ -1462,7 +1501,7 @@ cntr_trace(Csite *site, double levels[], int nlevels, int points, long nchunk)
     }
     else
     {
-        c_list = build_cntr_list_v(nseg0, xp0, yp0, nparts, ntotal);
+        c_list = build_cntr_list_v2(nseg0, xp0, yp0, nparts, ntotal);
     }
     PyMem_Free(xp0); PyMem_Free(yp0); PyMem_Free(nseg0);
     site->xcp = NULL; site->ycp = NULL;
@@ -1548,13 +1587,13 @@ Cntr_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 Cntr_init(Cntr *self, PyObject *args, PyObject *kwds)
 {
+    static char *kwlist[] = {"x", "y", "z", "mask", NULL};
     PyObject *xarg, *yarg, *zarg, *marg;
     PyArrayObject *xpa, *ypa, *zpa, *mpa;
     long iMax, jMax;
     char *mask;
 
     marg = NULL;
-    static char *kwlist[] = {"x", "y", "z", "mask", NULL};
 
     if (! PyArg_ParseTupleAndKeywords(args, kwds, "OOO|O", kwlist,
                                       &xarg, &yarg, &zarg, &marg))
@@ -1570,11 +1609,17 @@ Cntr_init(Cntr *self, PyObject *args, PyObject *kwds)
         return -1;
     }
 
-    xpa = (PyArrayObject *) PyArray_ContiguousFromObject(xarg, 'd', 2, 2);
-    ypa = (PyArrayObject *) PyArray_ContiguousFromObject(yarg, 'd', 2, 2);
-    zpa = (PyArrayObject *) PyArray_ContiguousFromObject(zarg, 'd', 2, 2);
+    xpa = (PyArrayObject *) PyArray_ContiguousFromObject(xarg,
+							 PyArray_DOUBLE, 2, 2);
+    ypa = (PyArrayObject *) PyArray_ContiguousFromObject(yarg,
+							 PyArray_DOUBLE,
+							 2, 2);
+    zpa = (PyArrayObject *) PyArray_ContiguousFromObject(zarg, PyArray_DOUBLE,
+							 2, 2);
     if (marg)
-        mpa = (PyArrayObject *) PyArray_ContiguousFromObject(marg, '1', 2, 2);
+        mpa = (PyArrayObject *) PyArray_ContiguousFromObject(marg,
+							     PyArray_SBYTE,
+							     2, 2);
     else
         mpa = NULL;
 

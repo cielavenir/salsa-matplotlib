@@ -7,8 +7,11 @@ from __future__ import division
  Author: Charles Moad (cmoad@users.sourceforge.net)
 
  Notes:
-  - THIS IS STILL IN DEVELOPMENT!
   - Requires PyObjC (currently testing v1.3.7)
+  - The Tk backend works nicely on OSX.  This code
+    primarily serves as an example of embedding a
+    matplotlib rendering context into a cocoa app
+    using a NSImageView.
 """
 
 import os, sys
@@ -33,7 +36,8 @@ from matplotlib._pylab_helpers import Gcf
 mplBundle = NSBundle.bundleWithPath_(matplotlib.get_data_path())
 
 def new_figure_manager(num, *args, **kwargs):
-    thisFig = Figure( *args, **kwargs )
+    FigureClass = kwargs.pop('FigureClass', Figure)
+    thisFig = FigureClass( *args, **kwargs )
     canvas = FigureCanvasCocoaAgg(thisFig)
     return FigureManagerCocoaAgg(canvas, num)
 
@@ -92,7 +96,9 @@ class MatplotlibController(NibClassBuilder.AutoBaseClass):
         return objc.YES
 
     def saveFigure_(self, sender):
-        print >>sys.stderr, 'Not Implented Yet'
+        p = NSSavePanel.savePanel()
+        if(p.runModal() == NSFileHandlingPanelOKButton):
+            self.canvas.print_figure(p.filename())
 
     def printFigure_(self, sender):
         op = NSPrintOperation.printOperationWithView_(self.plotView)

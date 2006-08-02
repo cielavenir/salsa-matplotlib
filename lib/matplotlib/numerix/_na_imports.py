@@ -5,8 +5,9 @@ from numarray import Int8, UInt8, Int16, UInt16, Int32, UInt32, \
      Float32, Float64, Complex32, Complex64, Float, Int, Complex,\
      typecode
 import numarray.ieeespecial as _ieee
+from matplotlib._isnan import isnan64 as _isnan
 inf = infinity = infty = Infinity = _ieee.inf
-
+isnan = _ieee.isnan
 
 class _TypeNamespace:
     """Numeric compatible type aliases for use with extension functions."""
@@ -23,7 +24,15 @@ class _TypeNamespace:
 
 nx = _TypeNamespace()
 
-from numarray import asarray, dot, fromlist, NumArray, shape
+from numarray import asarray, dot, fromlist, NumArray, shape, alltrue
+from numarray import all as _all
+
+def all(a, axis=None):
+    '''Numpy-compatible version of all()'''
+    if axis is None:
+        return _all(a)
+    return alltrue(a, axis)
+
 class _Matrix(NumArray):
     """_Matrix is a ported, stripped down version of the Numeric Matrix
     class which supplies only matrix multiplication.
@@ -33,7 +42,7 @@ class _Matrix(NumArray):
             return a
         else:
             return Matrix(a)
-            
+
     def __mul__(self, other):
         aother = asarray(other)
         #if len(aother.shape) == 0:
@@ -66,7 +75,3 @@ def Matrix(data, typecode=None, copy=1, savespace=0):
         a.shape = (1,) + a.shape
     a.__class__ = _Matrix
     return a
-
-
-
-

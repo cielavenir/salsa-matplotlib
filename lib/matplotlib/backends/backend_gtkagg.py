@@ -38,7 +38,8 @@ def new_figure_manager(num, *args, **kwargs):
     Create a new figure manager instance
     """
     if DEBUG: print 'backend_gtkagg.new_figure_manager'
-    thisFig = Figure(*args, **kwargs)
+    FigureClass = kwargs.pop('FigureClass', Figure)
+    thisFig = FigureClass(*args, **kwargs)
     canvas = FigureCanvasGTKAgg(thisFig)
     return FigureManagerGTKAgg(canvas, num)
     if DEBUG: print 'backend_gtkagg.new_figure_manager done'
@@ -79,7 +80,8 @@ class FigureCanvasGTKAgg(FigureCanvasGTK, FigureCanvasAgg):
         h = int(ren.height)
         pixbuf = gtk.gdk.pixbuf_new_from_data(
             buf, gtk.gdk.COLORSPACE_RGB,  True, 8, w, h, w*4)
-        pixmap.draw_pixbuf(pixmap.new_gc(), pixbuf, 0, 0, 0, 0, w, h, gtk.gdk.RGB_DITHER_NONE, 0, 0)
+        pixmap.draw_pixbuf(pixmap.new_gc(), pixbuf, 0, 0, 0, 0, w, h,
+                           gtk.gdk.RGB_DITHER_NONE, 0, 0)
         if DEBUG: print 'FigureCanvasGTKAgg.render_figure done'
 
     def blit(self, bbox=None):
@@ -93,22 +95,22 @@ class FigureCanvasGTKAgg(FigureCanvasGTK, FigureCanvasAgg):
                                    0, 0, 0, 0, w, h)
         if DEBUG: print 'FigureCanvasGTKAgg.done'
 
-    def print_figure(self, filename, dpi=150,
-                     facecolor='w', edgecolor='w',
-                     orientation='portrait'):
+    def print_figure(self, filename, dpi=150, facecolor='w', edgecolor='w',
+                     orientation='portrait', **kwargs):
         if DEBUG: print 'FigureCanvasGTKAgg.print_figure'
         # delete the renderer to prevent improper blitting after print
 
         root, ext = os.path.splitext(filename)       
         ext = ext.lower()[1:]
         if ext == 'jpg':
-            FigureCanvasGTK.print_figure(self, filename, dpi, facecolor,
-                                         edgecolor, orientation)
+            FigureCanvasGTK.print_figure(self, filename, dpi, facecolor, 
+                                         edgecolor, orientation, **kwargs)
             
         else:
             agg = self.switch_backends(FigureCanvasAgg)
             try:
-                agg.print_figure(filename, dpi, facecolor, edgecolor, orientation)
+                agg.print_figure(filename, dpi, facecolor, edgecolor,
+                                 orientation, **kwargs)
             except IOError, msg:
                 error_msg_gtk('Failed to save\nError message: %s'%(msg,), self)
 

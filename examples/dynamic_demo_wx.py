@@ -19,7 +19,7 @@ Should you require a toolbar and navigation, inspire yourself from
 embedding_in_wx.py, which provides these features.
 
 Modification History:
-$Log: dynamic_demo_wx.py,v $
+$Log$
 Revision 1.7  2005/06/15 20:24:56  jdh2358
 syncing for 82
 

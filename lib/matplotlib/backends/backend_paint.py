@@ -238,9 +238,8 @@ class FigureCanvasPaint(FigureCanvasBase):
         self.figure.draw(renderer)
         return renderer
         
-    def print_figure(self, filename, dpi=150,
-                     facecolor='w', edgecolor='w',
-                     orientation='portrait'):
+    def print_figure(self, filename, dpi=150, facecolor='w', edgecolor='w',
+                     orientation='portrait, '**kwargs):
 
         """
         Render the figure to hardcopy using self.renderer as the
@@ -255,7 +254,6 @@ class FigureCanvasPaint(FigureCanvasBase):
         self.figure.set_edgecolor(edgecolor)
 
         renderer = self.draw()
-
 
         basename, ext = os.path.splitext(filename)
         if not len(ext): filename += '.png'
@@ -281,7 +279,8 @@ def new_figure_manager_paint(num, *args, **kwargs):
     backends, you'll need to instantiate a new window and embed
     the figure in it.
     """
-    thisFig = Figure(*args, **kwargs)
+    FigureClass = kwargs.pop('FigureClass', Figure)
+    thisFig = FigureClass(*args, **kwargs)
     canvas = FigureCanvasPaint(thisFig)
     manager = FigureManagerBase(canvas, num)
     return manager

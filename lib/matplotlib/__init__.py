@@ -143,11 +143,11 @@ the exception of those in mlab.py provided by matplotlib.
 from __future__ import generators
 
 
-__version__  = '0.86.2'
-__revision__ = '$Revision: 1.104 $'
-__date__     = '$Date: 2006/01/24 12:56:45 $'
+__version__  = '0.87.4'
+__revision__ = '$Revision: 2558 $'
+__date__     = '$Date: 2006-07-11 22:23:40 -0400 (Tue, 11 Jul 2006) $'
 
-import sys, os, warnings, shutil, md5
+import md5, os, re, shutil, sys, warnings
 import distutils.sysconfig
 
 # Needed for toolkit setuptools support
@@ -312,46 +312,6 @@ def _get_home():
 
 
 
-def _old_get_home():  #ignore me
-    """Return the closest possible equivalent to a 'home' directory.
-
-    We first try $HOME.  Absent that, on NT it's USERPROFILE if
-    defined, else, $HOMEDRIVE\$HOMEPATH, else C:\
-
-    """
-
-
-    try: return os.environ['HOME']
-    except KeyError: pass
-
-    if os.name == 'nt':
-        # For some strange reason, win9x returns 'nt' for os.name.
-
-        try: p = os.environ['USERPROFILE']
-        except KeyError: pass
-        else:
-            if os.path.exists(p): return p
-
-        try: p =  os.path.join(os.environ['HOMEDRIVE'],os.environ['HOMEPATH'])
-        except KeyError: pass
-        else:
-            if os.path.exists(p): return p
-
-        try:
-            import _winreg as wreg
-            key = wreg.OpenKey(wreg.HKEY_CURRENT_USER,
-                               'Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders')
-            p = wreg.QueryValueEx(key,'Personal')[0]
-            key.Close()
-            if os.path.exists(p): return p
-        except: pass
-        return 'C:\\'
-
-    raise RuntimeError('please define environment variable $HOME')
-
-
-
-
 get_home = verbose.wrap('$HOME=%s', _get_home, always=False)
 
 def _get_configdir():
@@ -374,67 +334,41 @@ get_configdir = verbose.wrap('CONFIGDIR=%s', _get_configdir, always=False)
 
 def _get_data_path():
     'get the path to matplotlib data'
-    
+
     if os.environ.has_key('MATPLOTLIBDATA'):
         path = os.environ['MATPLOTLIBDATA']
         if os.path.isdir(path): return path
-    
-    else:
-        path = '/usr/share/matplotlib/mpl-data'
-        if os.path.isdir(path): return path
 
-#    if _have_pkg_resources:
-#        try:
-#            dist = pkg_resources.get_distribution('matplotlib')
-#        except pkg_resources.DistributionNotFound:
-#            # pkg_resources is installed, but setuptools wasn't used into install matplotlib.
-#            used_setuptools_to_install_MPL = False
-#        else:
-#            used_setuptools_to_install_MPL = True
-#
-#        if used_setuptools_to_install_MPL:
-#            req = pkg_resources.Requirement.parse('matplotlib')
-#            path = pkg_resources.resource_filename(req, 'share/matplotlib')
-#            return path
-#
-#    if os.environ.has_key('MATPLOTLIBDATA'):
-#        path = os.environ['MATPLOTLIBDATA']
-#        if os.path.isdir(path): return path
-#
-#    path = os.path.join(distutils.sysconfig.PREFIX, 'share', 'matplotlib')
-#    if os.path.isdir(path): return path
-#
-#    path = '/usr/local/share/matplotlib'
-#    if os.path.isdir(path): return path
-#
-#    path = '/usr/share/matplotlib'
-#    if os.path.isdir(path): return path
-#
-#    path = os.path.join(os.sep.join(__file__.split(os.sep)[:-1]),
-#                        'share','matplotlib')
-#    if os.path.isdir(path): return path
-#
-#    path = os.path.join(os.sep.join(__file__.split(os.sep)[:-5]),
-#                        'share','matplotlib')
-#    if os.path.isdir(path): return path
-#
-#    # CODE ADDED TO SUPPORT PY2EXE - you will need to copy
-#    # C:\Python23\share\matplotlib into your dist dir.  See
-#    # http://starship.python.net/crew/theller/moin.cgi/MatPlotLib
-#    # for more info
-#
-#    if sys.platform=='win32' and sys.frozen:
-#        path = os.path.join(os.path.split(sys.path[0])[0], 'matplotlibdata')
-#        if os.path.isdir(path):  return path
-#        else:
-#            # Try again assuming sys.path[0] is a dir not a exe
-#            path = os.path.join(sys.path[0], 'matplotlibdata')
-#            if os.path.isdir(path): return path
-#
+    path = os.sep.join([os.path.dirname(__file__), 'mpl-data'])
+    if os.path.isdir(path): return path
+
+    # setuptools' namespace_packages may highjack this init file
+    # so need to try something known to be in matplotlib, not basemap
+    import matplotlib.afm
+    path = os.sep.join([os.path.dirname(matplotlib.afm.__file__), 'mpl-data'])
+    if os.path.isdir(path): return path
+
+    # py2exe zips pure python, so still need special check
+    if getattr(sys,'frozen',None):
+        path = os.path.join(os.path.split(sys.path[0])[0], 'matplotlibdata')
+        if os.path.isdir(path):  return path
+        else:
+            # Try again assuming sys.path[0] is a dir not a exe
+            path = os.path.join(sys.path[0], 'matplotlibdata')
+            if os.path.isdir(path): return path
+
     raise RuntimeError('Could not find the matplotlib data files')
 
 get_data_path = verbose.wrap('matplotlib data path %s', _get_data_path, always=False)
 
+def get_py2exe_datafiles():
+    import glob
+
+    mplfiles = glob.glob(os.sep.join([get_data_path(), '*']))
+    # Need to explicitly remove cocoa_agg files or py2exe complains
+    mplfiles.remove(os.sep.join([get_data_path(), 'Matplotlib.nib']))
+
+    return ('matplotlibdata', mplfiles)
 
 def checkdep_dvipng():
     try:
@@ -443,7 +377,7 @@ def checkdep_dvipng():
         v = line.split()[-1]
         float(v)
         return v
-    except IndexError, ValueError:
+    except (IndexError, ValueError):
         return None
 
 def checkdep_ghostscript():
@@ -458,7 +392,7 @@ def checkdep_ghostscript():
         vtest = '.'.join(v.split('.')[:2]) # deal with version numbers like '7.07.1'
         float(vtest)
         return vtest
-    except IndexError, ValueError:
+    except (IndexError, ValueError):
         return None
 
 def checkdep_ps2eps():
@@ -468,31 +402,30 @@ def checkdep_ps2eps():
         v = line.split()[-1]
         float(v)
         return v
-    except IndexError, ValueError:
+    except (IndexError, ValueError):
         return None
 
 def checkdep_tex():
     try:
-        stdin, stdout = os.popen4('tex -v')
+        stdin, stdout = os.popen4('tex -version')
         line = stdout.readlines()[0]
-        v = 0.0 # no version installed until we find one...
-        for potential_version_numstr in line.split():
-            if potential_version_numstr.startswith('3.1'):
-                v = potential_version_numstr
-                float(v)
-                break # found version number
+        pattern = '3\.1\d+'
+        match = re.search(pattern, line)
+        v = match.group(0)
+        float(v)
         return v
-    except IndexError, ValueError:
+    except (IndexError, ValueError):
         return None
 
 def checkdep_xpdf():
     try:
         stdin, stdout = os.popen4('xpdf -v')
-        line = stdout.readlines()[0]
-        v = line.split()[-1]
+        for line in stdout.readlines():
+            if 'version' in line:
+                v = line.split()[-1]
         float(v)
         return v
-    except IndexError, ValueError:
+    except (IndexError, ValueError):
         return None
 
 def compare_versions(a, b):
@@ -531,8 +464,19 @@ def validate_int(s):
     except ValueError:
         raise ValueError('Could not convert "%s" to int' % s)
 
+def validate_backend(s, fail_on_err = True):
+    s=s.lower()
+    backends = ['Agg2', 'Agg', 'Aqt', 'Cairo', 'CocoaAgg', 'EMF', 'GD', 'GDK',
+                'GTK', 'GTKAgg', 'GTKCairo', 'FltkAgg', 'Paint', 'Pdf', 'PS',
+                'QtAgg', 'Qt4Agg', 'SVG', 'Template', 'TkAgg', 'WX', 'WXAgg']
+    for i in backends:
+        if s == i.lower(): return i
+    if fail_on_err: raise ValueError('Backend must be %s, or %s'% \
+                        ', '.join((backends[:-1], backends[-1])))
+    else: return None
+
 def validate_numerix(s):
-    'return "Numeric" or "Numarray" or raise'
+    'return "Numeric" or "numarray" or "numpy" or raise'
     sl = s.lower()
     if sl=='numeric': return 'Numeric'
     elif sl=='numarray': return 'numarray'
@@ -578,11 +522,8 @@ def validate_color(s):
         except ValueError:
             raise ValueError('Could not convert all entries "%s" to floats'%s)
 
-    if s.replace('.', '').isdigit(): # looks like scalar
-        try: return float(s)
-        except ValueError:
-            raise ValueError('Could not convert "%s" to float' % s)
-
+    if s.replace('.', '').isdigit(): # looks like scalar (grayscale)
+        return s
 
     if len(s)==6 and s.isalnum(): # looks like hex
         return '#' + s
@@ -618,6 +559,14 @@ class ValidateInStrings:
 
 validate_orientation = ValidateInStrings(['landscape', 'portrait'])
 
+def validate_aspect(s):
+    if s in ('auto', 'equal'):
+        return s
+    try:
+        return float(s)
+    except ValueError:
+        raise ValueError('not a valid aspect specification')
+
 def validate_fontsize(s):
     if s.lower() in ['xx-small', 'x-small', 'small', 'medium', 'large', 'x-large',
              'xx-large', 'smaller', 'larger']:
@@ -648,93 +597,88 @@ def validate_verbose_fileo(s):
 
 
 validate_ps_papersize = ValidateInStrings([
-        'executive', 'letter', 'legal', 'ledger',
+        'auto', 'letter', 'legal', 'ledger',
         'a0', 'a1', 'a2','a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10',
-        'b0', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6',
-        'c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6'
+        'b0', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10',
         ], ignorecase=True)
 
 def validate_ps_distiller(s):
     s = s.lower()
-    
+
     if s == 'none':
         return None
     elif s == 'false':
         return False
-    
-    flag = True
-    
-    if (s == 'ghostscript') or (s == 'xpdf'):
+    elif s in ('ghostscript', 'xpdf'):
+        flag = True
         gs_req = '7.07'
-        gs_sugg = '8.16'
+        gs_sugg = '7.07'
         gs_v = checkdep_ghostscript()
         if compare_versions(gs_v, gs_sugg): pass
         elif compare_versions(gs_v, gs_req):
-            warnings.warn( 'ghostscript-%s.%s found. ghostscript-%s.%s or later is \
-recommended to use the ps.usedistiller option.' % (gs_v, gs_sugg), 'helpful')
+            verbose.report( 'ghostscript-%s found. ghostscript-%s or later \
+is recommended to use the ps.usedistiller option.' % (gs_v, gs_sugg))
         else:
             flag = False
             warnings.warn('matplotlibrc ps.usedistiller option can not be used \
 unless ghostscript-%s or later is installed on your system'% gs_req)
-    
-    if s == 'xpdf':
-        xpdf_req = '3.0'
-        ps2eps_req = '1.58'
-        xpdf_v = checkdep_xpdf()
-        if compare_versions(xpdf_v, xpdf_req): pass
-        else:
-            flag = False
-            warnings.warn('matplotlibrc ps.usedistiller can not be set to xpdf \
-unless xpdf-%s or later is installed on your system' % xpdf_req)
-        
-        ps2eps_v = checkdep_ps2eps()
-        if compare_versions(ps2eps_v, ps2eps_req): pass
-        else:
-            flag = False
-            warnings.warn('matplotlibrc ps.usedistiller can not be set to xpdf \
-unless ps2eps-%s or later is installed on your system' % ps2eps_req)
-        
-        if flag: return s.lower()
+
+        if s == 'xpdf':
+            xpdf_req = '3.0'
+            ps2eps_req = '1.58'
+            xpdf_v = checkdep_xpdf()
+            if compare_versions(xpdf_v, xpdf_req): pass
+            else:
+                flag = False
+                warnings.warn('matplotlibrc ps.usedistiller can not be set to \
+xpdf unless xpdf-%s or later is installed on your system' % xpdf_req)
+
+##            ps2eps_v = checkdep_ps2eps()
+##            if compare_versions(ps2eps_v, ps2eps_req): pass
+##            else:
+##                flag = False
+##                warnings.warn('matplotlibrc ps.usedistiller can not be set to xpdf \
+##unless ps2eps-%s or later is installed on your system' % ps2eps_req)
+
+        if flag: return s
         else: return None
-    else: 
+    else:
         raise ValueError('matplotlibrc ps.usedistiller must either be none, \
 ghostscript or xpdf')
-
-validate_tex_engine = ValidateInStrings(['tex', 'latex'], ignorecase=True)
 
 def validate_usetex(s):
     bl = validate_bool(s)
     if bl:
         tex_req = '3.1415'
         gs_req = '7.07'
-        gs_sugg = '8.16'
+        gs_sugg = '7.07'
         dvipng_req = '1.5'
         flag = True
-        
+
         tex_v = checkdep_tex()
         if compare_versions(tex_v, tex_req): pass
         else:
             flag = False
             warnings.warn('matplotlibrc text.usetex option can not be used \
 unless TeX-%s or later is installed on your system' % tex_req)
-        
+
         dvipng_v = checkdep_dvipng()
         if compare_versions(dvipng_v, dvipng_req): pass
         else:
             flag = False
             warnings.warn( 'matplotlibrc text.usetex can not be used with *Agg \
 backend unless dvipng-1.5 or later is installed on your system')
-        
+
         gs_v = checkdep_ghostscript()
         if compare_versions(gs_v, gs_sugg): pass
         elif compare_versions(gs_v, gs_req):
-            warnings.warn( 'ghostscript-%s found. ghostscript-%s or later is \
+            verbose.report( 'ghostscript-%s found. ghostscript-%s or later is \
 recommended for use with the text.usetex option.' % (gs_v, gs_sugg))
         else:
             flag = False
             warnings.warn('matplotlibrc text.usetex can not be used \
 unless ghostscript-%s or later is installed on your system'% gs_req)
-        
+
         if flag: return True
         else: return False
     else:
@@ -774,7 +718,7 @@ class ValidateInterval:
 
 # a map from key -> value, converter
 defaultParams = {
-    'backend'           : ['GTK', str],
+    'backend'           : ['GTK', validate_backend],
     'numerix'           : ['Numeric', validate_numerix],
     'toolbar'           : ['toolbar2', validate_toolbar],
     'datapath'          : [get_data_path(), validate_path_exists],
@@ -813,18 +757,17 @@ defaultParams = {
     'font.variant'      : ['normal', str],           #
     'font.stretch'      : ['normal', str],           #
     'font.weight'       : ['normal', str],           #
-    'font.size'         : ['medium', validate_fontsize], #
+    'font.size'         : [12.0, validate_float], #
     'font.serif'        : ['serif', validate_comma_sep_str],
     'font.sans-serif'   : ['sans-serif', validate_comma_sep_str],
     'font.cursive'      : ['cursive', validate_comma_sep_str],
     'font.fantasy'      : ['fantasy', validate_comma_sep_str],
     'font.monospace'    : ['monospace', validate_comma_sep_str],
-    'font.latex.package': ['type1cm', str],          # LaTeX font package: txfonts, pslatex, ...
 
     # text props
     'text.color'        : ['k', validate_color],     # black
     'text.usetex'       : [False, validate_usetex],
-    'text.tex.engine'   : ['tex', validate_tex_engine], # TeX or LaTeX
+    'text.dvipnghack'    : [False, validate_bool],
     'text.fontstyle'    : ['normal', str],
     'text.fontangle'    : ['normal', str],
     'text.fontvariant'  : ['normal', str],
@@ -832,13 +775,16 @@ defaultParams = {
     'text.fontsize'     : ['medium', validate_fontsize],
 
 
-    'image.aspect' : ['free', str],  # free| preserve
+    'image.aspect' : ['equal', validate_aspect],  # equal, auto, a number
     'image.interpolation'  : ['bilinear', str],
     'image.cmap'   : ['gray', str],        # one of gray, jet, etc
     'image.lut'    : [256, validate_int],  # lookup table
     'image.origin'    : ['upper', str],  # lookup table
 
+    'contour.negative_linestyle' : [(6.0,6.0), validate_nseq_float(2)],
+
     # axes props
+    'axes.axisbelow'         : [False, validate_bool],
     'axes.hold'         : [True, validate_bool],
     'axes.facecolor'    : ['w', validate_color],    # background color; white
     'axes.edgecolor'    : ['k', validate_color],    # edge color; black
@@ -851,16 +797,19 @@ defaultParams = {
     'polaraxes.grid'         : [True, validate_bool],   # display polar grid or not
 
     #legend properties
-    'legend.isaxes'	:	[True,validate_bool],
-    'legend.numpoints' 	:	[ 4,validate_int],      # the number of points in the legend line
+    'legend.isaxes'    :       [True,validate_bool],
+    'legend.numpoints'         :       [ 4,validate_int],      # the number of points in the legend line
     'legend.fontsize' : ["small",validate_fontsize],
-    'legend.pad' 	:	[ 0.2, validate_float],         # the fractional whitespace inside the legend border
-    'legend.markerscale' 	:	[ 0.6, validate_float],    # the relative size of legend markers vs. original
+    'legend.pad'       :       [ 0.2, validate_float],         # the fractional whitespace inside the legend border
+    'legend.markerscale'       :       [ 0.6, validate_float],    # the relative size of legend markers vs. original
+
+
     # the following dimensions are in axes coords
-    'legend.labelsep' 	:	[ 0.005, validate_float],    # the vertical space between the legend entries
-    'legend.handlelen' 	:	[ 0.05, validate_float],  # the length of the legend lines
-    'legend.handletextsep' 	:	[ 0.02, validate_float], # the space between the legend line and legend text
-    'legend.axespad' 	:	[ 0.02, validate_float], # the border between the axes and legend edge
+    'legend.labelsep'  :       [ 0.005, validate_float],    # the vertical space between the legend entries
+    'legend.handlelen'         :       [ 0.05, validate_float],  # the length of the legend lines
+    'legend.handletextsep'     :       [ 0.02, validate_float], # the space between the legend line and legend text
+    'legend.axespad'   :       [ 0.02, validate_float], # the border between the axes and legend edge
+
     'legend.shadow' : [ False, validate_bool ],
 
 
@@ -890,7 +839,7 @@ defaultParams = {
     # figure size in inches: width by height
     'figure.figsize'    : [ (8,6), validate_nseq_float(2)],
     'figure.dpi'        : [ 80, validate_float],   # DPI
-    'figure.facecolor'  : [ 0.75, validate_color], # facecolor; scalar gray
+    'figure.facecolor'  : [ '0.75', validate_color], # facecolor; scalar gray
     'figure.edgecolor'  : [ 'w', validate_color],  # edgecolor; white
 
     'figure.subplot.left'   : [0.125, ValidateInterval(0, 1, closedmin=False, closedmax=False)],
@@ -912,37 +861,11 @@ defaultParams = {
     'ps.useafm'   : [ False, validate_bool],  # Set PYTHONINSPECT
     'ps.usedistiller'   : [ False, validate_ps_distiller],  # use ghostscript or xpdf to distill ps output
     'ps.distiller.res'  : [6000, validate_int],       # dpi
+    'pdf.compression'   : [6, validate_int],            # compression level from 0 to 9; 0 to disable
     'plugins.directory' : ['.matplotlib_plugins', str], # where plugin directory is locate
 
     }
 
-
-def _old_matplotlib_fname():
-    """
-    Return the path to the rc file using the old search method
-    """
-
-    fname = os.path.join( os.getcwd(), '.matplotlibrc')
-    if os.path.exists(fname): return fname
-
-    if os.environ.has_key('MATPLOTLIBRC'):
-        path =  os.environ['MATPLOTLIBRC']
-        if os.path.exists(path):
-            fname = os.path.join(path, '.matplotlibrc')
-            if os.path.exists(fname):
-                return fname
-
-    home = get_home()
-    if home is not None:
-        fname = os.path.join(home, '.matplotlibrc')
-        if os.path.exists(fname):
-            return fname
-
-    path =  get_data_path() # guaranteed to exist or raise
-    fname = os.path.join(path, '.matplotlibrc')
-    if not os.path.exists(fname):
-        warnings.warn('Could not find .matplotlibrc; using defaults')
-    return fname
 
 def matplotlib_fname():
     """
@@ -999,18 +922,48 @@ WARNING: Old rc filename "%s" found and renamed to
     return fname
 
 
+def validate_key(key, val, line, cnt, fname, fail_on_error):
+    if key in _deprecated_map.keys():
+        alt = _deprecated_map[key]
+        warnings.warn('%s is deprecated in matplotlibrc - use %s instead.' % (key, alt))
+        key = alt
+
+    if not defaultParams.has_key(key):
+        print >> sys.stderr, """\
+Bad key "%s" on line %d in
+%s.
+You probably need to get an updated matplotlibrc file from
+http://matplotlib.sf.net/matplotlibrc or from the matplotlib source
+distribution""" % (key, cnt, fname)
+        return None
+
+    default, converter =  defaultParams[key]
+
+    ind = val.find('#')
+    if ind>=0: val = val[:ind]   # ignore trailing comments
+    val = val.strip()
+    if fail_on_error:
+        return converter(val)   # try to convert to proper type or raise
+    else:
+        try: cval = converter(val)   # try to convert to proper type or raise
+        except Exception, msg:
+            warnings.warn('Bad val "%s" on line #%d\n\t"%s"\n\tin file "%s"\n\t%s' % (
+                val, cnt, line, fname, msg))
+            return None
+        else:
+            return cval
+
+_deprecated_map = {
+    'text.fontstyle':   'font.style',
+    'text.fontangle':   'font.style',
+    'text.fontvariant': 'font.variant',
+    'text.fontweight':  'font.weight',
+    'text.fontsize':    'font.size',
+    'tick.size' :       'tick.major.size',
+    }
 
 def rc_params(fail_on_error=False):
     'Return the default params updated from the values in the rc file'
-
-    deprecated_map = {
-        'text.fontstyle':   'font.style',
-        'text.fontangle':   'font.style',
-        'text.fontvariant': 'font.variant',
-        'text.fontweight':  'font.weight',
-        'text.fontsize':    'font.size',
-        'tick.size' :       'tick.major.size',
-        }
 
     fname = matplotlib_fname()
     if not os.path.exists(fname):
@@ -1019,49 +972,35 @@ def rc_params(fail_on_error=False):
         warnings.warn(message)
         return ret
 
+    lines = [line.strip() for line in file(fname)]
     cnt = 0
-    for line in file(fname):
-        cnt +=1
-        line = line.strip()
+    rc_temp = {}
+    for line in lines:
+        cnt += 1
         if not len(line): continue
         if line.startswith('#'): continue
         tup = line.split(':',1)
         if len(tup) !=2:
             warnings.warn('Illegal line #%d\n\t%s\n\tin file "%s"' % (cnt, line, fname))
             continue
-
         key, val = tup
         key = key.strip()
-        if key in deprecated_map.keys():
-            alt = deprecated_map[key]
-            warnings.warn('%s is deprecated in matplotlibrc - use %s instead.' % (key, alt))
-            key = alt
+        rc_temp[key] = (val, line, cnt)
 
-        if not defaultParams.has_key(key):
-            warnings.warn('Bad key "%s" on line %d in %s' % (key, cnt, fname))
-            continue
-
-
-        default, converter =  defaultParams[key]
-
-
-        ind = val.find('#')
-        if ind>=0: val = val[:ind]   # ignore trailing comments
-        val = val.strip()
-        if fail_on_error:
-            cval = converter(val)   # try to convert to proper type or raise
-            defaultParams[key][0] = cval
+    for key in ('verbose.level', 'verbose.fileo'):
+        try: val, line, cnt = rc_temp.pop(key)
+        except KeyError: continue
         else:
-            try: cval = converter(val)   # try to convert to proper type or raise
-            except Exception, msg:
-                warnings.warn('Bad val "%s" on line #%d\n\t"%s"\n\tin file "%s"\n\t%s' % (
-                    val, cnt, line, fname, msg))
-                continue
-            else:
-                # Alles Klar, update dict
-                defaultParams[key][0] = cval
+            cval = validate_key(key, val, line, cnt, fname, fail_on_error)
+            if cval is not None: defaultParams[key][0] = cval
+    while len(rc_temp) > 0:
+        key, (val, line, cnt) = rc_temp.popitem()
 
-    # strip the conveter funcs and return
+        cval = validate_key(key, val, line, cnt, fname, fail_on_error)
+        if cval is not None: defaultParams[key][0] = cval
+        else: continue
+
+    # strip the converter funcs and return
     ret =  dict([ (key, tup[0]) for key, tup in defaultParams.items()])
     verbose.report('loaded rc file %s'%fname)
 
@@ -1144,7 +1083,6 @@ def rc(group, **kwargs):
 
             rcParams[key] = v
 
-
 def rcdefaults():
     """
     Restore the default rc params - the ones that were created at
@@ -1152,47 +1090,24 @@ def rcdefaults():
     """
     rcParams.update(rcParamsDefault)
 
-
-
-
-
-
-
-
-
 # Now allow command line to override
 
 # Allow command line access to the backend with -d (matlab compatible
 # flag)
 
-_knownBackends = {
-    'Agg2':1, 'Agg':1, 'Cairo':1, 'CocoaAgg':1, 'FltkAgg':1, 'GD':1, 'GDK':1,
-    'GTK':1, 'GTKAgg':1, 'GTKCairo':1, 'Paint':1, 'PS':1, 'LaTeX':1, 'QtAgg':1,
-    'SVG':1, 'EMF':1, 'Template':1, 'TkAgg':1, 'WX':1, 'WXAgg':1, 'WXGLAgg':1,}
-
-
-known = _knownBackends.keys()
 for s in sys.argv[1:]:
     if s.startswith('-d'):  # look for a -d flag
-        name = s[2:].strip()
+        name = validate_backend(s[2:].strip(), fail_on_err = False)
         # we don't want to assume all -d flags are backends, eg -debug
-        if name in  known:
+        if name:
             rcParams['backend'] = name
             break
 
-
-
 def use(arg):
     """
-    Set the matplotlib backend to one of the _knownBackends
+    Set the matplotlib backend to one of the known backends
     """
-
-    if not _knownBackends.has_key(arg):
-        raise ValueError('unrecognized backend %s.\n' % arg +\
-              'Use one of %s' % ', '.join( _knownBackends.keys() ))
-
-
-    rcParams['backend'] = arg
+    rcParams['backend'] = validate_backend(arg)
 
 def get_backend():
     return rcParams['backend']
@@ -1252,7 +1167,7 @@ class ExampleManager:
                 if m is not None:
                     examples.append('%s/%s'%(url, m.group(1)))
         return examples
-            
+
     def get_info(self, s):
         """
         return an ExampleInfo instance from s, the string content of

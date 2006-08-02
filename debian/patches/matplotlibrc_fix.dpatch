@@ -1,27 +1,28 @@
 #! /bin/sh /usr/share/dpatch/dpatch-run
-## build_fix.dpatch by Marco Presi (Zufus) <zufus@debian.org>
-##                  and Vittorio Palmisano <vpalmisano@gmail.com>
+## matplotlibrc_fix.dpatch by Marco Presi (Zufus) <zufus@debian.org>
 ##
 ## All lines beginning with `## DP:' are a description of the patch.
 ## DP: No description.
 
 @DPATCH@
-
-diff -Nuard matplotlib-0.86.2_orig/lib/matplotlib/__init__.py matplotlib-0.86.2_new/lib/matplotlib/__init__.py
---- matplotlib-0.86.2_orig/lib/matplotlib/__init__.py	2006-01-24 13:56:45.000000000 +0100
-+++ matplotlib-0.86.2_new/lib/matplotlib/__init__.py	2006-01-28 19:50:01.000000000 +0100
-@@ -938,8 +938,8 @@
-         if os.path.exists(fname):
-             return fname
+diff -urNad matplotlib-0.87.4~/lib/matplotlib/__init__.py matplotlib-0.87.4/lib/matplotlib/__init__.py
+--- matplotlib-0.87.4~/lib/matplotlib/__init__.py	2006-08-01 23:48:33.000000000 +0200
++++ matplotlib-0.87.4/lib/matplotlib/__init__.py	2006-08-01 23:49:36.000000000 +0200
+@@ -339,9 +339,11 @@
+         path = os.environ['MATPLOTLIBDATA']
+         if os.path.isdir(path): return path
  
--    path =  get_data_path() # guaranteed to exist or raise
--    fname = os.path.join(path, '.matplotlibrc')
-+    path =  '/etc' # guaranteed to exist or raise
-+    fname = os.path.join(path, 'matplotlibrc')
-     if not os.path.exists(fname):
-         warnings.warn('Could not find .matplotlibrc; using defaults')
-     return fname
-@@ -992,7 +992,7 @@
+-    path = os.sep.join([os.path.dirname(__file__), 'mpl-data'])
++    path = os.sep.join(['/usr/share/matplotlib', 'mpl-data'])
+     if os.path.isdir(path): return path
+-
++    
++    raise RuntimeError('Could not find the matplotlib data files')
++    
+     # setuptools' namespace_packages may highjack this init file
+     # so need to try something known to be in matplotlib, not basemap
+     import matplotlib.afm
+@@ -915,7 +917,7 @@
      if os.path.exists(fname): return fname
  
  

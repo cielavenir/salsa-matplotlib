@@ -63,7 +63,8 @@ def new_figure_manager( num, *args, **kwargs ):
     """
     Create a new figure manager instance
     """
-    thisFig = Figure( *args, **kwargs )
+    FigureClass = kwargs.pop('FigureClass', Figure)    
+    thisFig = FigureClass( *args, **kwargs )
     canvas = FigureCanvasQT( thisFig )
     manager = FigureManagerQT( canvas, num )
     return manager
@@ -120,6 +121,13 @@ class FigureCanvasQT( qt.QWidget, FigureCanvasBase ):
         FigureCanvasBase.key_release_event( self, key )
         if DEBUG: print 'key release', key
 
+    def resizeEvent( self, event ):
+        if DEBUG: print 'resize (%d x %d)' % (event.size().width(), event.size().height())
+        qt.QWidget.resizeEvent( self, event )
+
+    def resize( self, w, h ):
+        qt.QWidget.resize( self, w, h )
+
     def _get_key( self, event ):
         if event.key() < 256:
             key = event.text().latin1()
@@ -145,6 +153,7 @@ class FigureManagerQT( FigureManagerBase ):
         FigureManagerBase.__init__( self, canvas, num )
         self.canvas = canvas
         self.window = qt.QMainWindow( None, None, qt.Qt.WDestructiveClose )
+        self.window.closeEvent = self._widgetCloseEvent
 
         centralWidget = qt.QWidget( self.window )
         self.canvas.reparent( centralWidget, qt.QPoint( 0, 0 ) )
@@ -154,8 +163,6 @@ class FigureManagerQT( FigureManagerBase ):
         self.canvas.setFocus()
         self.window.setCaption( "Figure %d" % num )
 
-        qt.QObject.connect( self.window, qt.SIGNAL( 'destroyed()' ),
-                            self._widgetclosed )
         self.window._destroying = False
 
         if matplotlib.rcParams['toolbar'] == 'classic':
@@ -202,6 +209,10 @@ class FigureManagerQT( FigureManagerBase ):
         self.window._destroying = True
         Gcf.destroy(self.num)
 
+    def _widgetCloseEvent( self, event ):
+        self._widgetclosed()
+        qt.QWidget.closeEvent( self.window, event )
+
     def destroy( self, *args ):
         if self.window._destroying: return
         self.window._destroying = True
@@ -224,6 +235,8 @@ class NavigationToolbar2QT( NavigationToolbar2, qt.QWidget ):
         
     def __init__( self, parent, canvas ):
         self.canvas = canvas
+        self.buttons = {}
+
         qt.QWidget.__init__( self, parent )
 
         # Layout toolbar buttons horizontally.
@@ -247,6 +260,8 @@ class NavigationToolbar2QT( NavigationToolbar2, qt.QWidget ):
             button = qt.QPushButton( qt.QIconSet( image ), "", self )
             qt.QToolTip.add( button, tooltip_text )
 
+            self.buttons[ text ] = button
+
             # The automatic layout doesn't look that good - it's too close
             # to the images so add a margin around it.
             margin = 4
@@ -256,12 +271,23 @@ class NavigationToolbar2QT( NavigationToolbar2, qt.QWidget ):
                                 getattr( self, callback ) )
             self.layout.addWidget( button )
 
+        self.buttons[ 'Pan' ].setToggleButton( True )
+        self.buttons[ 'Zoom' ].setToggleButton( True )
+
         # Add the x,y location widget at the right side of the toolbar
         # The stretch factor is 1 which means any resizing of the toolbar
         # will resize this label instead of the buttons.
         self.locLabel = qt.QLabel( "", self )
         self.locLabel.setAlignment( qt.Qt.AlignRight | qt.Qt.AlignVCenter )
         self.layout.addWidget( self.locLabel, 1 )
+
+    def pan( self, *args ):
+        self.buttons[ 'Zoom' ].setOn( False )
+        NavigationToolbar2.pan( self, *args )
+
+    def zoom( self, *args ):
+        self.buttons[ 'Pan' ].setOn( False )
+        NavigationToolbar2.zoom( self, *args )
 
     def dynamic_update( self ):
         self.canvas.draw()
@@ -290,8 +316,15 @@ class NavigationToolbar2QT( NavigationToolbar2, qt.QWidget ):
         if fname:
             self.canvas.print_figure( fname.latin1() )
 
+    def set_history_buttons( self ):
+        canBackward = ( self._views._pos > 0 )
+        canForward = ( self._views._pos < len( self._views._elements ) - 1 )
+        self.buttons[ 'Back' ].setEnabled( canBackward )
+        self.buttons[ 'Forward' ].setEnabled( canForward )
+
 # set icon used when windows are minimized
 try:
+    # TODO: This is badly broken
     qt.window_set_default_icon_from_file (
         os.path.join( matplotlib.rcParams['datapath'], 'matplotlib.svg' ) )
 except:

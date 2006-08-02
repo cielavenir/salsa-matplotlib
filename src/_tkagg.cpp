@@ -1,6 +1,6 @@
 /*
  * The Python Imaging Library.
- * $Id: _tkagg.cpp,v 1.12 2005/12/06 18:33:17 efiring Exp $
+ * $Id: _tkagg.cpp 2145 2006-03-14 16:06:52 -0500 (Tue, 14 Mar 2006) jdh2358 $
  *
  */
 
@@ -68,8 +68,6 @@ PyAggImagePhoto(ClientData clientdata, Tcl_Interp* interp,
     /* get array (or object that can be converted to array) pointer */
     aggo = (PyObject*)atol(argv[2]);
     RendererAgg *aggRenderer = (RendererAgg *)aggo;
-    int srcstride = aggRenderer->get_width()*4;
-    int srcwidth = (int)aggRenderer->get_width();
     int srcheight = (int)aggRenderer->get_height();
 
     /* XXX insert aggRenderer type check */

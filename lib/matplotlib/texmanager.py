@@ -33,7 +33,8 @@ rc('text', usetex=True)
 
 """
 
-import glob, os, sys, md5, shutil
+import glob, md5, os, shutil, sys, warnings
+from tempfile import gettempdir
 from matplotlib import get_configdir, get_home, get_data_path, \
      rcParams, verbose
 from matplotlib._image import readpng
@@ -41,7 +42,22 @@ from matplotlib.numerix import ravel, where, array, \
      zeros, Float, absolute, nonzero, sqrt
      
 debug = False
-     
+
+if sys.platform.startswith('win'): cmd_split = '&'
+else: cmd_split = ';'
+
+
+def get_dvipng_version():
+    stdin, stdout = os.popen4('dvipng --version')
+    for line in stdout:
+        if line.startswith('dvipng '):
+            version = line.split()[-1]
+            verbose.report('Found dvipng version %s'% version, 
+                'helpful')
+            return version
+    raise RuntimeError('Could not obtain dvipng version')
+
+
 class TexManager:
     """
     Convert strings to dvi files using TeX, caching the results to a
@@ -54,230 +70,234 @@ class TexManager:
 
     configdir = get_configdir()
     texcache = os.path.join(configdir, 'tex.cache')
+    
 
-    os.environ['TEXMFOUTPUT'] = texcache
     if os.path.exists(oldcache):
         print >> sys.stderr, """\
 WARNING: found a TeX cache dir in the deprecated location "%s".
   Moving it to the new default location "%s"."""%(oldcache, texcache)
         shutil.move(oldcache, texcache)
+    if not os.path.exists(texcache):
+        os.mkdir(texcache)
 
-    dvipngVersion = None
+    dvipngVersion = get_dvipng_version()
 
     arrayd = {}
     postscriptd = {}
     pscnt = 0
+    
+    serif = ('cmr', '')
+    sans_serif = ('cmss', '')
+    monospace = ('cmtt', '')
+    cursive = ('pzc', r'\usepackage{chancery}')
+    font_family = 'serif'
+    
+    font_info = {'new century schoolbook': ('pnc', r'\renewcommand{\rmdefault}{pnc}'),
+                'bookman': ('pbk', r'\renewcommand{\rmdefault}{pbk}'),
+                'times': ('ptm', r'\usepackage{mathptmx}'),
+                'palatino': ('ppl', r'\usepackage{mathpazo}'),
+                'zapf chancery': ('pzc', r'\usepackage{chancery}'),
+                'charter': ('pch', r'\usepackage{charter}'),
+                'serif': ('cmr', ''),
+                'sans-serif': ('cmss', ''),
+                'helvetica': ('phv', r'\usepackage{helvet}'),
+                'avant garde': ('pag', r'\usepackage{avant}'),
+                'courier': ('pcr', r'\usepackage{courier}'),
+                'monospace': ('cmtt', ''),
+                'computer modern roman': ('cmr', ''),
+                'computer modern sans serif': ('cmss', ''),
+                'computer modern typewriter': ('cmtt', '')}
 
     def __init__(self):
+        
         if not os.path.isdir(self.texcache):
             os.mkdir(self.texcache)
-
+        if rcParams['font.family'].lower() in ('serif', 'sans-serif', 'cursive', 'monospace'):
+            self.font_family = rcParams['font.family'].lower()
+        else:
+            warnings.warn('The %s font family is not compatible with LaTeX. serif will be used by default.' % ff)
+            self.font_family = 'serif'
+        self._fontconfig = self.font_family
+        for font in rcParams['font.serif']:
+            try:
+                self.serif = self.font_info[font.lower()]
+            except KeyError:
+                continue
+            else:
+                break
+        self._fontconfig += self.serif[0]
+        for font in rcParams['font.sans-serif']:
+            try:
+                self.sans_serif = self.font_info[font.lower()]
+            except KeyError:
+                continue
+            else:
+                break
+        self._fontconfig += self.sans_serif[0]
+        for font in rcParams['font.monospace']:
+            try:
+                self.monospace = self.font_info[font.lower()]
+            except KeyError:
+                continue
+            else:
+                break                
+        self._fontconfig += self.monospace[0]
+        for font in rcParams['font.cursive']:
+            try:
+                self.cursive = self.font_info[font.lower()]
+            except KeyError:
+                continue
+            else:
+                break                
+        self._fontconfig += self.cursive[0]
         
-    def get_prefix(self, tex):
-        s = tex
-        if rcParams['text.tex.engine'] == 'latex':
-            s+='latex font: %s'%rcParams['font.latex.package']
-        return md5.md5(s).hexdigest()
+        # The following packages and commands need to be included in the latex 
+        # file's preamble:
+        cmd = [self.serif[1], self.sans_serif[1], self.monospace[1]]
+        if self.font_family == 'cursive': cmd.append(self.cursive[1])
+        while r'\usepackage{type1cm}' in cmd:
+            cmd.remove(r'\usepackage{type1cm}')
+        cmd = '\n'.join(cmd)
+        self._font_preamble = '\n'.join([r'\usepackage{type1cm}',
+                             cmd,
+                             r'\usepackage{textcomp}'])
         
-    def get_tex_command(self, tex, fname):
-
+    def get_basefile(self, tex, fontsize, dpi=None):
+        s = tex + self._fontconfig + ('%f'%fontsize)
+        if dpi: s += ('%s'%dpi)
+        return os.path.join(self.texcache, md5.md5(s).hexdigest())
+        
+    def get_font_config(self):
+        return self._fontconfig
+        
+    def get_font_preamble(self):
+        return self._font_preamble
+        
+    def get_shell_cmd(self, *args):
+        """
+        On windows, changing directories can be complicated by the presence of 
+        multiple drives. get_shell_cmd deals with this issue.
+        """
+        if sys.platform == 'win32': 
+            command = ['%s'% os.path.splitdrive(self.texcache)[0]]
+        else:
+            command = []
+        command.extend(args)
+        return ' && '.join(command)
+        
+    def make_tex(self, tex, fontsize):
+        basefile = self.get_basefile(tex, fontsize)
+        texfile = '%s.tex'%basefile
+        fh = file(texfile, 'w')
         fontcmd = {'sans-serif' : r'{\sffamily %s}',
-                   'monospace'  : r'{\ttfamily %s}'}.get(
-            rcParams['font.family'], r'{\rmfamily %s}')
+                   'monospace'  : r'{\ttfamily %s}'}.get(self.font_family, 
+                                                         r'{\rmfamily %s}')
         tex = fontcmd % tex
-        fh = file(fname, 'w')
-        if rcParams['text.tex.engine'] == 'latex':
-            s = r"""\documentclass{article}
-\usepackage{%s}
-\setlength{\paperwidth}{72in}
-\setlength{\paperheight}{72in}
+        s = r"""\documentclass{article}
+%s
+\usepackage[papersize={72in,72in}, body={70in,70in}, margin={1in,1in}]{geometry}
 \pagestyle{empty}
 \begin{document}
-%s
+\fontsize{%f}{%f}%s
 \end{document}
-""" % (rcParams['font.latex.package'], tex)
-            fh.write(s)
-            fh.close()
-            command = 'latex -interaction=nonstopmode "%s"'%fname
-        else:
-            s = r"""\def\frac#1#2{ {#1 \over #2} }
-\nopagenumbers
-\hsize=72in
-\vsize=72in
-%s
-\bye
-""" % tex
-            fh.write(s)
-            fh.close()
-            command = 'tex "%s"'%fname
-        return command
+""" % (self._font_preamble, fontsize, fontsize*1.25, tex)
+        fh.write(s)
+        fh.close()
         
-    def make_dvi(self, tex, force=0):
+        return texfile
+        
+    def make_dvi(self, tex, fontsize, force=0):
         if debug: force = True
-        
-        prefix = self.get_prefix(tex)
-        fname = os.path.join(self.texcache, prefix+ '.tex')
-        dvibase = prefix + '.dvi'
-        dvifile = os.path.join(self.texcache, dvibase)        
+
+        basefile = self.get_basefile(tex, fontsize)
+        dvifile = '%s.dvi'% basefile
 
         if force or not os.path.exists(dvifile):
-            command = self.get_tex_command(tex, fname)
-            verbose.report(command, 'debug-annoying')            
-            stdin, stdout, stderr = os.popen3(command)
-            verbose.report(stdout.read(), 'debug-annoying')
-            err = stderr.read()
-            if err: verbose.report(err, 'helpful')
+            texfile = self.make_tex(tex, fontsize)
+            outfile = basefile+'.output'
+            command = self.get_shell_cmd('cd "%s"'% self.texcache, 
+                            'latex -interaction=nonstopmode %s > "%s"'\
+                            %(os.path.split(texfile)[-1], outfile))
+            verbose.report(command, 'debug')
+            exit_status = os.system(command)
+            fh = file(outfile)
+            if exit_status:
+                raise RuntimeError('LaTeX was not able to process the flowing \
+string:\n%s\nHere is the full report generated by LaTeX: \n\n'% tex + fh.read())
+            else: verbose.report(fh.read(), 'debug')
+            fh.close()
+            for fname in glob.glob(basefile+'*'):
+                if fname.endswith('dvi'): pass
+                elif fname.endswith('tex'): pass
+                else: os.remove(fname)
 
-        # tex will put it's output in the current dir if possible, and
-        # if not in TEXMFOUTPUT.  So check for existence in current
-        # dir and move it if necessary and then cleanup
-        if os.path.exists(dvibase):
-            shutil.move(dvibase, dvifile)
-            for fname in glob.glob(prefix+'*'):
-                os.remove(fname)
         return dvifile
-        
-    def make_png(self, tex, dpi, force=0):
+
+    def make_png(self, tex, fontsize, dpi, force=0):
         if debug: force = True
-        
-        dvifile = self.make_dvi(tex)
-        prefix = self.get_prefix(tex)
-        pngfile = os.path.join(self.texcache, '%s_%d.png'% (prefix, dpi))
 
-        self.get_dvipng_version()  # raises if dvipng is not up-to-date
-        #print 'makepng', prefix, dvifile, pngfile
-        #command = 'dvipng -bg Transparent -fg "rgb 0.0 0.0 0.0" -D %d -T tight -o "%s" "%s"'% (dpi, pngfile, dvifile)
-        command = 'dvipng -bg Transparent -D %d -T tight -o "%s" "%s"'% (dpi, pngfile, dvifile)        
-
-        #assume white bg
-        #command = "dvipng -bg 'rgb 1.0 1.0 1.0' -fg 'rgb 0.0 0.0 0.0' -D %d -T tight -o %s %s"% (dpi, pngfile, dvifile)
-        # assume gray bg
-        #command = "dvipng -bg 'rgb 0.75 0.75 .75' -fg 'rgb 0.0 0.0 0.0' -D %d -T tight -o %s %s"% (dpi, pngfile, dvifile)                
+        basefile = self.get_basefile(tex, fontsize, dpi)
+        pngfile = '%s.png'% basefile
 
         # see get_rgba for a discussion of the background
         if force or not os.path.exists(pngfile):
-            verbose.report(command, 'debug-annoying')
-            stdin, stdout, stderr = os.popen3(command)
-            verbose.report(stdout.read(), 'debug-annoying')
-            err = stderr.read()
-            if err: verbose.report(err, 'helpful')
+            dvifile = self.make_dvi(tex, fontsize)
+            outfile = basefile+'.output'
+            command = self.get_shell_cmd('cd "%s"' % self.texcache, 
+                        'dvipng -bg Transparent -D %s -T tight -o \
+                        "%s" "%s" > "%s"'%(dpi, os.path.split(pngfile)[-1], 
+                        os.path.split(dvifile)[-1], outfile))
+            verbose.report(command, 'debug')
+            exit_status = os.system(command)
+            fh = file(outfile)
+            if exit_status:
+                raise RuntimeError('dvipng was not able to \
+process the flowing file:\n%s\nHere is the full report generated by dvipng: \
+\n\n'% dvifile + fh.read())
+            else: verbose.report(fh.read(), 'debug')
+            fh.close()
+            os.remove(outfile)
+
         return pngfile
 
-    def make_ps(self, tex, dpi, force=0):
+    def make_ps(self, tex, fontsize, force=0):
         if debug: force = True
-        
-        dvifile = self.make_dvi(tex)
-        prefix = self.get_prefix(tex)
-        psfile = os.path.join(self.texcache, '%s_%d.epsf'% (prefix, dpi))
 
-        if not os.path.exists(psfile):
-            command = 'dvips -q -E -D %d -o "%s" "%s"'% (dpi, psfile, dvifile)
-            verbose.report(command, 'debug-annoying')
-            stdin, stdout, stderr = os.popen3(command)
-            verbose.report(stdout.read(), 'debug-annoying')
-            err = stderr.read()
-            if err: verbose.report(err, 'helpful')
+        basefile = self.get_basefile(tex, fontsize)
+        psfile = '%s.epsf'% basefile
+
+        if force or not os.path.exists(psfile):
+            dvifile = self.make_dvi(tex, fontsize)
+            outfile = basefile+'.output'
+            command = self.get_shell_cmd('cd "%s"'% self.texcache, 
+                        'dvips -q -E -o "%s" "%s" > "%s"'\
+                        %(os.path.split(psfile)[-1], 
+                          os.path.split(dvifile)[-1], outfile))
+            verbose.report(command, 'debug')
+            exit_status = os.system(command)
+            fh = file(outfile)
+            if exit_status:
+                raise RuntimeError('dvipng was not able to \
+process the flowing file:\n%s\nHere is the full report generated by dvipng: \
+\n\n'% dvifile + fh.read())
+            else: verbose.report(fh.read(), 'debug')
+            fh.close()
+            os.remove(outfile)
 
         return psfile
 
-    def get_ps_bbox(self, tex):
-        key = tex
-        val = self.postscriptd.get(key)
-        if val is not None: return val
-        psfile = self.make_ps(tex, dpi=72.27)
-        ps = file(psfile).read()
-        for line in ps.split('\n'):
+    def get_ps_bbox(self, tex, fontsize):
+        psfile = self.make_ps(tex, fontsize)
+        ps = file(psfile)
+        for line in ps:
             if line.startswith('%%BoundingBox:'):
                 return [int(val) for val in line.split()[1:]]
         raise RuntimeError('Could not parse %s'%psfile)
         
-        
-    def __get_ps(self, tex, fontsize=10, dpi=80, rgb=(0,0,0)):
-        """
-        Return bbox, header, texps for tex string via make_ps    
-        """
-
-        # this is badly broken and safe to ignore.
-        key = tex, fontsize, dpi, rgb
-        val = self.postscriptd.get(key)
-        if val is not None: return val
-        psfile = self.make_ps(tex, dpi)
-        ps = file(psfile).read()
-        
-        # parse the ps
-        bbox = None
-        header = []
-        tex = []
-        inheader = False
-        texon = False
-        fonts = []
-        infont = False
-        replaced = {}
-        for line in ps.split('\n'):
-            if line.startswith('%%EndProlog'):
-                inheader = False
-            if line.startswith('%%Trailer'):
-                break
-
-            if line.startswith('%%BoundingBox:'):
-                bbox = [int(val) for val in line.split()[1:]]
-                continue
-            if line.startswith('%%BeginFont:'):
-                fontname = line.split()[-1].strip()
-                newfontname = fontname + str(self.pscnt)
-                replaced[fontname] = newfontname
-                thisfont = [line]
-                infont = True
-                continue
-            if line.startswith('%%EndFont'):
-                thisfont.append('%%EndFont\n')
-                fonts.append('\n'.join(thisfont).replace(fontname, newfontname))
-                thisfont = []
-                infont = False                
-                continue
-            if infont:
-                thisfont.append(line)
-                continue
-            if line.startswith('%%BeginProcSet:'):                
-                inheader = True
-            if inheader:
-                header.append(line)
-            if line.startswith('%%EndSetup'):
-                assert(not inheader)
-                texon = True
-                continue
-
-
-
-            if texon:
-                line = line.replace('eop end', 'end')
-                tex.append(line)
-
-        def clean(s):
-            for k,v in replaced.items():
-                s = s.replace(k,v)
-            return s
-        
-        header.append('\n')
-        tex.append('\n')
-        if bbox is None:
-            raise RuntimeError('Failed to parse dvips file: %s' % psfile)
-        
-        replaced['TeXDict'] = 'TeXDict%d'%self.pscnt
-        header = clean('\n'.join(header))
-        tex = clean('\n'.join(tex))
-        fonts = '\n'.join(fonts)
-        val = bbox, header, fonts, tex
-        self.postscriptd[key] = val
-
-        self.pscnt += 1
-        return val
-        
-    def get_rgba(self, tex, fontsize=10, dpi=80, rgb=(0,0,0)):
+    def get_rgba(self, tex, fontsize=None, dpi=None, rgb=(0,0,0)):
         """
         Return tex string as an rgba array
         """
-
         # dvipng assumes a constant background, whereas we want to
         # overlay these rasters with antialiasing over arbitrary
         # backgrounds that may have other figure elements under them.
@@ -295,46 +315,31 @@ WARNING: found a TeX cache dir in the deprecated location "%s".
         # backgrounds with antialiasing
         #
         # red = alpha*red_foreground + (1-alpha)*red_background
-
+        #
         # Since the foreground is black (0) and the background is
         # white (1) this reduces to red = 1-alpha or alpha = 1-red
-        
-        # assuming standard 10pt design size space
-        dpi = fontsize/10.0 * dpi
-        
+        if not fontsize: fontsize = rcParams['font.size']
+        if not dpi: dpi = rcParams['savefig.dpi']
         r,g,b = rgb
-        key = tex, dpi, tuple(rgb)
+        key = tex, fontsize, dpi, tuple(rgb)
         Z = self.arrayd.get(key)
-        
+
         if Z is None:
             # force=True to skip cacheing while debugging
-            pngfile = self.make_png(tex, dpi, force=False) 
-            X = readpng(pngfile)
-            vers = self.get_dvipng_version()
-            #print 'dvipng version', vers
-            if vers<'1.6':
+            pngfile = self.make_png(tex, fontsize, dpi, force=False)
+            X = readpng(os.path.join(self.texcache, pngfile))
+
+            if (self.dvipngVersion < '1.6') or rcParams['text.dvipnghack']:
                 # hack the alpha channel as described in comment above
                 alpha = sqrt(1-X[:,:,0])
             else:
                 alpha = X[:,:,-1]
-            
 
             Z = zeros(X.shape, Float)
             Z[:,:,0] = r
             Z[:,:,1] = g
             Z[:,:,2] = b
             Z[:,:,3] = alpha
-               
             self.arrayd[key] = Z
 
         return Z
-
-    def get_dvipng_version(self):
-        if self.dvipngVersion is not None: return self.dvipngVersion
-        sin, sout = os.popen2('dvipng --version')
-        for line in sout.readlines():
-            if line.startswith('dvipng '):
-                self.dvipngVersion = line.split()[-1]
-                return self.dvipngVersion
-        raise RuntimeError('Could not obtain dvipng version')
-            

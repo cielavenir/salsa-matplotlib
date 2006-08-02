@@ -2,7 +2,7 @@
 
 CURDIR="`dirname $0`"
 
-echo "This package was debianized by Vittorio Palmisano <vpalmisano@gmail.com> on" > "$CURDIR"/copyright
+echo "This package was debianized by Vittorio Palmisano <redclay81@gmail.com> on" > "$CURDIR"/copyright
 	echo -e "`date -R`\n" >> "$CURDIR"/copyright
 	echo -e  "It was downloaded from http://matplotlib.sourceforge.net/\n" >> "$CURDIR"/copyright
 	echo -e  "Upstream Author: John D. Hunter  <jdhunter@ace.bsd.uchicago.edu>\n" >> "$CURDIR"/copyright

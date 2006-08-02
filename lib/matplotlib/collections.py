@@ -13,7 +13,7 @@ from matplotlib import rcParams, verbose
 from artist import Artist
 from backend_bases import GraphicsContextBase
 from cbook import is_string_like, iterable
-from colors import colorConverter, looks_like_color
+from colors import colorConverter
 from cm import ScalarMappable
 from numerix import arange, sin, cos, pi, asarray, sqrt, array
 from transforms import identity_transform
@@ -40,15 +40,6 @@ class Collection(Artist):
         'return seq of (x,y) in collection'
         raise NotImplementedError('Derived must override')
 
-    def _get_color(self, c, N=1):
-        if looks_like_color(c):
-            return  [colorConverter.to_rgba(c)]*N
-        elif iterable(c) and len(c) and iterable(c[0]) and len(c[0])==4:
-            # looks like a tuple of rgba
-            return c
-        else:
-            raise TypeError('c must be a matplotlib color arg or nonzero length sequence of rgba tuples')
-
     def _get_value(self, val):
         try: return (float(val), )
         except TypeError:
@@ -61,12 +52,26 @@ class Collection(Artist):
 
 class PatchCollection(Collection, ScalarMappable):
     """
-    and transOffset are used to translate the patch after
+    Base class for filled regions such as PolyCollection etc.
+    It must be subclassed to be usable.
+
+    kwargs are:
+
+          edgecolors=None,
+          facecolors=None,
+          linewidths=None,
+          antialiaseds = None,
+          offsets = None,
+          transOffset = identity_transform(),
+          norm = None,  # optional for ScalarMappable
+          cmap = None,  # ditto
+
+    offsets and transOffset are used to translate the patch after
     rendering (default no offsets)
 
     If any of edgecolors, facecolors, linewidths, antialiaseds are
     None, they default to their patch.* rc params setting, in sequence
-    form
+    form.
 
     The use of ScalarMappable is optional.  If the ScalarMappable
     matrix _A is not None (ie a call to set_array has been made), at
@@ -87,15 +92,17 @@ class PatchCollection(Collection, ScalarMappable):
         Collection.__init__(self)
         ScalarMappable.__init__(self, norm, cmap)
 
-        if edgecolors is None: edgecolors =\
-           self._get_color(rcParams['patch.edgecolor'])
-        if facecolors is None: facecolors = \
-           self._get_color(rcParams['patch.facecolor'])
-        if linewidths is None: linewidths = ( rcParams['patch.linewidth'],)
-        if antialiaseds is None: antialiaseds = ( rcParams['patch.antialiased'],)
+        if facecolors is None: facecolors = rcParams['patch.facecolor']
+        if edgecolors is None: edgecolors = rcParams['patch.edgecolor']
+        if linewidths is None: linewidths = (rcParams['patch.linewidth'],)
+        if antialiaseds is None: antialiaseds = (rcParams['patch.antialiased'],)
 
-        self._edgecolors = edgecolors
-        self._facecolors  = facecolors
+        self._facecolors  = colorConverter.to_rgba_list(facecolors)
+        if edgecolors == 'None':
+            self._edgecolors = self._facecolors
+            linewidths = (0,)
+        else:
+            self._edgecolors = colorConverter.to_rgba_list(edgecolors)
         self._linewidths  = linewidths
         self._antialiaseds = antialiaseds
         self._offsets = offsets
@@ -131,7 +138,7 @@ class PatchCollection(Collection, ScalarMappable):
 
         ACCEPTS: matplotlib color arg or sequence of rgba tuples
         """
-        self._facecolors = self._get_color(c, len(self._facecolors))
+        self._facecolors = colorConverter.to_rgba_list(c)
 
     def set_edgecolor(self, c):
         """
@@ -141,22 +148,21 @@ class PatchCollection(Collection, ScalarMappable):
 
         ACCEPTS: matplotlib color arg or sequence of rgba tuples
         """
-        self._edgecolors = self._get_color(c, len(self._edgecolors))
+        self._edgecolors = colorConverter.to_rgba_list(c)
 
     def set_alpha(self, alpha):
         """
-        Set the alpha tranpancies of the collection.  Alpha can be a
-        float, in which case it is applied to the entire collection,
-        or a sequence of floats
+        Set the alpha tranpancies of the collection.  Alpha must be
+        a float.
 
-        ACCEPTS: float or sequence of floats
+        ACCEPTS: float
         """
         try: float(alpha)
         except TypeError: raise TypeError('alpha must be a float')
         else:
             Artist.set_alpha(self, alpha)
             self._facecolors = [(r,g,b,alpha) for r,g,b,a in self._facecolors]
-            if self._edgecolors != 'None':
+            if is_string_like(self._edgecolors) and self._edgecolors != 'None':
                 self._edgecolors = [(r,g,b,alpha) for r,g,b,a in self._edgecolors]
 
     def update_scalarmappable(self):
@@ -164,59 +170,77 @@ class PatchCollection(Collection, ScalarMappable):
         If the scalar mappable array is not none, update facecolors
         from scalar data
         """
+        #print 'update_scalarmappable: self._A', self._A
         if self._A is None: return
         if len(self._A.shape)>1:
             raise ValueError('PatchCollections can only map rank 1 arrays')
         self._facecolors = self.to_rgba(self._A, self._alpha)
-        #print self._A.shape, type(R), R.shape
-        #self._facecolors = [(r,g,b,a) for r,g,b,a in R]
+        #print self._facecolors
 
 class QuadMesh(PatchCollection):
-	"""
-	Class for the efficient drawing of a quadrilateral mesh.
-	A quadrilateral mesh consists of a grid of vertices. The dimensions of this array are (meshWidth+1, meshHeight+1). Each vertex in the mesh has a different set of "mesh coordinates" representing its position in the topology of the mesh. For any values (m, n) such that 0 <= m <= meshWidth and 0 <= n <= meshHeight, the vertices at mesh coordinates (m, n), (m, n+1), (m+1, n+1), and (m+1, n) form one of the quadrilaterals in the mesh. There are thus (meshWidth * meshHeight) quadrilaterals in the mesh.
-	The mesh need not be regular and the polygons need not be convex.
-	A quadrilateral mesh is represented by a (2 x ((meshWidth + 1) * (meshHeight + 1))) Numeric array 'coordinates' where each row is the X and Y coordinates of one of the vertices.
-	To define the function that maps from a data point to its corresponding color, use the set_cmap() function.
-Each of these arrays is indexed in row-major order by the mesh coordinates of the vertex (or the mesh coordinates of the lower left vertex, in the case of the colors). For example, the first entry in coordinates is the coordinates of the vertex at mesh coordinates (0, 0), then the one at (0, 1), then at (0, 2) .. (0, meshWidth), (1, 0), (1, 1), and so on.
-	"""	
-	def __init__(self, norm = None, cmap = None):
-		PatchCollection.__init__(self)
+    """
+    Class for the efficient drawing of a quadrilateral mesh.
+    A quadrilateral mesh consists of a grid of vertices. The dimensions
+    of this array are (meshWidth+1, meshHeight+1). Each vertex in
+    the mesh has a different set of "mesh coordinates" representing
+    its position in the topology of the mesh. For any values (m, n)
+    such that 0 <= m <= meshWidth and 0 <= n <= meshHeight, the
+    vertices at mesh coordinates (m, n), (m, n+1), (m+1, n+1), and
+    (m+1, n) form one of the quadrilaterals in the mesh. There are
+    thus (meshWidth * meshHeight) quadrilaterals in the mesh.
+    The mesh need not be regular and the polygons need not be convex.
+    A quadrilateral mesh is represented by a
+    (2 x ((meshWidth + 1) * (meshHeight + 1))) Numeric array
+    'coordinates' where each row is the X and Y coordinates of one
+    of the vertices.
+    To define the function that maps from a data point to
+    its corresponding color, use the set_cmap() function.
+    Each of these arrays is indexed in row-major order by the
+    mesh coordinates of the vertex (or the mesh coordinates of
+    the lower left vertex, in the case of the colors). For example,
+    the first entry in coordinates is the coordinates of the vertex
+    at mesh coordinates (0, 0), then the one at (0, 1), then at
+    (0, 2) .. (0, meshWidth), (1, 0), (1, 1), and so on.
+    """
+    def __init__(self, meshWidth, meshHeight, coordinates, showedges):
+        PatchCollection.__init__(self)
+        self._meshWidth = meshWidth
+        self._meshHeight = meshHeight
+        self._coordinates = coordinates
+        self._showedges = showedges
 
-	def __init__(self, meshWidth, meshHeight, coordinates, **kwargs):
-		PatchCollection.__init__(self, )
-		self._meshWidth = meshWidth
-		self._meshHeight = meshHeight
-		self._coordinates = coordinates
+    def get_verts(self, dataTrans=None):
+        return self._coordinates;
 
-	def get_verts(self):
-		return self._coordinates;
+    def draw(self, renderer):
+        # does not call update_scalarmappable, need to update it
+        # when creating/changing              ****** Why not?  speed?
+        if not self.get_visible(): return
+        self._transform.freeze()
+        self._transOffset.freeze()
+        #print 'QuadMesh draw'
+        self.update_scalarmappable()  #######################
 
-	def draw(self, renderer):
-		# does not call update_scalarmappable, need to update it when creating/changing
-		if not self.get_visible(): return
-		self._transform.freeze()
-        	self._transOffset.freeze()
-		renderer.draw_quad_mesh(self._meshWidth, self._meshHeight, self._facecolors, self._coordinates[:, 0], self._coordinates[:, 1], self.clipbox, self._transform, self._offsets, self._transOffset)
-		self._transform.thaw()
-		self._transOffset.thaw()
+        renderer.draw_quad_mesh( self._meshWidth, self._meshHeight,
+            self._facecolors, self._coordinates[:,0],
+            self._coordinates[:, 1], self.clipbox, self._transform,
+            self._offsets, self._transOffset, self._showedges)
+        self._transform.thaw()
+        self._transOffset.thaw()
 
 class PolyCollection(PatchCollection):
     def __init__(self, verts, **kwargs):
         """
         verts is a sequence of ( verts0, verts1, ...) where verts_i is
-        a sequence of xy tuples of vertices.
-
-        Optional kwargs from Patch collection include
-
-          edgecolors    = ( (0,0,0,1), ),
-          facecolors    = ( (1,1,1,0), ),
-          linewidths    = ( 1.0, ),
-          antialiaseds  = (1,),
-          offsets       = None
-          transOffset   = None
+        a sequence of xy tuples of vertices, or an equivalent
+        numerix array of shape (nv,2).
+        See PatchCollection for kwargs.
         """
         PatchCollection.__init__(self,**kwargs)
+        self._verts = verts
+
+    def set_verts(self, verts):
+        '''This allows one to delay initialization of the vertices.'''
         self._verts = verts
 
     def draw(self, renderer):
@@ -225,8 +249,9 @@ class PolyCollection(PatchCollection):
         self._transform.freeze()
         self._transOffset.freeze()
         self.update_scalarmappable()
-        if self._edgecolors == 'None':
-            self._edgecolors = self._facecolors
+        if is_string_like(self._edgecolors) and self._edgecolors[:2] == 'No':
+            self._linewidths = (0,)
+            #self._edgecolors = self._facecolors
         renderer.draw_poly_collection(
             self._verts, self._transform, self.clipbox,
             self._facecolors, self._edgecolors,
@@ -237,23 +262,22 @@ class PolyCollection(PatchCollection):
         renderer.close_group('polycollection')
 
 
-
-    def get_verts(self):
-        'return seq of (x,y) in collection'
+    def get_verts(self, dataTrans=None):
+        '''Return vertices in data coordinates.
+        The calculation is incomplete in general; it is based
+        on the vertices or the offsets, whichever is using
+        dataTrans as its transformation, so it does not take
+        into account the combined effect of segments and offsets.
+        '''
+        verts = []
         if self._offsets is None:
-            offsets = [(0,0)]
-        else:
-            offsets = self._offsets
-        Noffsets = len(offsets)
-        Nverts = len(self._verts)
-        N = max(Noffsets, Nverts)
-        vertsall = []
-        for i in range(N):
-            ox, oy = offsets[i%Noffsets]
-            verts = self._verts[i%Nverts]
-            vertsall.extend([(x+ox, y+oy) for x,y in verts])
-        return vertsall
-
+            for seg in self._verts:
+                verts.extend(seg)
+            return [tuple(xy) for xy in verts]
+        if self._transOffset == dataTrans:
+            return [tuple(xy) for xy in self._offsets]
+        raise NotImplementedError('Vertices in data coordinates are calculated\n'
+                + 'with offsets only if _transOffset == dataTrans.')
 
 
 class RegularPolyCollection(PatchCollection):
@@ -264,28 +288,57 @@ class RegularPolyCollection(PatchCollection):
                  sizes = (1,),
                  **kwargs):
         """
-        Draw a regular polygon with numsides.  sizes gives the area of
-        the circle circumscribing the regular polygon and rotation is
-        the rotation of the polygon in radians.
+        Draw a regular polygon with numsides.
 
-        offsets are a sequence of x,y tuples that give the centers of
-        the polygon in data coordinates, and transOffset is the
-        Transformation instance used to transform the centers onto the
-        canvas.
+        * dpi is the figure dpi instance, and is required to do the
+          area scaling.
 
-        dpi is the figure dpi instance, and is required to do the area
-        scaling.
+        * numsides: the number of sides of the  polygon
+
+        * sizes gives the area of the circle circumscribing the
+          regular polygon in points^2
+
+        * rotation is the rotation of the polygon in radians
+
+        kwargs: See PatchCollection for more details
+
+          * offsets are a sequence of x,y tuples that give the centers of
+            the polygon in data coordinates
+
+          * transOffset is the Transformation instance used to
+            transform the centers onto the canvas.
+
+        Example: see examples/dynamic_collection.py for complete example
+
+        offsets = nx.mlab.rand(20,2)
+        facecolors = [cm.jet(x) for x in nx.mlab.rand(20)]
+        black = (0,0,0,1)
+
+        collection = RegularPolyCollection(
+            fig.dpi,
+            numsides=5, # a pentagon
+            rotation=0,
+            sizes=(50,),
+            facecolors = facecolors,
+            edgecolors = (black,),
+            linewidths = (1,),
+            offsets = offsets,
+            transOffset = ax.transData,
+            )
+
+
         """
         PatchCollection.__init__(self,**kwargs)
-        self._sizes = asarray(sizes)
+        self._sizes = sizes
         self._dpi = dpi
+        self.numsides = numsides
+        self.rotation = rotation
+        self._update_verts()
 
+    def _update_verts(self):
         r = 1.0/math.sqrt(math.pi)  # unit area
-
-        theta = (2*math.pi/numsides)*arange(numsides) + rotation
+        theta = (2*math.pi/self.numsides)*arange(self.numsides) + self.rotation
         self._verts = zip( r*sin(theta), r*cos(theta) )
-
-
 
     def draw(self, renderer):
         if not self.get_visible(): return
@@ -293,11 +346,12 @@ class RegularPolyCollection(PatchCollection):
         self._transform.freeze()
         self._transOffset.freeze()
         self.update_scalarmappable()
-        scales = sqrt(self._sizes*self._dpi.get()/72.0)
+        self._update_verts()
+        scales = sqrt(asarray(self._sizes)*self._dpi.get()/72.0)
 
-        if self._edgecolors == 'None':
-            self._edgecolors = self._facecolors
-
+        if is_string_like(self._edgecolors) and self._edgecolors[:2] == 'No':
+            #self._edgecolors = self._facecolors
+            self._linewidths = (0,)
         renderer.draw_regpoly_collection(
             self.clipbox,
             self._offsets, self._transOffset,
@@ -310,30 +364,32 @@ class RegularPolyCollection(PatchCollection):
         renderer.close_group('regpolycollection')
 
 
+    def get_verts(self, dataTrans=None):
+        '''Return vertices in data coordinates.
+        The calculation is incomplete; it uses only
+        the offsets, and only if _transOffset is dataTrans.
+        '''
+        if self._transOffset == dataTrans:
+            return [tuple(xy) for xy in self._offsets]
+        raise NotImplementedError('Vertices in data coordinates are calculated\n'
+                + 'only with offsets and only if _transOffset == dataTrans.')
 
-    def get_verts(self):
-        'return seq of (x,y) in collection'
-        if self._offsets is None:
-            offsets = [(0,0)]
-        else:
-            offsets = self._offsets
-        return [ (x+ox, y+oy) for x,y in self._verts for ox,oy in offsets]
-
-
-class LineCollection(Collection):
+class LineCollection(Collection, ScalarMappable):
     """
     All parameters must be sequences.  The property of the ith line
     segment is the prop[i % len(props)], ie the properties cycle if
     the len of props is less than the number of sements
     """
     zorder = 2
-    def __init__(self, segments,
+    def __init__(self, segments,     # Can be None.
                  linewidths    = None,
                  colors        = None,
                  antialiaseds  = None,
                  linestyle = 'solid',
                  offsets = None,
-                 transOffset = None,
+                 transOffset = None,#identity_transform(),
+                 norm = None,
+                 cmap = None,
                  ):
         """
         segments is a sequence of ( line0, line1, line2), where
@@ -349,34 +405,82 @@ class LineCollection(Collection):
           solid|dashed|dashdot|dotted.  The dash tuple is (offset, onoffseq)
           where onoffseq is an even length tuple of on and off ink in points.
 
-        if linewidths, colors, or antialiaseds is None, they default to
-        their rc params setting, in sequence form
+        If linewidths, colors, or antialiaseds is None, they default to
+        their rc params setting, in sequence form.
+
+        If offsets and transOffset are not None, then
+        offsets are transformed by transOffset and applied after
+        the segments have been transformed to display coordinates.
+
+        If offsets is not None but transOffset is None, then the
+        offsets are added to the segments before any transformation.
+        In this case, a single offset can be specified as offsets=(xo,yo),
+        and this value will be
+        added cumulatively to each successive segment, so as
+        to produce a set of successively offset curves.
+
+        norm = None,  # optional for ScalarMappable
+        cmap = None,  # ditto
+
+        The use of ScalarMappable is optional.  If the ScalarMappable
+        matrix _A is not None (ie a call to set_array has been made), at
+        draw time a call to scalar mappable will be made to set the colors.
         """
 
         Collection.__init__(self)
+        ScalarMappable.__init__(self, norm, cmap)
 
         if linewidths is None   :
             linewidths   = (rcParams['lines.linewidth'], )
 
         if colors is None       :
-            colors       = self._get_color(rcParams['lines.color'])
+            colors       = (rcParams['lines.color'],)
         if antialiaseds is None :
             antialiaseds = (rcParams['lines.antialiased'], )
 
-        self._segments = segments
-        self._colors = colors
+        self._colors = colorConverter.to_rgba_list(colors)
         self._aa = antialiaseds
         self._lw = linewidths
         self.set_linestyle(linestyle)
+        self._uniform_offsets = None
+        if transOffset is None:
+            if offsets is not None:
+                self._uniform_offsets = offsets
+                offsets = None
+            transOffset = identity_transform()
         self._offsets = offsets
         self._transOffset = transOffset
+        self.set_segments(segments)
+
+    def set_segments(self, segments):
+        if segments is None: return
+        self._segments = list(segments)
+        if self._uniform_offsets is not None:
+            self._add_offsets()
+
+    set_verts = set_segments # for compatibility with PolyCollection
+
+    def _add_offsets(self):
+        segs = self._segments
+        offsets = self._uniform_offsets
+        Nsegs = len(segs)
+        Noffs = len(offsets)
+        if not iterable(offsets[0]):  # i.e., not a tuple but an x-offset
+            xo, yo = offsets
+            for i in range(Nsegs):
+                segs[i] = [(x+xo*i, y+yo*i) for x,y in segs[i]]
+        else:
+            for i in range(Nsegs):
+                xo, yo = offsets[i%Noffs]
+                segs[i] = [(x+xo, y+yo) for x,y in segs[i]]
+
 
     def draw(self, renderer):
         if not self.get_visible(): return
         renderer.open_group('linecollection')
         self._transform.freeze()
         if self._transOffset is not None: self._transOffset.freeze()
-
+        self.update_scalarmappable()
         renderer.draw_line_collection(
             self._segments, self._transform, self.clipbox,
             self._colors, self._lw, self._ls, self._aa, self._offsets,
@@ -419,7 +523,7 @@ class LineCollection(Collection):
 
         ACCEPTS: matplotlib color arg or sequence of rgba tuples
         """
-        self._colors = self._get_color(c, len(self._colors))
+        self._colors = colorConverter.to_rgba_list(c)
 
     def color(self, c):
         """
@@ -460,34 +564,32 @@ class LineCollection(Collection):
     def get_colors(self):
         return self._colors
 
-
-    def get_verts(self):
-        'return seq of (x,y) in collection'
+    def get_verts(self, dataTrans=None):
+        '''Return vertices in data coordinates.
+        The calculation is incomplete in general; it is based
+        on the segments or the offsets, whichever is using
+        dataTrans as its transformation, so it does not take
+        into account the combined effect of segments and offsets.
+        '''
+        verts = []
         if self._offsets is None:
-            offsets = [(0,0)]
-        else:
-            offsets = self._offsets
-        Noffsets = len(offsets)
-        Nsegments = len(self._segments)
-        vertsall = []
-        for i in range(max(Noffsets, Nsegments)):
-            #print i, N, i%N, len(offsets)
-            ox, oy = offsets[i%Noffsets]
-            verts = self._segments[i%Nsegments]
-            vertsall.extend([(x+ox, y+oy) for x,y in verts])
-        return vertsall
+            for seg in self._segments:
+                verts.extend(seg)
+            return [tuple(xy) for xy in verts]
+        if self._transOffset == dataTrans:
+            return [tuple(xy) for xy in self._offsets]
+        raise NotImplementedError('Vertices in data coordinates are calculated\n'
+                + 'with offsets only if _transOffset == dataTrans.')
 
-    def get_lines(self):
-        'return seq of lines in collection'
-        if self._offsets is None:
-            offsets = [(0,0)]
-        else:
-            offsets = self._offsets
-        Noffsets = len(offsets)
-        Nsegments = len(self._segments)
-        lines = []
-        for i in range(max(Noffsets, Nsegments)):
-            ox, oy = offsets[i%Noffsets]
-            segment = self._segments[i%Nsegments]
-            lines.append([(x+ox, y+oy) for x,y in segment])
-        return lines
+    def update_scalarmappable(self):
+        """
+        If the scalar mappable array is not none, update colors
+        from scalar data
+        """
+        if self._A is None: return
+        if len(self._A.shape)>1:
+            raise ValueError('LineCollections can only map rank 1 arrays')
+        self._colors = self.to_rgba(self._A, self._alpha)
+
+
+

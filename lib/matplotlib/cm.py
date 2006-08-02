@@ -48,18 +48,22 @@ class ScalarMappable:
         self.colorbar = im, ax
 
     def to_rgba(self, x, alpha=1.0):
-        # assume normalized rgb, rgba
-        #print '0', type(x), x.shape
+        '''Return a normalized rgba array corresponding to x.
+        If x is already an rgb or rgba array, return it unchanged.
+        '''
+        if hasattr(x, 'shape') and len(x.shape)>2: return x
         x = ma.asarray(x)
-        #print '1', type(x), x.shape
-        if len(x.shape)>2: return x
         x = self.norm(x)
         x = self.cmap(x, alpha)
         return x
 
     def set_array(self, A):
         'Set the image array from numeric/numarray A'
-        self._A = A.astype(nx.Float32)
+        from numerix import typecode, typecodes
+        if typecode(A) in typecodes['Float']:
+            self._A = A.astype(nx.Float32)
+        else:
+            self._A = A.astype(nx.Int16)
 
     def get_array(self):
         'Return the array'
@@ -67,11 +71,8 @@ class ScalarMappable:
 
     def set_clim(self, vmin=None, vmax=None):
         'set the norm limits for image scaling'
-        self.norm.vmin = vmin
-        self.norm.vmax = vmax
-        if self.colorbar is not None:
-            im, ax = self.colorbar
-            ax.set_ylim((vmin, vmax))
+        if vmin is not None: self.norm.vmin = vmin
+        if vmax is not None: self.norm.vmax = vmax
         self.changed()
 
     def set_cmap(self, cmap):

@@ -4,17 +4,22 @@ graphics contexts must implement to serve as a matplotlib backend
 """
 
 from __future__ import division
-import sys
+import sys, warnings
 
 from cbook import is_string_like, enumerate, strip_math, Stack
 from colors import colorConverter
-from numerix import array, sqrt, pi, log, asarray, ones, Float
+from numerix import array, sqrt, pi, log, asarray, ones, zeros, Float, Float32
+from numerix import arange, compress, take
 from patches import Rectangle
-from transforms import lbwh_to_bbox
+from transforms import lbwh_to_bbox, identity_transform
+import widgets
 
 class RendererBase:
     """An abstract base class to handle drawing/rendering operations
     """
+
+    def __init__(self):
+        self._texmanager = None
 
     def open_group(self, s):
         """open a grouping element with label s
@@ -113,6 +118,8 @@ class RendererBase:
         by itself.
         """
 
+        newstyle = getattr(self, 'draw_markers', None) is not None
+        identity = identity_transform()
         gc = self.new_gc()
         if clipbox is not None:
             gc.set_clip_rectangle(clipbox.get_bounds())
@@ -140,12 +147,15 @@ class RendererBase:
             seg = segments[i % Nsegments]
             if not len(seg): continue
             x, y = zip(*seg)
+
             x, y = transform.numerix_x_y(array(x), array(y))
             if usingOffsets:
                 xo, yo = transOffset.xy_tup(offsets[i % Noffsets])
                 x += xo
                 y += yo
-            self.draw_lines(gc, x, y)
+
+            if newstyle: self.draw_lines(gc, x, y, identity)
+            else: self.draw_lines(gc, x, y)
 
     def draw_line(self, gc, x1, y1, x2, y2):
         """
@@ -167,25 +177,33 @@ class RendererBase:
         """
         raise NotImplementedError
 
-    def draw_quad_mesh(self, meshWidth, meshHeight, colors, xCoords, yCoords, clipbox, transform, offsets, transOffset):
-	"""
-	Draw a quadrilateral mesh
-	See documentation in QuadMesh class in collections.py for details
-	"""
-	# print "draw_quad_mesh not found, using function in backend_bases"
-	verts = zeros(((meshWidth * meshHeight), 4, 2), Float32)
-	indices = arange((meshWidth + 1) * (meshHeight + 1))
-	indices = compress((indices + 1) % (meshWidth + 1), indices)
-	indices = indices[:(meshWidth * meshHeight)]
-	verts[:, 0, 0] = take(xCoords, indices)
-	verts[:, 0, 1] = take(yCoords, indices)
-	verts[:, 1, 0] = take(xCoords, (indices + 1))
-	verts[:, 1, 1] = take(yCoords, (indices + 1))
-	verts[:, 2, 0] = take(xCoords, (indices + meshWidth + 1))
-	verts[:, 2, 1] = take(yCoords, (indices + meshWidth + 1))
-	verts[:, 3, 0] = take(xCoords, (indices + meshWidth + 2))
-	verts[:, 3, 1] = take(yCoords, (indices + meshWidth + 2))
-	draw_poly_collection(self, verts, transform, clipbox, colors, colors, (0.25,), (0,), offsets, transOffset)
+    def draw_quad_mesh(self, meshWidth, meshHeight, colors,
+                        xCoords, yCoords, clipbox,
+                        transform, offsets, transOffset, showedges):
+        """
+        Draw a quadrilateral mesh
+        See documentation in QuadMesh class in collections.py for details
+        """
+        # print "draw_quad_mesh not found, using function in backend_bases"
+        verts = zeros(((meshWidth * meshHeight), 4, 2), Float32)
+        indices = arange((meshWidth + 1) * (meshHeight + 1))
+        indices = compress((indices + 1) % (meshWidth + 1), indices)
+        indices = indices[:(meshWidth * meshHeight)]
+        verts[:, 0, 0] = take(xCoords, indices)
+        verts[:, 0, 1] = take(yCoords, indices)
+        verts[:, 1, 0] = take(xCoords, (indices + 1))
+        verts[:, 1, 1] = take(yCoords, (indices + 1))
+        verts[:, 2, 0] = take(xCoords, (indices + meshWidth + 2))
+        verts[:, 2, 1] = take(yCoords, (indices + meshWidth + 2))
+        verts[:, 3, 0] = take(xCoords, (indices + meshWidth + 1))
+        verts[:, 3, 1] = take(yCoords, (indices + meshWidth + 1))
+        if (showedges):
+            edgecolors = colors
+        else:
+            edgecolors = (0, 0, 0, 0),
+        self.draw_poly_collection(verts, transform,
+                                clipbox, colors, edgecolors,
+                                (0.25,), (0,), offsets, transOffset)
 
     def draw_poly_collection(
         self, verts, transform, clipbox, facecolors, edgecolors,
@@ -199,7 +217,12 @@ class RendererBase:
         facecolors and edgecolors are a sequence of RGBA tuples
         linewidths are a sequence of linewidths
         antialiaseds are a sequence of 0,1 integers whether to use aa
+
+        If a linewidth is zero or an edgecolor alpha is zero, the
+        line will be omitted; similarly, the fill will be omitted
+        if the facecolor alpha is zero.
         """
+        ## line and/or fill OK
         Nface = len(facecolors)
         Nedge = len(edgecolors)
         Nlw = len(linewidths)
@@ -219,20 +242,29 @@ class RendererBase:
 
         for i in xrange(N):
 
+            linewidth = linewidths[i % Nlw]
             rf,gf,bf,af = facecolors[i % Nface]
             re,ge,be,ae = edgecolors[i % Nedge]
-            if af==0: rgbFace = None
-            else: rgbFace = rf,gf,bf
-            # the draw_poly interface can't handle separate alphas for
-            # edge and face so we'll just use the maximum
-            alpha = max(af,ae)
+            if af==0:
+                if ae==0 or linewidth == 0:
+                    continue
+                rgbFace = None
+                alpha = ae
+            else:
+                rgbFace = rf,gf,bf
+            if ae==0:
+                alpha = af
+                gc.set_linewidth(0)
+            else:
+                # the draw_poly interface can't handle separate alphas for
+                # edge and face so we'll just use the maximum
+                alpha = max(af,ae)
+                gc.set_foreground( (re,ge,be), isRGB=True)
+                gc.set_linewidth( linewidths[i % Nlw] )
+                #print 'verts', zip(thisxverts, thisyverts)
 
-            gc.set_foreground( (re,ge,be), isRGB=True)
+            gc.set_antialiased( antialiaseds[i % Naa] )  # Used for fill only?
             gc.set_alpha( alpha )
-            gc.set_linewidth( linewidths[i % Nlw] )
-            gc.set_antialiased( antialiaseds[i % Naa] )
-            #print 'verts', zip(thisxverts, thisyverts)
-
             tverts = transform.seq_xy_tups(verts[i % Nverts])
             if usingOffsets:
                 xo,yo = transOffset.xy_tup(offsets[i % Noffsets])
@@ -277,6 +309,7 @@ class RendererBase:
         linewidths are a sequence of linewidths
         antialiaseds are a sequence of 0,1 integers whether to use aa
         """
+        ## line and/or fill OK
         gc = self.new_gc()
         if clipbox is not None:
             gc.set_clip_rectangle(clipbox.get_bounds())
@@ -299,21 +332,30 @@ class RendererBase:
             thisxverts = scale*xverts + xo
             thisyverts = scale*yverts + yo
             #print 'xverts', xverts
+
+            linewidth = linewidths[i % Nlw]
             rf,gf,bf,af = facecolors[i % Nface]
             re,ge,be,ae = edgecolors[i % Nedge]
             if af==0:
+                if ae==0 or linewidth == 0:
+                    continue
                 rgbFace = None
+                alpha = ae
             else:
                 rgbFace = rf,gf,bf
-            # the draw_poly interface can't handle separate alphas for
-            # edge and face so we'll just use
-            alpha = max(af,ae)
+            if ae==0:
+                alpha = af
+                gc.set_linewidth(0)
+            else:
+                # the draw_poly interface can't handle separate alphas for
+                # edge and face so we'll just use the maximum
+                alpha = max(af,ae)
+                gc.set_foreground( (re,ge,be), isRGB=True)
+                gc.set_linewidth( linewidths[i % Nlw] )
+                #print 'verts', zip(thisxverts, thisyverts)
 
-            gc.set_foreground( (re,ge,be), isRGB=True)
+            gc.set_antialiased( antialiaseds[i % Naa] )  # Used for fill only?
             gc.set_alpha( alpha )
-            gc.set_linewidth( linewidths[i % Nlw] )
-            gc.set_antialiased( antialiaseds[i % Naa] )
-
             #print 'verts', zip(thisxverts, thisyverts)
             self.draw_polygon(gc, rgbFace, zip(thisxverts, thisyverts))
 
@@ -348,6 +390,12 @@ class RendererBase:
     def get_canvas_width_height(self):
         'return the canvas width and height in display coords'
         return 1, 1
+
+    def get_texmanager(self):
+        if self._texmanager is None:
+            from matplotlib.texmanager import TexManager
+            self._texmanager = TexManager()
+        return self._texmanager
 
     def get_text_extent(self, text): # is not used, can be removed?
         """
@@ -660,7 +708,7 @@ class LocationEvent(Event):
         for a in self.canvas.figure.get_axes():
             if self.x is not None and self.y is not None and a.in_axes(self.x, self.y):
                 self.inaxes.append(a)
-        
+
         if len(self.inaxes) == 0: # None found
             self.inaxes = None
             return
@@ -779,7 +827,7 @@ class FigureCanvasBase:
         set the canvas size in pixels
         """
         pass
-    
+
     def draw_event(self, renderer):
         event = DrawEvent('draw_event', self, renderer)
         for func in self.callbacks.get('draw_event', {}).values():
@@ -861,7 +909,7 @@ class FigureCanvasBase:
         return int(self.figure.bbox.width()), int(self.figure.bbox.height())
 
     def print_figure(self, filename, dpi=300, facecolor='w', edgecolor='w',
-                     orientation='portrait'):
+                     orientation='portrait', **kwargs):
         """
         Render the figure to hardcopy. Set the figure patch face and edge
         colors.  This is useful because some of the GUIs have a gray figure
@@ -871,6 +919,7 @@ class FigureCanvasBase:
         filename    - can also be a file object on image backends
         orientation - only currently applies to PostScript printing.
         """
+        pass
 
     def switch_backends(self, FigureCanvasClass):
         """
@@ -945,6 +994,7 @@ class FigureManagerBase:
     """
     def __init__(self, canvas, num):
         self.canvas = canvas
+        canvas.manager = self  # store a pointer to parent
         self.num = num
 
         self.canvas.mpl_connect('key_press_event', self.key_press)
@@ -954,7 +1004,6 @@ class FigureManagerBase:
 
     def full_screen_toggle (self):
         pass
-
     def key_press(self, event):
 
         # these bindings happen whether you are over an axes or not
@@ -975,6 +1024,16 @@ class FigureManagerBase:
         elif event.key == 'l':
             event.inaxes.toggle_log_lineary()
             self.canvas.draw()
+        elif event.key is not None and (event.key.isdigit() and event.key!='0') or event.key=='a':
+            # 'a' enables all axes
+            if event.key!='a':
+                n=int(event.key)-1
+            for i, a in enumerate(self.canvas.figure.get_axes()):
+                if event.x is not None and event.y is not None and a.in_axes(event.x, event.y):
+                    if event.key=='a':
+                        a.set_navigate(True)
+                    else:
+                        a.set_navigate(i==n)
 
 
     def show_popup(self, msg):
@@ -1111,9 +1170,9 @@ class NavigationToolbar2:
                 if self._lastCursor != cursors.SELECT_REGION:
                     self.set_cursor(cursors.SELECT_REGION)
                     self._lastCursor = cursors.SELECT_REGION
-                if self._xypress is not None:
+                if self._xypress:
                     x, y = event.x, event.y
-                    lastx, lasty, a, ind, lim, trans= self._xypress
+                    lastx, lasty, a, ind, lim, trans= self._xypress[0]
                     self.draw_rubberband(event, x, y, lastx, lasty)
             elif (self._active=='PAN' and
                   self._lastCursor != cursors.MOVE):
@@ -1125,7 +1184,7 @@ class NavigationToolbar2:
 
             try: s = event.inaxes.format_coord(event.xdata, event.ydata)
             except ValueError: pass
-            except OverflowError: pass            
+            except OverflowError: pass
             else:
                 if len(self.mode):
                     self.set_message('%s : %s' % (self.mode, s))
@@ -1142,7 +1201,6 @@ class NavigationToolbar2:
             self._active = None
         else:
             self._active = 'PAN'
-
         if self._idPress is not None:
             self._idPress = self.canvas.mpl_disconnect(self._idPress)
             self.mode = ''
@@ -1157,6 +1215,13 @@ class NavigationToolbar2:
             self._idRelease = self.canvas.mpl_connect(
                 'button_release_event', self.release_pan)
             self.mode = 'pan/zoom mode'
+            #widgets.lock(self)
+        else:
+            pass
+            #widgets.release(self)
+
+        for a in self.canvas.figure.get_axes():
+            a.set_navigate_mode(self._active)
 
         self.set_message(self.mode)
 
@@ -1180,16 +1245,15 @@ class NavigationToolbar2:
         # push the current view to define home if stack is empty
         if self._views.empty(): self.push_current()
 
-
+        self._xypress=[]
         for i, a in enumerate(self.canvas.figure.get_axes()):
-            if event.inaxes == a and event.inaxes.get_navigate():
+            if x is not None and y is not None and a.in_axes(x, y) and a.get_navigate():
                 xmin, xmax = a.get_xlim()
                 ymin, ymax = a.get_ylim()
                 lim = xmin, xmax, ymin, ymax
-                self._xypress = x, y, a, i, lim,a.transData.deepcopy()
+                self._xypress.append((x, y, a, i, lim,a.transData.deepcopy()))
                 self.canvas.mpl_disconnect(self._idDrag)
                 self._idDrag=self.canvas.mpl_connect('motion_notify_event', self.drag_pan)
-                break
 
         self.press(event)
 
@@ -1208,14 +1272,14 @@ class NavigationToolbar2:
         # push the current view to define home if stack is empty
         if self._views.empty(): self.push_current()
 
+        self._xypress=[]
         for i, a in enumerate(self.canvas.figure.get_axes()):
-            if event.inaxes==a and event.inaxes.get_navigate():
+            if x is not None and y is not None and a.in_axes(x, y) and a.get_navigate():
                 xmin, xmax = a.get_xlim()
                 ymin, ymax = a.get_ylim()
                 lim = xmin, xmax, ymin, ymax
-                self._xypress = x, y, a, i, lim, a.transData.deepcopy()
+                self._xypress.append(( x, y, a, i, lim, a.transData.deepcopy() ))
 
-                break
         self.press(event)
 
     def push_current(self):
@@ -1240,7 +1304,7 @@ class NavigationToolbar2:
         'the release mouse button callback in pan/zoom mode'
         self.canvas.mpl_disconnect(self._idDrag)
         self._idDrag=self.canvas.mpl_connect('motion_notify_event', self.mouse_move)
-        if self._xypress is None: return
+        if not self._xypress: return
         self._xypress = None
         self._button_pressed=None
         self.push_current()
@@ -1271,163 +1335,155 @@ class NavigationToolbar2:
                     dx=dx/abs(dx)*abs(dy)
             return (dx,dy)
 
-        if self._xypress is None: return
-        x, y = event.x, event.y
+        for cur_xypress in self._xypress:
+            lastx, lasty, a, ind, lim, trans = cur_xypress
+            xmin, xmax, ymin, ymax = lim
+            #safer to use the recorded button at the press than current button:
+            #multiple button can get pressed during motion...
+            if self._button_pressed==1:
+                lastx, lasty = trans.inverse_xy_tup( (lastx, lasty) )
+                x, y = trans.inverse_xy_tup( (event.x, event.y) )
+                if a.get_xscale()=='log':
+                    dx=1-lastx/x
+                else:
+                    dx=x-lastx
+                if a.get_yscale()=='log':
+                    dy=1-lasty/y
+                else:
+                    dy=y-lasty
 
-        lastx, lasty, a, ind, lim, trans = self._xypress
-        xmin, xmax, ymin, ymax = lim
-        #safer to use the recorded buttin at the press than current button:
-        #multiple button can get pressed during motion...
-        if self._button_pressed==1:
-            lastx, lasty = trans.inverse_xy_tup( (lastx, lasty) )
-            x, y = trans.inverse_xy_tup( (x, y) )
-            if a.get_xscale()=='log':
-                dx=1-lastx/x
-            else:
-                dx=x-lastx
-            if a.get_yscale()=='log':
-                dy=1-lasty/y
-            else:
-                dy=y-lasty
-            dx,dy=format_deltas(event,dx,dy)
-            if a.get_xscale()=='log':
-                xmin *= 1-dx
-                xmax *= 1-dx
-            else:
-                xmin -= dx
-                xmax -= dx
-            if a.get_yscale()=='log':
-                ymin *= 1-dy
-                ymax *= 1-dy
-            else:
-                ymin -= dy
-                ymax -= dy
-        elif self._button_pressed==3:
-            dx=(lastx-x)/float(a.bbox.width())
-            dy=(lasty-y)/float(a.bbox.height())
-            dx,dy=format_deltas(event,dx,dy)
-            alphax = pow(10.0,dx)
-            alphay = pow(10.0,dy)#use logscaling, avoid singularities and smother scaling...
-            lastx, lasty = trans.inverse_xy_tup( (lastx, lasty) )
-            if a.get_xscale()=='log':
-                xmin = lastx*(xmin/lastx)**alphax
-                xmax = lastx*(xmax/lastx)**alphax
-            else:
-                xmin = lastx+alphax*(xmin-lastx)
-                xmax = lastx+alphax*(xmax-lastx)
-            if a.get_yscale()=='log':
-                ymin = lasty*(ymin/lasty)**alphay
-                ymax = lasty*(ymax/lasty)**alphay
-            else:
-                ymin = lasty+alphay*(ymin-lasty)
-                ymax = lasty+alphay*(ymax-lasty)
+                dx,dy=format_deltas(event,dx,dy)
 
-        a.set_xlim((xmin, xmax))
-        a.set_ylim((ymin, ymax))
+                if a.get_xscale()=='log':
+                    xmin *= 1-dx
+                    xmax *= 1-dx
+                else:
+                    xmin -= dx
+                    xmax -= dx
+                if a.get_yscale()=='log':
+                    ymin *= 1-dy
+                    ymax *= 1-dy
+                else:
+                    ymin -= dy
+                    ymax -= dy
+            elif self._button_pressed==3:
+                try:
+                    dx=(lastx-event.x)/float(a.bbox.width())
+                    dy=(lasty-event.y)/float(a.bbox.height())
+                    dx,dy=format_deltas(event,dx,dy)
+                    if a.get_aspect() != 'auto':
+                        dx = 0.5*(dx + dy)
+                        dy = dx
+                    alphax = pow(10.0,dx)
+                    alphay = pow(10.0,dy)#use logscaling, avoid singularities and smother scaling...
+                    lastx, lasty = trans.inverse_xy_tup( (lastx, lasty) )
+                    if a.get_xscale()=='log':
+                        xmin = lastx*(xmin/lastx)**alphax
+                        xmax = lastx*(xmax/lastx)**alphax
+                    else:
+                        xmin = lastx+alphax*(xmin-lastx)
+                        xmax = lastx+alphax*(xmax-lastx)
+                    if a.get_yscale()=='log':
+                        ymin = lasty*(ymin/lasty)**alphay
+                        ymax = lasty*(ymax/lasty)**alphay
+                    else:
+                        ymin = lasty+alphay*(ymin-lasty)
+                        ymax = lasty+alphay*(ymax-lasty)
+                except OverflowError:
+                    warnings.warn('Overflow while panning')
+                    return
+            a.set_xlim(self.nonsingular(xmin, xmax))
+            a.set_ylim(self.nonsingular(ymin, ymax))
 
         self.dynamic_update()
 
+    def nonsingular(self, x0, x1):
+        '''Desperate hack to prevent crashes when button-3 panning with
+        axis('image') in effect.
+        '''
+        d = x1 - x0
+        # much smaller thresholds seem to cause Value Error
+        # later in Transformation::freeze in axes.draw()
+        if abs(d) < 1e-10:
+            warnings.warn('Axis data limit is too small for panning')
+            x1 += 1e-10
+            x0 -= 1e-10
+        return (x0, x1)
 
 
     def release_zoom(self, event):
         'the release mouse button callback in zoom to rect mode'
-        if self._xypress is None: return
-        x, y = event.x, event.y
+        if not self._xypress: return
 
+        for cur_xypress in self._xypress:
+            x, y = event.x, event.y
+            lastx, lasty, a, ind, lim, trans = cur_xypress
+            # ignore singular clicks - 5 pixels is a threshold
+            if abs(x-lastx)<5 or abs(y-lasty)<5:
+                self._xypress = None
+                self.release(event)
+                self.draw()
+                return
 
-        lastx, lasty, a, ind, lim, trans = self._xypress
-        # ignore singular clicks - 5 pixels is a threshold
-        if abs(x-lastx)<5 or abs(y-lasty)<5:
-            self._xypress = None
-            self.release(event)
-            self.draw()
-            return
+            xmin, ymin, xmax, ymax = lim
 
-        xmin, ymin, xmax, ymax = lim
+            # zoom to rect
+            lastx, lasty = a.transData.inverse_xy_tup( (lastx, lasty) )
+            x, y = a.transData.inverse_xy_tup( (x, y) )
+            Xmin,Xmax=a.get_xlim()
+            Ymin,Ymax=a.get_ylim()
 
-        # zoom to rect
-        lastx, lasty = a.transData.inverse_xy_tup( (lastx, lasty) )
-        x, y = a.transData.inverse_xy_tup( (x, y) )
-        Xmin,Xmax=a.get_xlim()
-        Ymin,Ymax=a.get_ylim()
-
-        if Xmin < Xmax:
-            if x<lastx:  xmin, xmax = x, lastx
-            else: xmin, xmax = lastx, x
-            if xmin < Xmin: xmin=Xmin
-            if xmax > Xmax: xmax=Xmax
-        else:
-            if x>lastx:  xmin, xmax = x, lastx
-            else: xmin, xmax = lastx, x
-            if xmin > Xmin: xmin=Xmin
-            if xmax < Xmax: xmax=Xmax
-
-        if Ymin < Ymax:
-            if y<lasty:  ymin, ymax = y, lasty
-            else: ymin, ymax = lasty, y
-            if ymin < Ymin: ymin=Ymin
-            if ymax > Ymax: ymax=Ymax
-        else:
-            if y>lasty:  ymin, ymax = y, lasty
-            else: ymin, ymax = lasty, y
-            if ymin > Ymin: ymin=Ymin
-            if ymax < Ymax: ymax=Ymax
-
-        if self._button_pressed == 1:
-            a.set_xlim((xmin, xmax))
-            a.set_ylim((ymin, ymax))
-        elif self._button_pressed == 3:
-            if a.get_xscale()=='log':
-                alpha=log(Xmax/Xmin)/log(xmax/xmin)
-                x1=pow(Xmin/xmin,alpha)*Xmin
-                x2=pow(Xmax/xmin,alpha)*Xmin
+            if Xmin < Xmax:
+                if x<lastx:  xmin, xmax = x, lastx
+                else: xmin, xmax = lastx, x
+                if xmin < Xmin: xmin=Xmin
+                if xmax > Xmax: xmax=Xmax
             else:
-                alpha=(Xmax-Xmin)/(xmax-xmin)
-                x1=alpha*(Xmin-xmin)+Xmin
-                x2=alpha*(Xmax-xmin)+Xmin
-            if a.get_yscale()=='log':
-                alpha=log(Ymax/Ymin)/log(ymax/ymin)
-                y1=pow(Ymin/ymin,alpha)*Ymin
-                y2=pow(Ymax/ymin,alpha)*Ymin
-            else:
-                alpha=(Ymax-Ymin)/(ymax-ymin)
-                y1=alpha*(Ymin-ymin)+Ymin
-                y2=alpha*(Ymax-ymin)+Ymin
-            a.set_xlim((x1, x2))
-            a.set_ylim((y1, y2))
+                if x>lastx:  xmin, xmax = x, lastx
+                else: xmin, xmax = lastx, x
+                if xmin > Xmin: xmin=Xmin
+                if xmax < Xmax: xmax=Xmax
 
-        # Zoom with fixed aspect; modified for shared x-axes
-        aspect = a.get_aspect()
-        if aspect == 'equal' or aspect == 'scaled': 
-            self.fix_aspect_after_zoom(a)
-        else:
-            aspect_shared = ''
-            if a._sharex != None: aspect_shared = a._sharex.get_aspect()
-            if aspect_shared == 'equal' or aspect_shared == 'scaled':
-                self.fix_aspect_after_zoom(a._sharex)
-                
+            if Ymin < Ymax:
+                if y<lasty:  ymin, ymax = y, lasty
+                else: ymin, ymax = lasty, y
+                if ymin < Ymin: ymin=Ymin
+                if ymax > Ymax: ymax=Ymax
+            else:
+                if y>lasty:  ymin, ymax = y, lasty
+                else: ymin, ymax = lasty, y
+                if ymin > Ymin: ymin=Ymin
+                if ymax < Ymax: ymax=Ymax
+
+            if self._button_pressed == 1:
+                a.set_xlim((xmin, xmax))
+                a.set_ylim((ymin, ymax))
+            elif self._button_pressed == 3:
+                if a.get_xscale()=='log':
+                    alpha=log(Xmax/Xmin)/log(xmax/xmin)
+                    x1=pow(Xmin/xmin,alpha)*Xmin
+                    x2=pow(Xmax/xmin,alpha)*Xmin
+                else:
+                    alpha=(Xmax-Xmin)/(xmax-xmin)
+                    x1=alpha*(Xmin-xmin)+Xmin
+                    x2=alpha*(Xmax-xmin)+Xmin
+                if a.get_yscale()=='log':
+                    alpha=log(Ymax/Ymin)/log(ymax/ymin)
+                    y1=pow(Ymin/ymin,alpha)*Ymin
+                    y2=pow(Ymax/ymin,alpha)*Ymin
+                else:
+                    alpha=(Ymax-Ymin)/(ymax-ymin)
+                    y1=alpha*(Ymin-ymin)+Ymin
+                    y2=alpha*(Ymax-ymin)+Ymin
+                a.set_xlim((x1, x2))
+                a.set_ylim((y1, y2))
+
         self.draw()
         self._xypress = None
-        self._button_pressed == None
+        self._button_pressed = None
 
         self.push_current()
         self.release(event)
-
-    def fix_aspect_after_zoom(self,a):
-        'Fix the aspect ratio after zooming in case of aspect equal or scaled'
-        lold,bold,wold,hold = a.get_position()
-        aspect = a.get_aspect()
-        a.set_aspect(aspect,True)
-        l,b,w,h = a.get_position()
-        if w != wold:  # width of axes was changed
-            ratio = w / wold
-            for ax in a.get_figure().axes:  # see if any subplot shares this axis
-                if ax._sharex == a:
-                    lax,bax,wax,hax = ax.get_position()
-                    wnew = ratio * wax
-                    lnew = lax
-                    if aspect == 'equal': lnew = lax - 0.5 * ( wnew - wax )
-                    ax.set_position( [lnew, bax, wnew, hax] )
 
     def draw(self):
         'redraw the canvases, update the locators'
@@ -1449,7 +1505,9 @@ class NavigationToolbar2:
 
 
     def _update_view(self):
-        'update the viewlim and position from the view and position stack for each axes'
+        '''update the viewlim and position from the view and
+        position stack for each axes
+        '''
 
         lims = self._views()
         if lims is None:  return
@@ -1500,6 +1558,13 @@ class NavigationToolbar2:
             self._idPress = self.canvas.mpl_connect('button_press_event', self.press_zoom)
             self._idRelease = self.canvas.mpl_connect('button_release_event', self.release_zoom)
             self.mode = 'Zoom to rect mode'
+            #widgets.lock(self)
+        else:
+            pass
+            #widgets.release(self)
+
+        for a in self.canvas.figure.get_axes():
+            a.set_navigate_mode(self._active)
 
         self.set_message(self.mode)
 

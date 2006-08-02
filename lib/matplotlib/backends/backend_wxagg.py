@@ -7,7 +7,8 @@ from __future__ import division
  Jeremy O'Donoghue (jeremy@o-donoghue.com) and the Agg backend by John
  Hunter (jdhunter@ace.bsd.uchicago.edu)
 
- Copyright (C) 2003-5 Jeremy O'Donoghue, John Hunter, Illinois Institute of Technology
+ Copyright (C) 2003-5 Jeremy O'Donoghue, John Hunter, Illinois Institute of 
+ Technology
 
   
  License: This work is licensed under the matplotlib license( PSF
@@ -87,21 +88,21 @@ class FigureCanvasWxAgg(FigureCanvasWx,FigureCanvasAgg):
         destDC.SelectObject(self.bitmap)
 
         destDC.BeginDrawing()
-        destDC.Blit(x, y, w, h, srcDC, 0, 0)
+        destDC.Blit(x, y, int(w), int(h), srcDC, 0, 0)
         destDC.EndDrawing()
 
         destDC.SelectObject(wx.NullBitmap)
         srcDC.SelectObject(wx.NullBitmap)
         self.gui_repaint()
 
-    def print_figure(self, filename, dpi=150, facecolor='w',
-                     edgecolor='w', orientation='portrait'):
-
+    def print_figure(self, filename, dpi=150, facecolor='w', edgecolor='w',
+                     orientation='portrait', **kwargs):
         """
         Render the figure to hardcopy
         """
         agg = self.switch_backends(FigureCanvasAgg)
-        agg.print_figure(filename, dpi, facecolor, edgecolor, orientation)
+        agg.print_figure(filename, dpi, facecolor, edgecolor, orientation,
+                         **kwargs)
         self.figure.set_canvas(self)
 
     def _get_imagesave_wildcards(self):
@@ -131,8 +132,9 @@ def new_figure_manager(num, *args, **kwargs):
         if backend_wx.wxapp is None:
             backend_wx.wxapp = wx.PySimpleApp()
             backend_wx.wxapp.SetExitOnFrameDelete(True)
-    
-    fig = Figure(*args, **kwargs)
+
+    FigureClass = kwargs.pop('FigureClass', Figure)    
+    fig = FigureClass(*args, **kwargs)
     frame = FigureFrameWxAgg(num, fig)
     figmgr = frame.get_figure_manager()
     if matplotlib.is_interactive():
@@ -152,9 +154,7 @@ def _py_convert_agg_to_wx_image(agg, bbox):
 
     Note: agg must be a backend_agg.RendererAgg instance.
     """
-    wPx = agg.width
-    hPx = agg.height
-    image = wx.EmptyImage(wPx, hPx)
+    image = wx.EmptyImage(int(agg.width), int(agg.height))
     image.SetData(agg.tostring_rgb())
 
     if bbox is None:
@@ -194,14 +194,14 @@ def _clipped_image_as_bitmap(image, bbox):
     srcDC = wx.MemoryDC()
     srcDC.SelectObject(srcBmp)
 
-    destBmp = wx.EmptyBitmap(width, height)
+    destBmp = wx.EmptyBitmap(int(width), int(height))
     destDC = wx.MemoryDC()
     destDC.SelectObject(destBmp)
  
     destDC.BeginDrawing()
     x = int(l)
     y = int(image.GetHeight() - t)
-    destDC.Blit(0, 0, width, height, srcDC, x, y)
+    destDC.Blit(0, 0, int(width), int(height), srcDC, x, y)
     destDC.EndDrawing()
 
     srcDC.SelectObject(wx.NullBitmap)

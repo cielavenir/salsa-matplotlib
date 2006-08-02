@@ -1,35 +1,13 @@
 #! /bin/sh /usr/share/dpatch/dpatch-run
 ## build_fix.dpatch by Marco Presi (Zufus) <zufus@debian.org>
-##                  and Vittorio Palmisano <vpalmisano@gmail.com>
 ##
 ## All lines beginning with `## DP:' are a description of the patch.
 ## DP: No description.
 
 @DPATCH@
-
-diff -Naurd matplotlib-0.86.2_old/setupext.py matplotlib-0.86.2_new/setupext.py
---- matplotlib-0.86.2_old/setupext.py	2006-01-09 14:20:44.000000000 +0100
-+++ matplotlib-0.86.2_new/setupext.py	2006-01-28 19:57:47.000000000 +0100
-@@ -309,11 +309,11 @@
- 	print "Using default library and include directories for Tcl and Tk because a"
- 	print "Tk window failed to open.  You may need to define DISPLAY for Tk to work"
- 	print "so that setup can determine where your libraries are located."
--	o.tcl_lib = "/usr/local/lib"
--	o.tcl_inc = "/usr/local/include"
--	o.tk_lib = "/usr/local/lib"
--        o.tk_inc = "/usr/local/include"
--	o.tkv = ""
-+	o.tcl_lib = "/usr/lib"
-+	o.tcl_inc = "/usr/include/tcl8.4"
-+	o.tk_lib = "/usr/lib"
-+        o.tk_inc = "/usr/include/tcl8.4"
-+	o.tkv = "8.4"
-     else:
- 	tk.withdraw()
- 	o.tcl_lib = os.path.join((tk.getvar('tcl_library')), '../')
-diff -Naurd matplotlib-0.86.2_old/setup.py matplotlib-0.86.2_new/setup.py
---- matplotlib-0.86.2_old/setup.py	2006-01-20 16:59:52.000000000 +0100
-+++ matplotlib-0.86.2_new/setup.py	2006-01-28 19:58:30.000000000 +0100
+diff -urNad matplotlib-0.87.4~/setup.py matplotlib-0.87.4/setup.py
+--- matplotlib-0.87.4~/setup.py	2006-08-02 20:51:12.000000000 +0200
++++ matplotlib-0.87.4/setup.py	2006-08-02 20:51:13.000000000 +0200
 @@ -28,21 +28,21 @@
  # it.  It makes very nice antialiased output and also supports alpha
  # blending
@@ -57,11 +35,10 @@ diff -Naurd matplotlib-0.86.2_old/setup.py matplotlib-0.86.2_new/setup.py
  
  
  VERBOSE = False # insert lots of diagnostic prints in extension code
-@@ -201,34 +201,17 @@
- build_transforms(ext_modules, packages, NUMERIX)
+@@ -200,47 +200,20 @@
  build_enthought(ext_modules, packages)
  
--if BUILD_GTK:
+ if BUILD_GTK:
 -    try:
 -        import gtk
 -    except ImportError:
@@ -69,8 +46,8 @@ diff -Naurd matplotlib-0.86.2_old/setup.py matplotlib-0.86.2_new/setup.py
 -        BUILD_GTK=0
 -    except RuntimeError:
 -        print 'pygtk present but import failed'
- 
- if BUILD_GTK:
+-
+-if BUILD_GTK:
          build_gdk(ext_modules, packages, NUMERIX)
          rc['backend'] = 'GTK'
  
@@ -78,9 +55,12 @@ diff -Naurd matplotlib-0.86.2_old/setup.py matplotlib-0.86.2_new/setup.py
 -    try: import Tkinter
 -    except ImportError: print 'TKAgg requires TkInter'
 -    else:
-         BUILD_AGG = 1
-         build_tkagg(ext_modules, packages, NUMERIX)
-         rc['backend'] = 'TkAgg'
+-        BUILD_AGG = 1
+-        build_tkagg(ext_modules, packages, NUMERIX)
+-        rc['backend'] = 'TkAgg'
++    BUILD_AGG = 1
++    build_tkagg(ext_modules, packages, NUMERIX)
++    rc['backend'] = 'TkAgg'
          
  if BUILD_WXAGG:
 -    try: import wxPython
@@ -89,13 +69,13 @@ diff -Naurd matplotlib-0.86.2_old/setup.py matplotlib-0.86.2_new/setup.py
 -            print 'WXAgg\'s accelerator requires wxPython'
 -        BUILD_WXAGG = 0
 -    else:
-         BUILD_AGG = 1
-         build_wxagg(ext_modules, packages, NUMERIX,
-             not (isinstance(BUILD_WXAGG, str) # don't about if BUILD_WXAGG
-@@ -236,15 +219,6 @@
-         rc['backend'] = 'WXAgg'
- 
- if BUILD_GTKAGG:
+-        BUILD_AGG = 1
+-        build_wxagg(ext_modules, packages, NUMERIX,
+-            not (isinstance(BUILD_WXAGG, str) # don't about if BUILD_WXAGG
+-                 and BUILD_WXAGG.lower() == 'auto')) # is "auto"
+-        rc['backend'] = 'WXAgg'
+-
+-if BUILD_GTKAGG:
 -    try:
 -        import gtk
 -    except ImportError:
@@ -103,8 +83,39 @@ diff -Naurd matplotlib-0.86.2_old/setup.py matplotlib-0.86.2_new/setup.py
 -        BUILD_GTKAGG=0
 -    except RuntimeError:
 -        print 'pygtk present but import failed'
--
--if BUILD_GTKAGG:
++    BUILD_AGG = 1
++    build_wxagg(ext_modules, packages, NUMERIX,
++                not (isinstance(BUILD_WXAGG, str) # don't about if BUILD_WXAGG
++                     and BUILD_WXAGG.lower() == 'auto')) # is "auto"
++    rc['backend'] = 'WXAgg'
+ 
+ if BUILD_GTKAGG:
      BUILD_AGG = 1
-     build_gtkagg(ext_modules, packages, NUMERIX)
-     rc['backend'] = 'GTKAgg'
+@@ -301,6 +274,6 @@
+       ext_modules = ext_modules,
+       data_files = data_files,
+       package_dir = {'': 'lib'},
+-      cmdclass = {'install_data':smart_install_data},
++      #cmdclass = {'install_data':smart_install_data},
+       **additional_params
+       )
+diff -urNad matplotlib-0.87.4~/setupext.py matplotlib-0.87.4/setupext.py
+--- matplotlib-0.87.4~/setupext.py	2006-07-10 19:55:59.000000000 +0200
++++ matplotlib-0.87.4/setupext.py	2006-08-02 20:51:49.000000000 +0200
+@@ -347,11 +347,11 @@
+         print "Using default library and include directories for Tcl and Tk because a"
+         print "Tk window failed to open.  You may need to define DISPLAY for Tk to work"
+         print "so that setup can determine where your libraries are located."
+-        o.tcl_lib = "/usr/local/lib"
+-        o.tcl_inc = "/usr/local/include"
+-        o.tk_lib = "/usr/local/lib"
+-        o.tk_inc = "/usr/local/include"
+-        o.tkv = ""
++        o.tcl_lib = "/usr/lib"
++        o.tcl_inc = "/usr/include/tcl8.4"
++        o.tk_lib = "/usr/lib"
++        o.tk_inc = "/usr/include/tcl8.4"
++        o.tkv = "8.4"
+     else:
+         tk.withdraw()
+         o.tcl_lib = os.path.normpath(os.path.join((tk.getvar('tcl_library')), '../'))

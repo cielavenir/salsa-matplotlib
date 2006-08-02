@@ -24,7 +24,7 @@ build-indep-stamp:
 	dh_testdir
 	## Building documentation...
 	mkdir -p doc
-	sh -c "cd doc; epydoc -n matplotlib ../lib/matplotlib/*; cd -;"
+	sh -c "cd doc; xvfb-run epydoc -n matplotlib ../lib/matplotlib/*; cd -;"
 	#wget http://matplotlib.sourceforge.net/$(users_guide)
 	touch build-indep-stamp
 
@@ -59,8 +59,8 @@ install-stamp-%: build-stamp-%
 	dh_testroot
 	python$* ./setup.py install_lib \
 		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/ --no-compile
-	dh_install -p$(p) lib/dateutil usr/lib/python$*/site-packages/
-	rm -rf debian/$(p)/usr/lib/python$*/site-packages/pytz
+	#dh_install -p$(p) lib/dateutil usr/lib/python$*/site-packages/
+	#dh_install -p$(p) lib/pytz usr/lib/python$*/site-packages/
 	touch $@
 
 install-indep: build-indep
@@ -98,7 +98,7 @@ binary-arch: build-arch install-arch
 	dh_testdir -a
 	dh_testroot -a
 	dh_installchangelogs -a CHANGELOG
-	dh_installdocs -p$(p) -a README debian/README.debian TODO API_CHANGES NUMARRAY_ISSUES KNOWN_BUGS
+	dh_installdocs -p$(p) -a README TODO API_CHANGES NUMARRAY_ISSUES KNOWN_BUGS
 	# make python scripts starting with '#!' executable
 	for i in `find debian -mindepth 2 -type f ! -perm 755`; do \
 	  if head -1 $$i | grep -q '^#!'; then \

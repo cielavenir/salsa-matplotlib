@@ -6,7 +6,7 @@ exist in matlab(TM) but have proven themselves to be useful nonetheless.
 The majority of them, however, have matlab analogs
 
 _Plotting commands
-
+  arrow     - add an arrow to the axes
   axes      - Create a new axes
   axhline   - draw a horizontal line across axes
   axvline   - draw a vertical line across axes
@@ -15,6 +15,7 @@ _Plotting commands
   axis      - Set or return the current axis limits
   bar       - make a bar chart
   barh      - a horizontal bar chart
+  box       - set the axes frame on/off state
   boxplot   - make a box and whisker plot
   cla       - clear current axes
   clabel    - label a contour plot
@@ -232,7 +233,8 @@ import numerix as nx
 # eg a bad pytz install.  I don't want to break all of matplotlib for
 # date support
 try:
-    from dates import date2num, num2date, datestr2num, drange, epoch2num, num2epoch, mx2num,\
+    from dates import date2num, num2date, datestr2num, drange,\
+            epoch2num, num2epoch, mx2num,\
             DateFormatter, IndexDateFormatter, DateLocator,\
             RRuleLocator, YearLocator, MonthLocator, WeekdayLocator,\
             DayLocator, HourLocator, MinuteLocator, SecondLocator,\
@@ -249,17 +251,32 @@ from ticker import TickHelper, Formatter, FixedFormatter, NullFormatter,\
            FuncFormatter, FormatStrFormatter, ScalarFormatter,\
            LogFormatter, LogFormatterExponent, LogFormatterMathtext,\
            Locator, IndexLocator, FixedLocator, NullLocator,\
-           LinearLocator, LogLocator, AutoLocator, MultipleLocator
+           LinearLocator, LogLocator, AutoLocator, MultipleLocator,\
+           MaxNLocator
 import ticker
 import matplotlib
 
 # bring all the  symbols in so folks can import them from
 # pylab in one fell swoop
 
-from numerix import array, zeros, shape, rank, size, fromstring, take, put, putmask, reshape, repeat, choose, searchsorted, asum, cumsum, product, cumproduct, alltrue, sometrue, allclose, arrayrange, arange, asarray, convolve, swapaxes, concatenate, transpose, sort, argsort, argmax, argmin, innerproduct, dot, outerproduct, resize, indices, fromfunction, diagonal, trace, ravel, nonzero, shape, where, compress, clip, zeros, ones, identity, add, logical_or, exp, subtract, logical_xor, log, multiply, logical_not, log10, divide, maximum, sin, minimum, sinh, conjugate, bitwise_and, sqrt, power, bitwise_or, tan, absolute, bitwise_xor, tanh, negative, ceil, greater, fabs, greater_equal, floor, less, arccos, arctan2, less_equal, arcsin, fmod, equal, arctan, hypot, not_equal, cos, around, logical_and, cosh, arccosh, arcsinh, arctanh, cross_correlate, \
-     pi, ArrayType, matrixmultiply
+from numerix import array, zeros, shape, rank, size, fromstring,\
+        take, put, putmask, reshape, repeat, choose, searchsorted,\
+        asum, cumsum, product, cumproduct, alltrue, sometrue, allclose,\
+        arrayrange, arange, asarray, convolve, swapaxes, concatenate,\
+        transpose, sort, argsort, argmax, argmin, innerproduct, dot,\
+        outerproduct, resize, indices, fromfunction, diagonal, trace,\
+        ravel, nonzero, shape, where, compress, clip, zeros, ones,\
+        identity, add, logical_or, exp, subtract, logical_xor,\
+        log, multiply, logical_not, log10, divide, maximum, sin,\
+        minimum, sinh, conjugate, bitwise_and, sqrt, power, bitwise_or,\
+        tan, absolute, bitwise_xor, tanh, negative, ceil, greater, fabs,\
+        greater_equal, floor, less, arccos, arctan2, less_equal, arcsin,\
+        fmod, equal, arctan, hypot, not_equal, cos, around, logical_and,\
+        cosh, arccosh, arcsinh, arctanh, cross_correlate,\
+        pi, ArrayType, matrixmultiply
 
-from numerix import Int8, UInt8, Int16, UInt16, Int32, UInt32, Float32, Float64, Complex32, Complex64, Float, Int, Complex
+from numerix import Int8, UInt8, Int16, UInt16, Int32, UInt32, Float32,\
+        Float64, Complex32, Complex64, Float, Int, Complex
 
 from matplotlib.numerix.fft import fft
 from matplotlib.numerix.linear_algebra import inverse, eigenvectors
@@ -270,7 +287,14 @@ pymin, pymax = min, max
 from matplotlib.numerix.mlab import *
 min, max = pymin, pymax
 
-from matplotlib.mlab import linspace, window_hanning, window_none, conv, detrend, detrend_mean, detrend_none, detrend_linear, corrcoef, polyfit, polyval, vander, entropy, normpdf, levypdf, find, trapz, prepca, fix, rem, norm, orth, rank, sqrtm, prctile, center_matrix, meshgrid, rk4, exp_safe, amap, sum_flat, mean_flat, rms_flat, l1norm, l2norm, norm, frange, diagonal_matrix, base_repr, binary_repr, log2, ispower2, bivariate_normal
+from matplotlib.mlab import linspace, window_hanning, window_none,\
+        conv, detrend, detrend_mean, detrend_none, detrend_linear,\
+        corrcoef, polyfit, polyval, vander, entropy, normpdf,\
+        levypdf, find, trapz, prepca, fix, rem, norm, orth, rank,\
+        sqrtm, prctile, center_matrix, meshgrid, rk4, exp_safe, amap,\
+        sum_flat, mean_flat, rms_flat, l1norm, l2norm, norm, frange,\
+        diagonal_matrix, base_repr, binary_repr, log2, ispower2,\
+        bivariate_normal, load, save, stineman_interp
 
 
 """
@@ -310,8 +334,17 @@ def _shift_string(s):
         lines[i] = line[min(nshift, nwhite):]
     return ''.join(lines)
 
+from colorbar import colorbar_doc
+def colorbar(mappable = None, cax=None,**kw):
+    if mappable is None:
+        mappable = gci()
+    ret = gcf().colorbar(mappable, cax = cax, **kw)
+    draw_if_interactive()
+    return ret
+colorbar.__doc__ = colorbar_doc
 
-def colorbar(mappable = None,
+
+def colorbar_classic(mappable = None,
              cax=None,
              orientation='vertical',
              tickfmt='%1.1f',
@@ -358,7 +391,7 @@ def colorbar(mappable = None,
     """
     if mappable is None:
         mappable = gci()
-    ret = gcf().colorbar(mappable, cax = cax,
+    ret = gcf().colorbar_classic(mappable, cax = cax,
                          orientation = orientation,
                          tickfmt = tickfmt,
                          cspacing=cspacing,
@@ -551,29 +584,32 @@ def axis(*v, **kwargs):
     """
     Set/Get the axis properties::
 
-        axis()  returns the current axis as a length a length 4 vector
+        v = axis()  returns the current axes as v = [xmin, xmax, ymin, ymax]
 
-        axis(v) where v = [xmin, xmax, ymin, ymax] sets the min and max of the x
-            and y axis limits
+        axis(v) where v = [xmin, xmax, ymin, ymax] sets the min and max
+          of the x and y axes
 
         axis('off') turns off the axis lines and labels
 
-        axis('equal') changes limits of x or y axis such that equal
-          tick mark increments are equal in size. This makes a
-          circle look like a circle, for example. This is persistent.
-          For example, when axis limits are changed after this command,
-          the scale remains equal
+        axis('equal') changes limits of x or y axis so that equal
+          increments of x and y have the same length; a circle
+          is circular.
 
-        axis('scaled') makes scale equal, changes lengths of axes while
-          keeping limits of x and y axes fixed. Keeps lower left hand corner
-          in original position. Fixes axis limits.
+        axis('scaled') achieves the same result by changing the
+          dimensions of the plot box instead of the axis data
+          limits.
 
-        axis('tight') changes limits x and y axis such that all data is
+        axis('tight') changes x and y axis limits such that all data is
           shown. If all data is already shown, it will move it to the center
           of the figure without modifying (xmax-xmin) or (ymax-ymin). Note
-          this is slightly different than in matlab. Fixes axis limits.
+          this is slightly different than in matlab.
 
-        axis('normal') sets the axis to normal, i.e. turns equal scale off
+        axis('image') is 'scaled' with the axis limits equal to the
+          data limits.
+
+        axis('auto') or 'normal' (deprecated) restores default behavior;
+          axis limits are automatically scaled to make the data fit
+          comfortably within the plot box.
 
        if len(*v)==0, you can pass in xmin, xmax, ymin, ymax as kwargs
        selectively to alter just those limits w/o changing the others.
@@ -583,50 +619,10 @@ def axis(*v, **kwargs):
 
     """
     ax = gca()
-    if len(v)==1 and is_string_like(v[0]):
-        s = v[0]
-        if s.lower()=='on': ax.set_axis_on()
-        elif s.lower()=='off': ax.set_axis_off()
-        elif s.lower()=='equal':
-            ax.set_aspect('equal')
-            draw_if_interactive()
-        elif s.lower()=='tight':
-            ax.autoscale_view()
-            ax.set_autoscale_on(False)
-            draw_if_interactive()
-        elif s.lower()=='scaled':
-            ax.set_autoscale_on(False)
-            ax.set_aspect('scaled',True)
-            draw_if_interactive()
-        elif s.lower()=='normal':
-            ax.set_autoscale_on(True)
-            ax.set_aspect('normal')
-        else:
-            raise ValueError('Unrecognized string %s to axis; try on or off' % s)
-        xmin, xmax = ax.get_xlim()
-        ymin, ymax = ax.get_ylim()
-        draw_if_interactive()
-        return xmin, xmax, ymin, ymax
-
-    try: v[0]
-    except IndexError:
-        xmin, xmax = ax.set_xlim(**kwargs)
-        ymin, ymax = ax.set_ylim(**kwargs)
-        draw_if_interactive()
-        return [xmin, xmax, ymin, ymax]
-
-    v = v[0]
-    if len(v) != 4:
-        raise ValueError('v must contain [xmin xmax ymin ymax]')
-
-
-    ax.set_xlim([v[0], v[1]])
-    ax.set_ylim([v[2], v[3]])
-    if ax.get_aspect() == 'equal':
-        ax.set_aspect( 'equal', True )
-
+    v = ax.axis(*v, **kwargs)
     draw_if_interactive()
     return v
+
 
 def axes(*args, **kwargs):
     """
@@ -823,6 +819,8 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
            facecolor = None, # defaults to rc figure.facecolor
            edgecolor = None, # defaults to rc figure.edgecolor
            frameon = True,
+           FigureClass = Figure,
+           **kwargs
            ):
     """
     figure(num = None, figsize=(8, 6), dpi=80, facecolor='w', edgecolor='k')
@@ -838,6 +836,9 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
 
       figure(1)
 
+    If you are creating many figures, make sure you explicitly call "close"
+    on the figures you are not using, because this will enable pylab
+    to properly clean up the memory.
 
     kwargs:
 
@@ -847,6 +848,11 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
       edgecolor - the border color; defaults to rc figure.edgecolor
 
     rcParams gives the default values from the .matplotlibrc file
+
+    FigureClass is a Figure or derived class that will be passed on to
+    new_figure_manager in the backends which allows you to hook custom
+    Figureclasses into the pylab interface.  Additional kwargs will be
+    passed on to your figure init function
     """
 
     if figsize is None   : figsize   = rcParams['figure.figsize']
@@ -864,7 +870,8 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
     figManager = _pylab_helpers.Gcf.get_fig_manager(num)
     if figManager is None:
         if get_backend()=='PS':  dpi = 72
-        figManager = new_figure_manager(num, figsize, dpi, facecolor, edgecolor, frameon)
+
+        figManager = new_figure_manager(num, figsize=figsize, dpi=dpi, facecolor=facecolor, edgecolor=edgecolor, frameon=frameon, FigureClass=FigureClass, **kwargs)
         _pylab_helpers.Gcf.set_active(figManager)
         figManager.canvas.figure.number = num
 
@@ -912,6 +919,11 @@ def gci():
 gci._current = None
 
 
+def sci(im):
+    """
+    Set the current image (the target of colormap commands like jet, hot or clim)
+    """
+    gci._current = im
 
 
 def hold(b=None):
@@ -951,75 +963,6 @@ if _imread.__doc__ is not None:
     imread.__doc__ = _shift_string(_imread.__doc__)
 
 
-def load(fname,comments='%',delimiter=None, converters=None,skiprows=0):
-    """
-    Load ASCII data from fname into an array and return the array.
-
-    The data must be regular, same number of values in every row
-
-    fname can be a filename or a file handle.  Support for gzipped files is
-    automatic, if the filename ends in .gz
-
-    matfile data is not currently supported, but see
-    Nigel Wade's matfile ftp://ion.le.ac.uk/matfile/matfile.tar.gz
-
-    Example usage:
-
-    X = load('test.dat')  # data in two columns
-    t = X[:,0]
-    y = X[:,1]
-
-    Alternatively, you can do
-
-    t,y = transpose(load('test.dat')) # for  two column data
-
-
-    X = load('test.dat')    # a matrix of data
-
-    x = load('test.dat')    # a single column of data
-
-    comments is the character used to indicate the start of a comment
-    in the file
-
-    delimiter is a string-like character used to seperate values in the
-    file. If delimiter is unspecified or none, any whitespace string is
-    a separator.
-
-    converters, if not None, is a dictionary mapping column number to
-    a function that will convert that column to a float.  Eg, if
-    column 0 is a date string: converters={0:datestr2num}
-
-    skiprows is the number of rows from the top to skip
-    """
-
-    if converters is None: converters = {}
-    if is_string_like(fname):
-        if fname.endswith('.gz'):
-            import gzip
-            fh = gzip.open(fname)
-        else:
-            fh = file(fname)
-    elif hasattr(fname, 'seek'):
-        fh = fname
-    else:
-        raise ValueError('fname must be a string or file handle')
-    X = []
-    numCols = None
-    for i,line in enumerate(fh):
-        if i<skiprows: continue
-        line = line[:line.find(comments)].strip()
-        if not len(line): continue
-        row = [converters.get(i,float)(val) for i,val in enumerate(line.split(delimiter))]
-        thisLen = len(row)
-        if numCols is not None and thisLen != numCols:
-            raise ValueError('All rows must have the same number of columns')
-        X.append(row)
-
-    X = array(X)
-    r,c = X.shape
-    if r==1 or c==1:
-        X.shape = max([r,c]),
-    return X
 
 
 def rc(*args, **kwargs):
@@ -1032,51 +975,6 @@ def rcdefaults():
     draw_if_interactive()
 if matplotlib.rcdefaults.__doc__ is not None:
     rcdefaults.__doc__ =   _shift_string(matplotlib.rcdefaults.__doc__)
-
-def save(fname, X, fmt='%.18e',delimiter=' '):
-    """
-    Save the data in X to file fname using fmt string to convert the
-    data to strings
-
-    fname can be a filename or a file handle.  If the filename ends in .gz,
-    the file is automatically saved in compressed gzip format.  The load()
-    command understands gzipped files transparently.
-
-    Example usage:
-
-    save('test.out', X)         # X is an array
-    save('test1.out', (x,y,z))  # x,y,z equal sized 1D arrays
-    save('test2.out', x)        # x is 1D
-    save('test3.out', x, fmt='%1.4e')  # use exponential notation
-
-    delimiter is used to separate the fields, eg delimiter ',' for
-    comma-separated values
-    """
-
-    if is_string_like(fname):
-        if fname.endswith('.gz'):
-            import gzip
-            fh = gzip.open(fname,'wb')
-        else:
-            fh = file(fname,'w')
-    elif hasattr(fname, 'seek'):
-        fh = fname
-    else:
-        raise ValueError('fname must be a string or file handle')
-
-
-    X = asarray(X)
-    origShape = None
-    if len(X.shape)==1:
-        origShape = X.shape
-        X.shape = len(X), 1
-    for row in X:
-        fh.write(delimiter.join([fmt%val for val in row]) + '\n')
-
-    if origShape is not None:
-        X.shape = origShape
-
-
 
 
 def subplot(*args, **kwargs):
@@ -1536,14 +1434,9 @@ def matshow(*args,**kw):
 
     ax.xaxis.tick_top()
     ax.title.set_y(1.05) # raise it up a bit for tick top
-
+    kw['aspect'] = 'auto'
     # imshow call: use 'lower' origin (we'll flip axes later)
     kw['origin'] = 'lower'
-    # Also set a 'free' aspect ratio b/c we've already done our best to fix
-    # it, while preserving the dimension sanity checks.  At this point, if a
-    # bit of rescaling is needed, so be it.  Otherwise, we'd get the nasty
-    # white bands we're working so hard to prevent.
-    kw['aspect'] = 'free'
     # Unless overridden, don't interpolate
     kw.setdefault('interpolation','nearest')
     # All other keywords go through to imshow.
@@ -1615,8 +1508,42 @@ def subplot_tool(targetfig=None):
     _pylab_helpers.Gcf.set_active(manager)  # restore the current figure
     return ret
 
+
+def box(on=None):
+    """
+    Turn the axes box on or off according to 'on'
+
+    If on is None, toggle state
+    """
+    ax = gca()
+    if on is None:
+        on = not ax.get_frame_on()
+    ax.set_frame_on(on)
+    draw_if_interactive()
+
 ### The following functions were autogenerated by the boilerplate.py
-### script.  They are simple wrappers around the Axes methods of the
+### script.  They are simple wrappers around Axes methods.
+
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
+def arrow(*args, **kwargs):
+    # allow callers to override the hold state by passing hold=True|False
+    b = ishold()
+    h = popd(kwargs, 'hold', None)
+    if h is not None:
+        hold(h)
+    try:
+        ret =  gca().arrow(*args, **kwargs)
+        draw_if_interactive()
+    except:
+        hold(b)
+        raise
+
+    hold(b)
+    return ret
+if Axes.arrow.__doc__ is not None:
+    arrow.__doc__ = _shift_string(Axes.arrow.__doc__) + """
+Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
@@ -1800,6 +1727,7 @@ def clabel(*args, **kwargs):
     except:
         hold(b)
         raise
+
     hold(b)
     return ret
 if Axes.clabel.__doc__ is not None:
@@ -2345,11 +2273,53 @@ def quiver(*args, **kwargs):
     except:
         hold(b)
         raise
-
+    gci._current = ret
     hold(b)
     return ret
 if Axes.quiver.__doc__ is not None:
     quiver.__doc__ = _shift_string(Axes.quiver.__doc__) + """
+Addition kwargs: hold = [True|False] overrides default hold state"""
+
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
+def quiver2(*args, **kwargs):
+    # allow callers to override the hold state by passing hold=True|False
+    b = ishold()
+    h = popd(kwargs, 'hold', None)
+    if h is not None:
+        hold(h)
+    try:
+        ret =  gca().quiver2(*args, **kwargs)
+        draw_if_interactive()
+    except:
+        hold(b)
+        raise
+    gci._current = ret
+    hold(b)
+    return ret
+if Axes.quiver2.__doc__ is not None:
+    quiver2.__doc__ = _shift_string(Axes.quiver2.__doc__) + """
+Addition kwargs: hold = [True|False] overrides default hold state"""
+
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
+def quiverkey(*args, **kwargs):
+    # allow callers to override the hold state by passing hold=True|False
+    b = ishold()
+    h = popd(kwargs, 'hold', None)
+    if h is not None:
+        hold(h)
+    try:
+        ret =  gca().quiverkey(*args, **kwargs)
+        draw_if_interactive()
+    except:
+        hold(b)
+        raise
+
+    hold(b)
+    return ret
+if Axes.quiverkey.__doc__ is not None:
+    quiverkey.__doc__ = _shift_string(Axes.quiverkey.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2582,5 +2552,7 @@ def winter():
     if im is not None:
         im.set_cmap(cm.winter)
     draw_if_interactive()
+
+
 
 

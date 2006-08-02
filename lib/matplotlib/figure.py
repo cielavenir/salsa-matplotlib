@@ -6,6 +6,7 @@ from artist import Artist
 from axes import Axes, Subplot, PolarSubplot, PolarAxes
 from cbook import flatten, allequal, popd, Stack, iterable
 import _image
+import colorbar as cbar
 from colors import normalize, rgb2hex
 from image import FigureImage
 from matplotlib import rcParams
@@ -19,6 +20,7 @@ from mlab import linspace, meshgrid
 from ticker import FormatStrFormatter
 from cm import ScalarMappable
 from contour import ContourSet
+import warnings
 
 class SubplotParams:
     """
@@ -109,8 +111,8 @@ class Figure(Artist):
                  subplotpars = None, # default to rc
                  ):
         """
-        paper size is a w,h tuple in inches
-        DPI is dots per inch
+        figsize is a w,h tuple in inches
+        dpi is dots per inch
         subplotpars is a SubplotParams instance, defaults to rc
         """
         Artist.__init__(self)
@@ -131,6 +133,7 @@ class Figure(Artist):
         self.ur = Point( self.figwidth*self.dpi,
                          self.figheight*self.dpi )
         self.bbox = Bbox(self.ll, self.ur)
+
         self.frameon = frameon
 
         self.transFigure = get_bbox_transform( unit_bbox(), self.bbox)
@@ -241,6 +244,8 @@ class Figure(Artist):
 
     def set_figsize_inches(self, *args, **kwargs):
         """
+        set_figsize_inches(w,h, forward=False)
+
         Set the figure size in inches
 
         Usage: set_figsize_inches(self, w,h)  OR
@@ -249,6 +254,8 @@ class Figure(Artist):
         optional kwarg forward=True will cause the canvas size to be
         automatically updated; eg you can resize the figure window
         from the shell
+
+        WARNING: forward=True is broken on all backends except GTK*
 
         ACCEPTS: a w,h tuple with w,h in inches
         """
@@ -358,7 +365,7 @@ class Figure(Artist):
 
         def fixitems(items):
             #items may have arrays and lists in them, so convert them
-            # to tuples for the kyey
+            # to tuples for the key
             ret = []
             for k, v in items:
                 if iterable(v): v = tuple(v)
@@ -379,11 +386,12 @@ class Figure(Artist):
         """
         Add an a axes with axes rect [left, bottom, width, height] where all
         quantities are in fractions of figure width and height.  kwargs are
-        legal Axes kwargs plus"polar" which sets whether to create a polar axes
+        legal Axes kwargs plus "polar" which sets whether to create a polar axes
 
-            add_axes((l,b,w,h))
-            add_axes((l,b,w,h), frameon=False, axisbg='g')
-            add_axes((l,b,w,h), polar=True)
+            rect = l,b,w,h
+            add_axes(rect)
+            add_axes(rect, frameon=False, axisbg='g')
+            add_axes(rect, polar=True)
             add_axes(ax)   # add an Axes instance
 
 
@@ -392,11 +400,11 @@ class Figure(Artist):
         behavior, eg you want to force the creation of a new axes, you must
         use a unique set of args and kwargs.  The artist "label" attribute has
         been exposed for this purpose.  Eg, if you want two axes that are
-        otherwise identical to be added to the axes, make sure you give them
+        otherwise identical to be added to the figure, make sure you give them
         unique labels:
 
-            add_axes((l,b,w,h), label='1')
-            add_axes((l,b,w,h), label='2')
+            add_axes(rect, label='axes1')
+            add_axes(rect, label='axes2')
 
         The Axes instance will be returned
         """
@@ -492,7 +500,7 @@ class Figure(Artist):
 
     def draw(self, renderer):
         """
-        Render the figure using RendererGD instance renderer
+        Render the figure using Renderer instance renderer
         """
         # draw the figure bounding box, perhaps none for white figure
         #print 'figure draw'
@@ -628,7 +636,7 @@ class Figure(Artist):
     def savefig(self, *args, **kwargs):
         """
         SAVEFIG(fname, dpi=150, facecolor='w', edgecolor='w',
-        orientation='portrait'):
+        orientation='portrait', papertype=None):
 
         Save the current figure to filename fname.  dpi is the resolution
         in dots per inch.
@@ -639,7 +647,11 @@ class Figure(Artist):
         facecolor and edgecolor are the colors os the figure rectangle
 
         orientation is either 'landscape' or 'portrait' - not supported on
-        all backends; currently only on postscript output.
+        all backends; currently only on postscript output
+
+        papertype is is one of 'letter', 'legal', 'executive', 'ledger', 'a0'
+        through 'a10', or 'b0' through 'b10' - only supported for postscript
+        output
         """
 
         for key in ('dpi', 'facecolor', 'edgecolor'):
@@ -648,7 +660,32 @@ class Figure(Artist):
 
         self.canvas.print_figure(*args, **kwargs)
 
-    def colorbar(self, mappable,  cax=None,
+    def colorbar(self, mappable, cax=None, **kw):
+        # Temporary compatibility code:
+        old = ('tickfmt', 'cspacing', 'clabels', 'edgewidth', 'edgecolor')
+        oldkw = [k for k in old if kw.has_key(k)]
+        if oldkw:
+            msg = 'Old colorbar kwargs (%s) found; using colorbar_classic.' % (','.join(oldkw),)
+            warnings.warn(msg, DeprecationWarning)
+            self.colorbar_classic(mappable, cax, **kw)
+            return cax
+        # End of compatibility code block.
+        orientation = kw.get('orientation', 'vertical')
+        ax = self.gca()
+        if cax is None:
+            cax, kw = cbar.make_axes(ax, **kw)
+        cb = cbar.Colorbar(cax, mappable, **kw)
+        mappable.add_observer(cb)
+        mappable.set_colorbar(cb, cax)
+        self.sca(ax)
+        return cb
+    colorbar.__doc__ =  '''
+        Create a colorbar for a ScalarMappable instance.
+
+        Documentation for the pylab thin wrapper: %s
+        '''% cbar.colorbar_doc
+
+    def colorbar_classic(self, mappable,  cax=None,
                     orientation='vertical', tickfmt='%1.1f',
                     cspacing='proportional',
                     clabels=None, drawedges=False, edgewidth=0.5,
@@ -708,11 +745,11 @@ class Figure(Artist):
             l,b,w,h = ax.get_position()
             if orientation=='vertical':
                 neww = 0.8*w
-                ax.set_position((l,b,neww,h))
+                ax.set_position((l,b,neww,h), 'both')
                 cax = self.add_axes([l + 0.9*w, b, 0.1*w, h])
             else:
                 newh = 0.8*h
-                ax.set_position((l,b+0.2*h,w,newh))
+                ax.set_position((l,b+0.2*h,w,newh), 'both')
                 cax = self.add_axes([l, b, w, 0.1*h])
 
         else:
@@ -821,9 +858,17 @@ class Figure(Artist):
         self.subplotpars.update(*args, **kwargs)
         import matplotlib.axes
         for ax in self.axes:
-            if not isinstance(ax, matplotlib.axes.Subplot): continue
-            ax.update_params()
-            ax.set_position([ax.figLeft, ax.figBottom, ax.figW, ax.figH])
+            if not isinstance(ax, matplotlib.axes.Subplot):
+                # Check if sharing a subplots axis
+                if ax._sharex is not None and isinstance(ax._sharex, matplotlib.axes.Subplot):
+                    ax._sharex.update_params()
+                    ax.set_position([ax._sharex.figLeft, ax._sharex.figBottom, ax._sharex.figW, ax._sharex.figH])
+                elif ax._sharey is not None and isinstance(ax._sharey, matplotlib.axes.Subplot):
+                    ax._sharey.update_params()
+                    ax.set_position([ax._sharey.figLeft, ax._sharey.figBottom, ax._sharey.figW, ax._sharey.figH])
+            else:
+                ax.update_params()
+                ax.set_position([ax.figLeft, ax.figBottom, ax.figW, ax.figH])
 
 
 
