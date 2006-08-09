@@ -1,3 +1,9 @@
+matplotlib (0.87.4-3) unstable; urgency=low
+
+  * Removed wrong "Section: doc" from python-matplotlib-doc package
+
+ -- Vittorio Palmisano <redclay81@gmail.com>  Wed, 09 Aug 2006 16:15:44 +0200
+
 matplotlib (0.87.4-2) unstable; urgency=low
 
   * Removed pytz files. Closes: #335991, #377275

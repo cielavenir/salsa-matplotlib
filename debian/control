@@ -41,7 +41,6 @@ Description: python based plotting system (data package)
 Package: python-matplotlib-doc
 Architecture: all
 Enhances: python-matplotlib
-Section: doc
 Description: python based plotting system (documentation package)
  Matplotlib is a pure python plotting library designed to bring publication 
  quality plotting to python with a syntax familiar to Matlab users. Although 
