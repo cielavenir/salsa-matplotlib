@@ -9,7 +9,7 @@ import sys, warnings
 from cbook import is_string_like, enumerate, strip_math, Stack
 from colors import colorConverter
 from numerix import array, sqrt, pi, log, asarray, ones, zeros, Float, Float32
-from numerix import arange, compress, take
+from numerix import arange, compress, take, isnan, any
 from patches import Rectangle
 from transforms import lbwh_to_bbox, identity_transform
 import widgets
@@ -33,12 +33,14 @@ class RendererBase:
         """
         pass
 
-    def draw_arc(self, gcEdge, rgbFace, x, y, width, height, angle1, angle2):
+
+    def draw_arc(self, gc, rgbFace, x, y, width, height, angle1, angle2, rotation):
         """
         Draw an arc using GraphicsContext instance gcEdge, centered at x,y,
         with width and height and angles from 0.0 to 360.0
         0 degrees is at 3-o'clock
         positive angles are anti-clockwise
+        draw rotated 'rotation' degrees anti-clockwise about x,y
 
         If the color rgbFace is not None, fill the arc with it.
         """
@@ -92,7 +94,7 @@ class RendererBase:
         matplotlib.collections for more details.
 
         segments is a sequence of ( line0, line1, line2), where linen =
-        (x0, y0), (x1, y1), ... (xm, ym).  Each line can be a
+        is an Mx2 array with columns x, y.  Each line can be a
         different length
 
         transform is used to Transform the lines
@@ -110,8 +112,9 @@ class RendererBase:
         antialiseds is a tuple of ones or zeros indicating whether the
         segment should be aa or not
 
-        offsets, if not None, is a list of x,y offsets to translate the lines
-        by after transform is used to transform the offset coords
+        offsets, if not None, is an Nx2 array of x,y offsets to
+        translate the lines by after transform is used to transform
+        the offset coords
 
         This function could be overridden in the backend to possibly implement
         faster drawing, but it is already much faster than using draw_lines()
@@ -133,7 +136,8 @@ class RendererBase:
         usingOffsets = offsets is not None
         Noffsets  = 0
         if usingOffsets:
-            Noffsets = len(offsets)
+            Noffsets = offsets.shape[0]
+            offsets = transOffset.numerix_xy(offsets)
 
         for i in xrange(max(Noffsets, Nsegments)):
             color = colors[i % Nc]
@@ -146,16 +150,12 @@ class RendererBase:
             gc.set_antialiased( antialiaseds[i % Naa] )
             seg = segments[i % Nsegments]
             if not len(seg): continue
-            x, y = zip(*seg)
-
-            x, y = transform.numerix_x_y(array(x), array(y))
+            xy = transform.numerix_xy(seg)
             if usingOffsets:
-                xo, yo = transOffset.xy_tup(offsets[i % Noffsets])
-                x += xo
-                y += yo
+                xy = xy + offsets[i % Noffsets]
 
-            if newstyle: self.draw_lines(gc, x, y, identity)
-            else: self.draw_lines(gc, x, y)
+            if newstyle: self.draw_lines(gc, xy[:,0], xy[:,1], identity)
+            else: self.draw_lines(gc, xy[:,0], xy[:,1])
 
     def draw_line(self, gc, x1, y1, x2, y2):
         """
@@ -241,7 +241,9 @@ class RendererBase:
             gc.set_clip_rectangle(clipbox.get_bounds())
 
         for i in xrange(N):
-
+            polyverts = verts[i % Nverts]
+            if any(isnan(polyverts)):
+                continue
             linewidth = linewidths[i % Nlw]
             rf,gf,bf,af = facecolors[i % Nface]
             re,ge,be,ae = edgecolors[i % Nedge]
@@ -265,7 +267,7 @@ class RendererBase:
 
             gc.set_antialiased( antialiaseds[i % Naa] )  # Used for fill only?
             gc.set_alpha( alpha )
-            tverts = transform.seq_xy_tups(verts[i % Nverts])
+            tverts = transform.seq_xy_tups(polyverts)
             if usingOffsets:
                 xo,yo = transOffset.xy_tup(offsets[i % Noffsets])
                 tverts = [(x+xo,y+yo) for x,y in tverts]
@@ -810,7 +812,7 @@ class FigureCanvasBase:
         self.cid = 0
         # a dictionary from event name to a dictionary that maps cid->func
         self.callbacks = {}
-
+        self.widgetlock = widgets.LockDraw()
         self._button     = None  # the button pressed
         self._key        = None  # the key pressed
         self._lastx, self._lasty = None, None
@@ -1004,6 +1006,11 @@ class FigureManagerBase:
 
     def full_screen_toggle (self):
         pass
+    
+    def resize(self, w, h):
+        'For gui backends: resize window in pixels'
+        pass
+    
     def key_press(self, event):
 
         # these bindings happen whether you are over an axes or not
@@ -1215,10 +1222,9 @@ class NavigationToolbar2:
             self._idRelease = self.canvas.mpl_connect(
                 'button_release_event', self.release_pan)
             self.mode = 'pan/zoom mode'
-            #widgets.lock(self)
+            self.canvas.widgetlock(self)
         else:
-            pass
-            #widgets.release(self)
+            self.canvas.widgetlock.release(self)
 
         for a in self.canvas.figure.get_axes():
             a.set_navigate_mode(self._active)
@@ -1558,10 +1564,9 @@ class NavigationToolbar2:
             self._idPress = self.canvas.mpl_connect('button_press_event', self.press_zoom)
             self._idRelease = self.canvas.mpl_connect('button_release_event', self.release_zoom)
             self.mode = 'Zoom to rect mode'
-            #widgets.lock(self)
+            self.canvas.widgetlock(self)
         else:
-            pass
-            #widgets.release(self)
+            self.canvas.widgetlock.release(self)
 
         for a in self.canvas.figure.get_axes():
             a.set_navigate_mode(self._active)

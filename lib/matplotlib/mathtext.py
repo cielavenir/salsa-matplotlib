@@ -184,7 +184,7 @@ or a Type1 symbol name (i.e. 'phi').
     except TypeError:
         pass
     try:# Is symbol a TeX symbol (i.e. \alpha)
-        return tex2uni[symbol]
+        return tex2uni[symbol.strip("\\")]
     except KeyError:
         pass
     try:# Is symbol a Type1 name (i.e. degree)? If not raise error
@@ -208,7 +208,7 @@ symbol can be a single unicode character, or a TeX command (i.e. r'\pi').
     except TypeError:
         pass
     try:# Is symbol a TeX symbol (i.e. \alpha)
-        return tex2type1[symbol]
+        return tex2type1[symbol.strip("\\")]
     except KeyError:
         pass
     # The symbol is already a Type1 name so return it
@@ -305,13 +305,13 @@ Specific terminology:
  * charmaps: a dict of facename -> charmap pairs
  * glyphmaps: a dict of facename -> glyphmap pairs. A glyphmap is an
     inverted charmap
- * output: a string in ['BMP','SVG','PS'], coresponding to the backends
+ * output: a string in ['Agg','SVG','PS'], coresponding to the backends
  * index: Fontfile specific index of a glyph/char. Taken from a charmap.
 
 """
 
     # The path to the dir with the fontfiles
-    def __init__(self, output='BMP'):
+    def __init__(self, output='Agg'):
         self.facenames = self.filenamesd.keys()
         # Set the filenames to full path
         for facename in self.filenamesd:
@@ -380,7 +380,7 @@ setfont
 /%(symbolname)s glyphshow
 """ % locals()
             self.pswriter.write(ps)
-        else: # BMP
+        else: # Agg
             fontface = self.fonts[facename]
             fontface.draw_glyph_to_bitmap(
             int(ox),  int(self.height - oy - metrics.ymax), glyph)
@@ -797,6 +797,34 @@ setfont
         basename, metrics, sym, offset  = \
                 self._get_info(font, sym, fontsize, dpi) 
         return metrics
+
+class BakomaPDFFonts(BakomaPSFonts):
+    """Hack of BakomaPSFonts for PDF support."""
+
+    def _get_filename_and_num (self, font, sym, fontsize, dpi):
+        'should be part of _get_info'
+        basename = self.fontmap[font]
+
+        if latex_to_bakoma.has_key(sym):
+            basename, num = latex_to_bakoma[sym]
+            sym = self.fonts[basename].get_glyph_name(num)
+            num = self.charmaps[basename][num]
+        elif len(sym) == 1:
+            num = ord(sym)
+        else:
+            num = 0
+            raise ValueError('unrecognized symbol "%s"' % (sym,))
+
+        return os.path.join(self.basepath, basename) + '.ttf', num
+
+    def render(self, ox, oy, font, sym, fontsize, dpi):
+        fontname, metrics, glyphname, offset = \
+                self._get_info(font, sym, fontsize, dpi)
+        filename, num = self._get_filename_and_num(font, sym, fontsize, dpi)
+        if fontname.lower() == 'cmex10':
+            oy += offset - 512/2048.*10.
+
+        self.pswriter.append((ox, oy, filename, fontsize, num))
 
 
 class StandardPSFonts(Fonts):
@@ -1502,7 +1530,6 @@ expression = OneOrMore(
 
 
 
-
 class math_parse_s_ft2font_common:
     """
     Parse the math expression s, return the (bbox, fonts) tuple needed
@@ -1530,7 +1557,7 @@ class math_parse_s_ft2font_common:
             self.font_object = BakomaTrueTypeFonts(useSVG=True)
             #self.font_object = MyUnicodeFonts(output='SVG')
             Element.fonts = self.font_object
-        elif self.output == 'BMP':
+        elif self.output == 'Agg':
             self.font_object = BakomaTrueTypeFonts()
             #self.font_object = MyUnicodeFonts()
             Element.fonts = self.font_object
@@ -1542,6 +1569,9 @@ class math_parse_s_ft2font_common:
                 self.font_object = BakomaPSFonts()
                 #self.font_object = MyUnicodeFonts(output='PS')
                 Element.fonts = self.font_object
+        elif self.output == 'PDF':
+            self.font_object = BakomaPDFFonts()
+            Element.fonts = self.font_object
         
         handler.clear()
         expression.parseString( s )
@@ -1563,12 +1593,13 @@ class math_parse_s_ft2font_common:
 
         handler.expr.set_origin(0, h-ymax)
 
-        if self.output == 'SVG':
-            Element.fonts.set_canvas_size(w,h)
-        elif self.output == 'BMP':
+        if self.output in ('SVG', 'Agg'):
             Element.fonts.set_canvas_size(w,h)
         elif self.output == 'PS':
             pswriter = StringIO()
+            Element.fonts.set_canvas_size(w, h, pswriter)
+        elif self.output == 'PDF':
+            pswriter = list()
             Element.fonts.set_canvas_size(w, h, pswriter)
         
         handler.expr.render()
@@ -1577,17 +1608,20 @@ class math_parse_s_ft2font_common:
         if self.output == 'SVG':
             self.cache[cacheKey] = w, h, self.font_object.svg_glyphs
             return w, h, self.font_object.svg_glyphs
-        elif self.output == 'BMP':
+        elif self.output == 'Agg':
             self.cache[cacheKey] = w, h, self.font_object.fonts.values()
             return w, h, self.font_object.fonts.values()
-        elif self.output == 'PS':
+        elif self.output in ('PS', 'PDF'):
             self.cache[cacheKey] = w, h, pswriter
             return w, h, pswriter
 
-math_parse_s_ft2font = math_parse_s_ft2font_common('BMP')
+if rcParams["mathtext.mathtext2"]:
+    from matplotlib.mathtext2 import math_parse_s_ft2font
+else:
+    math_parse_s_ft2font = math_parse_s_ft2font_common('Agg')
 math_parse_s_ft2font_svg = math_parse_s_ft2font_common('SVG')
 math_parse_s_ps = math_parse_s_ft2font_common('PS')
-
+math_parse_s_pdf = math_parse_s_ft2font_common('PDF')
 
 if 0: #__name__=='___main__':
     

@@ -51,7 +51,7 @@ class LockDraw:
         'the lock is held'
         return self._owner is not None
 
-lock = LockDraw()
+
 
 class Widget:
     """
@@ -756,8 +756,8 @@ class MultiCursor:
 
 
     def onmove(self, event):
-        if not lock.available(self): return
         if event.inaxes is None: return
+        if not self.canvas.widgetlock.available(self): return
         self.needclear = True
         if not self.visible: return
 
@@ -792,8 +792,12 @@ class SpanSelector:
           print vmin, vmax
       span = SpanSelector(ax, onselect, 'horizontal')
 
+      onmove_callback is an optional callback that will be called on mouse move
+      with the span range
+
     """
-    def __init__(self, ax, onselect, direction, minspan=None, useblit=False, rectprops=None):
+
+    def __init__(self, ax, onselect, direction, minspan=None, useblit=False, rectprops=None, onmove_callback=None):
         """
         Create a span selector in ax.  When a selection is made, clear
         the span and call onselect with
@@ -833,6 +837,7 @@ class SpanSelector:
 
         self.rectprops = rectprops
         self.onselect = onselect
+        self.onmove_callback = onmove_callback
         self.useblit = useblit
         self.minspan = minspan
 
@@ -928,6 +933,17 @@ class SpanSelector:
         else:
             self.rect.xy[1] = minv
             self.rect.set_height(maxv-minv)
+
+        if self.onmove_callback is not None:
+            vmin = self.pressv
+            if self.direction == 'horizontal':
+                vmax = event.xdata or self.prev[0]
+            else:
+                vmax = event.ydata or self.prev[1]
+
+            if vmin>vmax: vmin, vmax = vmax, vmin
+            self.onmove_callback(vmin, vmax)
+            
         self.update()
         return False
 
@@ -1124,3 +1140,46 @@ class RectangleSelector:
                                   [self.eventpress.ydata, y])
             self.update()
             return False
+
+class Lasso(Widget):
+    def __init__(self, ax, xy, callback=None, useblit=True):
+        self.axes = ax
+        self.figure = ax.figure
+        self.canvas = self.figure.canvas
+        self.useblit = useblit
+        if useblit:
+            self.background = self.canvas.copy_from_bbox(self.axes.bbox)
+
+        x, y = xy
+        self.verts = [(x,y)]
+        self.line = Line2D([x], [y], linestyle='-', color='black', lw=2)
+        self.axes.add_line(self.line)
+        self.callback = callback
+        self.cids = []
+        self.cids.append(self.canvas.mpl_connect('button_release_event', self.onrelease))
+        self.cids.append(self.canvas.mpl_connect('motion_notify_event', self.onmove))
+
+    def onrelease(self, event):
+        if self.verts is not None:
+            self.verts.append((event.xdata, event.ydata))
+            if len(self.verts)>2:
+                self.callback(self.verts)
+            self.axes.lines.remove(self.line)
+        self.verts = None
+        for cid in self.cids:
+            self.canvas.mpl_disconnect(cid)
+        
+    def onmove(self, event):
+        if self.verts is None: return 
+        if event.inaxes != self.axes: return
+        if event.button!=1: return 
+        self.verts.append((event.xdata, event.ydata))
+
+        self.line.set_data(zip(*self.verts))
+
+        if self.useblit:
+            self.canvas.restore_region(self.background)
+            self.axes.draw_artist(self.line)
+            self.canvas.blit(self.axes.bbox)
+        else:
+            self.canvas.draw_idle()

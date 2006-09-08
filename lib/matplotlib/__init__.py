@@ -143,9 +143,9 @@ the exception of those in mlab.py provided by matplotlib.
 from __future__ import generators
 
 
-__version__  = '0.87.4'
-__revision__ = '$Revision: 2558 $'
-__date__     = '$Date: 2006-07-11 22:23:40 -0400 (Tue, 11 Jul 2006) $'
+__version__  = '0.87.5'
+__revision__ = '$Revision: 2761 $'
+__date__     = '$Date: 2006-09-05 09:37:04 -0400 (Tue, 05 Sep 2006) $'
 
 import md5, os, re, shutil, sys, warnings
 import distutils.sysconfig
@@ -863,6 +863,16 @@ defaultParams = {
     'ps.distiller.res'  : [6000, validate_int],       # dpi
     'pdf.compression'   : [6, validate_int],            # compression level from 0 to 9; 0 to disable
     'plugins.directory' : ['.matplotlib_plugins', str], # where plugin directory is locate
+
+    # mathtext settings
+    'mathtext.mathtext2'  :   [False, validate_bool], # Needed to enable Unicode
+    # fonts used by mathtext. These ship with matplotlib
+    'mathtext.rm'       :   ['cmr10.ttf', str], # Roman (normal)
+    'mathtext.it'       :   ['cmmi10.ttf', str], # Italic
+    'mathtext.tt'       :   ['cmtt10.ttf', str],  # Typewriter (monospaced)
+    'mathtext.mit'       :   ['cmmi10.ttf', str], # Math italic
+    'mathtext.cal'      :   ['cmsy10.ttf', str], # Caligraphic
+    'mathtext.nonascii' :   ['cmex10.ttf', str], # All other nonascii fonts
 
     }
 

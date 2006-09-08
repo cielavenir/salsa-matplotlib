@@ -121,13 +121,17 @@ All transformations
   xy_tup(xy)            - transform the tuple (x,y)
   seq_x_y(x, y)         - transform the python sequences x and y
   numerix_x_y(x, y)     - x and y are numerix 1D arrays
-  seq_xy_tups(seq)      - seq is a sequence of xy tuples
+  numerix_xy(xy)        - xy is a numerix array of shape (N,2)
+  inverse_numerix_xy(xy)- inverse of the above
+  seq_xy_tups(seq)      - seq is a sequence of xy tuples or a (N,2) array
   inverse_xy_tup(xy)    - apply the inverse transformation to tuple xy
 
   set_offset(xy, trans) - xy is an x,y tuple and trans is a
     Transformation instance.  This will apply a post transformational
     offset of all future transformations by xt,yt = trans.xy_tup(xy[0], xy[1])
 
+  deepcopy()            - returns a deep copy; references are lost
+  shallowcopy()         - returns a shallow copy excluding the offset
 
 Separable transformations
 -------------------------
@@ -140,6 +144,7 @@ Separable transformations
   get_funcy() - return the Func instance on y
   set_funcx() - set the Func instance on x
   set_funcy() - set the Func instance on y
+
 
 Affine transformations
 ----------------------
@@ -167,20 +172,23 @@ but should use the helper functions defined in this module.
                                 left, bottom, width, height tuple
 
   multiply_affines            - return the affine that is the matrix product of
-    the two affines
+                                the two affines
 
   get_bbox_transform          - return a SeparableTransformation instance that
-    transforms one bbox to another
+                                transforms one bbox to another
 
   blend_xy_sep_transform      - mix the x and y components of two separable
-    transformations into a new transformation.  This allows you to
-    specify x and y in different coordinate systems
+                                transformations into a new transformation.
+                                This allows you to specify x and y in
+                                different coordinate systems
 
   transform_bbox              - apply a transformation to a bbox and return the
-    transformed bbox
+                                transformed bbox
 
   inverse_transform_bbox      - apply the inverse transformation of a bbox
-    and return the inverse transformed bbox
+                                and return the inverse transformed bbox
+
+  offset_copy                 - make a copy with an offset
 
 
 The units/transform_unit.py code has many examples.
@@ -410,9 +418,6 @@ def transform_bbox(trans, bbox):
     return Bbox(Point(Value(xmin), Value(ymin)),
                 Point(Value(xmax), Value(ymax)))
 
-
-
-
 def inverse_transform_bbox(trans, bbox):
     'inverse transform the bbox'
     xmin, xmax = bbox.intervalx().get_bounds()
@@ -424,29 +429,32 @@ def inverse_transform_bbox(trans, bbox):
                 Point(Value(xmax), Value(ymax)))
 
 
-def copy_bbox_transform(trans):
-    'return a deep copy of the bbox transform'
-
-    inbox = trans.get_bbox1()
-    xmin, xmax  =  inbox.intervalx().get_bounds()
-    ymin, ymax  =  inbox.intervaly().get_bounds()
-    newInbox  = Bbox( Point(Value(xmin),  Value(ymin)),
-                      Point(Value(xmax),  Value(ymax))  )
-
-    outbox = trans.get_bbox2()
-    xmin, xmax  =  outbox.intervalx().get_bounds()
-    ymin, ymax  =  outbox.intervaly().get_bounds()
-    newOutbox  = Bbox( Point(Value(xmin),  Value(ymin)),
-                       Point(Value(xmax),  Value(ymax))  )
-
-    typex = trans.get_funcx().get_type()
-    typey = trans.get_funcy().get_type()
-
-
-    newtrans = get_bbox_transform(newInbox, newOutbox)
-    newtrans.get_funcx().set_type(typex)
-    newtrans.get_funcy().set_type(typey)
+def offset_copy(trans, fig=None, x=0, y=0, units='inches'):
+    '''
+    Return a shallow copy of a transform with an added offset.
+      args:
+        trans is any transform
+      kwargs:
+        fig is the current figure; it can be None if units are 'dots'
+        x, y give the offset
+        units is 'inches', 'points' or 'dots'
+    '''
+    newtrans = trans.shallowcopy()
+    if units == 'dots':
+        newtrans.set_offset((x,y), identity_transform())
+        return newtrans
+    if fig is None:
+        raise ValueError('For units of inches or points a fig kwarg is needed')
+    if units == 'points':
+        x /= 72.0
+        y /= 72.0
+    elif not units == 'inches':
+        raise ValueError('units must be dots, points, or inches')
+    tx = Value(x) * fig.dpi
+    ty = Value(y) * fig.dpi
+    newtrans.set_offset((0,0), translation_transform(tx, ty))
     return newtrans
+
 
 def get_vec6_scales(v):
     'v is an affine vec6 a,b,c,d,tx,ty; return sx, sy'

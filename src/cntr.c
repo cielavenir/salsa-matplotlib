@@ -11,28 +11,14 @@
     was written by following the Python "Extending and Embedding"
     tutorial.
 
-  $Id: cntr.c 2546 2006-07-08 01:01:54Z teoliphant $
+  $Id: cntr.c 2749 2006-09-04 20:00:25Z jdh2358 $
  */
 
 #include <Python.h>
 #include "structmember.h"
 #include <stdlib.h>
 #include <stdio.h>
-
-#ifdef NUMARRAY
-#include "numarray/arrayobject.h"
-#else
-#ifdef NUMERIC
-#include "Numeric/arrayobject.h"
-#else
-#define PY_ARRAY_TYPES_PREFIX NumPy
-#include "numpy/arrayobject.h"
-#if (NDARRAY_VERSION >= 0x00090908)
-#include "numpy/oldnumeric.h"
-#endif
-#endif
-#endif
-
+#include "numerix.h"
 
 /* Note that all arrays in these routines are Fortran-style,
    in the sense that the "i" index varies fastest; the dimensions

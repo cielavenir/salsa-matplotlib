@@ -151,6 +151,10 @@ class Formatter(TickHelper):
     def format_data(self,value):
         return self.__call__(value)
 
+    def format_data_short(self,value):
+        'return a short string version'
+        return self.format_data(value)
+    
     def get_offset(self):
         return ''
 
@@ -269,6 +273,10 @@ class ScalarFormatter(Formatter):
             return ''
         else:
             return self.pprint_val(x)
+
+    def format_data_short(self,value):
+        'return a short formatted string representation of a number'
+        return '%1.3g'%value
 
     def format_data(self,value,sign=False,mathtext=False):
         'return a formatted string representation of a number'
@@ -772,7 +780,7 @@ def scale_range(vmin, vmax, n = 1, threshold=100):
     maxabsv = max(abs(vmin), abs(vmax))
     if maxabsv == 0 or dv/maxabsv < 1e-12:
         return 1.0, 0.0
-
+    #print vmin, vmax
     meanv = 0.5*(vmax+vmin)
     if abs(meanv)/dv < threshold:
         offset = 0

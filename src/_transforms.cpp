@@ -867,6 +867,72 @@ Transformation::inverse_xy_tup(const Py::Tuple & args) {
 }
 
 Py::Object
+Transformation::inverse_numerix_xy(const Py::Tuple & args) {
+  _VERBOSE("Transformation::inverse_numerix_xy");
+  args.verify_length(1);
+
+  Py::Object xyo = args[0];
+
+  PyArrayObject *xyin = (PyArrayObject *) PyArray_FromObject(xyo.ptr(),
+                                                   PyArray_DOUBLE, 2, 2);
+
+  if (xyin==NULL)
+    throw Py::TypeError("Transformation::inverse_numerix_xy expected numerix array");
+
+  size_t Nxy = xyin->dimensions[0];
+  size_t N2 = xyin->dimensions[1];
+
+  if (N2!=2) {
+    Py_XDECREF(xyin);
+    throw Py::ValueError("xy must have shape (N,2)");
+  }
+
+  // evaluate the lazy objects
+  try {
+    if (!_frozen) eval_scalars();
+  }
+  catch(...) {
+    Py_XDECREF(xyin);
+    throw Py::ValueError("Domain error on Transformation::inverse_numerix_xy");
+  }
+
+  int dimensions[2];
+  dimensions[0] = Nxy;
+  dimensions[1] = 2;
+
+  PyArrayObject *retxy = (PyArrayObject *)PyArray_FromDims(2,dimensions,
+                                                            PyArray_DOUBLE);
+  if (retxy==NULL) {
+    Py_XDECREF(xyin);
+    throw Py::RuntimeError("Could not create return xy array");
+  }
+
+  double nan = std::numeric_limits<float>::quiet_NaN();
+  for (size_t i=0; i< Nxy; ++i) {
+    double thisx = *(double *)(xyin->data + i*xyin->strides[0]);
+    double thisy = *(double *)(xyin->data + i*xyin->strides[0] +
+                                                xyin->strides[1]);
+    try {
+      inverse_api(thisx, thisy);
+    }
+    catch(...) {
+      xy.first = nan;
+      xy.second = nan;
+      //throw Py::ValueError("Domain error on Transformation::inverse_numerix_xy");
+    }
+    *(double *)(retxy->data + i*retxy->strides[0]) = xy.first;
+    *(double *)(retxy->data + i*retxy->strides[0] +
+                                    retxy->strides[1]) = xy.second;
+  }
+
+  Py_XDECREF(xyin);
+  return Py::asObject((PyObject *)retxy);
+}
+
+
+
+
+Py::Object
 Transformation::xy_tup(const Py::Tuple & args) {
   _VERBOSE("Transformation::xy_tup");
   args.verify_length(1);
@@ -961,14 +1027,17 @@ Transformation::numerix_xy(const Py::Tuple & args) {
   size_t Nxy = xyin->dimensions[0];
   size_t N2 = xyin->dimensions[1];
 
-  if (N2!=2)
+  if (N2!=2) {
+    Py_XDECREF(xyin);
     throw Py::ValueError("xy must have shape (N,2)");
+  }
 
   // evaluate the lazy objects
   try {
     if (!_frozen) eval_scalars();
   }
   catch(...) {
+    Py_XDECREF(xyin);
     throw Py::ValueError("Domain error on Transformation::numerix_xy");
   }
 
@@ -1007,7 +1076,7 @@ Transformation::numerix_xy(const Py::Tuple & args) {
 
 
 Py::Object
-Transformation::numerix_x_y(const Py::Tuple & args, const Py::Dict &kwargs) {
+Transformation::numerix_x_y(const Py::Tuple & args) {
   _VERBOSE("Transformation::numerix_x_y");
   args.verify_length(2);
 
@@ -1546,7 +1615,16 @@ Py::Object
 SeparableTransformation::deepcopy(const Py::Tuple &args) {
   _VERBOSE("SeparableTransformation::deepcopy");
   args.verify_length(0);
-  return Py::asObject( new SeparableTransformation( static_cast<Bbox*>((_b1->_deepcopy()).ptr()),static_cast<Bbox*>((_b2->_deepcopy()).ptr()), _funcx,_funcy ));
+  return Py::asObject( new SeparableTransformation(
+        static_cast<Bbox*>((_b1->_deepcopy()).ptr()),
+        static_cast<Bbox*>((_b2->_deepcopy()).ptr()), _funcx,_funcy ));
+}
+
+Py::Object
+SeparableTransformation::shallowcopy(const Py::Tuple &args) {
+  _VERBOSE("SeparableTransformation::shallowcopy");
+  args.verify_length(0);
+  return Py::asObject( new SeparableTransformation(_b1, _b2, _funcx,_funcy ));
 }
 
 NonseparableTransformation::NonseparableTransformation(Bbox *b1, Bbox *b2, FuncXY *funcxy) :
@@ -1730,6 +1808,14 @@ NonseparableTransformation::deepcopy(const Py::Tuple &args) {
   return Py::asObject( new NonseparableTransformation( static_cast<Bbox*>((_b1->_deepcopy()).ptr()),static_cast<Bbox*>((_b2->_deepcopy()).ptr()), _funcxy ));
 }
 
+Py::Object
+NonseparableTransformation::shallowcopy(const Py::Tuple &args) {
+  _VERBOSE("NonseparableTransformation::shallowcopy");
+  args.verify_length(0);
+  return Py::asObject( new NonseparableTransformation(_b1,_b2, _funcxy ));
+}
+
+
 Affine::Affine(LazyValue *a, LazyValue *b,  LazyValue *c,
 	       LazyValue *d, LazyValue *tx, LazyValue *ty) :
   _a(a), _b(b), _c(c), _d(d), _tx(tx), _ty(ty) {
@@ -1868,6 +1954,14 @@ Affine::deepcopy(const Py::Tuple &args) {
 
   return Py::asObject( new Affine( new Value(_aval),new Value(_bval), new Value(_cval),
                                    new Value(_dval),new Value(_txval),new Value(_tyval) ));
+}
+
+Py::Object
+Affine::shallowcopy(const Py::Tuple &args) {
+  _VERBOSE("Affine::shallowcopy");
+  args.verify_length(0);
+
+  return Py::asObject( new Affine( _a, _b, _c, _d, _tx, _ty ));
 }
 
 
@@ -2188,11 +2282,12 @@ Transformation::init_type()
 
   add_varargs_method("xy_tup",   &Transformation::xy_tup,  "xy_tup(xy)\n");
   add_varargs_method("seq_x_y",  &Transformation::seq_x_y, "seq_x_y(x, y)\n");
-  add_keyword_method("numerix_x_y",  &Transformation::numerix_x_y, "numerix_x_y(x, y)\n");
+  add_varargs_method("numerix_x_y",  &Transformation::numerix_x_y, "numerix_x_y(x, y)\n");
   add_keyword_method("nonlinear_only_numerix",  &Transformation::nonlinear_only_numerix, "nonlinear_only_numerix\n");
   add_varargs_method("need_nonlinear",  &Transformation::need_nonlinear, "need_nonlinear\n");
   add_varargs_method("seq_xy_tups", &Transformation::seq_xy_tups, "seq_xy_tups(seq)\n");
   add_varargs_method("numerix_xy", &Transformation::numerix_xy, "numerix_xy(XY)\n");
+  add_varargs_method("inverse_numerix_xy", &Transformation::inverse_numerix_xy, "inverse_numerix_xy(XY)\n");
   add_varargs_method("inverse_xy_tup",   &Transformation::inverse_xy_tup,  "inverse_xy_tup(xy)\n");
 
   add_varargs_method("set_offset",   &Transformation::set_offset,  "set_offset(xy, trans)\n");
@@ -2200,6 +2295,7 @@ Transformation::init_type()
   add_varargs_method("as_vec6", &Transformation::as_vec6, "as_vec6(): return the affine as length 6 list of Values\n");
   add_varargs_method("as_vec6_val", &Transformation::as_vec6_val, "as_vec6_val(): return the affine as length 6 list of float\n");
   add_varargs_method("deepcopy", &Transformation::deepcopy, "deepcopy()\n");
+  add_varargs_method("shallowcopy", &Transformation::shallowcopy, "shallowcopy()\n");
 
 }
 

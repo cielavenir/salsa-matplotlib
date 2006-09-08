@@ -152,7 +152,7 @@ def _from_ordinalf(x, tz=None):
     if tz is None: tz = _get_rc_timezone()
     ix = int(x)
     dt = datetime.datetime.fromordinal(ix)
-    remainder = x - ix
+    remainder = float(x) - ix
     hour, remainder = divmod(24*remainder, 1)
     minute, remainder = divmod(60*remainder, 1)
     second, remainder = divmod(60*remainder, 1)
@@ -190,6 +190,16 @@ def date2num(d):
     if not iterable(d): return _to_ordinalf(d)
     else: return asarray([_to_ordinalf(val) for val in d])
 
+
+def julian2num(j):
+    'convert a Julian date (or sequence) to a matplotlib date (or sequence)'
+    if iterable(j): j = asarray(j)
+    return j + 1721425.5
+
+def num2julian(n):
+    'convert a matplotlib date (or seguence) to a Julian date (or sequence)'
+    if iterable(n): n = asarray(n)
+    return n - 1721425.5
 
 def num2date(x, tz=None):
     """

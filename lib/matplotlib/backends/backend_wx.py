@@ -92,7 +92,7 @@ Examples which work on this release:
  (3) - Clipping seems to be broken.
 """
 
-cvs_id = '$Id: backend_wx.py 2502 2006-06-21 13:22:31 +0000 (Wed, 21 Jun 2006) jdh2358 $'
+cvs_id = '$Id: backend_wx.py 2728 2006-08-29 23:16:35Z cmoad $'
 
 import sys, os, os.path, math, StringIO
 
@@ -1072,7 +1072,7 @@ The current aspect ration will be kept."""
         dpival = self.figure.dpi.get()
         winch = self._width/dpival
         hinch = self._height/dpival
-        self.figure.set_figsize_inches(winch, hinch)
+        self.figure.set_size_inches(winch, hinch)
 
         if self._isRealized:
             self.draw()

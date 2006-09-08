@@ -122,13 +122,13 @@ class RendererSVG(RendererBase):
     def close_group(self, s):
         self._svgwriter.write('</g>\n')
 
-    def draw_arc(self, gc, rgbFace, x, y, width, height, angle1, angle2):
+    def draw_arc(self, gc, rgbFace, x, y, width, height, angle1, angle2, rotation):
         """
-        Currently implemented by drawing a circle of diameter width, not an
-        arc. angle1, angle2 not used
+        Ignores angles for now
         """
-        details = 'cx="%f" cy="%f" r="%f"' % (x,self.height-y,width/2)
-        self._draw_svg_element('circle', details, gc, rgbFace)
+        details = 'cx="%f" cy="%f" rx="%f" ry="%f" transform="rotate(%f %f %f)"' % \
+            (x,  self.height-y, width/2.0, height/2.0, -rotation, x, self.height-y)
+        self._draw_svg_element('ellipse', details, gc, rgbFace)
 
     def draw_image(self, x, y, im, bbox):
         filename = os.path.join (tempfile.gettempdir(),
@@ -151,7 +151,7 @@ class RendererSVG(RendererBase):
         im.write_png(filename)
 
         imfile = file (filename, 'r')
-        image64 = base64.b64encode (imfile.read())
+        image64 = base64.encodestring (imfile.read())
         imfile.close()
         os.remove(filename)
         lines = [image64[i:i+76] for i in range(0, len(image64), 76)]

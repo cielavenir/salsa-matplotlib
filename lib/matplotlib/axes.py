@@ -897,7 +897,6 @@ class Axes(Artist):
         p.set_clip_box(self.bbox)
         xys = self._get_verts_in_data_coords(
             p.get_transform(), p.get_verts())
-        #for x,y in xys: print x,y
         self.update_datalim(xys)
         self.patches.append(p)
 
@@ -907,12 +906,13 @@ class Axes(Artist):
         self.tables.append(tab)
 
     def update_datalim(self, xys):
-        'Update the data lim bbox with seq of xy tups'
+        'Update the data lim bbox with seq of xy tups or equiv. 2-D array'
         # if no data is set currently, the bbox will ignore its
         # limits and set the bound to be the bounds of the xydata.
         # Otherwise, it will compute the bounds of it's current data
         # and the data in xydata
-        self.dataLim.update(xys, -1)
+        xys = asarray(xys)
+        self.dataLim.update_numerix_xy(xys, -1)
 
 
     def update_datalim_numerix(self, x, y):
@@ -929,8 +929,11 @@ class Axes(Artist):
             return xys
         # data is not in axis data units.  We must transform it to
         # display and then back to data to get it in data units
-        xys = trans.seq_xy_tups(xys)
-        return [ self.transData.inverse_xy_tup(xy) for xy in xys]
+        #xys = trans.seq_xy_tups(xys)
+        #return [ self.transData.inverse_xy_tup(xy) for xy in xys]
+        xys = trans.numerix_xy(asarray(xys))
+        return self.transData.inverse_numerix_xy(xys)
+
 
     def in_axes(self, xwin, ywin):
         'return True is the point xwin, ywin (display coords) are in the Axes'
@@ -955,7 +958,8 @@ class Axes(Artist):
         """
         autoscale the view limits using the data limits. You can
         selectively autoscale only a single axis, eg, the xaxis by
-        setting scaley to False.
+        setting scaley to False.  The autoscaling preserves any
+        axis direction reversal that has already been done.
         """
         # if image data only just use the datalim
 
@@ -969,10 +973,18 @@ class Axes(Artist):
             if scaley: self.set_ylim(self.dataLim.intervaly().get_bounds())
             return
 
-        locator = self.xaxis.get_major_locator()
-        if scalex: self.set_xlim(locator.autoscale())
-        locator = self.yaxis.get_major_locator()
-        if scaley: self.set_ylim(locator.autoscale())
+        if scalex:
+            xl = self.get_xlim()
+            XL = self.xaxis.get_major_locator().autoscale()
+            if xl[1] < xl[0]:
+                XL = XL[::-1]
+            self.set_xlim(XL)
+        if scaley:
+            yl = self.get_ylim()
+            YL = self.yaxis.get_major_locator().autoscale()
+            if yl[1] < yl[0]:
+                YL = YL[::-1]
+            self.set_ylim(YL)
     #### Drawing
 
     def draw(self, renderer=None, inframe=False):
@@ -1234,9 +1246,11 @@ class Axes(Artist):
 
             * basex: base of the logarithm
 
-            * subsx: the location of the minor ticks; None defaults to
-            autosubs, which depend on the number of decades in the
-            plot.
+            * subsx: a sequence of the location of the minor ticks;
+              None defaults to autosubs, which depend on the number of
+              decades in the plot.  Eg for base 10, subsx=(1,2,5) will
+              put minor ticks on 1,2,5,11,12,15,21, ....To turn off
+              minor ticking, set subsx=[]
 
         ACCEPTS: ['log' | 'linear' ]
         """
@@ -1354,8 +1368,11 @@ class Axes(Artist):
 
             * basey: base of the logarithm
 
-            * subsy: the location of the minor ticks; None are the default
-              is to autosub
+            * subsy: a sequence of the location of the minor ticks;
+              None defaults to autosubs, which depend on the number of
+              decades in the plot.  Eg for base 10, subsy=(1,2,5) will
+              put minor ticks on 1,2,5,11,12,15, 21, ....To turn off
+              minor ticking, set subsy=[]
 
         ACCEPTS: ['log' | 'linear']
         """
@@ -1442,7 +1459,7 @@ class Axes(Artist):
         """
         try: return self.fmt_xdata(x)
         except TypeError:
-            func = self.xaxis.get_major_formatter().format_data
+            func = self.xaxis.get_major_formatter().format_data_short
             val = func(x)
             return val
 
@@ -1454,7 +1471,7 @@ class Axes(Artist):
         """
         try: return self.fmt_ydata(y)
         except TypeError:
-            func = self.yaxis.get_major_formatter().format_data
+            func = self.yaxis.get_major_formatter().format_data_short
             val =  func(y)
             return val
 
@@ -2166,13 +2183,15 @@ class Axes(Artist):
 
           * basex: base of the x logarithm
 
-          * subsx: the location of the minor ticks; None defaults to autosubs,
-            which depend on the number of decades in the plot
+          * subsx: the location of the minor ticks; None defaults to
+            autosubs, which depend on the number of decades in the
+            plot; see set_xscale for details
 
           * basey: base of the y logarithm
 
-          * subsy: the location of the minor yticks; None defaults to autosubs,
-            which depend on the number of decades in the plot
+          * subsy: the location of the minor yticks; None defaults to
+            autosubs, which depend on the number of decades in the
+            plot; see set_yscale for details
         """
         if not self._hold: self.cla()
 
@@ -2207,8 +2226,9 @@ class Axes(Artist):
 
             * basex: base of the logarithm
 
-            * subsx: the location of the minor ticks; None defaults to autosubs,
-            which depend on the number of decades in the plot
+            * subsx: the location of the minor ticks; None defaults to
+              autosubs, which depend on the number of decades in the
+              plot; see set_xscale for details
 
         """
         if not self._hold: self.cla()
@@ -2238,8 +2258,9 @@ class Axes(Artist):
 
             * basey: base of the logarithm
 
-            * subsy: the location of the minor ticks; None defaults to autosubs,
-            which depend on the number of decades in the plot
+            * subsy: a sequence of the location of the minor ticks;
+              None defaults to autosubs, which depend on the number of
+              decades in the plot; see set_yscale for details
 
         """
         if not self._hold: self.cla()
@@ -2477,14 +2498,16 @@ class Axes(Artist):
             not iterable(edgecolor)):
             edgecolor = [edgecolor]*nbars
 
-        if not iterable(yerr):
-            yerr = asarray([yerr]*nbars, Float) # Float converts Nones to NANs
-        else:
-            yerr = asarray(yerr)
-        if not iterable(xerr):
-            xerr = asarray([xerr]*nbars, Float)
-        else:
-            xerr = asarray(xerr)
+        if yerr is not None:
+            if not iterable(yerr):
+                yerr = asarray([yerr]*nbars, Float) 
+            else:
+                yerr = asarray(yerr)
+        if xerr is not None:
+            if not iterable(xerr):
+                xerr = asarray([xerr]*nbars, Float)
+            else:
+                xerr = asarray(xerr)
 
         if orientation == 'vertical':
             lenarg = 'left'
@@ -2496,8 +2519,9 @@ class Axes(Artist):
         assert len(bottom)==nbars, 'bar() argument \'bottom\' must be len(%s) or scalar' % lenarg
         assert len(color)==nbars, 'bar() argument \'color\' must be len(%s) or scalar' % lenarg
         assert len(edgecolor)==nbars, 'bar() argument \'edgecolor\' must be len(%s) or scalar' % lenarg
-        assert len(yerr)==nbars, 'bar() argument \'yerr\' must be len(%s) or scalar' % lenarg
-        assert len(xerr)==nbars, 'bar() argument \'xerr\' must be len(%s) or scalar' % lenarg
+
+        if yerr is not None: assert len(yerr)==nbars, 'bar() argument \'yerr\' must be len(%s) or scalar' % lenarg
+        if xerr is not None: assert len(xerr)==nbars, 'bar() argument \'xerr\' must be len(%s) or scalar' % lenarg
 
         patches = []
 
@@ -2638,12 +2662,13 @@ class Axes(Artist):
     def pie(self, x, explode=None, labels=None,
             colors=None,
             autopct=None,
+            pctdistance=0.6,
             shadow=False
             ):
         """
         PIE(x, explode=None, labels=None,
             colors=('b', 'g', 'r', 'c', 'm', 'y', 'k', 'w'),
-            autopct=None, shadow=False)
+            autopct=None, pctdistance=0.6, shadow=False)
 
         Make a pie chart of array x.  The fractional area of each wedge is
         given by x/sum(x).  If sum(x)<=1, then the values of x give the
@@ -2661,6 +2686,10 @@ class Axes(Artist):
             wedges with their numeric value.  The label will be placed inside
             the wedge.  If it is a format string, the label will be fmt%pct.
             If it is a function, it will be called
+
+          - pctdistance is the ratio between the center of each pie slice
+            and the start of the text generated by autopct.  Ignored if autopct
+            is None; default is 0.6.
 
           - shadow, if True, will draw a shadow beneath the pie.
 
@@ -2736,8 +2765,8 @@ class Axes(Artist):
             texts.append(t)
 
             if autopct is not None:
-                xt = x + 0.6*radius*math.cos(thetam)
-                yt = y + 0.6*radius*math.sin(thetam)
+                xt = x + pctdistance*radius*math.cos(thetam)
+                yt = y + pctdistance*radius*math.sin(thetam)
                 if is_string_like(autopct):
                     s = autopct%(100.*frac)
                 elif callable(autopct):
@@ -3142,14 +3171,11 @@ class Axes(Artist):
             '8' : (8,0),             # octagon
             }
 
-
-
-
-
-
-
         x, y, s, c = delete_masked_points(x, y, s, c)
 
+        if kwargs.has_key('color'):
+            c = kwargs['color']
+            kwargs.pop('color')
         if not is_string_like(c) and iterable(c) and len(c)==len(x):
             colors = None
         else:

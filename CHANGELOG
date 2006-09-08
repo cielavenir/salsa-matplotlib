@@ -1,7 +1,127 @@
 ===============================================================
+2006-09-05 Released 0.87.5 at revision 2761
+
+2006-09-04 Added nxutils for some numeric add-on extension code --
+		   specifically a better/more efficient inside polygon tester (see
+		   unit/inside_poly_*.py) - JDH
+
+2006-09-04 Made bitstream fonts the rc default - JDH
+
+2006-08-31 Fixed alpha-handling bug in ColorConverter, affecting
+           collections in general and contour/contourf in
+           particular. - EF
+
+2006-08-30 ft2font.cpp: Added draw_rect_filled method (now used by mathtext2
+           to draw the fraction bar) to FT2Font - ES
+
+2006-08-29 setupext.py: wrap calls to tk.getvar() with str(). On some
+           systems, getvar returns a Tcl_Obj instead of a string - DSD
+
+2006-08-28 mathtext2.py: Sub/superscripts can now be complex (i.e.
+           fractions etc.). The demo is also updated - ES
+
+2006-08-28 font_manager.py: Added /usr/local/share/fonts to list of
+           X11 font directories - DSD
+
+2006-08-28 mahtext2.py: Initial support for complex fractions. Also,
+           rendering is now completely separated from parsing. The
+           sub/superscripts now work better.
+           Updated the mathtext2_demo.py - ES
+
+2006-08-27 qt backends: don't create a QApplication when backend is
+           imported, do it when the FigureCanvasQt is created. Simplifies
+           applications where mpl is embedded in qt. Updated
+           embedding_in_qt* examples - DSD
+
+2006-08-27 mahtext2.py: Now the fonts are searched in the OS font dir and
+           in the mpl-data dir. Also env is not a dict anymore. - ES
+
+2006-08-26 minor changes to __init__.py, mathtex2_demo.py. Added matplotlibrc
+           key "mathtext.mathtext2" (removed the key "mathtext2") - ES
+
+2006-08-21 mathtext2.py: Initial support for fractions
+           Updated the mathtext2_demo.py
+           _mathtext_data.py: removed "\" from the unicode dicts
+           mathtext.py: Minor modification (because of _mathtext_data.py)- ES
+
+2006-08-20 Added mathtext2.py: Replacement for mathtext.py. Supports _ ^,
+           \rm, \cal etc., \sin, \cos etc., unicode, recursive nestings,
+           inline math mode. The only backend currently supported is Agg
+           __init__.py: added new rc params for mathtext2
+           added mathtext2_demo.py example - ES
+
+2006-08-19 Added embedding_in_qt4.py example - DSD
+
+2006-08-11 Added scale free Ellipse patch for Agg - CM
+
+2006-08-10 Added converters to and from julian dates to matplotlib.dates
+           (num2julian and julian2num) - JDH
+
+2006-08-08 Fixed widget locking so multiple widgets could share the
+           event handling - JDH
+
+2006-08-07 Added scale free Ellipse patch to SVG and PS - CM
+
+2006-08-05 Re-organized imports in numerix for numpy 1.0b2 -- TEO
+
+2006-08-04 Added draw_markers to PDF backend. - JKS
+
+2006-08-01 Fixed a bug in postscript's rendering of dashed lines - DSD
+
+2006-08-01 figure.py: savefig() update docstring to add support for 'format'
+           argument.
+           backend_cairo.py: print_figure() add support 'format' argument. - SC
+
+2006-07-31 Don't let postscript's xpdf distiller compress images - DSD
+
+2006-07-31 Added shallowcopy() methods to all Transformations;
+           removed copy_bbox_transform and copy_bbox_transform_shallow
+           from transforms.py;
+           added offset_copy() function to transforms.py to
+           facilitate positioning artists with offsets.
+           See examples/transoffset.py. - EF
+
+2006-07-31 Don't let postscript's xpdf distiller compress images - DSD
+
+2006-07-29 Fixed numerix polygon bug reported by Nick Fotopoulos.
+           Added inverse_numerix_xy() transform method.
+           Made autoscale_view() preserve axis direction
+           (e.g., increasing down).- EF
+
+2006-07-28 Added shallow bbox copy routine for transforms -- mainly
+           useful for copying transforms to apply offset to. - JDH
+
+2006-07-28 Added resize method to FigureManager class
+           for Qt and Gtk backend - CM
+
+2006-07-28 Added subplots_adjust button to Qt backend - CM
+
+2006-07-26 Use numerix more in collections.
+           Quiver now handles masked arrays. - EF
+
+2006-07-22 Fixed bug #1209354 - DSD
+
+2006-07-22 make scatter() work with the kwarg "color". Closes bug
+           1285750 - DSD
+
+2006-07-20 backend_cairo.py: require pycairo 1.2.0.
+           print_figure() update to output SVG using cairo.
+
+2006-07-19 Added blitting for Qt4Agg - CM
+
+2006-07-19 Added lasso widget and example examples/lasso_demo.py - JDH
+
+2006-07-18 Added blitting for QtAgg backend - CM
+
+2006-07-17 Fixed bug #1523585: skip nans in semilog plots - DSD
+
+2006-07-12 Add support to render the scientific notation label
+           over the right-side y-axis - DSD
+
+===============================================================
 2006-07-11 Released 0.87.4 at revision 2558
 
-2006-07-07 Fixed a usetex bug with older versions of latex - DSD 
+2006-07-07 Fixed a usetex bug with older versions of latex - DSD
 
 2006-07-07 Add compatibility for NumPy 1.0 - TEO
 
@@ -9,8 +129,8 @@
 
 2006-06-26 Fixed a usetex bug. On windows, usetex will prcess
            postscript output in the current directory rather than
-           in a temp directory. This is due to the use of spaces 
-           and tildes in windows paths, which cause problems with 
+           in a temp directory. This is due to the use of spaces
+           and tildes in windows paths, which cause problems with
            latex. The subprocess module is no longer used. - DSD
 
 2006-06-22 Various changes to bar(), barh(), and hist().

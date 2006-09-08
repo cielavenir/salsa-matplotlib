@@ -1,3 +1,9 @@
+matplotlib (0.87.5-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay81@gmail.com>  Fri, 08 Sep 2006 15:46:46 +0200
+
 matplotlib (0.87.4-3) unstable; urgency=low
 
   * Removed wrong "Section: doc" from python-matplotlib-doc package

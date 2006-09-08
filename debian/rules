@@ -24,7 +24,7 @@ build-indep-stamp:
 	dh_testdir
 	## Building documentation...
 	mkdir -p doc
-	sh -c "cd doc; xvfb-run epydoc -n matplotlib ../lib/matplotlib/*; cd -;"
+	which xvfb-run && sh -c "cd doc; xvfb-run epydoc -n matplotlib ../lib/matplotlib/*; cd -;" || true
 	#wget http://matplotlib.sourceforge.net/$(users_guide)
 	touch build-indep-stamp
 

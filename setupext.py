@@ -78,6 +78,7 @@ BUILT_TKAGG     = False
 BUILT_WXAGG     = False
 BUILT_WINDOWING = False
 BUILT_CONTOUR   = False
+BUILT_NXUTILS   = False
 BUILT_ENTHOUGHT   = False
 BUILT_CONTOUR   = False
 BUILT_GDK       = False
@@ -116,7 +117,7 @@ def get_win32_compiler():
             return 'mingw32'
     return 'msvc'
 win32_compiler = get_win32_compiler()
-if win32_compiler == 'msvc':
+if sys.platform == 'win32' and win32_compiler == 'msvc':
     std_libs = []
 else:
     std_libs = ['stdc++', 'm']
@@ -244,7 +245,7 @@ def add_pygtk_flags(module):
          (flag.startswith('-l') or flag.startswith('-L'))])
     
     # visual studio doesn't need the math library
-    if sys.platform=='win32' and win32_compiler != 'mingw32' and 'm' in module.libraries:
+    if sys.platform == 'win32' and win32_compiler == 'msvc' and 'm' in module.libraries:
         module.libraries.remove('m')
 
 
@@ -354,18 +355,18 @@ def find_tcltk():
         o.tkv = ""
     else:
         tk.withdraw()
-        o.tcl_lib = os.path.normpath(os.path.join((tk.getvar('tcl_library')), '../'))
+        o.tcl_lib = os.path.normpath(os.path.join(str(tk.getvar('tcl_library')), '../'))
         o.tk_lib = os.path.normpath(os.path.join(str(tk.getvar('tk_library')), '../'))
         o.tkv = str(Tkinter.TkVersion)[:3]
-        o.tcl_inc = os.path.normpath(os.path.join((tk.getvar('tcl_library')), 
+        o.tcl_inc = os.path.normpath(os.path.join(str(tk.getvar('tcl_library')), 
                     '../../include/tcl'+o.tkv))
         if not os.path.exists(o.tcl_inc):
-            o.tcl_inc = os.path.normpath(os.path.join((tk.getvar('tcl_library')), 
+            o.tcl_inc = os.path.normpath(os.path.join(str(tk.getvar('tcl_library')), 
                         '../../include'))
-        o.tk_inc = os.path.normpath(os.path.join((tk.getvar('tk_library')), 
+        o.tk_inc = os.path.normpath(os.path.join(str(tk.getvar('tk_library')), 
                     '../../include/tk'+o.tkv))
         if not os.path.exists(o.tk_inc):
-            o.tk_inc = os.path.normpath(os.path.join((tk.getvar('tk_library')), 
+            o.tk_inc = os.path.normpath(os.path.join(str(tk.getvar('tk_library')), 
                         '../../include'))
             
         if ((not os.path.exists(os.path.join(o.tk_inc,'tk.h'))) and
@@ -871,6 +872,47 @@ def build_contour(ext_modules, packages, numerix):
 
 
     BUILT_CONTOUR = True
+
+
+def build_nxutils(ext_modules, packages, numerix):
+    global BUILT_NXUTILS
+    if BUILT_NXUTILS: return # only build it if you you haven't already
+
+    if 'numarray' in numerix: # Build for numarray
+        temp_copy('src/nxutils.c', 'src/_na_nxutils.c')
+        module = Extension(
+            'matplotlib._na_nxutils',
+            [  'src/_na_nxutils.c',],
+            include_dirs=numarray_inc_dirs,
+            )
+        module.extra_compile_args.append('-DNUMARRAY=1')
+        add_base_flags(module)
+        ext_modules.append(module)    
+
+    if 'Numeric' in numerix: # Build for Numeric        
+        temp_copy('src/nxutils.c', 'src/_nc_nxutils.c')
+        module = Extension(
+            'matplotlib._nc_nxutils',
+            [ 'src/_nc_nxutils.c'],
+            include_dirs=numeric_inc_dirs,
+            )
+        module.extra_compile_args.append('-DNUMERIC=1')
+        add_base_flags(module)
+        ext_modules.append(module)
+    if 'numpy' in numerix: # Build for numpy
+        temp_copy('src/nxutils.c', 'src/_ns_nxutils.c')
+        module = Extension(
+            'matplotlib._ns_nxutils',
+            [ 'src/_ns_nxutils.c'],
+            include_dirs=numeric_inc_dirs,
+            )
+        add_numpy_flags(module)
+        module.extra_compile_args.append('-DSCIPY=1')
+        add_base_flags(module)
+        ext_modules.append(module)
+
+
+    BUILT_NXUTILS = True
 
 
 def build_gdk(ext_modules, packages, numerix):
