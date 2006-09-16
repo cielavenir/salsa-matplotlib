@@ -3,20 +3,14 @@ Section: python
 Priority: optional
 Maintainer: Vittorio Palmisano <redclay81@gmail.com>
 Uploaders: Marco Presi (Zufus) <zufus@debian.org>, Alexandre Fayolle <afayolle@debian.org>
-Build-Depends: debhelper (>= 5.0.37.2), python-all-dev(>=2.3.5-7),
- python-all (>=2.3.5-7), dpatch,python-gtk2-dev,python-numeric(>=24.2-3), 
- python-numarray(>=1.5.1-3),python-numpy (>=1:1.0b1), python-numpy-ext (>=1:1.0b1),
- python-numpy-dev(>=1:1.0b1), libgtk2.0-dev, libfreetype6-dev,zlib1g-dev, 
- libpng-dev, tk8.4-dev, python-tk, tcl8.4-dev, python-epydoc,
- python-setuptools (>=0.6b3-1), python-tz, 
- xvfb [!s390], xbase-clients[!s390]
+Build-Depends: debhelper (>= 5.0.37.2), python-all-dev(>=2.3.5-7), python-central (>= 0.5), python-all (>=2.3.5-7), dpatch,python-gtk2-dev,python-numeric(>=24.2-3),  python-numarray(>=1.5.1-3),python-numpy (>=1:1.0b5), python-numpy-ext (>=1:1.0b5), python-numpy-dev(>=1:1.0b5), libgtk2.0-dev, libfreetype6-dev,zlib1g-dev,  libpng-dev, tk8.4-dev, python-tk, tcl8.4-dev, python-epydoc, python-setuptools (>=0.6b3-1), python-tz,  xvfb [!s390], xbase-clients[!s390]
 XS-Python-Version: all
 Standards-Version: 3.7.2
 
 Package: python-matplotlib
 Architecture: any
 XB-Python-Version: ${python:Versions}
-Depends: ${python:Depends}, python-numeric | python-numarray | python-numpy (>=1.0), python-gd (>=0.52) | python-pypaint | python-gtk2 | libwxgtk2.4-python | python-qt3, python-numeric-ext | python-numarray-ext, python-tz, python-dev, dvipng, python-matplotlib-data(=${Source-Version})
+Depends: ${python:Depends},  python-numeric | python-numarray | python-numpy (>=1:1.0b5),  python-gd (>=0.52) | python-pypaint | python-gtk2 | libwxgtk2.4-python | python-qt3,  python-numeric-ext | python-numarray-ext, python-tz, python-dev, dvipng,  python-matplotlib-data(=${source:Version})
 Provides: ${python:Provides}
 Conflicts: python2.3-matplotlib, python2.4-matplotlib
 Replaces: python2.3-matplotlib, python2.4-matplotlib
