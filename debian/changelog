@@ -1,3 +1,10 @@
+matplotlib (0.87.5-2.2) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Also Depend: on python-dateutil (closes: #396335)
+
+ -- Mark Hymers <mark@hymers.org.uk>  Tue, 31 Oct 2006 18:05:10 +0000
+
 matplotlib (0.87.5-2.1) unstable; urgency=low
 
   * Non-maintainer upload.

@@ -10,7 +10,7 @@ Standards-Version: 3.7.2
 Package: python-matplotlib
 Architecture: any
 XB-Python-Version: ${python:Versions}
-Depends: ${python:Depends},  python-numeric | python-numarray | python-numpy (>=1:1.0b5),  python-gd (>=0.52) | python-pypaint | python-gtk2 | libwxgtk2.4-python | python-qt3,  python-numeric-ext | python-numarray-ext, python-tz, python-dev, dvipng,  python-matplotlib-data(=${source:Version})
+Depends: ${python:Depends},  python-numeric | python-numarray | python-numpy (>=1:1.0b5),  python-gd (>=0.52) | python-pypaint | python-gtk2 | libwxgtk2.4-python | python-qt3,  python-numeric-ext | python-numarray-ext, python-tz, python-dev, dvipng,  python-matplotlib-data(=${source:Version}), python-dateutil
 Provides: ${python:Provides}
 Conflicts: python2.3-matplotlib, python2.4-matplotlib
 Replaces: python2.3-matplotlib, python2.4-matplotlib
