@@ -1,3 +1,12 @@
+matplotlib (0.87.7-0) experimental; urgency=low
+
+  * New upstream version.
+  * (Build-)depend on python-numpy (>= 1:1.0.1).
+  * Remove redundant (build-)dependencies.
+  * Remove calls to python2.3.
+
+ -- Matthias Klose <doko@debian.org>  Wed,  3 Jan 2007 22:52:34 +0100
+
 matplotlib (0.87.5-2.2) unstable; urgency=low
 
   * Non-maintainer upload.

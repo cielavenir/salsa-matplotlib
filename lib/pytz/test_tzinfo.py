@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: ascii -*-
 '''
-$Id: test_tzinfo.py 540 2004-09-24 10:24:50 -0500 (Fri, 24 Sep 2004) jdh2358 $
+$Id: test_tzinfo.py 540 2004-09-24 15:24:50Z jdh2358 $
 '''
 
-__rcs_id__  = '$Id: test_tzinfo.py 540 2004-09-24 10:24:50 -0500 (Fri, 24 Sep 2004) jdh2358 $'
+__rcs_id__  = '$Id: test_tzinfo.py 540 2004-09-24 15:24:50Z jdh2358 $'
 __version__ = '$Revision: 540 $'[11:-2]
 
 import sys, os

@@ -41,7 +41,6 @@ clean: clean-patched unpatch
 clean-patched: patch
 	dh_testdir
 	dh_testroot
-	python2.3 ./setup.py clean --all
 	python2.4 ./setup.py clean --all
 	-rm -f *-stamp*
 	-rm -rf build *.pyc *.pyo *.pdf doc/html/
@@ -86,7 +85,7 @@ binary-indep: build-indep install-indep
 	dh_installchangelogs -i CHANGELOG
 	dh_installdocs -p$(pd) -i
 	dh_installexamples -p$(pd) -i examples/*
-	dh_install -p$(pd) doc/* usr/share/doc/$(pd)
+	-dh_install -p$(pd) doc/* usr/share/doc/$(pd)
 	dh_compress -i -Xexamples -Xexamples/data
 	dh_fixperms -i
 	dh_installdeb -i
@@ -107,12 +106,10 @@ binary-arch: build-arch install-arch
 	  fi; \
 	done
 	dh_pycentral -a
-	dh_python -a
 	dh_link -a
 	dh_strip -a
 	dh_compress -a
 	dh_fixperms -a
-	dh_python -a
 	dh_installdeb -a
 	dh_shlibdeps -a
 	dh_gencontrol -a

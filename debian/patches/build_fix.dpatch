@@ -5,9 +5,8 @@
 ## DP: No description.
 
 @DPATCH@
-diff -urNad matplotlib-0.87.4~/setup.py matplotlib-0.87.4/setup.py
---- matplotlib-0.87.4~/setup.py	2006-08-02 20:51:12.000000000 +0200
-+++ matplotlib-0.87.4/setup.py	2006-08-02 20:51:13.000000000 +0200
+--- ./setup.py.orig	2007-01-03 18:58:26.000000000 +0100
++++ ./setup.py	2007-01-03 19:08:16.000000000 +0100
 @@ -28,21 +28,21 @@
  # it.  It makes very nice antialiased output and also supports alpha
  # blending
@@ -35,7 +34,7 @@ diff -urNad matplotlib-0.87.4~/setup.py matplotlib-0.87.4/setup.py
  
  
  VERBOSE = False # insert lots of diagnostic prints in extension code
-@@ -200,47 +200,20 @@
+@@ -201,75 +201,19 @@
  build_enthought(ext_modules, packages)
  
  if BUILD_GTK:
@@ -43,39 +42,22 @@ diff -urNad matplotlib-0.87.4~/setup.py matplotlib-0.87.4/setup.py
 -        import gtk
 -    except ImportError:
 -        print 'GTK requires pygtk'
--        BUILD_GTK=0
+-        BUILD_GTK = 0
 -    except RuntimeError:
 -        print 'pygtk present but import failed'
--
--if BUILD_GTK:
-         build_gdk(ext_modules, packages, NUMERIX)
-         rc['backend'] = 'GTK'
+-        BUILD_GTK = 0
+-    else:
+-        version = (2,2,0)
+-        if gtk.pygtk_version < version:
+-            print "Error: GTK backend requires PyGTK %d.%d.%d (or later), " \
+-                  "%d.%d.%d was detected." % (
+-                version + gtk.pygtk_version)
+-            BUILD_GTK = 0
+-        else:
+             build_gdk(ext_modules, packages, NUMERIX)
+             rc['backend'] = 'GTK'
  
- if BUILD_TKAGG:
--    try: import Tkinter
--    except ImportError: print 'TKAgg requires TkInter'
--    else:
--        BUILD_AGG = 1
--        build_tkagg(ext_modules, packages, NUMERIX)
--        rc['backend'] = 'TkAgg'
-+    BUILD_AGG = 1
-+    build_tkagg(ext_modules, packages, NUMERIX)
-+    rc['backend'] = 'TkAgg'
-         
- if BUILD_WXAGG:
--    try: import wxPython
--    except ImportError:
--        if BUILD_WXAGG != 'auto':
--            print 'WXAgg\'s accelerator requires wxPython'
--        BUILD_WXAGG = 0
--    else:
--        BUILD_AGG = 1
--        build_wxagg(ext_modules, packages, NUMERIX,
--            not (isinstance(BUILD_WXAGG, str) # don't about if BUILD_WXAGG
--                 and BUILD_WXAGG.lower() == 'auto')) # is "auto"
--        rc['backend'] = 'WXAgg'
--
--if BUILD_GTKAGG:
+ if BUILD_GTKAGG:
 -    try:
 -        import gtk
 -    except ImportError:
@@ -83,15 +65,52 @@ diff -urNad matplotlib-0.87.4~/setup.py matplotlib-0.87.4/setup.py
 -        BUILD_GTKAGG=0
 -    except RuntimeError:
 -        print 'pygtk present but import failed'
-+    BUILD_AGG = 1
-+    build_wxagg(ext_modules, packages, NUMERIX,
-+                not (isinstance(BUILD_WXAGG, str) # don't about if BUILD_WXAGG
-+                     and BUILD_WXAGG.lower() == 'auto')) # is "auto"
-+    rc['backend'] = 'WXAgg'
+-        BUILD_GTKAGG = 0
+-    else:
+-        version = (2,2,0)
+-        if gtk.pygtk_version < version:
+-            print "Error: GTKAgg backend requires PyGTK %d.%d.%d " \
+-                  "(or later), %d.%d.%d was detected." % (
+-                version + gtk.pygtk_version)
+-            BUILD_GTKAGG=0
+-        else:
+-            BUILD_AGG = 1
+             build_gtkagg(ext_modules, packages, NUMERIX)
+             rc['backend'] = 'GTKAgg'
  
- if BUILD_GTKAGG:
-     BUILD_AGG = 1
-@@ -301,6 +274,6 @@
+ if BUILD_TKAGG:
+-    try:
+-        import Tkinter
+-    except ImportError:
+-        print 'TKAgg requires TkInter'
+-        BUILD_TKAGG = 0
+-    except RuntimeError:
+-        print 'Tkinter present but import failed'
+-        BUILD_TKAGG = 0
+-    else:
+-        try:
+-            tk = Tkinter.Tk()
+-            tk.withdraw()
+-        except Tkinter.TclError:
+-            print 'Tkinter present, but window failed to open'
+-            BUILD_TKAGG = 0
+-        else:
+             BUILD_AGG = 1
+             build_tkagg(ext_modules, packages, NUMERIX)
+             rc['backend'] = 'TkAgg'
+ 
+ if BUILD_WXAGG:
+-    try:
+-        import wxPython
+-    except ImportError:
+-        if BUILD_WXAGG != 'auto':
+-            print 'WXAgg\'s accelerator requires wxPython'
+-        BUILD_WXAGG = 0
+-    else:
+         BUILD_AGG = 1
+         build_wxagg(ext_modules, packages, NUMERIX,
+             not (isinstance(BUILD_WXAGG, str) # don't about if BUILD_WXAGG
+@@ -331,6 +275,6 @@
        ext_modules = ext_modules,
        data_files = data_files,
        package_dir = {'': 'lib'},
@@ -99,10 +118,9 @@ diff -urNad matplotlib-0.87.4~/setup.py matplotlib-0.87.4/setup.py
 +      #cmdclass = {'install_data':smart_install_data},
        **additional_params
        )
-diff -urNad matplotlib-0.87.4~/setupext.py matplotlib-0.87.4/setupext.py
---- matplotlib-0.87.4~/setupext.py	2006-07-10 19:55:59.000000000 +0200
-+++ matplotlib-0.87.4/setupext.py	2006-08-02 20:51:49.000000000 +0200
-@@ -347,11 +347,11 @@
+--- ./setupext.py.orig	2007-01-03 18:58:26.000000000 +0100
++++ ./setupext.py	2007-01-03 19:04:06.000000000 +0100
+@@ -349,11 +349,11 @@
          print "Using default library and include directories for Tcl and Tk because a"
          print "Tk window failed to open.  You may need to define DISPLAY for Tk to work"
          print "so that setup can determine where your libraries are located."
@@ -118,4 +136,4 @@ diff -urNad matplotlib-0.87.4~/setupext.py matplotlib-0.87.4/setupext.py
 +        o.tkv = "8.4"
      else:
          tk.withdraw()
-         o.tcl_lib = os.path.normpath(os.path.join((tk.getvar('tcl_library')), '../'))
+         o.tcl_lib = os.path.normpath(os.path.join(str(tk.getvar('tcl_library')), '../'))

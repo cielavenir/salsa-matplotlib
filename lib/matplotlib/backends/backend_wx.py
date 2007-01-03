@@ -92,7 +92,7 @@ Examples which work on this release:
  (3) - Clipping seems to be broken.
 """
 
-cvs_id = '$Id: backend_wx.py 2728 2006-08-29 23:16:35Z cmoad $'
+cvs_id = '$Id: backend_wx.py 2779 2006-09-21 12:28:54Z cmoad $'
 
 import sys, os, os.path, math, StringIO
 
@@ -275,7 +275,7 @@ class RendererWx(RendererBase):
         return self.width, self.height
 
 
-    def draw_arc(self, gc, rgbFace, x, y, width, height, angle1, angle2):
+    def draw_arc(self, gc, rgbFace, x, y, width, height, angle1, angle2, rotation):
         """
         Draw an arc centered at x,y with width and height and angles
         from 0.0 to 360.0.
@@ -926,12 +926,12 @@ The current aspect ration will be kept."""
         drawDC.DrawBitmap(self.bitmap, 0, 0)
         drawDC.EndDrawing()
 
-    def print_figure(self, filename, dpi=150, facecolor='w', edgecolor='w',
+    def print_figure(self, filename, dpi=None, facecolor='w', edgecolor='w',
                      orientation='portrait', **kwargs):
         """
         Render the figure to hardcopy
         """
-
+        if dpi is None: dpi = matplotlib.rcParams['savefig.dpi']
         DEBUG_MSG("print_figure()", 1, self)
         # Save state information, and set save DPI
 

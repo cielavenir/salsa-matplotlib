@@ -1,8 +1,0 @@
-matplotlib/enthought/resource
-pylab
-matplotlib/enthought/traits
-matplotlib/enthought/util
-matplotlib
-matplotlib/enthought
-matplotlib/enthought/traits/ui
-matplotlib/enthought/traits/ui/null
