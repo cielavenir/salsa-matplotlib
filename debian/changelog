@@ -1,9 +1,20 @@
+matplotlib (0.87.7-0.1) unstable; urgency=medium
+
+  * Remove build dependency on python-numpy-ext.
+  * Prefer python-numpy over (python-numeric as a dependency. Closes: #389669.
+  * Already fixed:
+    - Build dependency on python-numpy. Closes: #375558.
+  * Readd dependency on python-gst. Closes: #385590.
+  * Mention pylab in the package description. Closes: #403723.
+
+ -- Matthias Klose <doko@debian.org>  Sun,  7 Jan 2007 21:30:23 +0000
+
 matplotlib (0.87.7-0) experimental; urgency=low
 
-  * New upstream version.
+  * New upstream version (compatible with python-numpy-1.0). Closes: #361181.
   * (Build-)depend on python-numpy (>= 1:1.0.1).
   * Remove redundant (build-)dependencies.
-  * Remove calls to python2.3.
+  * Remove references to explicit python versions. Closes: #405611.
 
  -- Matthias Klose <doko@debian.org>  Wed,  3 Jan 2007 22:52:34 +0100
 

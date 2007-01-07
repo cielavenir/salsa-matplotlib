@@ -41,9 +41,11 @@ clean: clean-patched unpatch
 clean-patched: patch
 	dh_testdir
 	dh_testroot
-	python2.4 ./setup.py clean --all
-	-rm -f *-stamp*
-	-rm -rf build *.pyc *.pyo *.pdf doc/html/
+	for v in $(PYVERS); do \
+	  python$$v ./setup.py clean --all; \
+	done
+	rm -f *-stamp*
+	rm -rf build *.pyc *.pyo *.pdf doc/html/
 	find ./lib -name '*.pyc' -exec rm {} \;
 	dh_clean
 	sh $(CURDIR)/debian/mkcopyright.sh
