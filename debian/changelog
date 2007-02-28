@@ -1,3 +1,12 @@
+matplotlib (0.87.7-0.2) unstable; urgency=high
+
+  * Non-maintainer upload.
+  * Using patch provided by Mark Hymers <mark@hymers.org.uk>
+    - Add check to debian/rules to prevent builds silently failing to build
+      one of the plugins.  (Closes: #411925)
+
+ -- Martin Zobel-Helas <zobel@ftbfs.de>  Wed, 28 Feb 2007 10:39:43 +0100
+
 matplotlib (0.87.7-0.1) unstable; urgency=medium
 
   * Remove build dependency on python-numpy-ext.
