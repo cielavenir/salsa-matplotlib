@@ -1,11 +1,9 @@
-matplotlib (0.87.7-0.3) unstable; urgency=high
+matplotlib (0.90.0-1) experimental; urgency=low
 
-  * Non-maintainer upload.
-  * High-urgency upload for RC bugfix.
-  * Add dependency on python-tk, to ensure the package works out-of-the-box.
-    Closes: #408944.
+  * New upstream release
+  * Added depend on python-tk (Closes: #408944)
 
- -- Steve Langasek <vorlon@debian.org>  Wed,  7 Mar 2007 13:32:41 -0800
+ -- Marco Presi (Zufus) <zufus@debian.org>  Thu,  1 Mar 2007 22:32:45 +0000
 
 matplotlib (0.87.7-0.2) unstable; urgency=high
 

@@ -10,11 +10,14 @@ from artist import Artist
 from cbook import enumerate, popd, is_string_like, maxdict, is_numlike
 from font_manager import FontProperties
 from matplotlib import rcParams
-from patches import bbox_artist
+from patches import bbox_artist, YAArrow
 from numerix import sin, cos, pi, cumsum, dot, asarray, array, \
      where, nonzero, equal, sqrt
 from transforms import lbwh_to_bbox, bbox_all, identity_transform
 from lines import Line2D
+
+import matplotlib.nxutils as nxutils
+import artist
 
 def scanner(s):
     """
@@ -86,6 +89,7 @@ def get_rotation(rotation):
 
 _unit_box = lbwh_to_bbox(0,0,1,1)
 
+
 class Text(Artist):
     """
     Handle storing and drawing of text in window or data coordinates
@@ -105,6 +109,38 @@ class Text(Artist):
                  rotation=None,
                  **kwargs
                  ):
+        """
+        Create a Text instance at x,y with string text.  Valid kwargs are
+
+            alpha: float
+            animated: [True | False]
+            backgroundcolor: any matplotlib color
+            bbox: rectangle prop dict plus key 'pad' which is a pad in points
+            clip_box: a matplotlib.transform.Bbox instance
+            clip_on: [True | False]
+            color: any matplotlib color
+            family: [ 'serif' | 'sans-serif' | 'cursive' | 'fantasy' | 'monospace' ]
+            figure: a matplotlib.figure.Figure instance
+            fontproperties: a matplotlib.font_manager.FontProperties instance
+            horizontalalignment or ha: [ 'center' | 'right' | 'left' ]
+            label: any string
+            lod: [True | False]
+            multialignment: ['left' | 'right' | 'center' ]
+            name or fontname: string eg, ['Sans' | 'Courier' | 'Helvetica' ...]
+            position: (x,y)
+            rotation: [ angle in degrees 'vertical' | 'horizontal'
+            size or fontsize: [ size in points | relative size eg 'smaller', 'x-large' ]
+            style or fontstyle: [ 'normal' | 'italic' | 'oblique']
+            text: string
+            transform: a matplotlib.transform transformation instance
+            variant: [ 'normal' | 'small-caps' ]
+            verticalalignment or va: [ 'center' | 'top' | 'bottom' ]
+            visible: [True | False]
+            weight or fontweight: [ 'normal' | 'bold' | 'heavy' | 'light' | 'ultrabold' | 'ultralight']
+            x: float
+            y: float
+            zorder: any number
+        """
 
         Artist.__init__(self)
         if not is_string_like(text):
@@ -126,6 +162,28 @@ class Text(Artist):
         self._renderer = None
         self.update(kwargs)
         #self.set_bbox(dict(pad=0))
+
+
+    def pick(self, mouseevent):
+        """
+        if the mouse click is inside the vertices defining the
+        bounding box of the text, fire off a backend_bases.PickEvent
+        """
+        if not self.pickable(): return
+        picker = self.get_picker()
+        if callable(picker):
+            hit, props = picker(self, mouseevent)
+            if hit:
+                self.figure.canvas.pick_event(mouseevent, self, **props)
+        elif picker:
+            l,b,w,h = self.get_window_extent().get_bounds()
+            r = l+w
+            t = b+h
+            xyverts = (l,b), (l, t), (r, t), (r, b)
+            x, y = mouseevent.x, mouseevent.y
+            inside = nxutils.pnpoly(x, y, xyverts)
+            if inside:
+                self.figure.canvas.pick_event(mouseevent, self)
 
     def _get_multialignment(self):
         if self._multialignment is not None: return self._multialignment
@@ -157,7 +215,7 @@ class Text(Artist):
         self._horizontalalignment = other._horizontalalignment
         self._fontproperties = other._fontproperties.copy()
         self._rotation = other._rotation
-
+        self._picker = other._picker
 
     def _get_layout(self, renderer):
 
@@ -168,7 +226,7 @@ class Text(Artist):
         if self.cached.has_key(key): return self.cached[key]
         horizLayout = []
         pad =2
-        thisx, thisy = self._transform.xy_tup( (self._x, self._y) )
+        thisx, thisy = self.get_transform().xy_tup( (self._x, self._y) )
         width = 0
         height = 0
 
@@ -235,7 +293,7 @@ class Text(Artist):
 
         # compute the text location in display coords and the offsets
         # necessary to align the bbox with that location
-        tx, ty = self._transform.xy_tup( (self._x, self._y) )
+        tx, ty = self.get_transform().xy_tup( (self._x, self._y) )
 
         if halign=='center':  offsetx = tx - (xmin + width/2.0)
         elif halign=='right': offsetx = tx - (xmin + width)
@@ -261,7 +319,7 @@ class Text(Artist):
         ty = [float(v[1][0])+offsety for v in xys]
 
         # now inverse transform back to data coords
-        xys = [self._transform.inverse_xy_tup( xy ) for xy in zip(tx, ty)]
+        xys = [self.get_transform().inverse_xy_tup( xy ) for xy in zip(tx, ty)]
 
         xs, ys = zip(*xys)
 
@@ -273,7 +331,9 @@ class Text(Artist):
     def set_bbox(self, rectprops):
         """
         Draw a bounding box around self.  rect props are any settable
-        properties for a rectangle, eg color='r', alpha=0.5
+        properties for a rectangle, eg facecolor='red', alpha=0.5.
+
+          t.set_bbox(dict(facecolor='red', alpha=0.5))
 
         ACCEPTS: rectangle prop dict plus key 'pad' which is a pad in points
         """
@@ -320,7 +380,7 @@ class Text(Artist):
 
         if len(self._substrings)>1:
             # embedded mathtext
-            thisx, thisy = self._transform.xy_tup((self._x, self._y))
+            thisx, thisy = self.get_transform().xy_tup((self._x, self._y))
             for s,ismath in self._substrings:
                 w, h = renderer.get_text_width_height(
                     s, self._fontproperties, ismath)
@@ -338,11 +398,11 @@ class Text(Artist):
 
             return
         bbox, info = self._get_layout(renderer)
-
+        trans = self.get_transform()
         if ismath=='TeX':
             canvasw, canvash = renderer.get_canvas_width_height()
             for line, wh, x, y in info:
-                x, y = self._transform.xy_tup((x, y))
+                x, y = trans.xy_tup((x, y))
                 if renderer.flipy():
                     y = canvash-y
 
@@ -352,7 +412,7 @@ class Text(Artist):
 
         #print 'xy', self._x, self._y, info
         for line, wh, x, y in info:
-            x, y = self._transform.xy_tup((x, y))
+            x, y = trans.xy_tup((x, y))
 
             if renderer.flipy():
                 canvasw, canvash = renderer.get_canvas_width_height()
@@ -427,7 +487,7 @@ class Text(Artist):
         return (self._x, self._y, self._text, self._color,
                 self._verticalalignment, self._horizontalalignment,
                 hash(self._fontproperties), self._rotation,
-                self._transform.as_vec6_val(),
+                self.get_transform().as_vec6_val(),
                 )
 
     def get_text(self):
@@ -446,7 +506,7 @@ class Text(Artist):
         #return _unit_box
         if not self.get_visible(): return _unit_box
         if self._text == '':
-            tx, ty = self._transform.xy_tup( (self._x, self._y) )
+            tx, ty = self.get_transform().xy_tup( (self._x, self._y) )
             return lbwh_to_bbox(tx,ty,0,0)
 
         if renderer is not None:
@@ -490,18 +550,22 @@ class Text(Artist):
 
     def set_backgroundcolor(self, color):
         """
-        Set the background color of the text
+        Set the background color of the text by updating the bbox (see set_bbox for more info)
 
-        ACCEPTS: any matplotlib color - see help(colors)
+        ACCEPTS: any matplotlib color
         """
-        self._backgroundcolor = color
+        if self._bbox is None:
+            self._bbox = dict(facecolor=color, edgecolor=color)
+        else:
+            self._bbox.update(dict(facecolor=color))
+
 
 
     def set_color(self, color):
         """
         Set the foreground color of the text
 
-        ACCEPTS: any matplotlib color - see help(colors)
+        ACCEPTS: any matplotlib color
         """
         # Make sure it is hashable, or get_prop_tup will fail.
         try:
@@ -709,7 +773,7 @@ class Text(Artist):
 
         w = wb+we
 
-        xb, yb = self._transform.xy_tup((self._x, self._y))
+        xb, yb = self.get_transform().xy_tup((self._x, self._y))
         xe = xb+1.1*wb
         ye = yb+0.5*hb
         h = ye+he-yb
@@ -1070,7 +1134,7 @@ class _Annotation(Text):
           C: 'center', 'center'
           D: 'inside left', 'outside bottom'
           E: 'center', 'outside top'
-          
+
           inside and outside cannot be used with 'center'.  With
           upper, lower, left and right, inside will be assumed if
           inside|outside is not provided
@@ -1114,21 +1178,21 @@ class _Annotation(Text):
                      the line on each end
             xalign : left | right | center | auto - where to align the line on the text
             yalign : bottom | top | center | auto - where to align the line on the text
-            
+
         Here is an example with xalign='center' and yalign='bottom'
 
             ------------------------
             |                      |
-            |  the text annotation | 
+            |  the text annotation |
             |______________________|
                                               <---shrink shortens the line here
-                       / 
-                      /  
-                     /     
-                    /       
+                       /
+                      /
+                     /
+                    /
                                                <---and here
                   loc
-    
+
 
          coords, if not None, is a string that will specify the
          coordinate system of the x,y location.  Possible choices are
@@ -1151,11 +1215,11 @@ class _Annotation(Text):
 
           # 10 points to the right of the left border of the axes and
           # 5 points below the top border
-          loc=(10,-5), coords='axes points' 
+          loc=(10,-5), coords='axes points'
 
 
         """
-        
+
         # we'll draw ourself after the artist we annotate by default
         zorder = props.get('zorder', artist.get_zorder() + 1)
         Text.__init__(self, text=s, **props)
@@ -1185,12 +1249,12 @@ class _Annotation(Text):
         """
         self._lineprops = lineprops
         if lineprops is not None:
-            lineprops = lineprops.copy() 
+            lineprops = lineprops.copy()
             self._shrink = lineprops.pop('shrink', 0.)
             self._xalign = lineprops.pop('xalign', 'auto')
             self._yalign = lineprops.pop('yalign', 'auto')
             self.line.update(lineprops)
-            
+
     def get_lineprops(self):
         'get the x padding in points'
         return self._lineprops
@@ -1222,16 +1286,16 @@ class _Annotation(Text):
     def set_autopad(self, autopad):
         """
         Set the y padding in points
-        ACCEPTS: float value in points        
+        ACCEPTS: float value in points
         """
         self._autopad = autopad
-        self._process_xloc(self._loc[0])        
+        self._process_xloc(self._loc[0])
         self._process_yloc(self._loc[1])
 
     def get_autopad(self):
         'get the y padding in points'
         return self._autopad
-    
+
     def _process_xloc(self, xloc):
         """
         This function will set the horiz and vertical alignment
@@ -1244,7 +1308,7 @@ class _Annotation(Text):
             if self._padx=='auto':
                 self._padx = 0.
             self._funcx = None
-            return 
+            return
         if not is_string_like(xloc):
             raise ValueError('x location code must be a number or string')
         xloc = xloc.lower().strip()
@@ -1261,7 +1325,7 @@ class _Annotation(Text):
                 raise ValueError('location code looks like "inside|outside left|right".  You supplied "%s"'%xloc)
 
             inout, leftright = tup
-            
+
             if inout not in ('inside', 'outside'):
                 raise ValueError('x in/out: bad location code "%s"'%xloc)
             if leftright not in ('left', 'right'):
@@ -1304,7 +1368,7 @@ class _Annotation(Text):
         if is_numlike(yloc):
             if self._pady=='auto':
                 self._pady = 0.
-            self._funcy = None                
+            self._funcy = None
             return # nothing to do
 
         if not is_string_like(yloc):
@@ -1317,14 +1381,14 @@ class _Annotation(Text):
                 return 0.5*(bottom + top)
             if self._pady=='auto':
                 self._pady = 0.
-            
+
         else:
             tup = yloc.split(' ')
             if len(tup)!=2:
                 raise ValueError('location code looks like "inside|outside bottom|top".  You supplied "%s"'%yloc)
 
             inout, bottomtop = tup
-            
+
             if inout not in ('inside', 'outside'):
                 raise ValueError('y in/out: bad location code "%s"'%yloc)
             if bottomtop not in ('bottom', 'top'):
@@ -1353,7 +1417,7 @@ class _Annotation(Text):
                     return top
                 if self._pady=='auto':
                     self._pady = self._autopad
-                
+
         self.update(props)
         self._funcy = funcy
 
@@ -1432,7 +1496,7 @@ class _Annotation(Text):
                 if y<0:
                     self._y = t + y*dpi/72.
                 else:
-                    self._y = b + y*dpi/72.            
+                    self._y = b + y*dpi/72.
             elif self._coords=='axes pixels':
                 #pixels from the lower left corner of the axes
                 x, y = self._loc
@@ -1446,23 +1510,23 @@ class _Annotation(Text):
                 if y<0:
                     self._y = t + y
                 else:
-                    self._y = b + y                
+                    self._y = b + y
             elif self._coords=='axes fraction':
                 #(0,0) is lower left, (1,1) is upper right of axes
                 trans = self._annotateArtist.transAxes
                 self._x, self._y = trans.xy_tup(self._loc)
-            
+
         dpi = self.figure.dpi.get()
         dx = self._padx * dpi/72.
         dy = self._pady * dpi/72.
         self._x += dx
         self._y += dy
-        
+
     def draw(self, renderer):
         if renderer is not None:
             self._renderer = renderer
         self.update_positions()
-        #print 'drawing annotation', self._x, self._y, self._text        
+        #print 'drawing annotation', self._x, self._y, self._text
         Text.draw(self, renderer)
         if self._lineprops is not None:
             l,b,w,h = self.get_window_extent(renderer).get_bounds()
@@ -1483,7 +1547,7 @@ class _Annotation(Text):
                 dsu = [(abs(val-x0), val) for val in l, r, xc]
                 dsu.sort()
                 d, x = dsu[0]
-                
+
             if self._yalign=='bottom': y = b
             elif self._yalign=='top': y = t
             elif self._yalign=='center': y = yc
@@ -1492,7 +1556,7 @@ class _Annotation(Text):
                 dsu.sort()
                 d, y = dsu[0]
 
-            
+
 
             if self._shrink:
                 r = math.sqrt((x-x0)**2 + (y-y0)**2)
@@ -1503,10 +1567,10 @@ class _Annotation(Text):
                 x -= dx
                 y0 += dy
                 y -= dy
-                
+
             self.line.set_data([x0, x], [y0, y])
             self.line.draw(renderer)
-            
+
 class Annotation(Text):
     """
     A Text class to make annotating things in the figure: Figure,
@@ -1516,20 +1580,27 @@ class Annotation(Text):
                  xycoords='data',
                  xytext=None,
                  textcoords=None,
-                 lineprops=None,
-                 markerprops=None,
+                 arrowprops=None,
                  **kwargs):
         """
         Annotate the x,y point xy with text s at x,y location xytext
         (xytext if None defaults to xy and textcoords if None defaults
         to xycoords).
 
-        lineprops, if not None, is a dictionary of line properties
-        (see matplotlib.lines.Line2D) for a line that connects the
-        annotation to the point.
+        arrowprops, if not None, is a dictionary of line properties
+        (see matplotlib.lines.Line2D) for the arrow that connects
+        annotation to the point.   Valid keys are
 
-        markerprops, if not None, is a ductionaly of line marker
-        properties for marking the point at xy.
+          - width : the width of the arrow in points
+          - frac  : the fraction of the arrow length occupied by the head
+          - headwidth : the width of the base of the arrow head in points
+          - shrink: often times it is convenient to have the arrowtip
+            and base a bit away from the text and point being
+            annotated.  If d is the distance between the text and
+            annotated point, shrink will shorten the arrow so the tip
+            and base are shink percent of the distance d away from the
+            endpoints.  ie, shrink=0.05 is 5%
+          - any key for matplotlib.patches.polygon
 
         xycoords and textcoords are a string that indicates the
         coordinates of xy and xytext.
@@ -1552,7 +1623,7 @@ class Annotation(Text):
 
           # 10 points to the right of the left border of the axes and
           # 5 points below the top border
-          xy=(10,-5), xycoords='axes points' 
+          xy=(10,-5), xycoords='axes points'
 
 
         """
@@ -1563,19 +1634,11 @@ class Annotation(Text):
         # we'll draw ourself after the artist we annotate by default
         x,y = self.xytext = xytext
         Text.__init__(self, x, y, s, **kwargs)
-        
-        x,y = self.xy = xy
-        if lineprops is None:
-            self.line = None
-        else:
-            self.line   = Line2D([0], [0], **lineprops)
-        if markerprops is None:
-            self.marker = None
-        else:
-            self.marker = Line2D([x], [y], **markerprops)        
-
+        self.xy = xy
+        self.arrowprops = arrowprops
+        self.arrow = None
         self.xycoords = xycoords
-        self.textcoords = textcoords        
+        self.textcoords = textcoords
 
     def _get_xy(self, x, y, s):
         if s=='data':
@@ -1649,21 +1712,18 @@ class Annotation(Text):
             #(0,0) is lower left, (1,1) is upper right of axes
             trans = self.axes.transAxes
             return trans.xy_tup((x,y))
-            
+
 
     def update_positions(self, renderer):
 
         x, y = self.xytext
         self._x, self._y = self._get_xy(x, y, self.textcoords)
-        
+
 
         x, y = self.xy
         x, y = self._get_xy(x, y, self.xycoords)
-        if self.marker is not None:
-            self.marker.set_data([x], [y])
-            
 
-        if self.line is not None:
+        if self.arrowprops:
             x0, y0 = x, y
             l,b,w,h = self.get_window_extent(renderer).get_bounds()
             dpi = self.figure.dpi.get()
@@ -1676,26 +1736,37 @@ class Annotation(Text):
             dsu = [(abs(val-x0), val) for val in l, r, xc]
             dsu.sort()
             d, x = dsu[0]
-                
+
             dsu = [(abs(val-y0), val) for val in b, t, yc]
             dsu.sort()
             d, y = dsu[0]
-            self.line.set_data([x0, x], [y0, y])
 
-                                                            
+
+            d = self.arrowprops.copy()
+            width = popd(d, 'width', 4)
+            headwidth = popd(d, 'headwidth', 12)
+            frac = popd(d, 'frac', 0.1)
+            shrink = popd(d, 'shrink', 0.0)
+
+
+            theta = math.atan2(y-y0, x-x0)
+            r = math.sqrt((y-y0)**2. + (x-x0)**2.)
+            dx = shrink*r*math.cos(theta)
+            dy = shrink*r*math.sin(theta)
+
+            self.arrow = YAArrow(self.figure.dpi, (x0+dx,y0+dy), (x-dx, y-dy),
+                            width=width, headwidth=headwidth, frac=frac,
+                            **d)
+
     def draw(self, renderer):
         self.update_positions(renderer)
 
-        if self.line is not None:
-            self.line.draw(renderer)
-        if self.marker is not None:
-            self.marker.draw(renderer)
-            
+        if self.arrow is not None:
+            self.arrow.draw(renderer)
+
         Text.draw(self, renderer)
 
-                             
-                             
-            
-    
-        
-        
+
+artist.kwdocd['Text'] = artist.kwdoc(Text)
+artist.kwdocd['TextWithDash'] = artist.kwdoc(TextWithDash)
+artist.kwdocd['Annotation'] = artist.kwdoc(Annotation)

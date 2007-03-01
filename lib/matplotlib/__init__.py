@@ -143,9 +143,9 @@ the exception of those in mlab.py provided by matplotlib.
 from __future__ import generators
 
 
-__version__  = '0.87.7'
-__revision__ = '$Revision: 2835 $'
-__date__     = '$Date: 2006-10-26 12:30:22 -0400 (Thu, 26 Oct 2006) $'
+__version__  = '0.90.0'
+__revision__ = '$Revision: 3003 $'
+__date__     = '$Date: 2007-02-06 22:24:06 -0500 (Tue, 06 Feb 2007) $'
 
 import md5, os, re, shutil, sys, warnings
 import distutils.sysconfig
@@ -395,16 +395,6 @@ def checkdep_ghostscript():
     except (IndexError, ValueError):
         return None
 
-def checkdep_ps2eps():
-    try:
-        stdin, stdout = os.popen4('ps2eps -v')
-        line = stdout.readlines()[-1]
-        v = line.split()[-1]
-        float(v)
-        return v
-    except (IndexError, ValueError):
-        return None
-
 def checkdep_tex():
     try:
         stdin, stdout = os.popen4('tex -version')
@@ -417,9 +407,9 @@ def checkdep_tex():
     except (IndexError, ValueError):
         return None
 
-def checkdep_xpdf():
+def checkdep_pdftops():
     try:
-        stdin, stdout = os.popen4('xpdf -v')
+        stdin, stdout = os.popen4('pdftops -v')
         for line in stdout.readlines():
             if 'version' in line:
                 v = line.split()[-1]
@@ -459,7 +449,7 @@ def validate_float(s):
         raise ValueError('Could not convert "%s" to float' % s)
 
 def validate_int(s):
-    'convert s to float or raise'
+    'convert s to int or raise'
     try: return int(s)
     except ValueError:
         raise ValueError('Could not convert "%s" to int' % s)
@@ -506,6 +496,19 @@ class validate_nseq_float:
         try: return [float(val) for val in ss]
         except ValueError:
             raise ValueError('Could not convert all entries to floats')
+
+class validate_nseq_int:
+    def __init__(self, n):
+        self.n = n
+    def __call__(self, s):
+        'return a seq of n ints or raise'
+        ss = s.split(',')
+        if len(ss) != self.n:
+            raise ValueError('You must use exactly %d comma separated values'%self.n)
+        try: return [int(val) for val in ss]
+        except ValueError:
+            raise ValueError('Could not convert all entries to ints')
+
 
 def validate_color(s):
     'return a valid color arg'
@@ -624,21 +627,13 @@ is recommended to use the ps.usedistiller option.' % (gs_v, gs_sugg))
 unless ghostscript-%s or later is installed on your system'% gs_req)
 
         if s == 'xpdf':
-            xpdf_req = '3.0'
-            ps2eps_req = '1.58'
-            xpdf_v = checkdep_xpdf()
-            if compare_versions(xpdf_v, xpdf_req): pass
+            pdftops_req = '3.0'
+            pdftops_v = checkdep_pdftops()
+            if compare_versions(pdftops_v, pdftops_req): pass
             else:
                 flag = False
                 warnings.warn('matplotlibrc ps.usedistiller can not be set to \
-xpdf unless xpdf-%s or later is installed on your system' % xpdf_req)
-
-##            ps2eps_v = checkdep_ps2eps()
-##            if compare_versions(ps2eps_v, ps2eps_req): pass
-##            else:
-##                flag = False
-##                warnings.warn('matplotlibrc ps.usedistiller can not be set to xpdf \
-##unless ps2eps-%s or later is installed on your system' % ps2eps_req)
+xpdf unless xpdf-%s or later is installed on your system' % pdftops_req)
 
         if flag: return s
         else: return None
@@ -718,8 +713,8 @@ class ValidateInterval:
 
 # a map from key -> value, converter
 defaultParams = {
-    'backend'           : ['GTK', validate_backend],
-    'numerix'           : ['Numeric', validate_numerix],
+    'backend'           : ['WXAgg', validate_backend],
+    'numerix'           : ['numpy', validate_numerix],
     'toolbar'           : ['toolbar2', validate_toolbar],
     'datapath'          : [get_data_path(), validate_path_exists],
     'interactive'       : [False, validate_bool],
@@ -730,7 +725,7 @@ defaultParams = {
     'verbose.fileo'           : ['sys.stdout', validate_verbose_fileo],
 
     # line props
-    'lines.linewidth'   : [0.5, validate_float],     # line width in points
+    'lines.linewidth'   : [1.0, validate_float],     # line width in points
     'lines.linestyle'   : ['-', str],                # solid line
     'lines.color'       : ['b', validate_color],     # blue
     'lines.marker'       : ['None', str],     # black
@@ -743,7 +738,7 @@ defaultParams = {
     'lines.solid_capstyle' : ['projecting', validate_capstyle],
 
     # patch props
-    'patch.linewidth'   : [0.5, validate_float], # line width in points
+    'patch.linewidth'   : [1.0, validate_float], # line width in points
     'patch.edgecolor'   : ['k', validate_color], # black
     'patch.facecolor'   : ['b', validate_color], # blue
     'patch.antialiased' : [True, validate_bool], # antialised (no jaggies)
@@ -787,45 +782,48 @@ defaultParams = {
     'axes.facecolor'    : ['w', validate_color],    # background color; white
     'axes.edgecolor'    : ['k', validate_color],    # edge color; black
     'axes.linewidth'    : [1.0, validate_float],    # edge linewidth
-    'axes.titlesize'    : ['large', validate_fontsize], # fontsize of the axes title
+    'axes.titlesize'    : [14, validate_fontsize], # fontsize of the axes title
     'axes.grid'         : [False, validate_bool],   # display grid or not
-    'axes.labelsize'    : ['medium', validate_fontsize], # fontsize of the x any y labels
+    'axes.labelsize'    : [12, validate_fontsize], # fontsize of the x any y labels
     'axes.labelcolor'   : ['k', validate_color],    # color of axis label
+    'axes.formatter.limits' : [(-7, 7), validate_nseq_int(2)],
+                               # use scientific notation if log10
+                               # of the axis range is smaller than the
+                               # first or larger than the second
+
 
     'polaraxes.grid'         : [True, validate_bool],   # display polar grid or not
 
     #legend properties
     'legend.isaxes'    :       [True,validate_bool],
-    'legend.numpoints'         :       [ 4,validate_int],      # the number of points in the legend line
-    'legend.fontsize' : ["small",validate_fontsize],
+    'legend.numpoints' :       [ 2,validate_int],      # the number of points in the legend line
+    'legend.fontsize'  :       [14,validate_fontsize],
     'legend.pad'       :       [ 0.2, validate_float],         # the fractional whitespace inside the legend border
-    'legend.markerscale'       :       [ 0.6, validate_float],    # the relative size of legend markers vs. original
-
+    'legend.markerscale' :     [ 1.0, validate_float],    # the relative size of legend markers vs. original
 
     # the following dimensions are in axes coords
-    'legend.labelsep'  :       [ 0.005, validate_float],    # the vertical space between the legend entries
-    'legend.handlelen'         :       [ 0.05, validate_float],  # the length of the legend lines
-    'legend.handletextsep'     :       [ 0.02, validate_float], # the space between the legend line and legend text
+    'legend.labelsep'  :       [ 0.010, validate_float],    # the vertical space between the legend entries
+    'legend.handlelen'     :   [ 0.05, validate_float],  # the length of the legend lines
+    'legend.handletextsep' :   [ 0.02, validate_float], # the space between the legend line and legend text
     'legend.axespad'   :       [ 0.02, validate_float], # the border between the axes and legend edge
-
-    'legend.shadow' : [ False, validate_bool ],
+    'legend.shadow' :          [ False, validate_bool ],
 
 
     # tick properties
-    'xtick.major.size'   : [5, validate_float],      # major xtick size in points
+    'xtick.major.size'   : [4, validate_float],      # major xtick size in points
     'xtick.minor.size'   : [2, validate_float],      # minor xtick size in points
-    'xtick.major.pad'   : [3, validate_float],      # distance to label in points
-    'xtick.minor.pad'   : [3, validate_float],      # distance to label in points
+    'xtick.major.pad'    : [4, validate_float],      # distance to label in points
+    'xtick.minor.pad'    : [4, validate_float],      # distance to label in points
     'xtick.color'        : ['k', validate_color],    # color of the xtick labels
-    'xtick.labelsize'    : ['small', validate_fontsize], # fontsize of the xtick labels
+    'xtick.labelsize'    : [12, validate_fontsize], # fontsize of the xtick labels
     'xtick.direction'    : ['in', str],            # direction of xticks
 
-    'ytick.major.size'   : [5, validate_float],      # major ytick size in points
+    'ytick.major.size'   : [4, validate_float],      # major ytick size in points
     'ytick.minor.size'   : [2, validate_float],      # minor ytick size in points
-    'ytick.major.pad'   : [3, validate_float],      # distance to label in points
-    'ytick.minor.pad'   : [3, validate_float],      # distance to label in points
+    'ytick.major.pad'    : [4, validate_float],      # distance to label in points
+    'ytick.minor.pad'    : [4, validate_float],      # distance to label in points
     'ytick.color'        : ['k', validate_color],    # color of the ytick labels
-    'ytick.labelsize'    : ['small', validate_fontsize], # fontsize of the ytick labels
+    'ytick.labelsize'    : [12, validate_fontsize], # fontsize of the ytick labels
     'ytick.direction'    : ['in', str],            # direction of yticks
 
     'grid.color'       :   ['k', validate_color],       # grid color
@@ -848,15 +846,15 @@ defaultParams = {
     'figure.subplot.hspace' : [0.2, ValidateInterval(0, 1, closedmin=False, closedmax=True)],
 
 
-    'savefig.dpi'       : [ 150, validate_float],   # DPI
+    'savefig.dpi'       : [ 100, validate_float],   # DPI
     'savefig.facecolor' : [ 'w', validate_color],  # facecolor; white
     'savefig.edgecolor' : [ 'w', validate_color],  # edgecolor; white
     'savefig.orientation' : [ 'portait', validate_orientation],  # edgecolor; white
 
     'tk.window_focus'   : [ False, validate_bool],  # Maintain shell focus for TkAgg
-    'tk.pythoninspect'   : [ False, validate_bool],  # Set PYTHONINSPECT
+    'tk.pythoninspect'  : [ False, validate_bool],  # Set PYTHONINSPECT
     'ps.papersize'      : [ 'letter', validate_ps_papersize], # Set the papersize/type
-    'ps.useafm'   : [ False, validate_bool],  # Set PYTHONINSPECT
+    'ps.useafm'         : [ False, validate_bool],  # Set PYTHONINSPECT
     'ps.usedistiller'   : [ False, validate_ps_distiller],  # use ghostscript or xpdf to distill ps output
     'ps.distiller.res'  : [6000, validate_int],       # dpi
     'pdf.compression'   : [6, validate_int],            # compression level from 0 to 9; 0 to disable

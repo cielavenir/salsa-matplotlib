@@ -11,6 +11,9 @@ pd  := python-matplotlib-doc
 p   := python-matplotlib
 pdata := python-matplotlib-data
 
+#users_guide_ver := 0.87.1
+users_guide := users_guide_*.pdf
+
 # Include dpatch stuff.
 include /usr/share/dpatch/dpatch.make
 
@@ -23,8 +26,8 @@ build-indep: build-indep-stamp
 build-indep-stamp:
 	dh_testdir
 	## Building documentation...
-	mkdir -p doc
-	which xvfb-run && sh -c "cd doc; xvfb-run epydoc -n matplotlib ../lib/matplotlib/*; cd -;" || true
+	#mkdir -p doc
+	#which xvfb-run && sh -c "cd doc; xvfb-run epydoc -n matplotlib ../lib/matplotlib/*; cd -;" || true
 	#wget http://matplotlib.sourceforge.net/$(users_guide)
 	touch build-indep-stamp
 
@@ -41,14 +44,13 @@ clean: clean-patched unpatch
 clean-patched: patch
 	dh_testdir
 	dh_testroot
-	for v in $(PYVERS); do \
-	  python$$v ./setup.py clean --all; \
-	done
-	rm -f *-stamp*
-	rm -rf build *.pyc *.pyo *.pdf doc/html/
+	#python2.3 ./setup.py clean --all
+	for i in $(PYVERS); do python$(i) ./setup.py clean --all; done
+	-rm -f *-stamp*
+	-rm -rf build *.pyc *.pyo
 	find ./lib -name '*.pyc' -exec rm {} \;
 	dh_clean
-	sh $(CURDIR)/debian/mkcopyright.sh
+	#sh $(CURDIR)/debian/mkcopyright.sh
 
 # install
 install-arch: build-arch $(PYVERS:%=install-stamp-%)
@@ -114,8 +116,8 @@ binary-indep: build-indep install-indep
 	dh_installchangelogs -i CHANGELOG
 	dh_installdocs -p$(pd) -i
 	dh_installexamples -p$(pd) -i examples/*
-	-dh_install -p$(pd) doc/* usr/share/doc/$(pd)
-	dh_compress -i -Xexamples -Xexamples/data
+	dh_install -p$(pd) -i ./$(users_guide) usr/share/doc/$(pd)/pdf 
+	dh_compress -i -Xexamples -Xexamples/data -Xpdf
 	dh_fixperms -i
 	dh_installdeb -i
 	dh_gencontrol -i
@@ -135,10 +137,12 @@ binary-arch: build-arch install-arch
 	  fi; \
 	done
 	dh_pycentral -a
+	dh_python -a
 	dh_link -a
 	dh_strip -a
 	dh_compress -a
 	dh_fixperms -a
+	dh_python -a
 	dh_installdeb -a
 	dh_shlibdeps -a
 	dh_gencontrol -a

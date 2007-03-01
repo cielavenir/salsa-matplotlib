@@ -1,0 +1,37 @@
+diff -Naur matplotlib-0.87.7-orig/debian/rules matplotlib-0.87.7/debian/rules
+--- matplotlib-0.87.7-orig/debian/rules	2007-02-21 21:30:22.000000000 +0000
++++ matplotlib-0.87.7/debian/rules	2007-02-21 21:30:02.000000000 +0000
+@@ -62,6 +62,33 @@
+ 		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/ --no-compile
+ 	#dh_install -p$(p) lib/dateutil usr/lib/python$*/site-packages/
+ 	#dh_install -p$(p) lib/pytz usr/lib/python$*/site-packages/
++
++	# Check that we have built all of the plugins; FTBFS if not; this
++	# is better than having packages silently fail to build on the
++	# autobuilders.
++	# The plugin abbreviations are:
++	#  ns_ = numpy, na_ = numarray, nc_ = numeric
++	for v in $(PYVERS); do \
++		for p in na ns nc; do \
++			for f in transforms.so image.so cntr.so nxutils.so; do \
++				# Check for these four files for each plugin: \
++				#	_na_transforms.so, _na_image.so, _na_cntr.so, _na_nxutils.so \
++				if test ! -f debian/python-matplotlib/usr/lib/python$$v/site-packages/matplotlib/_$${p}_$${f}; then \
++					echo "Missing plugin file _$${p}_$${f}: Failing build"; \
++					exit 1; \
++				fi \
++			done \
++				# Also check for the backend plugins: \
++				# e.g. backends/_na_backend_agg.so \
++			for f in agg.so gdk.so; do \
++				if test ! -f debian/python-matplotlib/usr/lib/python$$v/site-packages/matplotlib/backends/_$${p}_backend_$${f}; then \
++					echo "Missing backend file _$${p}_backend_$${f}: Failing build"; \
++					exit 1; \
++				fi \
++			done \
++		done \
++	done
++
+ 	touch $@
+ 
+ install-indep: build-indep

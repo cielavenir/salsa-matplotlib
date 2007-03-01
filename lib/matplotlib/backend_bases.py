@@ -34,7 +34,8 @@ class RendererBase:
         pass
 
 
-    def draw_arc(self, gc, rgbFace, x, y, width, height, angle1, angle2, rotation):
+    def draw_arc(self, gc, rgbFace, x, y, width, height, angle1, angle2,
+                 rotation):
         """
         Draw an arc using GraphicsContext instance gcEdge, centered at x,y,
         with width and height and angles from 0.0 to 360.0
@@ -48,7 +49,7 @@ class RendererBase:
 
     def get_image_magnification(self):
         """
-        Get the factor by which to magnify images passed to draw_image.  
+        Get the factor by which to magnify images passed to draw_image.
         Allows a backend to have images at a different resolution to other
         artists.
         """
@@ -254,6 +255,7 @@ class RendererBase:
         gc = self.new_gc()
         if clipbox is not None:
             gc.set_clip_rectangle(clipbox.get_bounds())
+
 
         for i in xrange(N):
             polyverts = verts[i % Nverts]
@@ -660,6 +662,7 @@ class Event:
         self.canvas = canvas
         self.guiEvent = guiEvent
 
+    
 class DrawEvent(Event):
     """
     An event triggered by a draw operation on the canvas
@@ -778,6 +781,25 @@ class MouseEvent(LocationEvent):
         self.button = button
         self.key = key
 
+class PickEvent(Event):
+    """
+    a pick event, fired when the user picks a location on the canvas
+    sufficiently close to an artist.
+
+    Attrs: all the Event attrs plus
+    mouseevent : the MouseEvent that generated the pick
+    artist    : the artist picked
+
+    extra class dependent attrs -- eg a Line2D pick may define
+    different extra attributes than a PatchCollection pick event
+    """
+    def __init__(self, name, canvas, mouseevent, artist, guiEvent=None, **kwargs):
+        Event.__init__(self, name, canvas, guiEvent)
+        self.mouseevent = mouseevent
+        self.artist = artist
+        self.__dict__.update(kwargs)
+        
+
 class KeyEvent(LocationEvent):
     """
     A key event (key press, key release).
@@ -819,6 +841,7 @@ class FigureCanvasBase:
         'button_press_event',
         'button_release_event',
         'motion_notify_event',
+        'pick_event', 
               )
 
     def __init__(self, figure):
@@ -867,6 +890,15 @@ class FigureCanvasBase:
             func(event)
         self._key = None
 
+    def pick_event(self, mouseevent, artist, **kwargs):
+        """
+        This method will be called by artists who are picked and will
+        fire off PickEvent callbacks registered listeners
+        """
+        event = PickEvent('pick_event', self, mouseevent, artist, **kwargs)
+        for func in self.callbacks.get('pick_event', {}).values():
+            func(event)
+            
     def button_press_event(self, x, y, button, guiEvent=None):
         """
         Backend derived classes should call this function on any mouse
@@ -874,10 +906,13 @@ class FigureCanvasBase:
         button and key are as defined in MouseEvent
         """
         self._button = button
-        event = MouseEvent('button_press_event', self, x, y, button, self._key, guiEvent=guiEvent)
+        mouseevent = MouseEvent('button_press_event', self, x, y, button, self._key, guiEvent=guiEvent)
         for func in self.callbacks.get('button_press_event', {}).values():
-            func(event)
+            func(mouseevent)
 
+        if not self.widgetlock.locked():
+            self.figure.pick(mouseevent)
+        
     def button_release_event(self, x, y, button, guiEvent=None):
         """
         Backend derived classes should call this function on any mouse
@@ -936,6 +971,9 @@ class FigureCanvasBase:
         filename    - can also be a file object on image backends
         orientation - only currently applies to PostScript printing.
         dpi - the dots per inch to save the figure in; if None, use savefig.dpi
+        facecolor - the facecolor of the figure
+        edgecolor - the edgecolor of the figure
+        orientation - 'landscape' | 'portrait' (not supported on all backends)
         """
         pass
 
@@ -984,6 +1022,7 @@ class FigureCanvasBase:
         'button_press_event',
         'button_release_event',
         'motion_notify_event',
+        'pick_event', 
         )
 
         if s not in legit: raise ValueError('Unrecognized event "%s"'%s)
@@ -1022,11 +1061,11 @@ class FigureManagerBase:
 
     def full_screen_toggle (self):
         pass
-    
+
     def resize(self, w, h):
         'For gui backends: resize window in pixels'
         pass
-    
+
     def key_press(self, event):
 
         # these bindings happen whether you are over an axes or not
@@ -1414,24 +1453,10 @@ class NavigationToolbar2:
                 except OverflowError:
                     warnings.warn('Overflow while panning')
                     return
-            a.set_xlim(self.nonsingular(xmin, xmax))
-            a.set_ylim(self.nonsingular(ymin, ymax))
+            a.set_xlim(xmin, xmax)
+            a.set_ylim(ymin, ymax)
 
         self.dynamic_update()
-
-    def nonsingular(self, x0, x1):
-        '''Desperate hack to prevent crashes when button-3 panning with
-        axis('image') in effect.
-        '''
-        d = x1 - x0
-        # much smaller thresholds seem to cause Value Error
-        # later in Transformation::freeze in axes.draw()
-        if abs(d) < 1e-10:
-            warnings.warn('Axis data limit is too small for panning')
-            x1 += 1e-10
-            x0 -= 1e-10
-        return (x0, x1)
-
 
     def release_zoom(self, event):
         'the release mouse button callback in zoom to rect mode'

@@ -2,12 +2,13 @@
 Figure class -- add docstring here!
 """
 import sys
+import artist
 from artist import Artist
 from axes import Axes, Subplot, PolarSubplot, PolarAxes
-from cbook import flatten, allequal, popd, Stack, iterable
+from cbook import flatten, allequal, popd, Stack, iterable, dedent
 import _image
 import colorbar as cbar
-from colors import normalize, rgb2hex
+from colors import Normalize, rgb2hex
 from image import FigureImage
 from matplotlib import rcParams
 from patches import Rectangle, Polygon
@@ -159,8 +160,23 @@ class Figure(Artist):
 
         self._cachedRenderer = None
 
+    def get_children(self):
+        'get a list of artists contained in the figure'
+        children = [self.figurePatch]
+        children.extend(self.axes)
+        children.extend(self.lines)
+        children.extend(self.patches)
+        children.extend(self.texts)
+        children.extend(self.images)
+        children.extend(self.legends)
+        return children
+    
+    def pick(self, mouseevent):
+        for a in self.get_children():
+            a.pick(mouseevent)
+    
     def get_window_extent(self, *args, **kwargs):
-        'get the figure bounding box in display space'
+        'get the figure bounding box in display space; kwargs are void'
         return self.bbox
 
     def set_canvas(self, canvas):
@@ -214,7 +230,7 @@ class Figure(Artist):
           * cmap is a cm colormap instance, eg cm.jet.  If None, default to
             the rc image.cmap valuex
 
-          * norm is a matplotlib.colors.normalize instance; default is
+          * norm is a matplotlib.colors.Normalize instance; default is
             normalization().  This scales luminance -> 0-1
 
           * vmin and vmax are used to scale a luminance image to 0-1.  If
@@ -417,6 +433,9 @@ class Figure(Artist):
             add_axes(rect, label='axes2')
 
         The Axes instance will be returned
+
+        The following kwargs are supported:
+        %(Axes)s
         """
 
         key = self._make_key(*args, **kwargs)
@@ -429,7 +448,7 @@ class Figure(Artist):
         if not len(args): return
         if isinstance(args[0], Axes):
             a = args[0]
-            assert(a.get_figure() is self)            
+            assert(a.get_figure() is self)
         else:
             rect = args[0]
             ispolar = popd(kwargs, 'polar', False)
@@ -446,6 +465,8 @@ class Figure(Artist):
         self._seen[key] = a
         return a
 
+    add_axes.__doc__ = dedent(add_axes.__doc__) % artist.kwdocd
+
     def add_subplot(self, *args, **kwargs):
         """
         Add a subplot.  Examples
@@ -460,6 +481,9 @@ class Figure(Artist):
 
         If the figure already has a subplot with key *args, *kwargs then it will
         simply make that subplot current and return it
+
+        The following kwargs are supported:
+        %(Axes)s
         """
 
         key = self._make_key(*args, **kwargs)
@@ -487,6 +511,7 @@ class Figure(Artist):
         self.sca(a)
         self._seen[key] = a
         return a
+    add_subplot.__doc__ = dedent(add_subplot.__doc__) % artist.kwdocd
 
     def clf(self):
         """
@@ -595,7 +620,19 @@ class Figure(Artist):
         (0,0) is the left, bottom of the figure and 1,1 is the right,
         top.
 
-        The legend instance is returned
+        The legend instance is returned.  The following kwargs are supported:
+
+        isaxes=True           # whether this is an axes legend
+        numpoints = 4         # the number of points in the legend line
+        prop = FontProperties(size='smaller')  # the font property
+        pad = 0.2             # the fractional whitespace inside the legend border
+        markerscale = 0.6     # the relative size of legend markers vs. original
+        shadow                # if True, draw a shadow behind legend
+        labelsep = 0.005     # the vertical space between the legend entries
+        handlelen = 0.05     # the length of the legend lines
+        handletextsep = 0.02 # the space between the legend line and legend text
+        axespad = 0.02       # the border between the axes and legend edge
+
         """
 
 
@@ -609,6 +646,9 @@ class Figure(Artist):
         """
         Add text to figure at location x,y (relative 0-1 coords) See
         the help for Axis text for the meaning of the other arguments
+
+        kwargs control the Text properties:
+        %(Text)s
         """
 
         override = _process_text_args({}, *args, **kwargs)
@@ -620,6 +660,7 @@ class Figure(Artist):
         self._set_artist_props(t)
         self.texts.append(t)
         return t
+    text.__doc__ = dedent(text.__doc__) % artist.kwdocd
 
     def _set_artist_props(self, a):
         if a!= self:
@@ -629,10 +670,14 @@ class Figure(Artist):
     def gca(self, **kwargs):
         """
         Return the current axes, creating one if necessary
+
+        The following kwargs are supported
+        %(Axes)s
         """
         ax = self._axstack()
         if ax is not None: return ax
         return self.add_subplot(111, **kwargs)
+    gca.__doc__ = dedent(gca.__doc__) % artist.kwdocd
 
     def sca(self, a):
         'Set the current axes to be a and return a'
@@ -872,6 +917,8 @@ class Figure(Artist):
 
     def subplots_adjust(self, *args, **kwargs):
         """
+        subplots_adjust(self, left=None, bottom=None, right=None, top=None,
+                        wspace=None, hspace=None)
         fig.subplots_adjust(left=None, bottom=None, right=None, wspace=None, hspace=None):
         Update the SubplotParams with kwargs (defaulting to rc where
         None) and update the subplot locations
@@ -955,3 +1002,4 @@ def figaspect(arg):
     newsize = clip(newsize,figsize_min,figsize_max)
     return newsize
 
+artist.kwdocd['Figure'] = artist.kwdoc(Figure)

@@ -11,7 +11,7 @@
     was written by following the Python "Extending and Embedding"
     tutorial.
 
-  $Id: cntr.c 2749 2006-09-04 20:00:25Z jdh2358 $
+  $Id: cntr.c 2927 2006-12-15 07:02:24Z efiring $
  */
 
 #include <Python.h>
@@ -1612,7 +1612,8 @@ Cntr_init(Cntr *self, PyObject *args, PyObject *kwds)
     if (xpa == NULL || ypa == NULL || zpa == NULL || (marg && mpa == NULL))
     {
         PyErr_SetString(PyExc_ValueError,
-            "Arguments x, y, z, mask (if present) must be 2D arrays.");
+            "Arguments x, y, z, mask (if present) must be 2D arrays.\n"
+            "x, y, z must be castable to double.");
         goto error;
     }
     iMax = zpa->dimensions[1];

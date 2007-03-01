@@ -322,15 +322,17 @@ Bbox::contains(const Py::Tuple &args) {
 }
 
 Py::Object
-Bbox::overlaps(const Py::Tuple &args) {
+Bbox::overlaps(const Py::Tuple &args, const Py::Dict &kwargs) {
   _VERBOSE("Bbox::overlaps");
   args.verify_length(1);
 
   if (! check(args[0]))
     throw Py::TypeError("Expected a bbox");
 
-  int x = Py::Int( overlapsx(args) );
-  int y = Py::Int( overlapsy(args) );
+
+
+  int x = Py::Int( overlapsx(args, kwargs) );
+  int y = Py::Int( overlapsy(args, kwargs) );
   return Py::Int(x&&y);
 }
 
@@ -343,12 +345,17 @@ Bbox::ignore(const Py::Tuple &args) {
 }
 
 Py::Object
-Bbox::overlapsx(const Py::Tuple &args) {
+Bbox::overlapsx(const Py::Tuple &args, const Py::Dict &kwargs) {
   _VERBOSE("Bbox::overlapsx");
   args.verify_length(1);
 
   if (! check(args[0]))
     throw Py::TypeError("Expected a bbox");
+
+  int ignoreend = false;
+  if (kwargs.hasKey("ignoreend")) {
+    ignoreend = Py::Int(kwargs["ignoreend"]);
+  }
 
   Bbox* other = static_cast<Bbox*>(args[0].ptr());
 
@@ -358,19 +365,33 @@ Bbox::overlapsx(const Py::Tuple &args) {
   double ominx = other->_ll->xval();
   double omaxx = other->_ur->xval();
 
-  int b =  ( ( (ominx>=minx) && (ominx<=maxx)) ||
-	     ( (minx>=ominx) && (minx<=omaxx)) );
+  int b=0;
+  if (ignoreend) {
+    b =  ( ( (ominx>minx) && (ominx<maxx)) ||
+	   ( (minx>ominx) && (minx<omaxx)) );
+  }
+  else{
+    b =  ( ( (ominx>=minx) && (ominx<=maxx)) ||
+	   ( (minx>=ominx) && (minx<=omaxx)) );
+
+  }
   return Py::Int(b);
 
 }
 
 Py::Object
-Bbox::overlapsy(const Py::Tuple &args) {
+Bbox::overlapsy(const Py::Tuple &args, const Py::Dict &kwargs) {
   _VERBOSE("Bbox::overlapsy");
   args.verify_length(1);
 
   if (! check(args[0]))
     throw Py::TypeError("Expected a bbox");
+
+
+  int ignoreend = false;
+  if (kwargs.hasKey("ignoreend")) {
+    ignoreend = Py::Int(kwargs["ignoreend"]);
+  }
 
   Bbox* other = static_cast<Bbox*>(args[0].ptr());
 
@@ -381,9 +402,16 @@ Bbox::overlapsy(const Py::Tuple &args) {
   double omaxy = other->_ur->yval();
 
 
+  int b=0;
+  if (ignoreend) {
+    b =  ( ( (ominy>miny) && (ominy<maxy)) ||
+	       ( (miny>ominy) && (miny<omaxy)) );
+  }
+  else {
+    b =  ( ( (ominy>=miny) && (ominy<=maxy)) ||
+	       ( (miny>=ominy) && (miny<=omaxy)) );
 
-  int b =  ( ( (ominy>=miny) && (ominy<=maxy)) ||
-	     ( (miny>=ominy) && (miny<=omaxy)) );
+  }
   return Py::Int(b);
 
 }
@@ -659,6 +687,9 @@ Func::map(const Py::Tuple &args) {
   try {
     xout = this->operator()(xin);
   }
+  catch (const std::exception &e) {
+    throw Py::ValueError(e.what());
+  }
   catch(...) {
     throw Py::ValueError("Domain error on Func::map");
   }
@@ -690,6 +721,9 @@ FuncXY::map(const Py::Tuple &args) {
   std::pair<double, double> xy;
   try {
     xy = this->operator()(xin, yin);
+  }
+  catch (const std::exception &e) {
+    throw Py::ValueError(e.what());
   }
   catch(...) {
     throw Py::ValueError("Domain error on FuncXY nonlinear transform");
@@ -853,6 +887,10 @@ Transformation::inverse_xy_tup(const Py::Tuple & args) {
   try {
     if (!_frozen) eval_scalars();
   }
+  catch (const std::exception &e) {
+    throw Py::ValueError(e.what());
+  }
+
   catch(...) {
     throw Py::ValueError("Domain error on inverse_xy_tup");
   }
@@ -891,6 +929,11 @@ Transformation::inverse_numerix_xy(const Py::Tuple & args) {
   try {
     if (!_frozen) eval_scalars();
   }
+  catch (const std::exception &e) {
+    Py_XDECREF(xyin);
+    throw Py::ValueError(e.what());
+  }
+
   catch(...) {
     Py_XDECREF(xyin);
     throw Py::ValueError("Domain error on Transformation::inverse_numerix_xy");
@@ -940,6 +983,9 @@ Transformation::xy_tup(const Py::Tuple & args) {
   try {
     if (!_frozen) eval_scalars();
   }
+  catch (const std::exception &e) {
+    throw Py::ValueError(e.what());
+  }
   catch(...) {
     throw Py::ValueError("Domain error on nonlinear transform");
   }
@@ -953,6 +999,9 @@ Transformation::xy_tup(const Py::Tuple & args) {
   Py::Tuple out(2);
   try {
     this->operator()(x, y);
+  }
+  catch (const std::exception &e) {
+    throw Py::ValueError(e.what());
   }
   catch(...) {
     throw Py::ValueError("Domain error on nTransformation::xy_tup operator()(x,y)");
@@ -982,6 +1031,9 @@ Transformation::seq_x_y(const Py::Tuple & args) {
   try {
     if (!_frozen) eval_scalars();
   }
+  catch (const std::exception &e) {
+    throw Py::ValueError(e.what());
+  }
   catch(...) {
     throw Py::ValueError("Domain error on Transformation::seq_x_y");
   }
@@ -996,6 +1048,9 @@ Transformation::seq_x_y(const Py::Tuple & args) {
     double thisy = Py::Float(y[i]);
     try {
       this->operator()(thisx, thisy);
+    }
+    catch (const std::exception &e) {
+      throw Py::ValueError(e.what());
     }
     catch(...) {
       throw Py::ValueError("Domain error on Transformation::seq_x_y operator()(thisx, thisy)");
@@ -1035,6 +1090,10 @@ Transformation::numerix_xy(const Py::Tuple & args) {
   // evaluate the lazy objects
   try {
     if (!_frozen) eval_scalars();
+  }
+  catch (const std::exception &e) {
+    Py_XDECREF(xyin);
+    throw Py::ValueError(e.what());
   }
   catch(...) {
     Py_XDECREF(xyin);
@@ -1105,6 +1164,9 @@ Transformation::numerix_x_y(const Py::Tuple & args) {
   // evaluate the lazy objects
   try {
     if (!_frozen) eval_scalars();
+  }
+  catch (const std::exception &e) {
+    throw Py::ValueError(e.what());
   }
   catch(...) {
     throw Py::ValueError("Domain error on Transformation::numerix_x_y");
@@ -1309,6 +1371,9 @@ Transformation::seq_xy_tups(const Py::Tuple & args) {
   try {
     if (!_frozen) eval_scalars();
   }
+  catch (const std::exception &e) {
+    throw Py::ValueError(e.what());
+  }
   catch(...) {
     throw Py::ValueError("Domain error on Transformation::seq_xy_tups");
   }
@@ -1326,6 +1391,9 @@ Transformation::seq_xy_tups(const Py::Tuple & args) {
 
     try {
       this->operator()(thisx, thisy);
+    }
+    catch (const std::exception &e) {
+      throw Py::ValueError(e.what());
     }
     catch(...) {
       throw Py::ValueError("Domain error on nonlinear Transformation::seq_xy_tups operator()(thisx, thisy)");
@@ -1948,6 +2016,9 @@ Affine::deepcopy(const Py::Tuple &args) {
   try {
     eval_scalars();
   }
+  catch (const std::exception &e) {
+    throw Py::ValueError(e.what());
+  }
   catch(...) {
     throw Py::ValueError("Domain error on Affine deepcopy");
   }
@@ -2203,9 +2274,9 @@ Bbox::init_type()
   add_varargs_method("ur", 	&Bbox::ur, "ur()\n");
   add_varargs_method("contains" , &Bbox::contains, "contains(x,y)\n");
   add_varargs_method("count_contains", &Bbox::count_contains, "count_contains(xys)\n");
-  add_varargs_method("overlaps" , &Bbox::overlaps, "overlaps(bbox)\n");
-  add_varargs_method("overlapsx" , &Bbox::overlapsx, "overlapsx(bbox)\n");
-  add_varargs_method("overlapsy" , &Bbox::overlapsy, "overlapsy(bbox)\n");
+  add_keyword_method("overlaps" , &Bbox::overlaps, "overlaps(bbox)\n");
+  add_keyword_method("overlapsx" , &Bbox::overlapsx, "overlapsx(bbox)\n");
+  add_keyword_method("overlapsy" , &Bbox::overlapsy, "overlapsy(bbox)\n");
   add_varargs_method("intervalx" , &Bbox::intervalx, "intervalx()\n");
   add_varargs_method("intervaly" , &Bbox::intervaly, "intervaly()\n");
 

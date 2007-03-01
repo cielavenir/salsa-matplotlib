@@ -6,6 +6,7 @@ exist in matlab(TM) but have proven themselves to be useful nonetheless.
 The majority of them, however, have matlab analogs
 
 _Plotting commands
+  acorr     - plot the autocorrelation function
   annotate  - annotate something in the figure
   arrow     - add an arrow to the axes
   axes      - Create a new axes
@@ -16,6 +17,7 @@ _Plotting commands
   axis      - Set or return the current axis limits
   bar       - make a bar chart
   barh      - a horizontal bar chart
+  broken_barh - a set of horizontal bars with gaps
   box       - set the axes frame on/off state
   boxplot   - make a box and whisker plot
   cla       - clear current axes
@@ -70,8 +72,7 @@ _Plotting commands
   semilogy - log y axis
   show     - show the figures
   specgram - a spectrogram plot
-  spy      - plot sparsity pattern using markers
-  spy2     - plot sparsity pattern using image
+  spy      - plot sparsity pattern using markers or image
   stem     - make a stem plot
   subplot  - make a subplot (numrows, numcols, axesnum)
   subplots_adjust - change the params controlling the subplot positions of current figure
@@ -79,8 +80,8 @@ _Plotting commands
   table    - add a table to the plot
   text     - add some text at location x,y to the current axes
   thetagrids - customize the radial theta grids and labels for polar
-
   title    - add a title to the current axes
+  xcorr   - plot the autocorrelation function of x and y  
   xlim     - set/get the xlimits
   ylim     - set/get the ylimits
   xticks   - set/get the xticks
@@ -102,6 +103,7 @@ _Plotting commands
   spring - set the default colormap to spring
   summer - set the default colormap to summer
   winter - set the default colormap to winter
+  spectral - set the default colormap to spectral
 
 _Event handling
 
@@ -188,7 +190,7 @@ _Other
 __end
 
 Credits: The plotting commands were provided by
-John D. Hunter <jdhunter@ace.bsd.uhicago.edu>
+John D. Hunter <jdhunter@ace.bsd.uchicago.edu>
 
 Most of the other commands are from Numeric, MLab and FFT, with the
 exception of those in mlab.py provided by matplotlib.
@@ -201,14 +203,14 @@ import mlab  #so I can override hist, psd, etc...
 from axes import Axes, PolarAxes
 import backends
 from cbook import flatten, is_string_like, exception_to_str, popd, \
-     silent_list, iterable, enumerate
-from colors import normalize
+     silent_list, iterable, enumerate, dedent
+from colors import Normalize, normalize # latter for backwards compat.
 from cm import get_cmap
 from figure import Figure, figaspect
 import image
 from matplotlib import rcParams, rcParamsDefault, get_backend
 from backend_bases import FigureCanvasBase
-from artist import ArtistInspector, getp, get
+from artist import getp, get
 from artist import setp as _setp
 
 # a hack to keep old versions of ipython working with mpl after bug
@@ -314,26 +316,6 @@ right_shift
 sign
 """
 
-def _shift_string(s):
-    """
-    Remove excess indentation from docstrings.
-
-    Discards any leading blank lines, then removes up to
-    n whitespace characters from each line, where n is
-    the number of leading whitespace characters in the
-    first line. It is used by some of the functions generated
-    by boilerplate.py.
-    """
-    lines = s.splitlines(True)
-    ii = 0
-    while lines[ii].strip() == '':
-        ii += 1
-    lines = lines[ii:]
-    nshift = len(lines[0]) - len(lines[0].lstrip())
-    for i, line in enumerate(lines):
-        nwhite = len(line) - len(line.lstrip())
-        lines[i] = line[min(nshift, nwhite):]
-    return ''.join(lines)
 
 from colorbar import colorbar_doc
 def colorbar(mappable = None, cax=None,**kw):
@@ -513,6 +495,7 @@ def plotting():
     spring - set the default colormap to spring
     summer - set the default colormap to summer
     winter - set the default colormap to winter
+    spectral - set the default colormap to spectral
 
     """
     pass
@@ -522,7 +505,7 @@ def colormaps():
     matplotlib provides the following colormaps.
 
       autumn bone cool copper flag gray hot hsv jet pink prism
-      spring summer winter
+      spring summer winter spectral
 
     You can set the colormap for an image, pcolor, scatter, etc,
     either as a keyword argumentdef con
@@ -555,12 +538,12 @@ def get_current_fig_manager():
 def connect(s, func):
     return get_current_fig_manager().canvas.mpl_connect(s, func)
 if FigureCanvasBase.mpl_connect.__doc__ is not None:
-    connect.__doc__ = _shift_string(FigureCanvasBase.mpl_connect.__doc__)
+    connect.__doc__ = dedent(FigureCanvasBase.mpl_connect.__doc__)
 
 def disconnect(cid):
     return get_current_fig_manager().canvas.mpl_disconnect(cid)
 if FigureCanvasBase.mpl_disconnect.__doc__ is not None:
-    disconnect.__doc__ = _shift_string(FigureCanvasBase.mpl_disconnect.__doc__)
+    disconnect.__doc__ = dedent(FigureCanvasBase.mpl_disconnect.__doc__)
 
 def get_plot_commands(): return ( 'axes', 'axis', 'bar', 'boxplot', 'cla', 'clf',
     'close', 'colorbar', 'cohere', 'csd', 'draw', 'errorbar',
@@ -776,7 +759,7 @@ def figtext(*args, **kwargs):
     draw_if_interactive()
     return ret
 if Figure.text.__doc__ is not None:
-    figtext.__doc__ = _shift_string(Figure.text.__doc__)
+    figtext.__doc__ = dedent(Figure.text.__doc__)
 
 def figimage(*args, **kwargs):
     # allow callers to override the hold state by passing hold=True|False
@@ -785,7 +768,7 @@ def figimage(*args, **kwargs):
     gci._current = ret
     return ret
 if Figure.figimage.__doc__ is not None:
-    figimage.__doc__ = _shift_string(Figure.figimage.__doc__) + """
+    figimage.__doc__ = dedent(Figure.figimage.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 def figlegend(handles, labels, loc, **kwargs):
@@ -812,7 +795,7 @@ def savefig(*args, **kwargs):
     fig = gcf()
     return fig.savefig(*args, **kwargs)
 if Figure.savefig.__doc__ is not None:
-    savefig.__doc__ = _shift_string(Figure.savefig.__doc__)
+    savefig.__doc__ = dedent(Figure.savefig.__doc__)
 
 
 def figure(num=None, # autoincrement if None, else integer from 1-N
@@ -849,7 +832,7 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
       facecolor - the background color; defaults to rc figure.facecolor
       edgecolor - the border color; defaults to rc figure.edgecolor
 
-    rcParams gives the default values from the .matplotlibrc file
+    rcParams gives the default values from the matplotlibrc file
 
     FigureClass is a Figure or derived class that will be passed on to
     new_figure_manager in the backends which allows you to hook custom
@@ -962,7 +945,7 @@ def isinteractive():
 def imread(*args, **kwargs):
     return _imread(*args, **kwargs)
 if _imread.__doc__ is not None:
-    imread.__doc__ = _shift_string(_imread.__doc__)
+    imread.__doc__ = dedent(_imread.__doc__)
 
 
 
@@ -970,13 +953,13 @@ if _imread.__doc__ is not None:
 def rc(*args, **kwargs):
     matplotlib.rc(*args, **kwargs)
 if matplotlib.rc.__doc__ is not None:
-    rc.__doc__ =  _shift_string(matplotlib.rc.__doc__)
+    rc.__doc__ =  dedent(matplotlib.rc.__doc__)
 
 def rcdefaults():
     matplotlib.rcdefaults()
     draw_if_interactive()
 if matplotlib.rcdefaults.__doc__ is not None:
-    rcdefaults.__doc__ =   _shift_string(matplotlib.rcdefaults.__doc__)
+    rcdefaults.__doc__ =   dedent(matplotlib.rcdefaults.__doc__)
 
 
 def subplot(*args, **kwargs):
@@ -1020,7 +1003,7 @@ def subplot(*args, **kwargs):
     byebye = []
     for other in fig.axes:
         if other==a: continue
-        if bbox.overlaps(other.bbox):
+        if bbox.overlaps(other.bbox, ignoreend=True):
             byebye.append(other)
     for ax in byebye: delaxes(ax)
 
@@ -1424,8 +1407,9 @@ def matshow(*args,**kw):
     """
 
     # Preprocess args for our purposes
-    arr = args[0]
+    arr = asarray(args[0])
     # Extract unique keywords we can't pass to imshow
+    kw = kw.copy()
     fignum = popd(kw,'fignum',None)
     retall = popd(kw,'returnall',False)
 
@@ -1467,7 +1451,8 @@ if _setp.__doc__ is not None:
 
 def subplots_adjust(*args, **kwargs):
     """
-    subplots_adjust(left=None, right=None, bottom=None, top=None, wspace=0.2, hspace=0.2)
+    subplots_adjust(left=None, bottom=None, right=None, top=None,
+                    wspace=None, hspace=None)
 
     Tune the subplot layout via the figure.SubplotParams mechanism.
     The parameter meanings (and suggested defaults) are
@@ -1529,9 +1514,40 @@ def annotate(*args, **kwargs):
     ax.add_artist(a)
     draw_if_interactive()
 annotate.__doc__ = "annotate(artist, s, loc=None, padx='auto', pady='auto', autopad=3, lineprops=None,**props)\n\n"+Annotation.__init__.__doc__
-    
+
+### Deprecated functions:
+def scatter_classic(*args, **kwargs):
+    return gca().scatter_classic(*args, **kwargs)
+if Axes.scatter_classic.__doc__ is not None:
+    scatter_classic.__doc__ = dedent(Axes.scatter_classic.__doc__)
+
+def pcolor_classic(*args, **kwargs):
+    return gca().pcolor_classic(*args, **kwargs)
+if Axes.pcolor_classic.__doc__ is not None:
+    pcolor_classic.__doc__ = dedent(Axes.pcolor_classic.__doc__)
 
 ### Do not edit below this point
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
+def acorr(*args, **kwargs):
+    # allow callers to override the hold state by passing hold=True|False
+    b = ishold()
+    h = popd(kwargs, 'hold', None)
+    if h is not None:
+        hold(h)
+    try:
+        ret =  gca().acorr(*args, **kwargs)
+        draw_if_interactive()
+    except:
+        hold(b)
+        raise
+    
+    hold(b)
+    return ret
+if Axes.acorr.__doc__ is not None:
+    acorr.__doc__ = dedent(Axes.acorr.__doc__) + """
+Addition kwargs: hold = [True|False] overrides default hold state"""
+
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 def arrow(*args, **kwargs):
@@ -1550,7 +1566,7 @@ def arrow(*args, **kwargs):
     hold(b)
     return ret
 if Axes.arrow.__doc__ is not None:
-    arrow.__doc__ = _shift_string(Axes.arrow.__doc__) + """
+    arrow.__doc__ = dedent(Axes.arrow.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1571,7 +1587,7 @@ def axhline(*args, **kwargs):
     hold(b)
     return ret
 if Axes.axhline.__doc__ is not None:
-    axhline.__doc__ = _shift_string(Axes.axhline.__doc__) + """
+    axhline.__doc__ = dedent(Axes.axhline.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1592,7 +1608,7 @@ def axhspan(*args, **kwargs):
     hold(b)
     return ret
 if Axes.axhspan.__doc__ is not None:
-    axhspan.__doc__ = _shift_string(Axes.axhspan.__doc__) + """
+    axhspan.__doc__ = dedent(Axes.axhspan.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1613,7 +1629,7 @@ def axvline(*args, **kwargs):
     hold(b)
     return ret
 if Axes.axvline.__doc__ is not None:
-    axvline.__doc__ = _shift_string(Axes.axvline.__doc__) + """
+    axvline.__doc__ = dedent(Axes.axvline.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1634,7 +1650,7 @@ def axvspan(*args, **kwargs):
     hold(b)
     return ret
 if Axes.axvspan.__doc__ is not None:
-    axvspan.__doc__ = _shift_string(Axes.axvspan.__doc__) + """
+    axvspan.__doc__ = dedent(Axes.axvspan.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1655,7 +1671,7 @@ def bar(*args, **kwargs):
     hold(b)
     return ret
 if Axes.bar.__doc__ is not None:
-    bar.__doc__ = _shift_string(Axes.bar.__doc__) + """
+    bar.__doc__ = dedent(Axes.bar.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1676,7 +1692,28 @@ def barh(*args, **kwargs):
     hold(b)
     return ret
 if Axes.barh.__doc__ is not None:
-    barh.__doc__ = _shift_string(Axes.barh.__doc__) + """
+    barh.__doc__ = dedent(Axes.barh.__doc__) + """
+Addition kwargs: hold = [True|False] overrides default hold state"""
+
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
+def broken_barh(*args, **kwargs):
+    # allow callers to override the hold state by passing hold=True|False
+    b = ishold()
+    h = popd(kwargs, 'hold', None)
+    if h is not None:
+        hold(h)
+    try:
+        ret =  gca().broken_barh(*args, **kwargs)
+        draw_if_interactive()
+    except:
+        hold(b)
+        raise
+    
+    hold(b)
+    return ret
+if Axes.broken_barh.__doc__ is not None:
+    broken_barh.__doc__ = dedent(Axes.broken_barh.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1697,7 +1734,7 @@ def boxplot(*args, **kwargs):
     hold(b)
     return ret
 if Axes.boxplot.__doc__ is not None:
-    boxplot.__doc__ = _shift_string(Axes.boxplot.__doc__) + """
+    boxplot.__doc__ = dedent(Axes.boxplot.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1718,7 +1755,7 @@ def cohere(*args, **kwargs):
     hold(b)
     return ret
 if Axes.cohere.__doc__ is not None:
-    cohere.__doc__ = _shift_string(Axes.cohere.__doc__) + """
+    cohere.__doc__ = dedent(Axes.cohere.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1739,7 +1776,7 @@ def clabel(*args, **kwargs):
     hold(b)
     return ret
 if Axes.clabel.__doc__ is not None:
-    clabel.__doc__ = _shift_string(Axes.clabel.__doc__) + """
+    clabel.__doc__ = dedent(Axes.clabel.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1760,7 +1797,7 @@ def contour(*args, **kwargs):
     hold(b)
     return ret
 if Axes.contour.__doc__ is not None:
-    contour.__doc__ = _shift_string(Axes.contour.__doc__) + """
+    contour.__doc__ = dedent(Axes.contour.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1781,7 +1818,7 @@ def contourf(*args, **kwargs):
     hold(b)
     return ret
 if Axes.contourf.__doc__ is not None:
-    contourf.__doc__ = _shift_string(Axes.contourf.__doc__) + """
+    contourf.__doc__ = dedent(Axes.contourf.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1802,7 +1839,7 @@ def csd(*args, **kwargs):
     hold(b)
     return ret
 if Axes.csd.__doc__ is not None:
-    csd.__doc__ = _shift_string(Axes.csd.__doc__) + """
+    csd.__doc__ = dedent(Axes.csd.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1823,7 +1860,7 @@ def errorbar(*args, **kwargs):
     hold(b)
     return ret
 if Axes.errorbar.__doc__ is not None:
-    errorbar.__doc__ = _shift_string(Axes.errorbar.__doc__) + """
+    errorbar.__doc__ = dedent(Axes.errorbar.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1844,7 +1881,7 @@ def fill(*args, **kwargs):
     hold(b)
     return ret
 if Axes.fill.__doc__ is not None:
-    fill.__doc__ = _shift_string(Axes.fill.__doc__) + """
+    fill.__doc__ = dedent(Axes.fill.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1865,7 +1902,7 @@ def hist(*args, **kwargs):
     hold(b)
     return ret
 if Axes.hist.__doc__ is not None:
-    hist.__doc__ = _shift_string(Axes.hist.__doc__) + """
+    hist.__doc__ = dedent(Axes.hist.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1886,7 +1923,7 @@ def hlines(*args, **kwargs):
     hold(b)
     return ret
 if Axes.hlines.__doc__ is not None:
-    hlines.__doc__ = _shift_string(Axes.hlines.__doc__) + """
+    hlines.__doc__ = dedent(Axes.hlines.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1907,7 +1944,7 @@ def imshow(*args, **kwargs):
     hold(b)
     return ret
 if Axes.imshow.__doc__ is not None:
-    imshow.__doc__ = _shift_string(Axes.imshow.__doc__) + """
+    imshow.__doc__ = dedent(Axes.imshow.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1928,7 +1965,7 @@ def loglog(*args, **kwargs):
     hold(b)
     return ret
 if Axes.loglog.__doc__ is not None:
-    loglog.__doc__ = _shift_string(Axes.loglog.__doc__) + """
+    loglog.__doc__ = dedent(Axes.loglog.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1949,7 +1986,7 @@ def pcolor(*args, **kwargs):
     hold(b)
     return ret
 if Axes.pcolor.__doc__ is not None:
-    pcolor.__doc__ = _shift_string(Axes.pcolor.__doc__) + """
+    pcolor.__doc__ = dedent(Axes.pcolor.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -1970,28 +2007,7 @@ def pcolormesh(*args, **kwargs):
     hold(b)
     return ret
 if Axes.pcolormesh.__doc__ is not None:
-    pcolormesh.__doc__ = _shift_string(Axes.pcolormesh.__doc__) + """
-Addition kwargs: hold = [True|False] overrides default hold state"""
-
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
-def pcolor_classic(*args, **kwargs):
-    # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = popd(kwargs, 'hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().pcolor_classic(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
-    
-    hold(b)
-    return ret
-if Axes.pcolor_classic.__doc__ is not None:
-    pcolor_classic.__doc__ = _shift_string(Axes.pcolor_classic.__doc__) + """
+    pcolormesh.__doc__ = dedent(Axes.pcolormesh.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2012,7 +2028,7 @@ def pie(*args, **kwargs):
     hold(b)
     return ret
 if Axes.pie.__doc__ is not None:
-    pie.__doc__ = _shift_string(Axes.pie.__doc__) + """
+    pie.__doc__ = dedent(Axes.pie.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2033,7 +2049,7 @@ def plot(*args, **kwargs):
     hold(b)
     return ret
 if Axes.plot.__doc__ is not None:
-    plot.__doc__ = _shift_string(Axes.plot.__doc__) + """
+    plot.__doc__ = dedent(Axes.plot.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2054,7 +2070,7 @@ def plot_date(*args, **kwargs):
     hold(b)
     return ret
 if Axes.plot_date.__doc__ is not None:
-    plot_date.__doc__ = _shift_string(Axes.plot_date.__doc__) + """
+    plot_date.__doc__ = dedent(Axes.plot_date.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2075,7 +2091,7 @@ def psd(*args, **kwargs):
     hold(b)
     return ret
 if Axes.psd.__doc__ is not None:
-    psd.__doc__ = _shift_string(Axes.psd.__doc__) + """
+    psd.__doc__ = dedent(Axes.psd.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2096,28 +2112,7 @@ def scatter(*args, **kwargs):
     hold(b)
     return ret
 if Axes.scatter.__doc__ is not None:
-    scatter.__doc__ = _shift_string(Axes.scatter.__doc__) + """
-Addition kwargs: hold = [True|False] overrides default hold state"""
-
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
-def scatter_classic(*args, **kwargs):
-    # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = popd(kwargs, 'hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().scatter_classic(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
-    
-    hold(b)
-    return ret
-if Axes.scatter_classic.__doc__ is not None:
-    scatter_classic.__doc__ = _shift_string(Axes.scatter_classic.__doc__) + """
+    scatter.__doc__ = dedent(Axes.scatter.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2138,7 +2133,7 @@ def semilogx(*args, **kwargs):
     hold(b)
     return ret
 if Axes.semilogx.__doc__ is not None:
-    semilogx.__doc__ = _shift_string(Axes.semilogx.__doc__) + """
+    semilogx.__doc__ = dedent(Axes.semilogx.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2159,7 +2154,7 @@ def semilogy(*args, **kwargs):
     hold(b)
     return ret
 if Axes.semilogy.__doc__ is not None:
-    semilogy.__doc__ = _shift_string(Axes.semilogy.__doc__) + """
+    semilogy.__doc__ = dedent(Axes.semilogy.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2180,7 +2175,7 @@ def specgram(*args, **kwargs):
     hold(b)
     return ret
 if Axes.specgram.__doc__ is not None:
-    specgram.__doc__ = _shift_string(Axes.specgram.__doc__) + """
+    specgram.__doc__ = dedent(Axes.specgram.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2197,32 +2192,11 @@ def spy(*args, **kwargs):
     except:
         hold(b)
         raise
-    
-    hold(b)
-    return ret
-if Axes.spy.__doc__ is not None:
-    spy.__doc__ = _shift_string(Axes.spy.__doc__) + """
-Addition kwargs: hold = [True|False] overrides default hold state"""
-
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
-def spy2(*args, **kwargs):
-    # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = popd(kwargs, 'hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().spy2(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
     gci._current = ret
     hold(b)
     return ret
-if Axes.spy2.__doc__ is not None:
-    spy2.__doc__ = _shift_string(Axes.spy2.__doc__) + """
+if Axes.spy.__doc__ is not None:
+    spy.__doc__ = dedent(Axes.spy.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2243,7 +2217,7 @@ def stem(*args, **kwargs):
     hold(b)
     return ret
 if Axes.stem.__doc__ is not None:
-    stem.__doc__ = _shift_string(Axes.stem.__doc__) + """
+    stem.__doc__ = dedent(Axes.stem.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2264,7 +2238,7 @@ def vlines(*args, **kwargs):
     hold(b)
     return ret
 if Axes.vlines.__doc__ is not None:
-    vlines.__doc__ = _shift_string(Axes.vlines.__doc__) + """
+    vlines.__doc__ = dedent(Axes.vlines.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2285,7 +2259,7 @@ def quiver(*args, **kwargs):
     hold(b)
     return ret
 if Axes.quiver.__doc__ is not None:
-    quiver.__doc__ = _shift_string(Axes.quiver.__doc__) + """
+    quiver.__doc__ = dedent(Axes.quiver.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2306,7 +2280,7 @@ def quiver2(*args, **kwargs):
     hold(b)
     return ret
 if Axes.quiver2.__doc__ is not None:
-    quiver2.__doc__ = _shift_string(Axes.quiver2.__doc__) + """
+    quiver2.__doc__ = dedent(Axes.quiver2.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2327,7 +2301,28 @@ def quiverkey(*args, **kwargs):
     hold(b)
     return ret
 if Axes.quiverkey.__doc__ is not None:
-    quiverkey.__doc__ = _shift_string(Axes.quiverkey.__doc__) + """
+    quiverkey.__doc__ = dedent(Axes.quiverkey.__doc__) + """
+Addition kwargs: hold = [True|False] overrides default hold state"""
+
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
+def xcorr(*args, **kwargs):
+    # allow callers to override the hold state by passing hold=True|False
+    b = ishold()
+    h = popd(kwargs, 'hold', None)
+    if h is not None:
+        hold(h)
+    try:
+        ret =  gca().xcorr(*args, **kwargs)
+        draw_if_interactive()
+    except:
+        hold(b)
+        raise
+    
+    hold(b)
+    return ret
+if Axes.xcorr.__doc__ is not None:
+    xcorr.__doc__ = dedent(Axes.xcorr.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
@@ -2338,7 +2333,7 @@ def cla(*args, **kwargs):
     draw_if_interactive()
     return ret
 if Axes.cla.__doc__ is not None:
-    cla.__doc__ = _shift_string(Axes.cla.__doc__)
+    cla.__doc__ = dedent(Axes.cla.__doc__)
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
@@ -2348,7 +2343,7 @@ def grid(*args, **kwargs):
     draw_if_interactive()
     return ret
 if Axes.grid.__doc__ is not None:
-    grid.__doc__ = _shift_string(Axes.grid.__doc__)
+    grid.__doc__ = dedent(Axes.grid.__doc__)
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
@@ -2358,7 +2353,7 @@ def legend(*args, **kwargs):
     draw_if_interactive()
     return ret
 if Axes.legend.__doc__ is not None:
-    legend.__doc__ = _shift_string(Axes.legend.__doc__)
+    legend.__doc__ = dedent(Axes.legend.__doc__)
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
@@ -2368,7 +2363,7 @@ def table(*args, **kwargs):
     draw_if_interactive()
     return ret
 if Axes.table.__doc__ is not None:
-    table.__doc__ = _shift_string(Axes.table.__doc__)
+    table.__doc__ = dedent(Axes.table.__doc__)
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
@@ -2378,7 +2373,7 @@ def text(*args, **kwargs):
     draw_if_interactive()
     return ret
 if Axes.text.__doc__ is not None:
-    text.__doc__ = _shift_string(Axes.text.__doc__)
+    text.__doc__ = dedent(Axes.text.__doc__)
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
@@ -2388,7 +2383,7 @@ def annotate(*args, **kwargs):
     draw_if_interactive()
     return ret
 if Axes.annotate.__doc__ is not None:
-    annotate.__doc__ = _shift_string(Axes.annotate.__doc__)
+    annotate.__doc__ = dedent(Axes.annotate.__doc__)
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
@@ -2569,6 +2564,19 @@ def winter():
 
     if im is not None:
         im.set_cmap(cm.winter)
+    draw_if_interactive()
+
+
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
+def spectral():
+    'set the default colormap to spectral and apply to current image if any.  See help(colormaps) for more information'
+    rc('image', cmap='spectral')
+    im = gci()
+
+
+    if im is not None:
+        im.set_cmap(cm.spectral)
     draw_if_interactive()
 
 

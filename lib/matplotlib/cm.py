@@ -8,6 +8,7 @@ from matplotlib import rcParams
 from matplotlib.numerix import asarray
 from numerix import nx
 import numerix.ma as ma
+from cbook import iterable
 from _cm import *
 
 
@@ -35,7 +36,7 @@ class ScalarMappable:
         """
 
         if cmap is None: cmap = get_cmap()
-        if norm is None: norm = colors.normalize()
+        if norm is None: norm = colors.Normalize()
 
         self._A = None
         self.norm = norm
@@ -74,20 +75,33 @@ class ScalarMappable:
         return self.norm.vmin, self.norm.vmax
 
     def set_clim(self, vmin=None, vmax=None):
-        'set the norm limits for image scaling'
+        """
+        set the norm limits for image scaling; if vmin is a length2
+        sequence, interpret it as (vmin, vmax) which is used to
+        support setp
+
+        ACCEPTS: a length 2 sequence of floats
+        """
+        if vmin is not None and vmax is None and iterable(vmin) and len(vmin)==2:
+            vmin, vmax = vmin
+            
         if vmin is not None: self.norm.vmin = vmin
         if vmax is not None: self.norm.vmax = vmax
         self.changed()
 
     def set_cmap(self, cmap):
-        'set the colormap for luminance data'
+        """
+        set the colormap for luminance data
+
+        ACCEPTS: a colormap
+        """
         if cmap is None: cmap = get_cmap()
         self.cmap = cmap
         self.changed()
 
     def set_norm(self, norm):
         'set the normalization instance'
-        if norm is None: norm = colors.normalize()
+        if norm is None: norm = colors.Normalize()
         self.norm = norm
         self.changed()
 
@@ -110,14 +124,22 @@ class ScalarMappable:
         cmap of another image
         """
         self.observers.append(mappable)
+        try:
+            self.add_callback(mappable.notify)
+        except AttributeError:
+            pass
 
     def notify(self, mappable):
         """
         If this is called then we are pegged to another mappable.
-        Update the cmap, norm accordingly
+        Update our cmap, norm, alpha from the other mappable.
         """
         self.set_cmap(mappable.cmap)
         self.set_norm(mappable.norm)
+        try:
+            self.set_alpha(mappable.get_alpha())
+        except AttributeError:
+            pass
 
     def changed(self):
         """

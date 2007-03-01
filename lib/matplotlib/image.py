@@ -7,7 +7,7 @@ from __future__ import division
 import sys, os
 from matplotlib import rcParams
 from artist import Artist
-from colors import normalize, colorConverter
+from colors import colorConverter
 import cm
 import numerix
 import numerix.ma as ma
@@ -26,17 +26,20 @@ class AxesImage(Artist, cm.ScalarMappable):
                  extent=None,
                  filternorm=1,
                  filterrad=4.0,
+                 **kwargs
                  ):
 
         """
         interpolation and cmap default to their rc settings
 
-        cmap is a cm colormap instance
-        norm is a colors.normalize instance to map luminance to 0-1
+        cmap is a colors.Colormap instance
+        norm is a colors.Normalize instance to map luminance to 0-1
 
         extent is a data xmin, xmax, ymin, ymax for making image plots
         registered with data plots.  Default is the image dimensions
         in pixels
+
+        Additional kwargs are matplotlib.artist properties
 
         """
         Artist.__init__(self)
@@ -81,6 +84,8 @@ class AxesImage(Artist, cm.ScalarMappable):
 
         self._imcache = None
 
+        self.update(kwargs)
+        
     def get_size(self):
         'Get the numrows, numcols of the input image'
         if self._A is None:
@@ -106,6 +111,7 @@ class AxesImage(Artist, cm.ScalarMappable):
         self._imcache = None
         cm.ScalarMappable.changed(self)
 
+        
     def make_image(self, magnification=1.0):
         if self._A is None:
             raise RuntimeError('You must first set the image array or the image attribute')
@@ -176,6 +182,23 @@ class AxesImage(Artist, cm.ScalarMappable):
         l, b, widthDisplay, heightDisplay = self.axes.bbox.get_bounds()
         renderer.draw_image(l, b, im, self.axes.bbox)
 
+    def pick(self, mouseevent):
+        'return true if the data coords of mouse click are within the extent of the image'
+        if not self.pickable(): return 
+        picker = self.get_picker()
+        if callable(picker):
+            hit, props = picker(self, mouseevent)
+            if hit:
+                self.figure.canvas.pick_event(mouseevent, self, **props)
+        elif picker:
+            xmin, xmax, ymin, ymax = self.get_extent()
+            xdata, ydata = mouseevent.xdata, mouseevent.ydata
+            #print xdata, ydata, xmin, xmax, ymin, ymax
+            if (xdata is not None and ydata is not None and
+                xdata>=xmin and xdata<=xmax and ydata>=ymin and ydata<=ymax):
+                self.figure.canvas.pick_event(mouseevent, self)
+            
+        
     def write_png(self, fname, noscale=False):
         """Write the image to png file with fname"""
         im = self.make_image()
@@ -385,8 +408,8 @@ class FigureImage(Artist, cm.ScalarMappable):
                  ):
 
         """
-        cmap is a cm colormap instance
-        norm is a colors.normalize instance to map luminance to 0-1
+        cmap is a colors.Colormap instance
+        norm is a colors.Normalize instance to map luminance to 0-1
 
         """
         Artist.__init__(self)
@@ -406,12 +429,12 @@ class FigureImage(Artist, cm.ScalarMappable):
         return self._A.shape[:2]
 
     def make_image(self, magnification=1.0):
-	# had to introduce argument magnification to satisfy the unit test
-	# figimage_demo.py. I have no idea, how magnification should be used
-	# within the function. It should be !=1.0 only for non-default DPI
-	# settings in the PS backend, as introduced by patch #1562394
-	# Probably Nicholas Young should look over this code and see, how
-	# magnification should be handled correctly.
+        # had to introduce argument magnification to satisfy the unit test
+        # figimage_demo.py. I have no idea, how magnification should be used
+        # within the function. It should be !=1.0 only for non-default DPI
+        # settings in the PS backend, as introduced by patch #1562394
+        # Probably Nicholas Young should look over this code and see, how
+        # magnification should be handled correctly.
         if self._A is None:
             raise RuntimeError('You must first set the image array')
 
