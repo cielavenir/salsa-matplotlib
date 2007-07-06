@@ -81,7 +81,7 @@ _Plotting commands
   text     - add some text at location x,y to the current axes
   thetagrids - customize the radial theta grids and labels for polar
   title    - add a title to the current axes
-  xcorr   - plot the autocorrelation function of x and y  
+  xcorr   - plot the autocorrelation function of x and y
   xlim     - set/get the xlimits
   ylim     - set/get the ylimits
   xticks   - set/get the xticks
@@ -236,7 +236,7 @@ import numerix as nx
 # eg a bad pytz install.  I don't want to break all of matplotlib for
 # date support
 try:
-    from dates import date2num, num2date, datestr2num, drange,\
+    from dates import date2num, num2date, datestr2num, strpdate2num, drange,\
             epoch2num, num2epoch, mx2num,\
             DateFormatter, IndexDateFormatter, DateLocator,\
             RRuleLocator, YearLocator, MonthLocator, WeekdayLocator,\
@@ -895,7 +895,7 @@ def gcf():
 def gci():
     """
     get the current ScalarMappable instance (image or patch
-    collection), or None if no images or patch collecitons have been
+    collection), or None if no images or patch collections have been
     defined.  The commands imshow and figimage create images
     instances, and the commands pcolor and scatter create patch
     collection instances
@@ -1028,6 +1028,23 @@ def twinx(ax=None):
     draw_if_interactive()
     return ax2
 
+
+def twiny(ax=None):
+    """
+    Make a second axes overlay ax (or the current axes if ax is None)
+    sharing the yaxis.  The ticks for ax2 will be placed on the top,
+    and the ax2 instance is returned.
+    """
+    if ax is None:
+        ax=gca()
+
+
+    ax2 = gcf().add_axes(ax.get_position(), sharey=ax, frameon=False)
+    ax2.xaxis.tick_top()
+    ax2.xaxis.set_label_position('top')
+    ax.xaxis.tick_bottom()
+    draw_if_interactive()
+    return ax2
 
 def title(s, *args, **kwargs):
     """
@@ -1327,7 +1344,9 @@ def polar(*args, **kwargs):
     with format strings, as in plot.
     """
     ax = gca(polar=True)
-    return ax.plot(*args, **kwargs)
+    ret = ax.plot(*args, **kwargs)
+    draw_if_interactive()
+    return ret
 
 def over(func, *args, **kwargs):
     """
@@ -1364,22 +1383,20 @@ def switch_backend(newbackend):
     reload(backends)
     from backends import new_figure_manager, draw_if_interactive, show
 
-def matshow(*args,**kw):
+def matshow(A, fignum=None, **kw):
     """Display an array as a matrix in a new figure window.
 
     The origin is set at the upper left hand corner and rows (first dimension
     of the array) are displayed horizontally.  The aspect ratio of the figure
-    window is that of the array, as long as it is possible to fit it within
-    your screen with no stretching.  If the window dimensions can't accomodate
-    this (extremely tall/wide arrays), some stretching will inevitably occur.
+    window is that of the array, unless this would make an excessively
+    short or narrow figure.
 
-    Tick labels for the xaxis are placed on top by default.
+    Tick labels for the xaxis are placed on top.
 
-    matshow() calls imshow() with args and **kwargs, but by default it sets
-    interpolation='nearest' (unless you override it).  All other arguments and
-    keywords are passed to imshow(), so see its docstring for further details.
+    With one exception, keyword arguments are passed to
+    imshow().
 
-    Special keyword arguments which are NOT passed to imshow():
+    Special keyword argument which is NOT passed to imshow():
 
       - fignum(None): by default, matshow() creates a new figure window with
       automatic numbering.  If fignum is given as an integer, the created
@@ -1387,9 +1404,7 @@ def matshow(*args,**kw):
       set the figure aspect ratio to be the one of the array, if you provide
       the number of an already existing figure, strange things may happen.
 
-      - returnall(False): by default, the return value is a figure instance.
-      With 'returnall=True', a (figure, axes, image) tuple is returned.
-
+      if fignum is False or 0, a new figure window will NOT be created.
 
     Example usage:
 
@@ -1402,44 +1417,21 @@ def matshow(*args,**kw):
     dimlist = [(12,12),(128,64),(64,512),(2048,256)]
 
     for d in dimlist:
-        fig, ax, im = matshow(samplemat(d))
+        im = matshow(samplemat(d))
     show()
     """
+    if fignum is False or fignum is 0:
+        ax = gca()
+    else:
+        # Extract actual aspect ratio of array and make appropriately sized figure
+        fig = figure(fignum, figsize=figaspect(A))
+        ax  = fig.add_axes([0.15, 0.09, 0.775, 0.775])
 
-    # Preprocess args for our purposes
-    arr = asarray(args[0])
-    # Extract unique keywords we can't pass to imshow
-    kw = kw.copy()
-    fignum = popd(kw,'fignum',None)
-    retall = popd(kw,'returnall',False)
-
-    # Extract actual aspect ratio of array and make appropriately sized figure
-    w,h = figaspect(arr)
-    fig = figure(fignum,figsize=(w,h))
-    ax  = fig.add_axes([0.15, 0.09, 0.775, 0.775])
-
-    ax.xaxis.tick_top()
-    ax.title.set_y(1.05) # raise it up a bit for tick top
-    kw['aspect'] = 'auto'
-    # imshow call: use 'lower' origin (we'll flip axes later)
-    kw['origin'] = 'lower'
-    # Unless overridden, don't interpolate
-    kw.setdefault('interpolation','nearest')
-    # All other keywords go through to imshow.
-    im = ax.imshow(*args,**kw)
+    im = ax.matshow(A, **kw)
     gci._current = im
 
-    # set the x and y lim to equal the matrix dims
-    nr,nc = arr.shape[:2]
-    ax.set_xlim((0,nc))
-    ax.set_ylim((nr,0))
-
     draw_if_interactive()
-    if retall:
-        return fig, ax, im
-    else:
-        return fig
-
+    return im
 
 def setp(*args, **kwargs):
     ret = _setp(*args, **kwargs)
@@ -1508,13 +1500,6 @@ def box(on=None):
     ax.set_frame_on(on)
     draw_if_interactive()
 
-def annotate(*args, **kwargs):
-    a = Annotation(*args, **kwargs)
-    ax = gca()
-    ax.add_artist(a)
-    draw_if_interactive()
-annotate.__doc__ = "annotate(artist, s, loc=None, padx='auto', pady='auto', autopad=3, lineprops=None,**props)\n\n"+Annotation.__init__.__doc__
-
 ### Deprecated functions:
 def scatter_classic(*args, **kwargs):
     return gca().scatter_classic(*args, **kwargs)
@@ -1541,7 +1526,7 @@ def acorr(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.acorr.__doc__ is not None:
@@ -1562,7 +1547,7 @@ def arrow(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.arrow.__doc__ is not None:
@@ -1583,7 +1568,7 @@ def axhline(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.axhline.__doc__ is not None:
@@ -1604,7 +1589,7 @@ def axhspan(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.axhspan.__doc__ is not None:
@@ -1625,7 +1610,7 @@ def axvline(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.axvline.__doc__ is not None:
@@ -1646,7 +1631,7 @@ def axvspan(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.axvspan.__doc__ is not None:
@@ -1667,7 +1652,7 @@ def bar(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.bar.__doc__ is not None:
@@ -1688,7 +1673,7 @@ def barh(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.barh.__doc__ is not None:
@@ -1709,7 +1694,7 @@ def broken_barh(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.broken_barh.__doc__ is not None:
@@ -1730,7 +1715,7 @@ def boxplot(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.boxplot.__doc__ is not None:
@@ -1751,7 +1736,7 @@ def cohere(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.cohere.__doc__ is not None:
@@ -1772,7 +1757,7 @@ def clabel(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.clabel.__doc__ is not None:
@@ -1835,7 +1820,7 @@ def csd(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.csd.__doc__ is not None:
@@ -1856,7 +1841,7 @@ def errorbar(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.errorbar.__doc__ is not None:
@@ -1877,7 +1862,7 @@ def fill(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.fill.__doc__ is not None:
@@ -1898,7 +1883,7 @@ def hist(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.hist.__doc__ is not None:
@@ -1919,7 +1904,7 @@ def hlines(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.hlines.__doc__ is not None:
@@ -1961,7 +1946,7 @@ def loglog(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.loglog.__doc__ is not None:
@@ -2024,7 +2009,7 @@ def pie(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.pie.__doc__ is not None:
@@ -2045,7 +2030,7 @@ def plot(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.plot.__doc__ is not None:
@@ -2066,7 +2051,7 @@ def plot_date(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.plot_date.__doc__ is not None:
@@ -2087,7 +2072,7 @@ def psd(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.psd.__doc__ is not None:
@@ -2129,7 +2114,7 @@ def semilogx(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.semilogx.__doc__ is not None:
@@ -2150,7 +2135,7 @@ def semilogy(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.semilogy.__doc__ is not None:
@@ -2213,7 +2198,7 @@ def stem(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.stem.__doc__ is not None:
@@ -2234,7 +2219,7 @@ def vlines(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.vlines.__doc__ is not None:
@@ -2297,7 +2282,7 @@ def quiverkey(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.quiverkey.__doc__ is not None:
@@ -2318,7 +2303,7 @@ def xcorr(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.xcorr.__doc__ is not None:

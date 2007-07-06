@@ -143,19 +143,19 @@ the exception of those in mlab.py provided by matplotlib.
 from __future__ import generators
 
 
-__version__  = '0.90.0'
-__revision__ = '$Revision: 3003 $'
-__date__     = '$Date: 2007-02-06 22:24:06 -0500 (Tue, 06 Feb 2007) $'
+__version__  = '0.90.1'
+__revision__ = '$Revision: 3333 $'
+__date__     = '$Date: 2007-05-31 09:52:25 -0400 (Thu, 31 May 2007) $'
 
 import md5, os, re, shutil, sys, warnings
 import distutils.sysconfig
 
 # Needed for toolkit setuptools support
-try:
-    __import__('pkg_resources').declare_namespace(__name__)
-except ImportError:
-    pass # must not have setuptools
-
+if 0:
+    try:
+        __import__('pkg_resources').declare_namespace(__name__)
+    except ImportError:
+        pass # must not have setuptools
 
 if not hasattr(sys, 'argv'):  # for modpython
     sys.argv = ['modpython']
@@ -545,6 +545,20 @@ def validate_comma_sep_str(s):
     except ValueError:
         raise ValueError('Could not convert all entries to strings')
 
+def validate_latex_preamble(s):
+    'return a list'
+    preamble_list = validate_comma_sep_str(s)
+    if not preamble_list == ['']: 
+        verbose.report("""
+*****************************************************************
+You have the following UNSUPPORTED LaTeX preamble customizations:
+%s
+Please do not ask for support with these customizations active.
+*****************************************************************
+"""% '\n'.join(preamble_list), 'helpful')
+    return preamble_list
+    
+
 class ValidateInStrings:
     def __init__(self, valid, ignorecase=False):
         'valid is a list of legal strings'
@@ -717,6 +731,7 @@ defaultParams = {
     'numerix'           : ['numpy', validate_numerix],
     'toolbar'           : ['toolbar2', validate_toolbar],
     'datapath'          : [get_data_path(), validate_path_exists],
+    'units'             : [False, validate_bool],
     'interactive'       : [False, validate_bool],
     'timezone'          : ['UTC', str],
 
@@ -751,15 +766,17 @@ defaultParams = {
     'font.stretch'      : ['normal', str],           #
     'font.weight'       : ['normal', str],           #
     'font.size'         : [12.0, validate_float], #
-    'font.serif'        : ['serif', validate_comma_sep_str],
-    'font.sans-serif'   : ['sans-serif', validate_comma_sep_str],
-    'font.cursive'      : ['cursive', validate_comma_sep_str],
-    'font.fantasy'      : ['fantasy', validate_comma_sep_str],
-    'font.monospace'    : ['monospace', validate_comma_sep_str],
+    'font.serif'        : ['Bitstream Vera Serif, New Century Schoolbook, Century Schoolbook L, Utopia, ITC Bookman, Bookman, Nimbus Roman No9 L, Times New Roman, Times, Palatino, Charter, serif', validate_comma_sep_str],
+    'font.sans-serif'   : ['Bitstream Vera Sans, Lucida Grande, Verdana, Geneva, Lucid, Arial, Helvetica, Avant Garde, sans-serif', validate_comma_sep_str],
+    'font.cursive'      : ['Apple Chancery, Textile, Zapf Chancery, Sand, cursive', validate_comma_sep_str],
+    'font.fantasy'      : ['Comic Sans MS, Chicago, Charcoal, Impact, Western, fantasy', validate_comma_sep_str],
+    'font.monospace'    : ['Bitstream Vera Sans Mono, Andale Mono, Nimbus Mono L, Courier New, Courier, Fixed, Terminal, monospace', validate_comma_sep_str],
 
     # text props
     'text.color'        : ['k', validate_color],     # black
     'text.usetex'       : [False, validate_usetex],
+    'text.latex.unicode': [False, validate_bool],
+    'text.latex.preamble': ['', validate_latex_preamble],
     'text.dvipnghack'    : [False, validate_bool],
     'text.fontstyle'    : ['normal', str],
     'text.fontangle'    : ['normal', str],
@@ -856,10 +873,12 @@ defaultParams = {
     'ps.papersize'      : [ 'letter', validate_ps_papersize], # Set the papersize/type
     'ps.useafm'         : [ False, validate_bool],  # Set PYTHONINSPECT
     'ps.usedistiller'   : [ False, validate_ps_distiller],  # use ghostscript or xpdf to distill ps output
-    'ps.distiller.res'  : [6000, validate_int],       # dpi
-    'pdf.compression'   : [6, validate_int],            # compression level from 0 to 9; 0 to disable
-    'svg.image_inline'  : [True, validate_bool],        # write raster image data directly into the svg file
-    'svg.image_noscale'  : [False, validate_bool],        # suppress scaling of raster data embedded in SVG
+    'ps.distiller.res'  : [6000, validate_int],     # dpi
+    'pdf.compression'   : [6, validate_int],        # compression level from 0 to 9; 0 to disable
+    'pdf.inheritcolor'  : [False, validate_bool],   # ignore any color-setting commands from the frontend
+    'pdf.use14corefonts' : [False, validate_bool],  # use only the 14 PDF core fonts, embedded in every PDF viewing application
+    'svg.image_inline'  : [True, validate_bool],    # write raster image data directly into the svg file
+    'svg.image_noscale'  : [False, validate_bool],  # suppress scaling of raster data embedded in SVG
     'plugins.directory' : ['.matplotlib_plugins', str], # where plugin directory is locate
 
     # mathtext settings
@@ -1149,6 +1168,7 @@ def tk_window_focus():
 verbose.report('matplotlib version %s'%__version__)
 verbose.report('verbose.level %s'%verbose.level)
 verbose.report('interactive is %s'%rcParams['interactive'])
+verbose.report('units is %s'%rcParams['units'])
 verbose.report('platform is %s'%sys.platform)
 verbose.report('loaded modules: %s'%sys.modules.keys(), 'debug')
 

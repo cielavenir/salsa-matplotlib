@@ -100,7 +100,7 @@ if 1:
                 horizontalalignment='left',
                 verticalalignment='bottom',
                 )
-    #fig.savefig('annotation_polar')
+    fig.savefig('annotation_polar')
 
 if 1:
     # You can also use polar notation on a catesian axes.  Here the
@@ -122,13 +122,14 @@ if 1:
                 arrowprops=dict(facecolor='black', shrink=0.05),
                 horizontalalignment='left',
                 verticalalignment='bottom',
-                )
+		clip_on=True, # clip to the axes bounding box
+     )
                    
     ax.set_xlim(-20, 20)
     ax.set_ylim(-20, 20)
-    #fig.savefig('annotation_ellipse')
+    fig.savefig('annotation_ellipse')
     
 
 
-fig.savefig('annotation_demo.png')
+#fig.savefig('annotation_demo.png')
 show()

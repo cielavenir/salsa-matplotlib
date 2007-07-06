@@ -5,10 +5,10 @@
 ## DP: No description.
 
 @DPATCH@
-diff -urNad matplotlib-0.87.7~/setup.py matplotlib-0.87.7/setup.py
---- matplotlib-0.87.7~/setup.py	2006-11-01 18:11:30.000000000 +0100
-+++ matplotlib-0.87.7/setup.py	2006-11-01 18:12:28.000000000 +0100
-@@ -28,21 +28,21 @@
+diff -urNad matplotlib-0.90.1/setup.py.orig matplotlib-0.90.1/setup.py
+--- matplotlib-0.90.1/setup.py.orig     2007-07-06 17:59:58.000000000 +0200
++++ matplotlib-0.90.1/setup.py  2007-07-06 18:04:52.000000000 +0200
+@@ -28,13 +28,13 @@
  # it.  It makes very nice antialiased output and also supports alpha
  # blending
  BUILD_AGG          = 1
@@ -23,10 +23,9 @@ diff -urNad matplotlib-0.87.7~/setup.py matplotlib-0.87.7/setup.py
 -BUILD_TKAGG        = 'auto'
 +BUILD_TKAGG        = 1
  
- # build wxPython GUI with Agg renderer ; requires wxPython package
--BUILD_WXAGG        = 'auto'
-+BUILD_WXAGG        = 0
- 
+ # build wxPython extension code to efficiently blit agg into wx.  Only
+ # needed for wxpython <2.8 if you plan on doing animations
+@@ -43,7 +43,7 @@
  
  # build a small extension to manage the focus on win32 platforms.
  #BUILD_WINDOWING        = 0
@@ -35,31 +34,23 @@ diff -urNad matplotlib-0.87.7~/setup.py matplotlib-0.87.7/setup.py
  
  
  VERBOSE = False # insert lots of diagnostic prints in extension code
-@@ -199,7 +199,7 @@
- build_swigagg(ext_modules, packages)
- build_transforms(ext_modules, packages, NUMERIX)
- build_enthought(ext_modules, packages)
--
-+'''
- if BUILD_GTK:
-     try:
-         import gtk
-@@ -219,7 +219,11 @@
-         else:
-             build_gdk(ext_modules, packages, NUMERIX)
-             rc['backend'] = 'GTK'
-+'''
-+
-+build_gdk(ext_modules, packages, NUMERIX)
+@@ -226,15 +226,25 @@
+ 
+ havegtk.gotit = None
  
 +'''
- if BUILD_GTKAGG:
-     try:
-         import gtk
-@@ -240,7 +244,12 @@
-             BUILD_AGG = 1
-             build_gtkagg(ext_modules, packages, NUMERIX)
-             rc['backend'] = 'GTKAgg'
+ if BUILD_GTK and havegtk():
+     build_gdk(ext_modules, packages, NUMERIX)
+     rc['backend'] = 'GTK'
++'''
++build_gdk(ext_modules, packages, NUMERIX)
++rc['backend'] = 'GTK'
+ 
++'''
+ if BUILD_GTKAGG and havegtk():
+     BUILD_AGG = 1
+     build_gtkagg(ext_modules, packages, NUMERIX)
+     rc['backend'] = 'GTKAgg'
 +'''
 +
 +build_gtkagg(ext_modules, packages, NUMERIX)
@@ -69,41 +60,55 @@ diff -urNad matplotlib-0.87.7~/setup.py matplotlib-0.87.7/setup.py
  if BUILD_TKAGG:
      try:
          import Tkinter
-@@ -261,7 +270,12 @@
+@@ -255,7 +265,12 @@
              BUILD_AGG = 1
              build_tkagg(ext_modules, packages, NUMERIX)
              rc['backend'] = 'TkAgg'
 +'''
- 
 +BUILD_AGG = 1
 +build_tkagg(ext_modules, packages, NUMERIX)
-+
-+'''
++rc['backend'] = 'TkAgg'
+ 
++"""
  if BUILD_WXAGG:
      try:
-         import wxPython
-@@ -275,6 +289,9 @@
-             not (isinstance(BUILD_WXAGG, str) # don't about if BUILD_WXAGG
-                  and BUILD_WXAGG.lower() == 'auto')) # is "auto"
+         import wx
+@@ -270,7 +285,9 @@
+                 not (isinstance(BUILD_WXAGG, str) # don't abort if BUILD_WXAGG
+                      and BUILD_WXAGG.lower() == 'auto')) # is "auto"
          rc['backend'] = 'WXAgg'
-+'''
-+
-+BUILD_AGG = 1
++"""
  
++BUILD_AGG=1
  if BUILD_AGG:
      build_agg(ext_modules, packages, NUMERIX)
-@@ -331,6 +348,6 @@
-       ext_modules = ext_modules,
-       data_files = data_files,
-       package_dir = {'': 'lib'},
--      cmdclass = {'install_data':smart_install_data},
-+      #cmdclass = {'install_data':smart_install_data},
-       **additional_params
-       )
-diff -urNad matplotlib-0.87.7~/setupext.py matplotlib-0.87.7/setupext.py
---- matplotlib-0.87.7~/setupext.py	2006-11-01 18:11:30.000000000 +0100
-+++ matplotlib-0.87.7/setupext.py	2006-11-01 18:11:49.000000000 +0100
-@@ -349,11 +349,11 @@
+     if rc['backend'] == 'PS': rc['backend'] = 'Agg'
+diff -urNad matplotlib-0.90.1/setupext.py.orig matplotlib-0.90.1/setupext.py
+--- matplotlib-0.90.1/setupext.py.orig  2007-07-06 18:07:08.000000000 +0200
++++ matplotlib-0.90.1/setupext.py       2007-07-06 18:10:17.000000000 +0200
+@@ -45,8 +45,8 @@
+ 
+ basedir = {
+     'win32'  : ['win32_static',],
+-    'linux2' : ['/usr/local', '/usr',],
+-    'linux'  : ['/usr/local', '/usr',],
++    'linux2' : ['/usr',],
++    'linux'  : ['/usr',],
+     'cygwin' : ['/usr/local', '/usr',],
+     'darwin' : ['/sw/lib/freetype2', '/sw/lib/freetype219', '/usr/local',
+                 '/usr', '/sw'],
+@@ -54,8 +54,8 @@
+     'freebsd5' : ['/usr/local', '/usr'],
+     'freebsd6' : ['/usr/local', '/usr'],
+     'sunos5' : [os.getenv('MPLIB_BASE') or '/usr/local',],
+-    'gnukfreebsd5' : ['/usr/local', '/usr'],
+-    'gnukfreebsd6' : ['/usr/local', '/usr'],
++    'gnukfreebsd5' : ['/usr'],
++    'gnukfreebsd6' : ['/usr'],
+     'aix5' : ['/usr/local'],
+ }
+ 
+@@ -357,11 +357,11 @@
          print "Using default library and include directories for Tcl and Tk because a"
          print "Tk window failed to open.  You may need to define DISPLAY for Tk to work"
          print "so that setup can determine where your libraries are located."
@@ -120,3 +125,4 @@ diff -urNad matplotlib-0.87.7~/setupext.py matplotlib-0.87.7/setupext.py
      else:
          tk.withdraw()
          o.tcl_lib = os.path.normpath(os.path.join(str(tk.getvar('tcl_library')), '../'))
+ 

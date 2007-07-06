@@ -7,6 +7,7 @@
 #export DH_VERBOSE=1
 
 PYVERS := $(shell pyversions -v -r debian/control)
+DEFPY := $(shell pyversions -v -d)
 pd  := python-matplotlib-doc
 p   := python-matplotlib
 pdata := python-matplotlib-data
@@ -45,7 +46,7 @@ clean-patched: patch
 	dh_testdir
 	dh_testroot
 	#python2.3 ./setup.py clean --all
-	for i in $(PYVERS); do python$(i) ./setup.py clean --all; done
+	for i in $(PYVERS); do python$(i) ./setup.py clean --all || true ; done
 	-rm -f *-stamp*
 	-rm -rf build *.pyc *.pyo
 	find ./lib -name '*.pyc' -exec rm {} \;
@@ -62,15 +63,15 @@ install-stamp-%: build-stamp-%
 	dh_testroot
 	python$* ./setup.py install_lib \
 		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/ --no-compile
-	#dh_install -p$(p) lib/dateutil usr/lib/python$*/site-packages/
-	#dh_install -p$(p) lib/pytz usr/lib/python$*/site-packages/
+	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/mpl-data/
+	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/backends/Matplotlib.nib/
 
-	# Check that we have built all of the plugins; FTBFS if not; this
+	# Check that we have built all of the plugins for the default python version; FTBFS if not; this
 	# is better than having packages silently fail to build on the
 	# autobuilders.
 	# The plugin abbreviations are:
 	#  ns_ = numpy, na_ = numarray, nc_ = numeric
-	for v in $(PYVERS); do \
+	for v in $(DEFPY); do \
 		for p in na ns nc; do \
 			for f in transforms.so image.so cntr.so nxutils.so; do \
 				# Check for these four files for each plugin: \
@@ -97,17 +98,20 @@ install-indep: build-indep
 	dh_testdir -i
 	dh_testroot -i
 	dh_clean -k
-	python ./setup.py install_data -d $(CURDIR)/debian/$(pdata)/usr/share
-
-	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/Vera*.ttf
+	dh_install -p python-matplotlib-data
+##	python ./setup.py install --no-compile --prefix $(CURDIR)/debian/$(pdata)/usr
+	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/Vera*.ttf
+	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/*.TXT
+	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/local.conf
+	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/pdfcorefonts/readme.txt
 
 	# make svg images not executable:
-	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/*.svg
+	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/images/*.svg
 
 	# move .matplotlibrc to /etc
-	mkdir $(CURDIR)/debian/$(pdata)/etc/
-	mv $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/matplotlibrc \
-		$(CURDIR)/debian/$(pdata)/etc/matplotlibrc
+##	mkdir $(CURDIR)/debian/$(pdata)/etc/
+##	mv $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/matplotlibrc \
+##		$(CURDIR)/debian/$(pdata)/etc/matplotlibrc
 
 # binary
 binary-indep: build-indep install-indep
@@ -116,7 +120,7 @@ binary-indep: build-indep install-indep
 	dh_installchangelogs -i CHANGELOG
 	dh_installdocs -p$(pd) -i
 	dh_installexamples -p$(pd) -i examples/*
-	dh_install -p$(pd) -i ./$(users_guide) usr/share/doc/$(pd)/pdf 
+##	dh_install -p$(pd) -i ./$(users_guide) usr/share/doc/$(pd)/pdf 
 	dh_compress -i -Xexamples -Xexamples/data -Xpdf
 	dh_fixperms -i
 	dh_installdeb -i
@@ -137,12 +141,10 @@ binary-arch: build-arch install-arch
 	  fi; \
 	done
 	dh_pycentral -a
-	dh_python -a
 	dh_link -a
 	dh_strip -a
 	dh_compress -a
 	dh_fixperms -a
-	dh_python -a
 	dh_installdeb -a
 	dh_shlibdeps -a
 	dh_gencontrol -a

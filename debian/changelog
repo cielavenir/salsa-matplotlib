@@ -1,3 +1,20 @@
+matplotlib (0.90.1-1) experimental; urgency=low
+
+  * New upstream release
+  * updated debian/copyright file
+  
+ -- Alexandre Fayolle <afayolle@debian.org>  Fri, 06 Jul 2007 17:49:05 +0200
+
+matplotlib (0.90.0-2) experimental; urgency=low
+
+  * Changed dvipng dependency to a recommends (Closes: #403198)
+  * Added to suggests tetex-extra | texlive-extra-utils (Closes: 406176)
+  * Added to suggests texlive-latex-extra (Closes: #410777)
+  * Changed python-gst dependency to python-gobject
+  * Already closed bug: (Closes: #396386)
+
+ -- Vittorio Palmisano <redclay81@gmail.com>  Thu, 26 Apr 2007 11:00:02 +0200
+
 matplotlib (0.90.0-1) experimental; urgency=low
 
   * New upstream release

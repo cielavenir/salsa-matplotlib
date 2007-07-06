@@ -31,7 +31,7 @@ class ScalarMappable:
 
     def __init__(self, norm=None, cmap=None):
         """
-        norm is a colors.Norm instance to map luminance to 0-1
+        norm is a colors.normalize instance to map luminance to 0-1
         cmap is a cm colormap instance
         """
 
@@ -60,11 +60,7 @@ class ScalarMappable:
 
     def set_array(self, A):
         'Set the image array from numeric/numarray A'
-        from numerix import typecode, typecodes
-        if typecode(A) in typecodes['Float']:
-            self._A = A.astype(nx.Float32)
-        else:
-            self._A = A.astype(nx.Int16)
+        self._A = A
 
     def get_array(self):
         'Return the array'
@@ -84,7 +80,7 @@ class ScalarMappable:
         """
         if vmin is not None and vmax is None and iterable(vmin) and len(vmin)==2:
             vmin, vmax = vmin
-            
+
         if vmin is not None: self.norm.vmin = vmin
         if vmax is not None: self.norm.vmax = vmax
         self.changed()
@@ -114,6 +110,18 @@ class ScalarMappable:
             raise TypeError('You must first set_array for mappable')
         self.norm.autoscale(self._A)
         self.changed()
+
+    def autoscale_None(self):
+        """
+        Autoscale the scalar limits on the norm instance using the
+        current array, changing only limits that are None
+        """
+        if self._A is None:
+            raise TypeError('You must first set_array for mappable')
+        self.norm.autoscale_None(self._A)
+        self.changed()
+
+
 
     def add_observer(self, mappable):
         """

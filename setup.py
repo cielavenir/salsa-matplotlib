@@ -36,8 +36,9 @@ BUILD_GTK          = 'auto'
 # Use False or 0 if you don't want to build
 BUILD_TKAGG        = 'auto'
 
-# build wxPython GUI with Agg renderer ; requires wxPython package
-BUILD_WXAGG        = 'auto'
+# build wxPython extension code to efficiently blit agg into wx.  Only
+# needed for wxpython <2.8 if you plan on doing animations
+BUILD_WXAGG        = 0
 
 
 # build a small extension to manage the focus on win32 platforms.
@@ -57,7 +58,24 @@ VERBOSE = False # insert lots of diagnostic prints in extension code
 import os
 if os.path.exists('MANIFEST'): os.remove('MANIFEST')
 
-import sys,os
+import sys
+major, minor1, minor2, s, tmp = sys.version_info
+
+if major==2 and minor1==2:
+    print >> sys.stderr, "***\n\nWARNING, see build info for python2.2 in the header of setup.py\n\n***"
+if major==2 and minor1<=3:
+    # setuptools monkeypatches distutils.core.Distribution to support
+    # package_data
+    try: import setuptools 
+    except ImportError:
+        raise SystemExit("""\
+matplotlib requires setuptools for installation.  Visit:
+http://cheeseshop.python.org/pypi/setuptools
+for installation instructions for the proper version of setuptools for your
+system.  If this is your first time upgrading matplotlib with the new
+setuptools requirement, you must delete the old matplotlib install
+directory.""")
+    
 import glob
 from distutils.core import Extension, setup
 from setupext import build_agg, build_gtkagg, build_tkagg, build_wxagg,\
@@ -66,38 +84,22 @@ from setupext import build_agg, build_gtkagg, build_tkagg, build_wxagg,\
      build_subprocess, build_isnan
 import distutils.sysconfig
 
-major, minor1, minor2, s, tmp = sys.version_info
-
-if major==2 and minor1==2:
-    print >> sys.stderr, "***\n\nWARNING, see build info for python2.2 in the header of setup.py\n\n***"
-
 for line in file('lib/matplotlib/__init__.py').readlines():
     if line[:11] == '__version__':
-        exec(line)
+        exec(line.strip())
 
 # Specify all the required mpl data
-data = []
-data.extend(glob.glob('gui/*.glade'))
-data.extend(glob.glob('fonts/afm/*.afm'))
-data.extend(glob.glob('fonts/ttf/*.ttf'))
-data.extend(glob.glob('images/*.xpm'))
-data.extend(glob.glob('images/*.svg'))
-data.extend(glob.glob('images/*.png'))
-data.extend(glob.glob('images/*.ppm'))
-data.append('matplotlibrc')
-
-data_files=[('matplotlib/mpl-data', data),
-            ('matplotlib/mpl-data/Matplotlib.nib',
-             glob.glob('lib/matplotlib/backends/Matplotlib.nib/*.nib'))]
-
-# data_files fix from http://wiki.python.org/moin/DistutilsInstallDataScattered
-from distutils.command.install_data import install_data
-class smart_install_data(install_data):
-    def run(self):
-        #need to change self.install_dir to the library dir
-        install_cmd = self.get_finalized_command('install')
-        self.install_dir = getattr(install_cmd, 'install_lib')
-        return install_data.run(self)
+package_data = {'matplotlib':['mpl-data/fonts/afm/*.afm',
+                              'mpl-data/fonts/pdfcorefonts/*.afm',
+                              'mpl-data/fonts/pdfcorefonts/*.txt',
+                              'mpl-data/fonts/ttf/*.ttf',
+                              'mpl-data/images/*.xpm',
+                              'mpl-data/images/*.svg',
+                              'mpl-data/images/*.png',
+                              'mpl-data/images/*.ppm',
+                              'mpl-data/matplotlibrc',
+                              'backends/Matplotlib.nib/*',
+                              ]}
 
 # Figure out which array packages to provide binary support for
 # and append to the NUMERIX list.
@@ -106,7 +108,6 @@ NUMERIX = []
 try:
     import Numeric
     NUMERIX.append('Numeric')
-
 except ImportError:
     pass
 try:
@@ -124,6 +125,7 @@ if not NUMERIX:
     raise RuntimeError("You must install one or more of numpy, Numeric, and numarray to build matplotlib")
 
 
+#NUMERIX = ['numpy']
 rc['numerix'] = NUMERIX[-1]
 
 ext_modules = []
@@ -200,46 +202,38 @@ build_swigagg(ext_modules, packages)
 build_transforms(ext_modules, packages, NUMERIX)
 build_enthought(ext_modules, packages)
 
-if BUILD_GTK:
+def havegtk():
+    'check for the presence of pygtk'
+    if havegtk.gotit is not None: return havegtk.gotit
     try:
         import gtk
     except ImportError:
-        print 'GTK requires pygtk'
-        BUILD_GTK = 0
+        print 'building for GTK requires pygtk; you must be able to "import gtk" in your build/install environment'
+        havegtk.gotit = False
     except RuntimeError:
         print 'pygtk present but import failed'
-        BUILD_GTK = 0
+        havegtk.gotit = False
     else:
         version = (2,2,0)
         if gtk.pygtk_version < version:
             print "Error: GTK backend requires PyGTK %d.%d.%d (or later), " \
                   "%d.%d.%d was detected." % (
                 version + gtk.pygtk_version)
-            BUILD_GTK = 0
+            havegtk.gotit = False
         else:
-            build_gdk(ext_modules, packages, NUMERIX)
-            rc['backend'] = 'GTK'
+            havegtk.gotit = True
+    return havegtk.gotit
 
-if BUILD_GTKAGG:
-    try:
-        import gtk
-    except ImportError:
-        print 'GTKAgg requires pygtk'
-        BUILD_GTKAGG=0
-    except RuntimeError:
-        print 'pygtk present but import failed'
-        BUILD_GTKAGG = 0
-    else:
-        version = (2,2,0)
-        if gtk.pygtk_version < version:
-            print "Error: GTKAgg backend requires PyGTK %d.%d.%d " \
-                  "(or later), %d.%d.%d was detected." % (
-                version + gtk.pygtk_version)
-            BUILD_GTKAGG=0
-        else:
-            BUILD_AGG = 1
-            build_gtkagg(ext_modules, packages, NUMERIX)
-            rc['backend'] = 'GTKAgg'
+havegtk.gotit = None
+
+if BUILD_GTK and havegtk():
+    build_gdk(ext_modules, packages, NUMERIX)
+    rc['backend'] = 'GTK'
+
+if BUILD_GTKAGG and havegtk():
+    BUILD_AGG = 1
+    build_gtkagg(ext_modules, packages, NUMERIX)
+    rc['backend'] = 'GTKAgg'
 
 if BUILD_TKAGG:
     try:
@@ -264,16 +258,17 @@ if BUILD_TKAGG:
 
 if BUILD_WXAGG:
     try:
-        import wxPython
+        import wx
     except ImportError:
         if BUILD_WXAGG != 'auto':
             print 'WXAgg\'s accelerator requires wxPython'
         BUILD_WXAGG = 0
     else:
-        BUILD_AGG = 1
-        build_wxagg(ext_modules, packages, NUMERIX,
-            not (isinstance(BUILD_WXAGG, str) # don't about if BUILD_WXAGG
-                 and BUILD_WXAGG.lower() == 'auto')) # is "auto"
+        if getattr(wx, '__version__', '0.0')[0:3] < '2.8':
+            BUILD_AGG = 1
+            build_wxagg(ext_modules, packages, NUMERIX,
+                not (isinstance(BUILD_WXAGG, str) # don't abort if BUILD_WXAGG
+                     and BUILD_WXAGG.lower() == 'auto')) # is "auto"
         rc['backend'] = 'WXAgg'
 
 if BUILD_AGG:
@@ -308,7 +303,7 @@ for mod in ext_modules:
 if sys.platform=='win32':
     rc = dict(backend='TkAgg', numerix='numpy')
 template = file('matplotlibrc.template').read()
-file('matplotlibrc', 'w').write(template%rc)
+file('lib/matplotlib/mpl-data/matplotlibrc', 'w').write(template%rc)
 
 try: additional_params # has setupegg.py provided
 except NameError: additional_params = {}
@@ -329,8 +324,7 @@ distrib = setup(name="matplotlib",
       platforms='any',
       py_modules = ['pylab'],
       ext_modules = ext_modules,
-      data_files = data_files,
       package_dir = {'': 'lib'},
-      cmdclass = {'install_data':smart_install_data},
+      package_data = package_data,
       **additional_params
       )

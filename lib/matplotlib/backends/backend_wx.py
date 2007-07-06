@@ -92,7 +92,7 @@ Examples which work on this release:
  (3) - Clipping seems to be broken.
 """
 
-cvs_id = '$Id: backend_wx.py 2779 2006-09-21 12:28:54Z cmoad $'
+cvs_id = '$Id: backend_wx.py 3011 2007-02-12 23:10:43Z jdh2358 $'
 
 import sys, os, os.path, math, StringIO
 
@@ -1372,7 +1372,7 @@ def _load_bitmap(filename):
     Returns a wx.Bitmap object
     """
 
-    basedir = rcParams['datapath']
+    basedir = os.path.join(rcParams['datapath'],'images')
 
     bmpFilename = os.path.normpath(os.path.join(basedir, filename))
     if not os.path.exists(bmpFilename):

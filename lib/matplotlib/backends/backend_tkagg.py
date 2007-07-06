@@ -183,9 +183,15 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
 
         if dpi is None: dpi = rcParams['savefig.dpi']
         agg = self.switch_backends(FigureCanvasAgg)
-        agg.print_figure(filename, dpi, facecolor, edgecolor, orientation,
-                         **kwargs)
-        self.figure.set_canvas(self)
+        try:
+            agg.print_figure(filename, dpi, facecolor, edgecolor, orientation,
+                             **kwargs)
+        except:
+            self.figure.set_canvas(self)
+            raise
+        else:
+            self.figure.set_canvas(self)
+            
 
     def motion_notify_event(self, event):
         x = event.x
@@ -311,8 +317,9 @@ class FigureManagerTkAgg(FigureManagerBase):
             if self.window is not None:
                 self.window.quit()
         if self.window is not None:
-            #print 'calling window destroy'
+            #self.toolbar.destroy()
             self.window.destroy()
+
             pass
         self.window = None
 
@@ -387,7 +394,7 @@ class NavigationToolbar(Tk.Frame):
 
     """
     def _Button(self, text, file, command):
-        file = os.path.join(rcParams['datapath'], file)
+        file = os.path.join(rcParams['datapath'], 'images', file)
         im = Tk.PhotoImage(master=self, file=file)
         b = Tk.Button(
             master=self, text=text, padx=2, pady=2, image=im, command=command)
@@ -534,7 +541,7 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
         self.canvas = canvas
         self.window = window
         self._idle = True
-        Tk.Frame.__init__(self, master=self.canvas._tkcanvas)
+        #Tk.Frame.__init__(self, master=self.canvas._tkcanvas)
         NavigationToolbar2.__init__(self, canvas)
         
     def set_message(self, s):
@@ -562,7 +569,7 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
         self.window.configure(cursor=cursord[cursor])
     
     def _Button(self, text, file, command):
-        file = os.path.join(rcParams['datapath'], file)
+        file = os.path.join(rcParams['datapath'], 'images', file)
         im = Tk.PhotoImage(master=self, file=file)
         b = Tk.Button(
             master=self, text=text, padx=2, pady=2, image=im, command=command)

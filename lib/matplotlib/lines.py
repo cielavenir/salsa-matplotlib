@@ -219,19 +219,20 @@ class Line2D(Artist):
 
         self.verticalOffset = None
 
+        # update kwargs before updating data to give the caller a
+        # chance to init axes (and hence unit support)
+        self.update(kwargs)
+
         self.set_data(xdata, ydata)
-
         self._logcache = None
-
-        if len(kwargs): setp(self, **kwargs)
 
     def pick(self, mouseevent):
         """
         If mouseevent is over data that satisifies the picker, fire
-        off a backend_bases.PickEvent with the additional attribute"ind"
+        off a backend_bases.PickEvent with the additional attribute "ind"
         which is a sequence of indices into the data that meet the criteria
         """
-        if not self.pickable(): return 
+        if not self.pickable(): return
 
         if self._newstyle:
             # transform in backend
@@ -260,8 +261,8 @@ class Line2D(Artist):
             hit, props = picker(self, mouseevent)
             if hit:
                 self.figure.canvas.pick_event(mouseevent, self, **props)
-                
-            
+
+
 
     def get_window_extent(self, renderer):
         self._newstyle = hasattr(renderer, 'draw_markers')
@@ -290,6 +291,13 @@ class Line2D(Artist):
         return lbwh_to_bbox( left, bottom, width, height)
 
 
+    def set_axes(self, ax):
+        Artist.set_axes(self, ax)
+        if ax.xaxis is not None:
+            self._xcid = ax.xaxis.callbacks.connect('units', self.recache)
+        if ax.yaxis is not None:
+            self._ycid = ax.yaxis.callbacks.connect('units', self.recache)
+
     def set_data(self, *args):
         """
         Set the x and y data
@@ -302,8 +310,15 @@ class Line2D(Artist):
         else:
             x, y = args
 
-        self._x_orig = x
-        self._y_orig = y
+        self._xorig = x
+        self._yorig = y
+        self.recache()
+
+    def recache(self):
+        #if self.axes is None: print 'recache no axes'
+        #else: print 'recache units', self.axes.xaxis.units, self.axes.yaxis.units
+        x = ma.asarray(self.convert_xunits(self._xorig), Float)
+        y = ma.asarray(self.convert_yunits(self._yorig), Float)
 
         x = ma.ravel(x)
         y = ma.ravel(y)
@@ -379,13 +394,12 @@ class Line2D(Artist):
         if not self._visible: return
         self._newstyle = hasattr(renderer, 'draw_markers')
         gc = renderer.new_gc()
+        self._set_gc_clip(gc)
+
         gc.set_foreground(self._color)
         gc.set_antialiased(self._antialiased)
         gc.set_linewidth(self._linewidth)
         gc.set_alpha(self._alpha)
-        if self.get_clip_on():
-            gc.set_clip_rectangle(self.clipbox.get_bounds())
-
         if self.is_dashed():
             cap = self._dashcapstyle
             join = self._dashjoinstyle
@@ -412,12 +426,15 @@ class Line2D(Artist):
         if self._segments is not None:
             for ii in self._segments:
                 lineFunc(renderer, gc, xt[ii[0]:ii[1]], yt[ii[0]:ii[1]])
+
         else:
             lineFunc(renderer, gc, xt, yt)
 
 
         if self._marker is not None:
+
             gc = renderer.new_gc()
+            self._set_gc_clip(gc)
             if (is_string_like(self._markeredgecolor) and
                 self._markeredgecolor == 'auto'):
                 if self._marker in self.filled_markers:
@@ -427,8 +444,7 @@ class Line2D(Artist):
             else:
                 gc.set_foreground(self._markeredgecolor)
             gc.set_linewidth(self._markeredgewidth)
-            if self.get_clip_on():
-                gc.set_clip_rectangle(self.clipbox.get_bounds())
+            gc.set_alpha(self._alpha)
             funcname = self._markers.get(self._marker, '_draw_nothing')
             markerFunc = getattr(self, funcname)
             markerFunc(renderer, gc, xt, yt)
@@ -445,16 +461,24 @@ class Line2D(Artist):
     def get_markeredgewidth(self): return self._markeredgewidth
     def get_markerfacecolor(self): return self._markerfacecolor
     def get_markersize(self): return self._markersize
-    def get_xdata(self, valid_only = False):
-        if valid_only:
-            return self._x
-        return self._x_orig
-    def get_ydata(self, valid_only = False):
-        if valid_only:
-            return self._y
-        return self._y_orig
 
+    def get_xdata(self, orig=True):
+        """
+        return the xdata; if orig is true return the original data,
+        else the processed data
+        """
+        if orig:
+            return self._xorig
+        return self._x
 
+    def get_ydata(self, orig=True):
+        """
+        return the ydata; if orig is true return the original data,
+        else the processed data
+        """
+        if orig:
+            return self._yorig
+        return self._y
 
     def set_antialiased(self, b):
         """
@@ -685,7 +709,7 @@ class Line2D(Artist):
             path.end_poly()
             renderer.draw_markers(gc, path, rgbFace, xt, yt, self.get_transform())
         else:
-            for (x,y) in zip(xt, yt):
+            for (x,y) in zip(xt,yt):
                 renderer.draw_arc(gc, rgbFace,
                                   x, y, w, w, 0.0, 360.0, 0.0)
 
