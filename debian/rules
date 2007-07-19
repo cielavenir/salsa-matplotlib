@@ -46,7 +46,7 @@ clean-patched: patch
 	dh_testdir
 	dh_testroot
 	#python2.3 ./setup.py clean --all
-	for i in $(PYVERS); do python$(i) ./setup.py clean --all || true ; done
+	for i in $(PYVERS); do python$(i) ./setup.py clean --all; done
 	-rm -f *-stamp*
 	-rm -rf build *.pyc *.pyo
 	find ./lib -name '*.pyc' -exec rm {} \;
@@ -106,7 +106,7 @@ install-indep: build-indep
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/pdfcorefonts/readme.txt
 
 	# make svg images not executable:
-	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/images/*.svg
+##	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/*.svg
 
 	# move .matplotlibrc to /etc
 ##	mkdir $(CURDIR)/debian/$(pdata)/etc/

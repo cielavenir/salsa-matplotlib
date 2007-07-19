@@ -15,40 +15,36 @@ Provides: ${python:Provides}
 Conflicts: python2.3-matplotlib, python2.4-matplotlib
 Replaces: python2.3-matplotlib, python2.4-matplotlib
 Enhances: ipython
-Suggests: ipython (>= 0.6.3), python-matplotlib-doc, tetex-extra | texlive-extra-utils, texlive-latex-extra
+Suggests: ipython (>= 0.6.3), python-matplotlib-doc, texlive-extra-utils, texlive-latex-extra
 Recommends: dvipng
 Description: python based plotting system in a style similar to Matlab
- Matplotlib is a pure python plotting library designed to bring publication 
- quality plotting to python with a syntax familiar to Matlab users. Although 
- the goal of publication quality is not yet attained, the library does produce 
- high quality 2D plots. All of the plotting commands in the pylab interface
- can be accessed either via a functional interface familiar to Matlab users or
- an object oriented interface familiar to python users.
+ Matplotlib is a pure python plotting library designed to bring
+ publication quality plotting to python with a syntax familiar to
+ Matlab users. All of the plotting commands in the pylab interface can
+ be accessed either via a functional interface familiar to Matlab
+ users or an object oriented interface familiar to python users.
  .
  homepage: http://matplotlib.sf.net/
 
 Package: python-matplotlib-data
 Architecture: all
 Description: python based plotting system (data package)
- Matplotlib is a pure python plotting library designed to bring publication 
- quality plotting to python with a syntax familiar to Matlab users. Although 
- the goal of publication quality is not yet attained, the library does produce 
- high quality 2D plots. All of the plotting commands in the pylab interface
- can be accessed either via a functional interface familiar to Matlab users or
- an object oriented interface familiar to python users.
+ Matplotlib is a pure python plotting library designed to bring
+ publication quality plotting to python with a syntax familiar to
+ Matlab users. All of the plotting commands in the pylab interface can
+ be accessed either via a functional interface familiar to Matlab
+ users or an object oriented interface familiar to python users.
  .
  This package contains architecture independent data for python-matplotlib
 
 Package: python-matplotlib-doc
 Architecture: all
-Enhances: python-matplotlib
 Description: python based plotting system (documentation package)
- Matplotlib is a pure python plotting library designed to bring publication 
- quality plotting to python with a syntax familiar to Matlab users. Although 
- the goal of publication quality is not yet attained, the library does produce 
- high quality 2D plots. All of the plotting commands in the pylab interface
- can be accessed either via a functional interface familiar to Matlab users or
- an object oriented interface familiar to python users.
+ Matplotlib is a pure python plotting library designed to bring
+ publication quality plotting to python with a syntax familiar to
+ Matlab users. All of the plotting commands in the pylab interface can
+ be accessed either via a functional interface familiar to Matlab
+ users or an object oriented interface familiar to python users.
  .
  This package contains documentation for python-matplotlib
 

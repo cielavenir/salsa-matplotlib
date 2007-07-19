@@ -1,3 +1,17 @@
+matplotlib (0.90.1-2) unstable; urgency=low
+
+  * Upload to unstable and not experimental (closes: #411709)
+  * New version can coexist with python-numpy (closes: #426953)
+  * Removed spurious dependency on python-gst (closes: #422711)
+  * New package correctly detects numpy, numeric and numarray (closes: #425906)
+  * applied debian/rules patch for the check that plugins were built (closes: #422475)
+  * Changed dependency on dvipng to a recommendation (closes: #403198)
+  * use texlive instead of tetex (closes:  #406176)
+  * added suggests on texlive-latex-extra (closes: #410777)
+  * reworded the description bit about "publication quality" (closes: #421593) 
+  
+ -- Alexandre Fayolle <afayolle@debian.org>  Thu, 19 Jul 2007 11:58:24 +0200
+
 matplotlib (0.90.1-1) experimental; urgency=low
 
   * New upstream release
