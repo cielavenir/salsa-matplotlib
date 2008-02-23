@@ -1,0 +1,440 @@
+matplotlib (0.90.1-2) unstable; urgency=low
+
+  * Upload to unstable and not experimental (closes: #411709)
+  * New version can coexist with python-numpy (closes: #426953)
+  * Removed spurious dependency on python-gst (closes: #422711)
+  * New package correctly detects numpy, numeric and numarray (closes: #425906)
+  * applied debian/rules patch for the check that plugins were built (closes: #422475)
+  * Changed dependency on dvipng to a recommendation (closes: #403198)
+  * use texlive instead of tetex (closes:  #406176)
+  * added suggests on texlive-latex-extra (closes: #410777)
+  * reworded the description bit about "publication quality" (closes: #421593) 
+  
+ -- Alexandre Fayolle <afayolle@debian.org>  Thu, 19 Jul 2007 11:58:24 +0200
+
+matplotlib (0.90.1-1) experimental; urgency=low
+
+  * New upstream release
+  * updated debian/copyright file
+  
+ -- Alexandre Fayolle <afayolle@debian.org>  Fri, 06 Jul 2007 17:49:05 +0200
+
+matplotlib (0.90.0-2) experimental; urgency=low
+
+  * Changed dvipng dependency to a recommends (Closes: #403198)
+  * Added to suggests tetex-extra | texlive-extra-utils (Closes: 406176)
+  * Added to suggests texlive-latex-extra (Closes: #410777)
+  * Changed python-gst dependency to python-gobject
+  * Already closed bug: (Closes: #396386)
+
+ -- Vittorio Palmisano <redclay81@gmail.com>  Thu, 26 Apr 2007 11:00:02 +0200
+
+matplotlib (0.90.0-1) experimental; urgency=low
+
+  * New upstream release
+  * Added depend on python-tk (Closes: #408944)
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Thu,  1 Mar 2007 22:32:45 +0000
+
+matplotlib (0.87.7-0.2) unstable; urgency=high
+
+  * Non-maintainer upload.
+  * Using patch provided by Mark Hymers <mark@hymers.org.uk>
+    - Add check to debian/rules to prevent builds silently failing to build
+      one of the plugins.  (Closes: #411925)
+
+ -- Martin Zobel-Helas <zobel@ftbfs.de>  Wed, 28 Feb 2007 10:39:43 +0100
+
+matplotlib (0.87.7-0.1) unstable; urgency=medium
+
+  * Remove build dependency on python-numpy-ext.
+  * Prefer python-numpy over (python-numeric as a dependency. Closes: #389669.
+  * Already fixed:
+    - Build dependency on python-numpy. Closes: #375558.
+  * Readd dependency on python-gst. Closes: #385590.
+  * Mention pylab in the package description. Closes: #403723.
+
+ -- Matthias Klose <doko@debian.org>  Sun,  7 Jan 2007 21:30:23 +0000
+
+matplotlib (0.87.7-0) experimental; urgency=low
+
+  * New upstream version (compatible with python-numpy-1.0). Closes: #361181.
+  * (Build-)depend on python-numpy (>= 1:1.0.1).
+  * Remove redundant (build-)dependencies.
+  * Remove references to explicit python versions. Closes: #405611.
+
+ -- Matthias Klose <doko@debian.org>  Wed,  3 Jan 2007 22:52:34 +0100
+
+matplotlib (0.87.5-2.2) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Also Depend: on python-dateutil (closes: #396335)
+
+ -- Mark Hymers <mark@hymers.org.uk>  Tue, 31 Oct 2006 18:05:10 +0000
+
+matplotlib (0.87.5-2.1) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Build-Depend on python-dateutil so that we don't supply our internal copy.
+    Closes: #393074.
+
+ -- Mark Hymers <mark@hymers.org.uk>  Sun, 29 Oct 2006 01:57:17 +0100
+
+matplotlib (0.87.5-2) unstable; urgency=low
+
+  * Fixed python-numpy dependency. Closes: #387440
+  * python-gtk2 includes gobject module and it is an optional dependency for
+    those who use an X server.
+    Closes: #382400, #385590
+
+ -- Vittorio Palmisano <redclay81@gmail.com>  Sat, 16 Sep 2006 18:14:25 +0200
+
+matplotlib (0.87.5-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay81@gmail.com>  Fri, 08 Sep 2006 15:46:46 +0200
+
+matplotlib (0.87.4-3) unstable; urgency=low
+
+  * Removed wrong "Section: doc" from python-matplotlib-doc package
+
+ -- Vittorio Palmisano <redclay81@gmail.com>  Wed, 09 Aug 2006 16:15:44 +0200
+
+matplotlib (0.87.4-2) unstable; urgency=low
+
+  * Removed pytz files. Closes: #335991, #377275
+  * Added numpy support. Closes: #353342
+  * Removed duplicate README.debian. Closes: #380102
+
+ -- Vittorio Palmisano <redclay81@gmail.com>  Wed, 02 Aug 2006 18:28:22 +0200
+
+matplotlib (0.87.4-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Wed, 12 Jul 2006 09:27:16 +0200
+
+matplotlib (0.87.3-1) unstable; urgency=low
+
+  * New upstream version. Closes: #361181
+  * Added numpy support. Closes: #375558
+  * Added depends on python-tz. Closes: #376715
+  
+ -- Marco Presi (Zufus) <zufus@debian.org>  Thu,  6 Jul 2006 09:54:55 +0200
+
+matplotlib (0.86.2-6.1) unstable; urgency=low
+  
+    * Depend on python-tz, remove the pytz files. Closes: #376715.
+  
+ -- Matthias Klose <doko@debian.org>  Fri,  7 Jul 2006 18:38:43 +0000
+  
+matplotlib (0.86.2-6) unstable; urgency=low
+
+  * Added a note about numeric/numarray deps in README.debian. Closes: #376198
+  * Added PYVERS to debian/rules (Carlo Segre <segre@iit.edu> patch). Closes: #376239
+  * Modified Vittorio Palmisano e-mail address.
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Tue,  4 Jul 2006 15:35:38 +0200
+
+matplotlib (0.86.2-5) unstable; urgency=low
+
+  * Updated to new Python policy (closes: #373462)
+  * fixed dependency on python-numarray (closes: #373165)
+
+ -- Alexandre Fayolle <afayolle@debian.org>  Thu, 15 Jun 2006 18:27:18 +0200
+
+matplotlib (0.86.2-4) unstable; urgency=low
+
+  * Added Build-Deps on python-setuputils. Closes: #358597
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Wed, 29 Mar 2006 16:26:27 +0200
+
+matplotlib (0.86.2-3) unstable; urgency=low
+
+  * Fix the previuos BAD Non-maintaner upload. Closes: #357459
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Mon, 20 Mar 2006 23:00:38 +0100
+
+matplotlib (0.86.2-2.1) unstable; urgency=high
+
+  * Non-maintainer upload.
+  * Fix FTBFS 'rm: cannot remove ...: No such file ... (Closes: #354370).
+
+ -- Luk Claes <luk@debian.org>  Thu, 16 Mar 2006 18:52:47 +0100
+
+matplotlib (0.86.2-2) unstable; urgency=low
+
+  * Packages now depend both on python-numarray and python-numeric. Closes: #353043
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Thu, 16 Feb 2006 19:19:42 +0100
+
+matplotlib (0.86.2-1) unstable; urgency=low
+
+  * New upstream release. Closes: #341730
+  * Added ${shlibs:Depends}. Closes: #345366
+  * python-matplotlib-doc is suggested by python-matplotlib and enhances it. 
+    Closes: #341610
+  * Replaced latex dependency with tetex-extra. Closes: #337361
+  * subplot() behavior fixed. Closes: #346285
+  * Added users_guide in -doc package. Closes: #341399
+  
+ -- Vittorio Palmisano <vpalmisano@gmail.com>  Sat, 28 Jan 2006 19:29:15 +0100
+
+matplotlib (0.85-1) unstable; urgency=low
+
+  * New upstream release. Closes: #341730
+
+  * Added ipython among Enhanced packages.
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Sat, 10 Dec 2005 22:53:24 -0500
+
+matplotlib (0.82-5) unstable; urgency=low
+
+  * Added documentation package. Closes: #338622
+  * Added python-epydoc dependency for documentation generation.
+
+ -- Vittorio Palmisano <vpalmisano@gmail.com>  Sat, 12 Nov 2005 21:26:16 +0100
+
+matplotlib (0.82-4) unstable; urgency=low
+
+  * Fixed FTBFS on hppa: added patch to build on systems without X server 
+    (autobuilders) also in the clean stage. Closes: 338423.
+  * The same patch fix the build also on GNU/kFreeBSD. Closes: #336953
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Fri, 11 Nov 2005 20:51:08 -0500
+
+matplotlib (0.82-3) unstable; urgency=low
+
+  * Fixed deps on python-matplotlib (was depending on 0.82-1)
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Thu, 10 Nov 2005 23:46:04 -0500
+
+matplotlib (0.82-2) unstable; urgency=low
+
+  [Marco Presi]
+  
+  * Included patch by Aurelien Jarno <aurel32@debian.org> to fix build on
+    GNU/kFreeBSD. Closes: #336953
+  * Added latex as Suggested dependency. Closes: #337361
+
+ -- Marco Presi (Zufus) <zufus@debian.org>  Sun,  6 Nov 2005 21:49:45 -0500
+
+matplotlib (0.82-1) unstable; urgency=low
+
+  * New upstream release
+  * First Debian release. Closes: #206691
+  * Removed doc package, added notes in README.debian
+  * Added dvipng dependency
+  * Added python2.3-qt3, python2.4-qt3 optional dependency
+  * Added API_CHANGES, INTERACTIVE, KNOWN_BUGS, NUMARRAY_ISSUES to docs
+  * Removed import gtk/tk from setup.py for building on systems without X
+    server (buildd)
+  * Moved .matplolibrc to /etc/matplolibrc and patched lib/__init__.py in
+    order to make the package compliant with Debian Policy
+
+ -- Vittorio Palmisano <vpalmisano@gmail.com>  Sat, 15 Oct 2005 22:42:01 +0200
+
+matplotlib (0.81-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Sat, 11 Jun 2005 13:16:37 +0200
+
+matplotlib (0.80-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Mon, 25 Apr 2005 19:16:59 +0200
+
+matplotlib (0.74-1) unstable; urgency=low
+
+  * New upstream release
+  * Aurelien Jarno:
+    - python-matplotlib does not need to depends on python-matplotlib-data
+    - remove README.Debian file
+    - README and TODO also in python2.3-matplotlib and python2.4-matplotlib
+    - keep the name matplotlib for the source package only
+    - remove generation of html docs, using User's Guide pdf
+
+ -- Vittorio Palmisano <redclay@email.it>  Sun, 10 Apr 2005 09:53:51 +0200
+
+python-matplotlib (0.72-4) unstable; urgency=low
+
+  * Added support for different python versions
+
+ -- Vittorio Palmisano <redclay@email.it>  Sat, 26 Feb 2005 22:05:40 +0100 
+
+python-matplotlib (0.72-3) unstable; urgency=low
+
+  * Aurelien Jarno:
+    - fixed find_tcltk() error if X display is not accessible
+    - changed matlab to Matlab in debian/control file
+
+ -- Vittorio Palmisano <redclay@email.it>  Wed, 23 Feb 2005 16:17:36 +0100
+
+python-matplotlib (0.72-2) unstable; urgency=low
+
+  * Aurelien Jarno:
+    - Fixed debhelper(>=4.1.67) dependency
+    - removed debian/postinst and debian/preinst
+    - removed gunzip of example/data
+
+ -- Vittorio Palmisano <redclay@email.it>  Sun, 20 Feb 2005 21:44:17 +0100
+
+python-matplotlib (0.72-1) unstable; urgency=low
+
+  * New upstream release
+  * Added python-dev dependency
+
+ -- Vittorio Palmisano <redclay@email.it>  Fri, 18 Feb 2005 15:16:26 +0100
+
+python-matplotlib (0.71-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Sat, 22 Jan 2005 15:19:56 +0100
+
+python-matplotlib (0.70.1-2) unstable; urgency=low
+
+  * Added python-numeric-ext | python-numarray-ext dependency
+
+ -- Vittorio Palmisano <redclay@email.it>  Mon, 17 Jan 2005 11:16:01 +0100
+
+python-matplotlib (0.70.1-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Sun, 02 Jan 2005 23:35:30 +0100
+
+python-matplotlib (0.65.1-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Thu, 23 Dec 2004 21:58:31 +0100
+
+python-matplotlib (0.65-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Sat, 18 Dec 2004 15:22:58 +0100
+
+python-matplotlib (0.64-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Sat, 13 Nov 2004 22:28:00 +0100
+
+python-matplotlib (0.63.4-3) unstable; urgency=low
+
+  * Jochen Voss:
+    - fix the dependencies and build-dependencies
+    - remove the Vera*.ttf files and depend on ttf-bitstream-vera instead
+  * added Recommends: ipython(>=0.6.3)
+
+ -- Vittorio Palmisano <redclay@email.it>  Sat, 23 Oct 2004 10:48:27 +0200
+
+python-matplotlib (0.63.4-2) unstable; urgency=low
+
+  * Updated copyright file (autogenerated)
+  * Changed Description
+  * Removed libttf-dev depends (thanks to Jochen Voss)
+
+ -- Vittorio Palmisano <redclay@email.it>  Sun, 03 Oct 2004 23:05:06 +0200
+
+python-matplotlib (0.63.4-1) unstable; urgency=low
+
+  * New upstream release (closes: #206691)
+  * fixed .svg files perms
+  * removed Recommends: libwxgtk2.4-python
+
+ -- Vittorio Palmisano <redclay@email.it>  Fri, 01 Oct 2004 22:31:28 +0200
+
+python-matplotlib (0.62.4-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Mon, 30 Aug 2004 22:30:50 +0200
+
+python-matplotlib (0.61.0-2) unstable; urgency=low
+
+  * John Hunter:
+    - Removed python-ttfquery dependency
+
+ -- Vittorio Palmisano <redclay@email.it>  Sun, 15 Aug 2004 20:25:00 +0200
+
+python-matplotlib (0.61.0-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Mon, 09 Aug 2004 23:40:44 +0200
+
+python-matplotlib (0.60.2-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Sun, 11 Jul 2004 10:24:01 +0200
+
+python-matplotlib (0.54.2-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Fri, 11 Jun 2004 22:48:50 +0200
+
+python-matplotlib (0.54.1-1) unstable; urgency=low
+
+  * New upstream release
+  * Seo Sanghyeon:
+    - Fixed python-numeric | python-numarray dependency
+    - Fixed python-gtk2 dependency
+
+ -- Vittorio Palmisano <redclay@email.it>  Sun, 30 May 2004 10:14:08 +0200
+
+python-matplotlib (0.54-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Sat, 22 May 2004 22:47:59 +0200
+
+python-matplotlib (0.53.1-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Sat,  1 May 2004 23:19:40 +0200
+
+python-matplotlib (0.53-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Fri, 23 Apr 2004 20:49:25 +0200
+
+python-matplotlib (0.52-2) unstable; urgency=low
+
+  * Fixed python-gd dependency 
+
+ -- Vittorio Palmisano <redclay@email.it>  Fri, 26 Mar 2004 11:40:37 +0100
+
+python-matplotlib (0.52-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Sat, 20 Mar 2004 17:40:06 +0100
+
+python-matplotlib (0.51-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Vittorio Palmisano <redclay@email.it>  Fri,  5 Mar 2004 14:27:08 +0100
+
+python-matplotlib (0.50-2) unstable; urgency=low
+
+  * Removed python2.3-numeric-ext dependency
+
+ -- Vittorio Palmisano <redclay@email.it>  Thu, 26 Feb 2004 15:27:30 +0100
+
+python-matplotlib (0.50-1) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Vittorio Palmisano <redclay@email.it>  Sat, 21 Feb 2004 23:52:10 +0100
+

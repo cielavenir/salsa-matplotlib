@@ -1,0 +1,155 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+PYVERS := $(shell pyversions -v -r debian/control)
+DEFPY := $(shell pyversions -v -d)
+pd  := python-matplotlib-doc
+p   := python-matplotlib
+pdata := python-matplotlib-data
+
+#users_guide_ver := 0.87.1
+users_guide := users_guide_*.pdf
+
+# Include dpatch stuff.
+include /usr/share/dpatch/dpatch.make
+
+#users_guide := $(shell wget http://matplotlib.sourceforge.net/index.html && grep 'users_guide_.*\.pdf' index.html | sed s/'.*\(users_guide_.*\.pdf\).*'/'\1'/; rm -f index.html)
+
+# build
+build: patch-stamp build-arch build-indep
+
+build-indep: build-indep-stamp
+build-indep-stamp:
+	dh_testdir
+	## Building documentation...
+	#mkdir -p doc
+	#which xvfb-run && sh -c "cd doc; xvfb-run epydoc -n matplotlib ../lib/matplotlib/*; cd -;" || true
+	#wget http://matplotlib.sourceforge.net/$(users_guide)
+	touch build-indep-stamp
+
+build-arch:$(PYVERS:%=build-stamp-%)
+
+build-stamp-%:
+	dh_testdir
+	python$* ./setup.py build $(PY_BUILD_FLAGS)
+	touch $@
+
+
+# clean
+clean: clean-patched unpatch
+clean-patched: patch
+	dh_testdir
+	dh_testroot
+	#python2.3 ./setup.py clean --all
+	for i in $(PYVERS); do python$(i) ./setup.py clean --all; done
+	-rm -f *-stamp*
+	-rm -rf build *.pyc *.pyo
+	find ./lib -name '*.pyc' -exec rm {} \;
+	dh_clean
+	#sh $(CURDIR)/debian/mkcopyright.sh
+
+# install
+install-arch: build-arch $(PYVERS:%=install-stamp-%)
+	dh_testdir
+	dh_testroot
+
+install-stamp-%: build-stamp-%
+	dh_testdir
+	dh_testroot
+	python$* ./setup.py install_lib \
+		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/ --no-compile
+	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/mpl-data/
+	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/backends/Matplotlib.nib/
+
+	# Check that we have built all of the plugins for the default python version; FTBFS if not; this
+	# is better than having packages silently fail to build on the
+	# autobuilders.
+	# The plugin abbreviations are:
+	#  ns_ = numpy, na_ = numarray, nc_ = numeric
+	for v in $(DEFPY); do \
+		for p in na ns nc; do \
+			for f in transforms.so image.so cntr.so nxutils.so; do \
+				# Check for these four files for each plugin: \
+				#	_na_transforms.so, _na_image.so, _na_cntr.so, _na_nxutils.so \
+				if test ! -f debian/python-matplotlib/usr/lib/python$$v/site-packages/matplotlib/_$${p}_$${f}; then \
+					echo "Missing plugin file _$${p}_$${f}: Failing build"; \
+					exit 1; \
+				fi \
+			done \
+				# Also check for the backend plugins: \
+				# e.g. backends/_na_backend_agg.so \
+			for f in agg.so gdk.so; do \
+				if test ! -f debian/python-matplotlib/usr/lib/python$$v/site-packages/matplotlib/backends/_$${p}_backend_$${f}; then \
+					echo "Missing backend file _$${p}_backend_$${f}: Failing build"; \
+					exit 1; \
+				fi \
+			done \
+		done \
+	done
+
+	touch $@
+
+install-indep: build-indep
+	dh_testdir -i
+	dh_testroot -i
+	dh_clean -k
+	dh_install -p python-matplotlib-data
+##	python ./setup.py install --no-compile --prefix $(CURDIR)/debian/$(pdata)/usr
+	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/Vera*.ttf
+	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/*.TXT
+	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/local.conf
+	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/pdfcorefonts/readme.txt
+
+	# make svg images not executable:
+##	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/*.svg
+
+	# move .matplotlibrc to /etc
+##	mkdir $(CURDIR)/debian/$(pdata)/etc/
+##	mv $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/matplotlibrc \
+##		$(CURDIR)/debian/$(pdata)/etc/matplotlibrc
+
+# binary
+binary-indep: build-indep install-indep
+	dh_testdir -i
+	dh_testroot -i
+	dh_installchangelogs -i CHANGELOG
+	dh_installdocs -p$(pd) -i
+	dh_installexamples -p$(pd) -i examples/*
+##	dh_install -p$(pd) -i ./$(users_guide) usr/share/doc/$(pd)/pdf 
+	dh_compress -i -Xexamples -Xexamples/data -Xpdf
+	dh_fixperms -i
+	dh_installdeb -i
+	dh_gencontrol -i
+	dh_md5sums -i
+	dh_builddeb -i
+
+binary-arch: build-arch install-arch
+	dh_testdir -a
+	dh_testroot -a
+	dh_installchangelogs -a CHANGELOG
+	dh_installdocs -p$(p) -a README TODO API_CHANGES NUMARRAY_ISSUES KNOWN_BUGS
+	# make python scripts starting with '#!' executable
+	for i in `find debian -mindepth 2 -type f ! -perm 755`; do \
+	  if head -1 $$i | grep -q '^#!'; then \
+	    chmod 755 $$i; \
+	    echo "made executable: $$i"; \
+	  fi; \
+	done
+	dh_pycentral -a
+	dh_link -a
+	dh_strip -a
+	dh_compress -a
+	dh_fixperms -a
+	dh_installdeb -a
+	dh_shlibdeps -a
+	dh_gencontrol -a
+	dh_md5sums -a
+	dh_builddeb -a
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install
