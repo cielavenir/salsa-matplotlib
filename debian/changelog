@@ -1,3 +1,12 @@
+matplotlib (0.90.1-3.1) unstable; urgency=medium
+
+  * Non-maintainer upload to fix an RC bug. python-numpy conflicts with
+    python-matplotlib (<< 0.90.1-3), that's why we use 0.90.1-3.1 instead of
+    0.90.1-2.1.
+  * Rebuilt against python-numpy 1:1.0.4-6 (Closes: #467099)
+
+ -- Ondrej Certik <ondrej@certik.cz>  Sun, 24 Feb 2008 14:36:08 +0100
+
 matplotlib (0.90.1-2) unstable; urgency=low
 
   * Upload to unstable and not experimental (closes: #411709)
