@@ -4,7 +4,8 @@ matplotlib (0.90.1-4) unstable; urgency=low
   * Vittorio Palmisano and Ondrej Certik added to Uploaders
   * "DM-Upload-Allowed: yes" field added
   * Standards-Version bumped to 3.7.3
-  * python-numarray and python-numeric removed from build-depends 
+  * python-numarray and python-numeric removed from build-depends and
+    debian/rules fixed to make the package compile
 
  -- Ondrej Certik <ondrej@certik.cz>  Sat, 08 Mar 2008 19:10:55 +0100
 
