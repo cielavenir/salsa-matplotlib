@@ -7,6 +7,7 @@ Build-Depends: debhelper (>= 5.0.38), python-dateutil, python-all-dev (>= 2.3.5-
 XS-Python-Version: all
 Standards-Version: 3.7.3
 XS-DM-Upload-Allowed: yes
+Homepage: http://matplotlib.sf.net/
 
 Package: python-matplotlib
 Architecture: any
@@ -24,8 +25,6 @@ Description: Python based plotting system in a style similar to Matlab
  Matlab users. All of the plotting commands in the pylab interface can
  be accessed either via a functional interface familiar to Matlab
  users or an object oriented interface familiar to Python users.
- .
- homepage: http://matplotlib.sf.net/
 
 Package: python-matplotlib-data
 Architecture: all
@@ -40,7 +39,8 @@ Description: Python based plotting system (data package)
 
 Package: python-matplotlib-doc
 Architecture: all
-Description: python based plotting system (documentation package)
+Section: doc
+Description: Python based plotting system (documentation package)
  Matplotlib is a pure Python plotting library designed to bring
  publication quality plotting to Python with a syntax familiar to
  Matlab users. All of the plotting commands in the pylab interface can
@@ -48,4 +48,3 @@ Description: python based plotting system (documentation package)
  users or an object oriented interface familiar to Python users.
  .
  This package contains documentation for python-matplotlib
-
