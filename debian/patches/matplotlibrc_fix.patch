@@ -1,13 +1,7 @@
-#! /bin/sh /usr/share/dpatch/dpatch-run
-## matplotlibrc_fix.dpatch by Marco Presi (Zufus) <zufus@debian.org>
-##
-## All lines beginning with `## DP:' are a description of the patch.
-## DP: No description.
-
-@DPATCH@
-diff -urNad matplotlib-0.87.4~/lib/matplotlib/__init__.py matplotlib-0.87.4/lib/matplotlib/__init__.py
---- matplotlib-0.87.4~/lib/matplotlib/__init__.py	2006-08-01 23:48:33.000000000 +0200
-+++ matplotlib-0.87.4/lib/matplotlib/__init__.py	2006-08-01 23:49:36.000000000 +0200
+Index: matplotlib-0.90.1/lib/matplotlib/__init__.py
+===================================================================
+--- matplotlib-0.90.1.orig/lib/matplotlib/__init__.py	2008-03-09 16:26:37.183488583 +0100
++++ matplotlib-0.90.1/lib/matplotlib/__init__.py	2008-03-09 16:27:41.868489923 +0100
 @@ -339,9 +339,11 @@
          path = os.environ['MATPLOTLIBDATA']
          if os.path.isdir(path): return path
@@ -22,7 +16,7 @@ diff -urNad matplotlib-0.87.4~/lib/matplotlib/__init__.py matplotlib-0.87.4/lib/
      # setuptools' namespace_packages may highjack this init file
      # so need to try something known to be in matplotlib, not basemap
      import matplotlib.afm
-@@ -915,7 +917,7 @@
+@@ -942,7 +944,7 @@
      if os.path.exists(fname): return fname
  
  

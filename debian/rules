@@ -12,8 +12,7 @@ pd  := python-matplotlib-doc
 p   := python-matplotlib
 pdata := python-matplotlib-data
 
-# Include dpatch stuff.
-include /usr/share/dpatch/dpatch.make
+include /usr/share/quilt/quilt.make
 
 # build
 build: patch-stamp build-arch build-indep

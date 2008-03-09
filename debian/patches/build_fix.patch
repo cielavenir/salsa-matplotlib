@@ -1,13 +1,7 @@
-#! /bin/sh /usr/share/dpatch/dpatch-run
-## build_fix.dpatch by Vittorio Palmisano <redclay81@gmail.com>
-##
-## All lines beginning with `## DP:' are a description of the patch.
-## DP: No description.
-
-@DPATCH@
-diff -urNad matplotlib-0.90.1/setup.py.orig matplotlib-0.90.1/setup.py
---- matplotlib-0.90.1/setup.py.orig     2007-07-06 17:59:58.000000000 +0200
-+++ matplotlib-0.90.1/setup.py  2007-07-06 18:04:52.000000000 +0200
+Index: matplotlib-0.90.1/setup.py
+===================================================================
+--- matplotlib-0.90.1.orig/setup.py	2008-03-09 16:31:44.511489293 +0100
++++ matplotlib-0.90.1/setup.py	2008-03-09 16:31:54.587540476 +0100
 @@ -28,13 +28,13 @@
  # it.  It makes very nice antialiased output and also supports alpha
  # blending
@@ -52,10 +46,10 @@ diff -urNad matplotlib-0.90.1/setup.py.orig matplotlib-0.90.1/setup.py
      build_gtkagg(ext_modules, packages, NUMERIX)
      rc['backend'] = 'GTKAgg'
 +'''
-+
+ 
 +build_gtkagg(ext_modules, packages, NUMERIX)
 +rc['backend'] = 'GTKAgg'
- 
++
 +'''
  if BUILD_TKAGG:
      try:
@@ -83,9 +77,10 @@ diff -urNad matplotlib-0.90.1/setup.py.orig matplotlib-0.90.1/setup.py
  if BUILD_AGG:
      build_agg(ext_modules, packages, NUMERIX)
      if rc['backend'] == 'PS': rc['backend'] = 'Agg'
-diff -urNad matplotlib-0.90.1/setupext.py.orig matplotlib-0.90.1/setupext.py
---- matplotlib-0.90.1/setupext.py.orig  2007-07-06 18:07:08.000000000 +0200
-+++ matplotlib-0.90.1/setupext.py       2007-07-06 18:10:17.000000000 +0200
+Index: matplotlib-0.90.1/setupext.py
+===================================================================
+--- matplotlib-0.90.1.orig/setupext.py	2008-03-09 16:31:44.527489655 +0100
++++ matplotlib-0.90.1/setupext.py	2008-03-09 16:31:54.596520271 +0100
 @@ -45,8 +45,8 @@
  
  basedir = {
@@ -125,4 +120,3 @@ diff -urNad matplotlib-0.90.1/setupext.py.orig matplotlib-0.90.1/setupext.py
      else:
          tk.withdraw()
          o.tcl_lib = os.path.normpath(os.path.join(str(tk.getvar('tcl_library')), '../'))
- 
