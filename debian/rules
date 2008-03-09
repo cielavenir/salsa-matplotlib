@@ -12,13 +12,8 @@ pd  := python-matplotlib-doc
 p   := python-matplotlib
 pdata := python-matplotlib-data
 
-#users_guide_ver := 0.87.1
-users_guide := users_guide_*.pdf
-
 # Include dpatch stuff.
 include /usr/share/dpatch/dpatch.make
-
-#users_guide := $(shell wget http://matplotlib.sourceforge.net/index.html && grep 'users_guide_.*\.pdf' index.html | sed s/'.*\(users_guide_.*\.pdf\).*'/'\1'/; rm -f index.html)
 
 # build
 build: patch-stamp build-arch build-indep
@@ -26,10 +21,6 @@ build: patch-stamp build-arch build-indep
 build-indep: build-indep-stamp
 build-indep-stamp:
 	dh_testdir
-	## Building documentation...
-	#mkdir -p doc
-	#which xvfb-run && sh -c "cd doc; xvfb-run epydoc -n matplotlib ../lib/matplotlib/*; cd -;" || true
-	#wget http://matplotlib.sourceforge.net/$(users_guide)
 	touch build-indep-stamp
 
 build-arch:$(PYVERS:%=build-stamp-%)
@@ -45,13 +36,11 @@ clean: clean-patched unpatch
 clean-patched: patch
 	dh_testdir
 	dh_testroot
-	#python2.3 ./setup.py clean --all
 	for i in $(PYVERS); do python$(i) ./setup.py clean --all; done
 	-rm -f *-stamp*
 	-rm -rf build *.pyc *.pyo
 	find ./lib -name '*.pyc' -exec rm {} \;
 	dh_clean
-	#sh $(CURDIR)/debian/mkcopyright.sh
 
 # install
 install-arch: build-arch $(PYVERS:%=install-stamp-%)
@@ -72,20 +61,12 @@ install-indep: build-indep
 	dh_testdir -i
 	dh_testroot -i
 	dh_clean -k
-	dh_install -p python-matplotlib-data
-##	python ./setup.py install --no-compile --prefix $(CURDIR)/debian/$(pdata)/usr
+	dh_install -p $(pdata)
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/Vera*.ttf
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/*.TXT
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/local.conf
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/pdfcorefonts/readme.txt
 
-	# make svg images not executable:
-##	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/*.svg
-
-	# move .matplotlibrc to /etc
-##	mkdir $(CURDIR)/debian/$(pdata)/etc/
-##	mv $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/matplotlibrc \
-##		$(CURDIR)/debian/$(pdata)/etc/matplotlibrc
 
 # binary
 binary-indep: build-indep install-indep
@@ -94,7 +75,6 @@ binary-indep: build-indep install-indep
 	dh_installchangelogs -i CHANGELOG
 	dh_installdocs -p$(pd) -i
 	dh_installexamples -p$(pd) -i examples/*
-##	dh_install -p$(pd) -i ./$(users_guide) usr/share/doc/$(pd)/pdf 
 	dh_compress -i -Xexamples -Xexamples/data -Xpdf
 	dh_fixperms -i
 	dh_installdeb -i
