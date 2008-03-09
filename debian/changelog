@@ -8,8 +8,9 @@ matplotlib (0.90.1-4) unstable; urgency=low
     debian/rules fixed to make the package compile
   * debian/rules polished 
   * patches moved under a quilt control 
+  * Package descriptions fixed (python -> Python) 
 
- -- Ondrej Certik <ondrej@certik.cz>  Sun, 09 Mar 2008 16:36:31 +0100
+ -- Ondrej Certik <ondrej@certik.cz>  Sun, 09 Mar 2008 17:48:27 +0100
 
 matplotlib (0.90.1-3.1) unstable; urgency=medium
 
