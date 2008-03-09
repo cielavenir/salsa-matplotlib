@@ -6,14 +6,14 @@ matplotlib (0.90.1-4) unstable; urgency=low
   * Standards-Version bumped to 3.7.3
   * python-numarray and python-numeric removed from build-depends and
     debian/rules fixed to make the package compile
-  * debian/rules polished 
-  * patches moved under a quilt control 
-  * Package descriptions fixed (python -> Python) 
+  * debian/rules polished
+  * patches moved under a quilt control
+  * Package descriptions fixed (python -> Python)
   * Homepage field added (and removed from description)
   * python-matplotlib-doc package moved to the "doc" Section
   * /usr/share/matplotlib/mpl-data/images/*.svg made chmod 644 (i.e. not
-    executable) 
-  * debian/watch uncommented, as it seems to work
+    executable)
+  * debian/watch uncommented, as it seems to work (and last line removed)
 
  -- Ondrej Certik <ondrej@certik.cz>  Sun, 09 Mar 2008 20:15:40 +0100
 
