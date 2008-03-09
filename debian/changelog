@@ -14,8 +14,7 @@ matplotlib (0.90.1-4) unstable; urgency=low
   * /usr/share/matplotlib/mpl-data/images/*.svg made chmod 644 (i.e. not
     executable)
   * debian/watch uncommented, as it seems to work (and last line removed)
-  * python2.3-matplotlib and python2.4-matplotlib removed from
-    Conflicts/Replaces 
+  * python2.3-matplotlib removed from Conflicts/Replaces 
 
  -- Ondrej Certik <ondrej@certik.cz>  Sun, 09 Mar 2008 20:39:04 +0100
 
