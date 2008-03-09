@@ -3,5 +3,5 @@
 # to check for upstream updates and more.
 # Site				Directory		Pattern				Version	Script
 version=3
-#http://sf.net/matplotlib/matplotlib-([0-9]+(?:\.[0-9]+)*)\.tar\.gz
-#http://prdownloads.sourceforge.net/matplotlib/matplotlib-([0-9]+(?:\.[0-9]+)*)\.tar\.gz
+http://sf.net/matplotlib/matplotlib-([0-9]+(?:\.[0-9]+)*)\.tar\.gz
+http://prdownloads.sourceforge.net/matplotlib/matplotlib-([0-9]+(?:\.[0-9]+)*)\.tar\.gz
