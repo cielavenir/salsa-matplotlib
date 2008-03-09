@@ -15,7 +15,7 @@ pdata := python-matplotlib-data
 include /usr/share/quilt/quilt.make
 
 # build
-build: patch-stamp build-arch build-indep
+build: patch build-arch build-indep
 
 build-indep: build-indep-stamp
 build-indep-stamp:
