@@ -12,7 +12,7 @@ Homepage: http://matplotlib.sf.net/
 Package: python-matplotlib
 Architecture: any
 XB-Python-Version: ${python:Versions}
-Depends: ${python:Depends},  python-numpy (>= 1:1.0.3) | python-numeric-ext | python-numarray-ext,  python-tk, python-gd (>= 0.52) | python-pypaint | python-gtk2 | libwxgtk2.4-python | python-qt3, python-tz, python-dev, python-matplotlib-data (>= ${source:Version}), python-dateutil, python-gobject, ${shlibs:Depends}
+Depends: ${python:Depends},  python-numpy (>= 1:1.0.3) | python-numeric-ext | python-numarray-ext,  python-tk, python-gd (>= 0.52) | python-pypaint | python-gtk2 | python-wxgtk2.6 | python-qt3, python-tz, python-dev, python-matplotlib-data (>= ${source:Version}), python-dateutil, python-gobject, ${shlibs:Depends}
 Provides: ${python:Provides}
 Conflicts: python2.4-matplotlib
 Replaces: python2.4-matplotlib

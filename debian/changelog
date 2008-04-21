@@ -1,3 +1,10 @@
+matplotlib (0.90.1-5) UNRELEASED; urgency=low
+
+  * Replace libwxgtk2.4-python with python-wxgtk2.6 in Depends
+    (closes: #466470)
+
+ -- Piotr Ożarowski <piotr@debian.org>  Mon, 21 Apr 2008 23:19:44 +0200
+
 matplotlib (0.90.1-4) unstable; urgency=low
 
   * Maintainer changed to Debian Python Modules Team
