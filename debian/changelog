@@ -1,9 +1,29 @@
-matplotlib (0.90.1-5) UNRELEASED; urgency=low
+matplotlib (0.91.2-1) UNRELEASED; urgency=low
 
+  [ Piotr Ożarowski ]
   * Replace libwxgtk2.4-python with python-wxgtk2.6 in Depends
     (closes: #466470)
 
- -- Piotr Ożarowski <piotr@debian.org>  Mon, 21 Apr 2008 23:19:44 +0200
+  [ Sandro Tosi ]
+  * New upstream release (Closes: #459200, #474001)
+  * debian/patches/build_fix.patch
+    - edited to match new code
+  * debian/rules
+    - adjusted doc files installation
+  * debian/docs
+    - removed since the same files were already in debian/rules
+  * debian/patches/matplotlibrc_fix.patch
+    - edited to match new code (sync from Ubuntu)
+  * debian/control
+    - added "dvipng, python-configobj, python-enthought-traits (>= 2.0),
+      python-qt-dev, python-qt4-dev, python-wxgtk2.6" as build-dep (sync from
+      Ubuntu)
+    - bump depends on python-numpy (sync from Ubuntu)
+    - added "python-qt4, dvipng, python-configobj, python-enthought-traits (>=
+      2.0)" to Depends (sync from Ubuntu)
+    - merged Recommends into Depends
+
+ -- Sandro Tosi <matrixhasu@gmail.com>  Wed, 23 Apr 2008 00:17:32 +0200
 
 matplotlib (0.90.1-4) unstable; urgency=low
 

@@ -86,7 +86,7 @@ binary-arch: build-arch install-arch
 	dh_testdir -a
 	dh_testroot -a
 	dh_installchangelogs -a CHANGELOG
-	dh_installdocs -p$(p) -a README TODO API_CHANGES NUMARRAY_ISSUES KNOWN_BUGS
+	dh_installdocs -p$(p) -a README TODO API_CHANGES KNOWN_BUGS INTERACTIVE
 	# make python scripts starting with '#!' executable
 	for i in `find debian -mindepth 2 -type f ! -perm 755`; do \
 	  if head -1 $$i | grep -q '^#!'; then \

@@ -2,12 +2,12 @@ Index: matplotlib-0.90.1/lib/matplotlib/__init__.py
 ===================================================================
 --- matplotlib-0.90.1.orig/lib/matplotlib/__init__.py	2008-03-09 16:26:37.183488583 +0100
 +++ matplotlib-0.90.1/lib/matplotlib/__init__.py	2008-03-09 16:27:41.868489923 +0100
-@@ -339,9 +339,11 @@
-         path = os.environ['MATPLOTLIBDATA']
-         if os.path.isdir(path): return path
+@@ -417,9 +417,11 @@
+             raise RuntimeError('Path in environment MATPLOTLIBDATA not a directory')
+         return path
  
 -    path = os.sep.join([os.path.dirname(__file__), 'mpl-data'])
-+    path = os.sep.join(['/usr/share/matplotlib', 'mpl-data'])
++    path = '/usr/share/matplotlib/mpl-data'
      if os.path.isdir(path): return path
 -
 +    
@@ -16,7 +16,7 @@ Index: matplotlib-0.90.1/lib/matplotlib/__init__.py
      # setuptools' namespace_packages may highjack this init file
      # so need to try something known to be in matplotlib, not basemap
      import matplotlib.afm
-@@ -942,7 +944,7 @@
+@@ -514,7 +516,7 @@
      if os.path.exists(fname): return fname
  
  
@@ -25,3 +25,4 @@ Index: matplotlib-0.90.1/lib/matplotlib/__init__.py
      fname = os.path.join(path, 'matplotlibrc')
      if not os.path.exists(fname):
          warnings.warn('Could not find matplotlibrc; using defaults')
+
