@@ -19,7 +19,7 @@ DEBUG = False
 class NavigationToolbar2GTKAgg(NavigationToolbar2GTK):
     def _get_canvas(self, fig):
         return FigureCanvasGTKAgg(fig)
-    
+
 
 class FigureManagerGTKAgg(FigureManagerGTK):
     def _get_toolbar(self, canvas):
@@ -32,7 +32,7 @@ class FigureManagerGTKAgg(FigureManagerGTK):
         else:
             toolbar = None
         return toolbar
-    
+
 def new_figure_manager(num, *args, **kwargs):
     """
     Create a new figure manager instance
@@ -45,12 +45,14 @@ def new_figure_manager(num, *args, **kwargs):
     if DEBUG: print 'backend_gtkagg.new_figure_manager done'
 
 class FigureCanvasGTKAgg(FigureCanvasGTK, FigureCanvasAgg):
-
+    filetypes = FigureCanvasGTK.filetypes.copy()
+    filetypes.update(FigureCanvasAgg.filetypes)
+    
     def configure_event(self, widget, event=None):
 
         if DEBUG: print 'FigureCanvasGTKAgg.configure_event'
         if widget.window is None:
-            return 
+            return
         try:
             del self.renderer
         except AttributeError:
@@ -65,9 +67,9 @@ class FigureCanvasGTKAgg(FigureCanvasGTK, FigureCanvasAgg):
         self.figure.set_size_inches(winch, hinch)
         self._need_redraw = True
         self.resize_event()
-        if DEBUG: print 'FigureCanvasGTKAgg.configure_event end'        
+        if DEBUG: print 'FigureCanvasGTKAgg.configure_event end'
         return True
-    
+
     def _render_figure(self, pixmap, width, height):
         if DEBUG: print 'FigureCanvasGTKAgg.render_figure'
         FigureCanvasAgg.draw(self)
@@ -95,33 +97,10 @@ class FigureCanvasGTKAgg(FigureCanvasGTK, FigureCanvasAgg):
                                    0, 0, 0, 0, w, h)
         if DEBUG: print 'FigureCanvasGTKAgg.done'
 
-    def print_figure(self, filename, dpi=None, facecolor='w', edgecolor='w',
-                     orientation='portrait', **kwargs):
-        if DEBUG: print 'FigureCanvasGTKAgg.print_figure'
-        # delete the renderer to prevent improper blitting after print
-
-        if dpi is None: dpi = matplotlib.rcParams['savefig.dpi']
-        root, ext = os.path.splitext(filename)       
-        ext = ext.lower()[1:]
-        if ext == 'jpg':
-            FigureCanvasGTK.print_figure(self, filename, dpi, facecolor, 
-                                         edgecolor, orientation, **kwargs)
-            
-        else:
-            agg = self.switch_backends(FigureCanvasAgg)
-            try:
-                agg.print_figure(filename, dpi, facecolor, edgecolor,
-                                 orientation, **kwargs)
-            except IOError, msg:
-                error_msg_gtk('Failed to save\nError message: %s'%(msg,), self)
-            except:
-                self.figure.set_canvas(self)
-                raise
-
-        self.figure.set_canvas(self)
-        if DEBUG: print 'FigureCanvasGTKAgg.print_figure done'
-
-
+    def print_png(self, filename, *args, **kwargs):
+        # Do this so we can save the resolution of figure in the PNG file
+        agg = self.switch_backends(FigureCanvasAgg)
+        return agg.print_png(filename, *args, **kwargs)
 
 """\
 Traceback (most recent call last):

@@ -1,7 +1,11 @@
 """
 Figure class -- add docstring here!
 """
+import os
 import sys
+
+import numpy as npy
+
 import artist
 from artist import Artist
 from axes import Axes, Subplot, PolarSubplot, PolarAxes
@@ -16,8 +20,6 @@ from text import Text, _process_text_args
 
 from legend import Legend
 from transforms import Bbox, Value, Point, get_bbox_transform, unit_bbox
-from numerix import array, clip, transpose, minimum, maximum
-from mlab import linspace, meshgrid
 from ticker import FormatStrFormatter
 from cm import ScalarMappable
 from contour import ContourSet
@@ -102,6 +104,9 @@ class SubplotParams:
 
 class Figure(Artist):
 
+    def __str__(self):
+        return "Figure(%gx%g)"%(self.figwidth.get(),self.figheight.get())
+
     def __init__(self,
                  figsize   = None,  # defaults to rc figure.figsize
                  dpi       = None,  # defaults to rc figure.dpi
@@ -160,31 +165,41 @@ class Figure(Artist):
 
     def autofmt_xdate(self, bottom=0.2, rotation=30, ha='right'):
         """
-        A common use case is a number of subplots with shared xaxes
-        where the x-axis is date data.  The ticklabels are often
-        long,and it helps to rotate them on the bottom subplot and
-        turn them off on other subplots.  This function will raise a
-        RuntimeError if any of the Axes are not Subplots.
+        Date ticklabels often overlap, so it is useful to rotate them
+        and right align them.  Also, a common use case is a number of
+        subplots with shared xaxes where the x-axis is date data.  The
+        ticklabels are often long, and it helps to rotate them on the
+        bottom subplot and turn them off on other subplots, as well as
+        turn off xlabels.
+
 
         bottom : the bottom of the subplots for subplots_adjust
         rotation: the rotation of the xtick labels
         ha : the horizontal alignment of the xticklabels
 
-        
+
         """
 
-        for ax in self.get_axes():
-            if not hasattr(ax, 'is_last_row'):
-                raise RuntimeError('Axes must be subplot instances; found %s'%type(ax))
-            if ax.is_last_row():
-                for label in ax.get_xticklabels():
-                    label.set_ha(ha)
-                    label.set_rotation(rotation)                
-            else:
-                for label in ax.get_xticklabels():
-                    label.set_visible(False)
-        self.subplots_adjust(bottom=bottom)
-        
+        allsubplots = npy.alltrue([hasattr(ax, 'is_last_row') for ax in self.axes])
+        if len(self.axes)==1:
+            for label in ax.get_xticklabels():
+                label.set_ha(ha)
+                label.set_rotation(rotation)
+        else:
+            if allsubplots:
+                for ax in self.get_axes():
+                    if ax.is_last_row():
+                        for label in ax.get_xticklabels():
+                            label.set_ha(ha)
+                            label.set_rotation(rotation)
+                    else:
+                        for label in ax.get_xticklabels():
+                            label.set_visible(False)
+                        ax.set_xlabel('')
+
+        if allsubplots:
+            self.subplots_adjust(bottom=bottom)
+
     def get_children(self):
         'get a list of artists contained in the figure'
         children = [self.figurePatch]
@@ -196,9 +211,16 @@ class Figure(Artist):
         children.extend(self.legends)
         return children
 
-    def pick(self, mouseevent):
-        for a in self.get_children():
-            a.pick(mouseevent)
+    def contains(self, mouseevent):
+        """Test whether the mouse event occurred on the figure.
+
+        Returns True,{}
+        """
+        if callable(self._contains): return self._contains(self,mouseevent)
+        #inside = mouseevent.x >= 0 and mouseevent.y >= 0
+        inside = self.bbox.contains(mouseevent.x,mouseevent.y)
+
+        return inside,{}
 
     def get_window_extent(self, *args, **kwargs):
         'get the figure bounding box in display space; kwargs are void'
@@ -497,6 +519,7 @@ class Figure(Artist):
         Add a subplot.  Examples
 
             add_subplot(111)
+            add_subplot(1,1,1)            # equivalent but more general
             add_subplot(212, axisbg='r')  # add subplot with red background
             add_subplot(111, polar=True)  # add a polar subplot
             add_subplot(sub)              # add Subplot instance sub
@@ -621,7 +644,7 @@ class Figure(Artist):
     def get_axes(self):
         return self.axes
 
-    def legend(self, handles, labels, loc, **kwargs):
+    def legend(self, handles, labels, *args, **kwargs):
         """
         Place a legend in the figure.  Labels are a sequence of
         strings, handles is a sequence of line or patch instances, and
@@ -635,8 +658,8 @@ class Figure(Artist):
 
         The LOC location codes are
 
-          'best' : 0,          (currently not supported, defaults to upper right)
-          'upper right'  : 1,  (default)
+          'best' : 0,          (currently not supported for figure legends)
+          'upper right'  : 1,
           'upper left'   : 2,
           'lower left'   : 3,
           'lower right'  : 4,
@@ -654,7 +677,7 @@ class Figure(Artist):
 
         The legend instance is returned.  The following kwargs are supported:
 
-        isaxes=True           # whether this is an axes legend
+        loc = "upper right" #
         numpoints = 4         # the number of points in the legend line
         prop = FontProperties(size='smaller')  # the font property
         pad = 0.2             # the fractional whitespace inside the legend border
@@ -669,7 +692,7 @@ class Figure(Artist):
 
 
         handles = flatten(handles)
-        l = Legend(self, handles, labels, loc, isaxes=False, **kwargs)
+        l = Legend(self, handles, labels, *args, **kwargs)
         self._set_artist_props(l)
         self.legends.append(l)
         return l
@@ -734,9 +757,11 @@ class Figure(Artist):
                 used.  and are deduced by the extension to fname.
                 Possibilities are eps, jpeg, pdf, png, ps, svg.  fname
                 can also be a file or file-like object - cairo backend
-                only.  dpi - is the resolution in dots per inch.  If
-                None it will default to the value savefig.dpi in the
-                matplotlibrc file
+                only.
+
+        dpi - is the resolution in dots per inch.  If
+              None it will default to the value savefig.dpi in the
+              matplotlibrc file
 
         facecolor and edgecolor are the colors of the figure rectangle
 
@@ -747,9 +772,7 @@ class Figure(Artist):
         through 'a10', or 'b0' through 'b10' - only supported for postscript
         output
 
-        format - one of 'pdf', 'png', 'ps', 'svg'. It is used to specify the
-                 output when fname is a file or file-like object - cairo
-                 backend only.
+        format - one of the file extensions supported by the active backend.
         """
 
         for key in ('dpi', 'facecolor', 'edgecolor'):
@@ -758,9 +781,9 @@ class Figure(Artist):
 
         self.canvas.print_figure(*args, **kwargs)
 
-    def colorbar(self, mappable, cax=None, **kw):
-        orientation = kw.get('orientation', 'vertical')
-        ax = self.gca()
+    def colorbar(self, mappable, cax=None, ax=None, **kw):
+        if ax is None:
+            ax = self.gca()
         if cax is None:
             cax, kw = cbar.make_axes(ax, **kw)
         cb = cbar.Colorbar(cax, mappable, **kw)
@@ -832,8 +855,8 @@ def figaspect(arg):
 
     # min/max sizes to respect when autoscaling.  If John likes the idea, they
     # could become rc parameters, for now they're hardwired.
-    figsize_min = array((4.0,2.0)) # min length for width/height
-    figsize_max = array((16.0,16.0)) # max length for width/height
+    figsize_min = npy.array((4.0,2.0)) # min length for width/height
+    figsize_max = npy.array((16.0,16.0)) # max length for width/height
     #figsize_min = rcParams['figure.figsize_min']
     #figsize_max = rcParams['figure.figsize_max']
 
@@ -848,7 +871,7 @@ def figaspect(arg):
     fig_height = rcParams['figure.figsize'][1]
 
     # New size for the figure, keeping the aspect ratio of the caller
-    newsize = array((fig_height/arr_ratio,fig_height))
+    newsize = npy.array((fig_height/arr_ratio,fig_height))
 
     # Sanity checks, don't drop either dimension below figsize_min
     newsize /= min(1.0,*(newsize/figsize_min))
@@ -858,7 +881,7 @@ def figaspect(arg):
 
     # Finally, if we have a really funky aspect ratio, break it but respect
     # the min/max dimensions (we don't want figures 10 feet tall!)
-    newsize = clip(newsize,figsize_min,figsize_max)
+    newsize = npy.clip(newsize,figsize_min,figsize_max)
     return newsize
 
 artist.kwdocd['Figure'] = artist.kwdoc(Figure)

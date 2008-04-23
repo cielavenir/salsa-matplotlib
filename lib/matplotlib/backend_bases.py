@@ -4,15 +4,15 @@ graphics contexts must implement to serve as a matplotlib backend
 """
 
 from __future__ import division
-import sys, warnings
+import os, sys, warnings
 
-from cbook import is_string_like, enumerate, strip_math, Stack, CallbackRegistry
-from colors import colorConverter
-from numerix import array, sqrt, pi, log, asarray, ones, zeros, Float, Float32
-from numerix import arange, compress, take, isnan, any
-from patches import Rectangle
-from transforms import lbwh_to_bbox, identity_transform
-import widgets
+import numpy as npy
+import matplotlib.numerix.npyma as ma
+import matplotlib.cbook as cbook
+import matplotlib.colors as colors
+import matplotlib.transforms as transforms
+import matplotlib.widgets as widgets
+from matplotlib import rcParams
 
 class RendererBase:
     """An abstract base class to handle drawing/rendering operations
@@ -138,7 +138,7 @@ class RendererBase:
         """
 
         newstyle = getattr(self, 'draw_markers', None) is not None
-        identity = identity_transform()
+        identity = transforms.identity_transform()
         gc = self.new_gc()
         if clipbox is not None:
             gc.set_clip_rectangle(clipbox.get_bounds())
@@ -201,18 +201,18 @@ class RendererBase:
         See documentation in QuadMesh class in collections.py for details
         """
         # print "draw_quad_mesh not found, using function in backend_bases"
-        verts = zeros(((meshWidth * meshHeight), 4, 2), Float32)
-        indices = arange((meshWidth + 1) * (meshHeight + 1))
-        indices = compress((indices + 1) % (meshWidth + 1), indices)
+        verts = npy.zeros(((meshWidth * meshHeight), 4, 2), npy.float32)
+        indices = npy.arange((meshWidth + 1) * (meshHeight + 1))
+        indices = npy.compress((indices + 1) % (meshWidth + 1), indices)
         indices = indices[:(meshWidth * meshHeight)]
-        verts[:, 0, 0] = take(xCoords, indices)
-        verts[:, 0, 1] = take(yCoords, indices)
-        verts[:, 1, 0] = take(xCoords, (indices + 1))
-        verts[:, 1, 1] = take(yCoords, (indices + 1))
-        verts[:, 2, 0] = take(xCoords, (indices + meshWidth + 2))
-        verts[:, 2, 1] = take(yCoords, (indices + meshWidth + 2))
-        verts[:, 3, 0] = take(xCoords, (indices + meshWidth + 1))
-        verts[:, 3, 1] = take(yCoords, (indices + meshWidth + 1))
+        verts[:, 0, 0] = npy.take(xCoords, indices)
+        verts[:, 0, 1] = npy.take(yCoords, indices)
+        verts[:, 1, 0] = npy.take(xCoords, (indices + 1))
+        verts[:, 1, 1] = npy.take(yCoords, (indices + 1))
+        verts[:, 2, 0] = npy.take(xCoords, (indices + meshWidth + 2))
+        verts[:, 2, 1] = npy.take(yCoords, (indices + meshWidth + 2))
+        verts[:, 3, 0] = npy.take(xCoords, (indices + meshWidth + 1))
+        verts[:, 3, 1] = npy.take(yCoords, (indices + meshWidth + 1))
         if (showedges):
             edgecolors = colors
         else:
@@ -258,8 +258,8 @@ class RendererBase:
 
 
         for i in xrange(N):
-            polyverts = verts[i % Nverts]
-            if any(isnan(polyverts)):
+            polyverts = ma.filled(verts[i % Nverts], npy.nan)
+            if npy.any(npy.isnan(polyverts)):
                 continue
             linewidth = linewidths[i % Nlw]
             rf,gf,bf,af = facecolors[i % Nface]
@@ -334,8 +334,8 @@ class RendererBase:
             gc.set_clip_rectangle(clipbox.get_bounds())
 
         xverts, yverts = zip(*verts)
-        xverts = asarray(xverts)
-        yverts = asarray(yverts)
+        xverts = npy.asarray(xverts)
+        yverts = npy.asarray(yverts)
 
         Nface  = len(facecolors)
         Nedge  = len(edgecolors)
@@ -420,14 +420,15 @@ class RendererBase:
         """
         Get the text extent in window coords
         """
-        return lbwh_to_bbox(0,0,1,1)  # your values here
+        return transforms.lbwh_to_bbox(0,0,1,1)  # your values here
 
-    def get_text_width_height(self, s, prop, ismath):
+    def get_text_width_height_descent(self, s, prop, ismath):
         """
-        get the width and height in display coords of the string s
-        with FontPropertry prop
+        get the width and height, and the offset from the bottom to the
+        baseline (descent), in display coords of the string s with
+        FontPropertry prop
         """
-        return 1,1
+        return 1,1,1
 
     def new_gc(self):
         """
@@ -438,7 +439,7 @@ class RendererBase:
     def points_to_pixels(self, points):
         """
         Convert points to display units
-        points - a float or a numerix array of float
+        points - a float or a numpy array of float
         return points converted to pixels
 
         You need to override this function (unless your backend doesn't have a
@@ -449,7 +450,7 @@ class RendererBase:
         return points
 
     def strip_math(self, s):
-        return strip_math(s)
+        return cbook.strip_math(s)
 
 
 class GraphicsContextBase:
@@ -615,7 +616,7 @@ class GraphicsContextBase:
         if isRGB:
             self._rgb = fg
         else:
-            self._rgb = colorConverter.to_rgb(fg)
+            self._rgb = colors.colorConverter.to_rgb(fg)
 
     def set_graylevel(self, frac):
         """
@@ -676,7 +677,7 @@ class Event:
         self.canvas = canvas
         self.guiEvent = guiEvent
 
-    
+
 class DrawEvent(Event):
     """
     An event triggered by a draw operation on the canvas
@@ -734,26 +735,24 @@ class LocationEvent(Event):
         self.x = x
         self.y = y
 
-        if self.x is None or self.y is None:
+        if x is None or y is None:
             # cannot check if event was in axes if no x,y info
             return
 
-        self.inaxes = [] # Need to correctly handle overlapping axes
-        for a in self.canvas.figure.get_axes():
-            if self.x is not None and self.y is not None and a.in_axes(self.x, self.y):
-                self.inaxes.append(a)
+        # Find all axes containing the mouse
+        axes_list = [a for a in self.canvas.figure.get_axes() if a.in_axes(x, y)]
 
-        if len(self.inaxes) == 0: # None found
+        if len(axes_list) == 0: # None found
             self.inaxes = None
             return
-        elif (len(self.inaxes) > 1): # Overlap, get the highest zorder
-            axCmp = lambda x,y: cmp(x.zorder, y.zorder)
-            self.inaxes.sort(axCmp)
-            self.inaxes = self.inaxes[-1] # Use the highest zorder
+        elif (len(axes_list) > 1): # Overlap, get the highest zorder
+            axCmp = lambda _x,_y: cmp(_x.zorder, _y.zorder)
+            axes_list.sort(axCmp)
+            self.inaxes = axes_list[-1] # Use the highest zorder
         else: # Just found one hit
-            self.inaxes = self.inaxes[0]
+            self.inaxes = axes_list[0]
 
-        try: xdata, ydata = self.inaxes.transData.inverse_xy_tup((self.x, self.y))
+        try: xdata, ydata = self.inaxes.transData.inverse_xy_tup((x, y))
         except ValueError:
             self.xdata  = None
             self.ydata  = None
@@ -763,7 +762,7 @@ class LocationEvent(Event):
 
 class MouseEvent(LocationEvent):
     """
-    A mouse event (button_press_event, button_release_event,
+    A mouse event (button_press_event, button_release_event, scroll_event,
     motion_notify_event).
 
     The following attributes are defined and shown with their default
@@ -771,7 +770,8 @@ class MouseEvent(LocationEvent):
 
     x      = None       # x position - pixels from left of canvas
     y      = None       # y position - pixels from bottom of canvas
-    button = None       # button pressed None, 1, 2, 3
+    button = None       # button pressed None, 1, 2, 3, 'up', 'down'
+                          (up and down are used for scroll events)
     key    = None       # the key pressed: None, chr(range(255), shift, win, or control
     inaxes = None       # the Axes instance if mouse us over axes
     xdata  = None       # x coord of mouse in data coords
@@ -812,7 +812,7 @@ class PickEvent(Event):
         self.mouseevent = mouseevent
         self.artist = artist
         self.__dict__.update(kwargs)
-        
+
 
 class KeyEvent(LocationEvent):
     """
@@ -856,8 +856,9 @@ class FigureCanvasBase:
         'key_release_event',
         'button_press_event',
         'button_release_event',
+        'scroll_event',
         'motion_notify_event',
-        'pick_event', 
+        'pick_event',
         )
 
 
@@ -865,12 +866,97 @@ class FigureCanvasBase:
         figure.set_canvas(self)
         self.figure = figure
         # a dictionary from event name to a dictionary that maps cid->func
-        self.callbacks = CallbackRegistry(self.events)
+        self.callbacks = cbook.CallbackRegistry(self.events)
         self.widgetlock = widgets.LockDraw()
         self._button     = None  # the button pressed
         self._key        = None  # the key pressed
         self._lastx, self._lasty = None, None
+        self.button_pick_id = self.mpl_connect('button_press_event',self.pick)
+        self.scroll_pick_id = self.mpl_connect('scroll_event',self.pick)
 
+        if False:
+            ## highlight the artists that are hit
+            self.mpl_connect('motion_notify_event',self.onHilite)
+            ## delete the artists that are clicked on
+            #self.mpl_disconnect(self.button_pick_id)
+            #self.mpl_connect('button_press_event',self.onRemove)
+
+    def onRemove(self, ev):
+        """
+        Mouse event processor which removes the top artist
+        under the cursor.  Connect this to the mouse_press_event
+        using canvas.mpl_connect('mouse_press_event',canvas.onRemove)
+        """
+        def sort_artists(artists):
+            # This depends on stable sort and artists returned
+            # from get_children in z order.
+            L = [ (h.zorder, h) for h in artists ]
+            L.sort()
+            return [ h for zorder, h in L ]
+
+        # Find the top artist under the cursor
+        under = sort_artists(self.figure.hitlist(ev))
+        h = None
+        if under: h = under[-1]
+
+        # Try deleting that artist, or its parent if you
+        # can't delete the artist
+        while h:
+            print "Removing",h
+            if h.remove(): 
+                self.draw_idle()
+                break
+            parent = None
+            for p in under:
+                if hasattr(p,'getchildren') and h in p.get_children():
+                    parent = p
+                    break
+            h = parent
+        
+    def onHilite(self, ev):
+        """
+        Mouse event processor which highlights the artists
+        under the cursor.  Connect this to the motion_notify_event
+        using canvas.mpl_connect('motion_notify_event',canvas.onHilite)
+        """
+        if not hasattr(self,'_active'): self._active = dict()
+
+        under = self.figure.hitlist(ev)
+        enter = [a for a in under if a not in self._active]
+        leave = [a for a in self._active if a not in under]
+        print "within:"," ".join([str(x) for x in under])
+        #print "entering:",[str(a) for a in enter]
+        #print "leaving:",[str(a) for a in leave]
+        # On leave restore the captured colour
+        for a in leave:
+            if hasattr(a,'get_color'):
+                a.set_color(self._active[a])
+            elif hasattr(a,'get_edgecolor'):
+                a.set_edgecolor(self._active[a][0])
+                a.set_facecolor(self._active[a][1])
+            del self._active[a]
+        # On enter, capture the color and repaint the artist
+        # with the highlight colour.  Capturing colour has to
+        # be done first in case the parent recolouring affects
+        # the child.
+        for a in enter:
+            if hasattr(a,'get_color'):
+                self._active[a] = a.get_color()
+            elif hasattr(a,'get_edgecolor'):
+                self._active[a] = (a.get_edgecolor(),a.get_facecolor())
+            else: self._active[a] = None
+        for a in enter:
+            if hasattr(a,'get_color'):
+                a.set_color('red')
+            elif hasattr(a,'get_edgecolor'):
+                a.set_edgecolor('red')
+                a.set_facecolor('lightblue')
+            else: self._active[a] = None
+        self.draw_idle()
+
+    def pick(self, mouseevent):
+        if not self.widgetlock.locked():
+            self.figure.pick(mouseevent)
 
     def blit(self, bbox=None):
         """
@@ -914,7 +1000,19 @@ class FigureCanvasBase:
         s = 'pick_event'
         event = PickEvent(s, self, mouseevent, artist, **kwargs)
         self.callbacks.process(s, event)
-            
+
+    def scroll_event(self, x, y, button, guiEvent=None):
+        """
+        Backend derived classes should call this function on any
+        scroll wheel event.  x,y are the canvas coords: 0,0 is lower,
+        left.  button and key are as defined in MouseEvent
+        """
+        self._button = button
+        s = 'scroll_event'
+        mouseevent = MouseEvent(s, self, x, y, button, self._key, guiEvent=guiEvent)
+        self.callbacks.process(s, mouseevent)
+
+
     def button_press_event(self, x, y, button, guiEvent=None):
         """
         Backend derived classes should call this function on any mouse
@@ -926,10 +1024,6 @@ class FigureCanvasBase:
         mouseevent = MouseEvent(s, self, x, y, button, self._key, guiEvent=guiEvent)
         self.callbacks.process(s, mouseevent)
 
-
-        if not self.widgetlock.locked():
-            self.figure.pick(mouseevent)
-        
     def button_release_event(self, x, y, button, guiEvent=None):
         """
         Backend derived classes should call this function on any mouse
@@ -977,8 +1071,76 @@ class FigureCanvasBase:
         (depending on the backend), truncated to integers"""
         return int(self.figure.bbox.width()), int(self.figure.bbox.height())
 
+    filetypes = {
+        'emf': 'Enhanced Metafile',
+        'eps': 'Encapsulated Postscript',
+        'pdf': 'Portable Document Format',
+        'png': 'Portable Network Graphics',
+        'ps' : 'Postscript',
+        'raw': 'Raw RGBA bitmap',
+        'rgba': 'Raw RGBA bitmap',
+        'svg': 'Scalable Vector Graphics',
+        'svgz': 'Scalable Vector Graphics'
+        }
+
+    # All of these print_* functions do a lazy import because
+    #  a) otherwise we'd have cyclical imports, since all of these
+    #     classes inherit from FigureCanvasBase
+    #  b) so we don't import a bunch of stuff the user may never use
+    
+    def print_emf(self, *args, **kwargs):
+        from backends.backend_emf import FigureCanvasEMF # lazy import
+        emf = self.switch_backends(FigureCanvasEMF)
+        return emf.print_emf(*args, **kwargs)
+
+    def print_eps(self, *args, **kwargs):
+        from backends.backend_ps import FigureCanvasPS # lazy import
+        ps = self.switch_backends(FigureCanvasPS)
+        return ps.print_eps(*args, **kwargs)
+    
+    def print_pdf(self, *args, **kwargs):
+        from backends.backend_pdf import FigureCanvasPdf # lazy import
+        pdf = self.switch_backends(FigureCanvasPdf)
+        return pdf.print_pdf(*args, **kwargs)
+
+    def print_png(self, *args, **kwargs):
+        from backends.backend_agg import FigureCanvasAgg # lazy import
+        agg = self.switch_backends(FigureCanvasAgg)
+        return agg.print_png(*args, **kwargs)
+    
+    def print_ps(self, *args, **kwargs):
+        from backends.backend_ps import FigureCanvasPS # lazy import
+        ps = self.switch_backends(FigureCanvasPS)
+        return ps.print_ps(*args, **kwargs)
+
+    def print_raw(self, *args, **kwargs):
+        from backends.backend_agg import FigureCanvasAgg # lazy import
+        agg = self.switch_backends(FigureCanvasAgg)
+        return agg.print_raw(*args, **kwargs)
+    print_bmp = print_rgb = print_raw
+
+    def print_svg(self, *args, **kwargs):
+        from backends.backend_svg import FigureCanvasSVG # lazy import
+        svg = self.switch_backends(FigureCanvasSVG)
+        return svg.print_svg(*args, **kwargs)
+    
+    def print_svgz(self, *args, **kwargs):
+        from backends.backend_svg import FigureCanvasSVG # lazy import
+        svg = self.switch_backends(FigureCanvasSVG)
+        return svg.print_svgz(*args, **kwargs)
+    
+    def get_supported_filetypes(self):
+        return self.filetypes
+
+    def get_supported_filetypes_grouped(self):
+        groupings = {}
+        for ext, name in self.filetypes.items():
+            groupings.setdefault(name, []).append(ext)
+            groupings[name].sort()
+        return groupings
+    
     def print_figure(self, filename, dpi=None, facecolor='w', edgecolor='w',
-                     orientation='portrait', **kwargs):
+                     orientation='portrait', format=None, **kwargs):
         """
         Render the figure to hardcopy. Set the figure patch face and edge
         colors.  This is useful because some of the GUIs have a gray figure
@@ -991,8 +1153,65 @@ class FigureCanvasBase:
         facecolor - the facecolor of the figure
         edgecolor - the edgecolor of the figure
         orientation - 'landscape' | 'portrait' (not supported on all backends)
+        format - when set, forcibly set the file format to save to
         """
-        pass
+        if format is None:
+            if cbook.is_string_like(filename):
+                format = os.path.splitext(filename)[1][1:]
+            if format is None or format == '':
+                format = self.get_default_filetype()
+                if cbook.is_string_like(filename):
+                    filename = filename.rstrip('.') + '.' + format
+        format = format.lower()
+
+        method_name = 'print_%s' % format
+        if (format not in self.filetypes or
+            not hasattr(self, method_name)):
+            formats = self.filetypes.keys()
+            formats.sort()
+            raise ValueError(
+                'Format "%s" is not supported.\n'
+                'Supported formats: '
+                '%s.' % (format, ', '.join(formats)))
+
+        if dpi is None:
+            dpi = rcParams['savefig.dpi']
+            
+        origDPI = self.figure.dpi.get()
+        origfacecolor = self.figure.get_facecolor()
+        origedgecolor = self.figure.get_edgecolor()
+
+        self.figure.dpi.set(dpi)
+        self.figure.set_facecolor(facecolor)
+        self.figure.set_edgecolor(edgecolor)
+
+        try:
+            result = getattr(self, method_name)(
+                filename,
+                dpi=dpi,
+                facecolor=facecolor,
+                edgecolor=edgecolor,
+                orientation=orientation,
+                **kwargs)
+        finally:
+            self.figure.dpi.set(origDPI)
+            self.figure.set_facecolor(origfacecolor)
+            self.figure.set_edgecolor(origedgecolor)
+            self.figure.set_canvas(self)
+            self.figure.canvas.draw()
+            
+        return result
+
+    def get_default_filetype(self):
+        raise NotImplementedError
+    
+    def set_window_title(self, title):
+        """
+        Set the title text of the window containing the figure.  Note that
+        this has no effect if there is no window (eg, a PS backend).
+        """
+        if hasattr(self, "manager"):
+            self.manager.set_window_title(title)
 
     def switch_backends(self, FigureCanvasClass):
         """
@@ -1007,7 +1226,7 @@ class FigureCanvasBase:
         return newCanvas
 
     def mpl_connect(self, s, func):
-        """\
+        """
         Connect event with string s to func.  The signature of func is
 
           def func(event)
@@ -1020,16 +1239,17 @@ class FigureCanvasBase:
         'key_release_event',
         'button_press_event',
         'button_release_event',
+        'scroll_event',
         'motion_notify_event',
-        'pick_event', 
-        
-        
+        'pick_event',
+
+
         For the three events above, if the mouse is over the axes,
         the variable event.inaxes will be set to the axes it is over,
         and additionally, the variables event.xdata and event.ydata
         will be defined.  This is the mouse location in data coords.
         See backend_bases.MplEvent.
-        
+
         return value is a connection id that can be used with
         mpl_disconnect """
 
@@ -1039,7 +1259,7 @@ class FigureCanvasBase:
         """
         disconnect callback id cid
         """
-        return self.callbacks.disconnect(cid)        
+        return self.callbacks.disconnect(cid)
 
 
 class FigureManagerBase:
@@ -1105,6 +1325,13 @@ class FigureManagerBase:
         """
         pass
 
+    def set_window_title(self, title):
+        """
+        Set the title text of the window containing the figure.  Note that
+        this has no effect if there is no window (eg, a PS backend).
+        """
+        pass
+
 # cursors
 class Cursors:  #namespace
     HAND, POINTER, SELECT_REGION, MOVE = range(4)
@@ -1153,8 +1380,8 @@ class NavigationToolbar2:
         self.canvas = canvas
         canvas.toolbar = self
         # a dict from axes index to a list of view limits
-        self._views = Stack()
-        self._positions = Stack()  # stack of subplot positions
+        self._views = cbook.Stack()
+        self._positions = cbook.Stack()  # stack of subplot positions
         self._xypress = None  # the  location and axis info at the time of the press
         self._idPress = None
         self._idRelease = None
@@ -1351,7 +1578,10 @@ class NavigationToolbar2:
             xmin, xmax = a.get_xlim()
             ymin, ymax = a.get_ylim()
             lims.append( (xmin, xmax, ymin, ymax) )
-            pos.append( tuple( a.get_position() ) )
+            # Store both the original and modified positions
+            pos.append( (
+                    tuple( a.get_position(True) ),
+                    tuple( a.get_position() ) ) )
         self._views.push(lims)
         self._positions.push(pos)
         self.set_history_buttons()
@@ -1508,7 +1738,7 @@ class NavigationToolbar2:
                 a.set_ylim((ymin, ymax))
             elif self._button_pressed == 3:
                 if a.get_xscale()=='log':
-                    alpha=log(Xmax/Xmin)/log(xmax/xmin)
+                    alpha=npy.log(Xmax/Xmin)/npy.log(xmax/xmin)
                     x1=pow(Xmin/xmin,alpha)*Xmin
                     x2=pow(Xmax/xmin,alpha)*Xmin
                 else:
@@ -1516,7 +1746,7 @@ class NavigationToolbar2:
                     x1=alpha*(Xmin-xmin)+Xmin
                     x2=alpha*(Xmax-xmin)+Xmin
                 if a.get_yscale()=='log':
-                    alpha=log(Ymax/Ymin)/log(ymax/ymin)
+                    alpha=npy.log(Ymax/Ymin)/npy.log(ymax/ymin)
                     y1=pow(Ymin/ymin,alpha)*Ymin
                     y2=pow(Ymax/ymin,alpha)*Ymin
                 else:
@@ -1565,7 +1795,9 @@ class NavigationToolbar2:
             xmin, xmax, ymin, ymax = lims[i]
             a.set_xlim((xmin, xmax))
             a.set_ylim((ymin, ymax))
-            a.set_position( pos[i] )
+            # Restore both the original and modified positions
+            a.set_position( pos[i][0], 'original' )
+            a.set_position( pos[i][1], 'active' )
 
         self.draw()
 

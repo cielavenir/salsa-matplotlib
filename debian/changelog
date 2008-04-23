@@ -1,3 +1,34 @@
+matplotlib (0.91.2-1) unstable; urgency=low
+
+  [ Piotr Ożarowski ]
+  * Replace libwxgtk2.4-python with python-wxgtk2.6 in Depends
+    (closes: #466470)
+
+  [ Sandro Tosi ]
+  * New upstream release (Closes: #459200, #474001, #447741, #408955)
+  * debian/patches/build_fix.patch
+    - edited to match new code
+  * debian/rules
+    - adjusted doc files installation
+  * debian/docs
+    - removed since the same files were already in debian/rules
+  * debian/patches/matplotlibrc_fix.patch
+    - edited to match new code (sync from Ubuntu)
+  * debian/control
+    - added "dvipng, python-configobj, python-enthought-traits (>= 2.0),
+      python-qt-dev, python-qt4-dev, python-wxgtk2.6" as build-dep (sync from
+      Ubuntu)
+    - bump depends on python-numpy (sync from Ubuntu)
+    - added "python-qt4, dvipng, python-configobj, python-enthought-traits (>=
+      2.0)" to Depends (sync from Ubuntu)
+    - merged Recommends into Depends
+    - removed Depends on python-pypaint since that package is unavailable
+    - added myself to Uploaders
+  * debian/patches/bts-468977_memory_api_usage.patch
+    - fixes Python API memory usage (Closes: #468977)
+
+ -- Sandro Tosi <matrixhasu@gmail.com>  Wed, 23 Apr 2008 17:37:03 +0200
+
 matplotlib (0.90.1-4) unstable; urgency=low
 
   * Maintainer changed to Debian Python Modules Team

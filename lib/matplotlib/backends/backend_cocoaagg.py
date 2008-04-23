@@ -64,22 +64,22 @@ class MatplotlibController(NibClassBuilder.AutoBaseClass):
     # available outlets:
     #  NSWindow plotWindow
     #  PlotView plotView
-    
+
     def awakeFromNib(self):
         # Get a reference to the active canvas
         NSApp().setDelegate_(self)
         self.app = NSApp()
-        self.canvas = Gcf.get_active().canvas 
+        self.canvas = Gcf.get_active().canvas
         self.plotView.canvas = self.canvas
         self.canvas.plotView = self.plotView
-    
+
         self.plotWindow.setAcceptsMouseMovedEvents_(True)
         self.plotWindow.makeKeyAndOrderFront_(self)
         self.plotWindow.setDelegate_(self)#.plotView)
 
         self.plotView.setImageFrameStyle_(NSImageFrameGroove)
-        self.plotView.image = NSImage.alloc().initWithSize_((0,0))
-        self.plotView.setImage_(self.plotView.image)
+        self.plotView.image_ = NSImage.alloc().initWithSize_((0,0))
+        self.plotView.setImage_(self.plotView.image_)
 
         # Make imageview first responder for key events
         self.plotWindow.makeFirstResponder_(self.plotView)
@@ -112,10 +112,10 @@ class PlotView(NibClassBuilder.AutoBaseClass):
         w,h = self.canvas.get_width_height()
 
         # Remove all previous images
-        for i in xrange(self.image.representations().count()):
-            self.image.removeRepresentation_(self.image.representations().objectAtIndex_(i))
-    
-        self.image.setSize_((w,h))
+        for i in xrange(self.image_.representations().count()):
+            self.image_.removeRepresentation_(self.image_.representations().objectAtIndex_(i))
+
+        self.image_.setSize_((w,h))
 
         brep = NSBitmapImageRep.alloc().initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(
             (self.canvas.buffer_rgba(0,0),'','','',''), # Image data
@@ -129,7 +129,7 @@ class PlotView(NibClassBuilder.AutoBaseClass):
             w*4, # row bytes
             32) # bits per pixel
 
-        self.image.addRepresentation_(brep)
+        self.image_.addRepresentation_(brep)
         self.setNeedsDisplay_(True)
 
     def windowDidResize_(self, sender):

@@ -1,15 +1,19 @@
 from __future__ import division
 
-import os, codecs, base64, tempfile
+import os, codecs, base64, tempfile, urllib, gzip
 
+from matplotlib import agg
 from matplotlib import verbose, __version__, rcParams
 from matplotlib.backend_bases import RendererBase, GraphicsContextBase,\
      FigureManagerBase, FigureCanvasBase
+from matplotlib.cbook import is_string_like, is_writable_file_like, maxdict
 from matplotlib.colors import rgb2hex
 from matplotlib.figure import Figure
-from matplotlib.font_manager import fontManager
-from matplotlib.ft2font import FT2Font
-from matplotlib.mathtext import math_parse_s_ft2font_svg
+from matplotlib.font_manager import findfont, FontProperties
+from matplotlib.ft2font import FT2Font, KERNING_DEFAULT, LOAD_NO_HINTING
+from matplotlib.mathtext import MathTextParser
+
+from xml.sax.saxutils import escape as escape_xml_text
 
 backend_version = __version__
 
@@ -21,9 +25,11 @@ def new_figure_manager(num, *args, **kwargs):
     return manager
 
 
-_fontd = {}
 _capstyle_d = {'projecting' : 'square', 'butt' : 'butt', 'round': 'round',}
 class RendererSVG(RendererBase):
+    FONT_SCALE = 100.0
+    fontd = maxdict(50)
+
     def __init__(self, width, height, svgwriter, basename=None):
         self.width=width
         self.height=height
@@ -35,6 +41,8 @@ class RendererSVG(RendererBase):
             self.basename = basename
             self._imaged = {}
         self._clipd = {}
+        self._char_defs = {}
+        self.mathtext_parser = MathTextParser('SVG')
         svgwriter.write(svgProlog%(width,height,width,height))
 
     def _draw_svg_element(self, element, details, gc, rgbFace):
@@ -44,17 +52,20 @@ class RendererSVG(RendererBase):
         else:
             clippath = 'clip-path="url(#%s)"' % clipid
 
-        self._svgwriter.write ('%s<%s %s %s %s/>\n' % (
-            cliprect,
-            element, self._get_style(gc, rgbFace), clippath, details))
+        style = self._get_style(gc, rgbFace)
+        self._svgwriter.write ('%s<%s style="%s" %s %s/>\n' % (
+            cliprect, element, style, clippath, details))
 
     def _get_font(self, prop):
         key = hash(prop)
-        font = _fontd.get(key)
+        font = self.fontd.get(key)
         if font is None:
-            fname = fontManager.findfont(prop)
-            font = FT2Font(str(fname))
-            _fontd[key] = font
+            fname = findfont(prop)
+            font = self.fontd.get(fname)
+            if font is None:
+                font = FT2Font(str(fname))
+                self.fontd[fname] = font
+            self.fontd[key] = font
         font.clear()
         size = prop.get_size_in_points()
         font.set_size(size, 72.0)
@@ -74,13 +85,13 @@ class RendererSVG(RendererBase):
         if seq is None:
             dashes = ''
         else:
-            dashes = 'stroke-dasharray: %s; stroke-dashoffset: %f;' % (
-                ' '.join(['%f'%val for val in seq]), offset)
+            dashes = 'stroke-dasharray: %s; stroke-dashoffset: %s;' % (
+                ','.join(['%s'%val for val in seq]), offset)
 
         linewidth = gc.get_linewidth()
         if linewidth:
-            return 'style="fill: %s; stroke: %s; stroke-width: %f; ' \
-                'stroke-linejoin: %s; stroke-linecap: %s; %s opacity: %f"' % (
+            return 'fill: %s; stroke: %s; stroke-width: %s; ' \
+                'stroke-linejoin: %s; stroke-linecap: %s; %s opacity: %s' % (
                          fill,
                          rgb2hex(gc.get_rgb()),
                          linewidth,
@@ -90,7 +101,7 @@ class RendererSVG(RendererBase):
                          gc.get_alpha(),
                 )
         else:
-            return 'style="fill: %s; opacity: %f"' % (\
+            return 'fill: %s; opacity: %s' % (\
                          fill,
                          gc.get_alpha(),
                 )
@@ -106,11 +117,12 @@ class RendererSVG(RendererBase):
                 self._clipd[key] = cliprect
                 x, y, w, h = cliprect
                 y = self.height-(y+h)
+                style = "stroke: gray; fill: none;"
                 box = """\
 <defs>
     <clipPath id="%(key)s">
-    <rect x="%(x)f" y="%(y)f" width="%(w)f" height="%(h)f"
-    style="stroke: gray; fill: none;"/>
+    <rect x="%(x)s" y="%(y)s" width="%(w)s" height="%(h)s"
+    style="%(style)s"/>
     </clipPath>
 </defs>
 """ % locals()
@@ -126,11 +138,43 @@ class RendererSVG(RendererBase):
     def close_group(self, s):
         self._svgwriter.write('</g>\n')
 
+    def draw_path(self, gc, rgbFace, path):
+        cmd = []
+
+        while 1:
+            code, xp, yp = path.vertex()
+            yp = self.height - yp
+
+            if code == agg.path_cmd_stop:
+                cmd.append('z') # Hack, path_cmd_end_poly not found
+                break
+            elif code == agg.path_cmd_move_to:
+                cmd.append('M%g %g' % (xp, yp))
+            elif code == agg.path_cmd_line_to:
+                cmd.append('L%g %g' % (xp, yp))
+            elif code == agg.path_cmd_curve3:
+                verts = [xp, yp]
+                verts.extent(path.vertex()[1:])
+                verts[-1] = self.height - verts[-1]
+                cmd.append('Q%g %g %g %g' % tuple(verts))
+            elif code == agg.path_cmd_curve4:
+                verts = [xp, yp]
+                verts.extend(path.vertex()[1:])
+                verts[-1] = self.height - verts[-1]
+                verts.extend(path.vertex()[1:])
+                verts[-1] = self.height - verts[-1]
+                cmd.append('C%g %g %g %g %g %g'%tuple(verts))
+            elif code == agg.path_cmd_end_poly:
+                cmd.append('z')
+
+        path_data = "".join(cmd)
+        self._draw_svg_element("path", 'd="%s"' % path_data, gc, rgbFace)
+
     def draw_arc(self, gc, rgbFace, x, y, width, height, angle1, angle2, rotation):
         """
         Ignores angles for now
         """
-        details = 'cx="%f" cy="%f" rx="%f" ry="%f" transform="rotate(%f %f %f)"' % \
+        details = 'cx="%s" cy="%s" rx="%s" ry="%s" transform="rotate(%1.1f %s %s)"' % \
             (x,  self.height-y, width/2.0, height/2.0, -rotation, x, self.height-y)
         self._draw_svg_element('ellipse', details, gc, rgbFace)
 
@@ -149,7 +193,7 @@ class RendererSVG(RendererBase):
                 trans[4] += trans[0]
                 trans[5] += trans[3]
             trans[5] = -trans[5]
-            transstr = 'transform="matrix(%f %f %f %f %f %f)" '%tuple(trans)
+            transstr = 'transform="matrix(%s %s %s %s %s %s)" '%tuple(trans)
             assert trans[1] == 0
             assert trans[2] == 0
             numrows,numcols = im.get_size()
@@ -177,7 +221,7 @@ class RendererSVG(RendererBase):
             im.write_png(filename)
             im.flipud_out()
 
-            imfile = file (filename, 'r')
+            imfile = file (filename, 'rb')
             image64 = base64.encodestring (imfile.read())
             imfile.close()
             os.remove(filename)
@@ -193,12 +237,12 @@ class RendererSVG(RendererBase):
             hrefstr = filename
 
         self._svgwriter.write (
-            '<image x="%f" y="%f" width="%f" height="%f" '
+            '<image x="%s" y="%s" width="%s" height="%s" '
             'xlink:href="%s" %s/>\n'%(x/trans[0], (self.height-y)/trans[3]-h, w, h, hrefstr, transstr)
             )
 
     def draw_line(self, gc, x1, y1, x2, y2):
-        details = 'd="M %f,%f L %f,%f"' % (x1, self.height-y1,
+        details = 'd="M%s,%sL%s,%s"' % (x1, self.height-y1,
                                            x2, self.height-y2)
         self._draw_svg_element('path', details, gc, None)
 
@@ -208,11 +252,11 @@ class RendererSVG(RendererBase):
             raise ValueError('x and y must be the same length')
 
         y = self.height - y
-        details = ['d="M %f,%f' % (x[0], y[0])]
+        details = ['d="M%s,%s' % (x[0], y[0])]
         xys = zip(x[1:], y[1:])
-        details.extend(['L %f,%f' % tup for tup in xys])
+        details.extend(['L%s,%s' % tup for tup in xys])
         details.append('"')
-        details = ' '.join(details)
+        details = ''.join(details)
         self._draw_svg_element('path', details, gc, None)
 
     def draw_point(self, gc, x, y):
@@ -220,13 +264,13 @@ class RendererSVG(RendererBase):
         self.draw_arc(gc, gc.get_rgb(), x, y, 1, 0, 0, 0, 0)
 
     def draw_polygon(self, gc, rgbFace, points):
-        details = 'points = "%s"' % ' '.join(['%f,%f'%(x,self.height-y)
+        details = 'points = "%s"' % ' '.join(['%s,%s'%(x,self.height-y)
                                               for x, y in points])
         self._draw_svg_element('polygon', details, gc, rgbFace)
 
     def draw_rectangle(self, gc, rgbFace, x, y, width, height):
-        details = 'width="%f" height="%f" x="%f" y="%f"' % (width, height, x,
-                                                         self.height-y-height)
+        details = 'width="%s" height="%s" x="%s" y="%s"' % (width, height, x,
+                                                            self.height-y-height)
         self._draw_svg_element('rect', details, gc, rgbFace)
 
     def draw_text(self, gc, x, y, s, prop, angle, ismath):
@@ -235,61 +279,197 @@ class RendererSVG(RendererBase):
             return
 
         font = self._get_font(prop)
+        font.set_text(s, 0.0, flags=LOAD_NO_HINTING)
+        y -= font.get_descent() / 64.0
 
-        thetext = '%s' % s
-        fontfamily=font.family_name
-        fontstyle=font.style_name
         fontsize = prop.get_size_in_points()
         color = rgb2hex(gc.get_rgb())
 
-        style = 'font-size: %f; font-family: %s; font-style: %s; fill: %s;'%(fontsize, fontfamily,fontstyle, color)
-        if angle!=0:
-            transform = 'transform="translate(%f,%f) rotate(%1.1f) translate(%f,%f)"' % (x,y,-angle,-x,-y) # Inkscape doesn't support rotate(angle x y)
-        else: transform = ''
+        if rcParams['svg.embed_char_paths']:
+            svg = ['<g style="fill: %s; opacity: %s" transform="' % (color, gc.get_alpha())]
+            if angle != 0:
+                svg.append('translate(%s,%s)rotate(%1.1f)' % (x,y,-angle))
+            elif x != 0 or y != 0:
+                svg.append('translate(%s,%s)' % (x, y))
+            svg.append('scale(%s)">\n' % (fontsize / self.FONT_SCALE))
 
-        svg = """\
-<text style="%(style)s" x="%(x)f" y="%(y)f" %(transform)s>%(thetext)s</text>
+            cmap = font.get_charmap()
+            lastgind = None
+            currx = 0
+            for c in s:
+                charid = self._add_char_def(prop, c)
+                ccode = ord(c)
+                gind = cmap.get(ccode)
+                if gind is None:
+                    ccode = ord('?')
+                    gind = 0
+                glyph = font.load_char(ccode, flags=LOAD_NO_HINTING)
+
+                if lastgind is not None:
+                    kern = font.get_kerning(lastgind, gind, KERNING_DEFAULT)
+                else:
+                    kern = 0
+                lastgind = gind
+                currx += kern/64.0
+
+                svg.append('<use xlink:href="#%s"' % charid)
+                if currx != 0:
+                    svg.append(' transform="translate(%s)"' %
+                               (currx * (self.FONT_SCALE / fontsize)))
+                svg.append('/>\n')
+                currx += (glyph.linearHoriAdvance / 65536.0) / (self.FONT_SCALE / fontsize)
+            svg.append('</g>\n')
+            svg = ''.join(svg)
+        else:
+            thetext = escape_xml_text(s)
+            fontfamily = font.family_name
+            fontstyle = prop.get_style()
+
+            style = ('font-size: %f; font-family: %s; font-style: %s; fill: %s; opacity: %s' %
+                     (fontsize, fontfamily,fontstyle, color, gc.get_alpha()))
+            if angle!=0:
+                transform = 'transform="translate(%s,%s) rotate(%1.1f) translate(%s,%s)"' % (x,y,-angle,-x,-y)
+                # Inkscape doesn't support rotate(angle x y)
+            else:
+                transform = ''
+
+            svg = """\
+<text style="%(style)s" x="%(x)s" y="%(y)s" %(transform)s>%(thetext)s</text>
 """ % locals()
         self._svgwriter.write (svg)
+
+    def _add_char_def(self, prop, char):
+        if isinstance(prop, FontProperties):
+            newprop = prop.copy()
+            font = self._get_font(newprop)
+        else:
+            font = prop
+        font.set_size(self.FONT_SCALE, 72)
+        ps_name = font.get_sfnt()[(1,0,0,6)]
+        char_id = urllib.quote('%s-%d' % (ps_name, ord(char)))
+        char_num, path = self._char_defs.get(char_id, (None, None))
+        if char_num is not None:
+            return char_num
+
+        path_data = []
+        glyph = font.load_char(ord(char), flags=LOAD_NO_HINTING)
+        currx, curry = 0.0, 0.0
+        for step in glyph.path:
+            if step[0] == 0:   # MOVE_TO
+                path_data.append("M%s %s" %
+                                 (step[1], -step[2]))
+            elif step[0] == 1: # LINE_TO
+                path_data.append("l%s %s" %
+                                 (step[1] - currx, -step[2] - curry))
+            elif step[0] == 2: # CURVE3
+                path_data.append("q%s %s %s %s" %
+                                 (step[1] - currx, -step[2] - curry,
+                                  step[3] - currx, -step[4] - curry))
+            elif step[0] == 3: # CURVE4
+                path_data.append("c%s %s %s %s %s %s" %
+                                 (step[1] - currx, -step[2] - curry,
+                                  step[3] - currx, -step[4] - curry,
+                                  step[5] - currx, -step[6] - curry))
+            elif step[0] == 4: # ENDPOLY
+                path_data.append("z")
+                currx, curry = 0.0, 0.0
+
+            if step[0] != 4:
+                currx, curry = step[-2], -step[-1]
+        char_num = 'c_%x' % len(self._char_defs)
+        path_element = '<path id="%s" d="%s"/>\n' % (char_num, ''.join(path_data))
+        self._char_defs[char_id] = (char_num, path_element)
+        return char_num
 
     def _draw_mathtext(self, gc, x, y, s, prop, angle):
         """
         Draw math text using matplotlib.mathtext
         """
-        fontsize = prop.get_size_in_points()
-        width, height, svg_elements = math_parse_s_ft2font_svg(s,
-                                                                72, fontsize)
+        width, height, descent, svg_elements, used_characters = \
+            self.mathtext_parser.parse(s, 72, prop)
         svg_glyphs = svg_elements.svg_glyphs
-        svg_lines = svg_elements.svg_lines
+        svg_rects = svg_elements.svg_rects
         color = rgb2hex(gc.get_rgb())
 
-        svg = ""
         self.open_group("mathtext")
-        for fontname, fontsize, thetext, ox, oy, metrics in svg_glyphs:
-            style = 'font-size: %f; font-family: %s; fill: %s;'%(fontsize,
-                                                            fontname, color)
-            if angle!=0:
-                transform = 'transform="translate(%f,%f) rotate(%1.1f) translate(%f,%f)"' % (x,y,-angle,-x,-y) # Inkscape doesn't support rotate(angle x y)
-            else: transform = ''
-            if rcParams["mathtext.mathtext2"]:
-                newx, newy = x+ox, y+oy-height
-            else:
-                newx, newy = x+ox, y-oy
-            svg += """\
-<text style="%(style)s" x="%(newx)f" y="%(newy)f" %(transform)s>%(thetext)s</text>
-""" % locals()
 
-        self._svgwriter.write (svg)
-        rgbFace = gc.get_rgb()
-        for xmin, ymin, xmax, ymax in svg_lines:
-            newx, newy = x + xmin, y + height - ymax#-(ymax-ymin)/2#-height
-            self.draw_rectangle(gc, rgbFace, newx, newy, xmax-xmin, ymax-ymin)
-            #~ self.draw_line(gc, x + xmin, y + ymin,# - height,
-                                     #~ x + xmax, y + ymax)# - height)
+        style = "fill: %s" % color
+
+        if rcParams['svg.embed_char_paths']:
+            svg = ['<g style="%s" transform="' % style]
+            if angle != 0:
+                svg.append('translate(%s,%s)rotate(%1.1f)'
+                           % (x,y,-angle) )
+            else:
+                svg.append('translate(%s,%s)' % (x, y))
+            svg.append('">\n')
+
+            for font, fontsize, thetext, new_x, new_y_mtc, metrics in svg_glyphs:
+                charid = self._add_char_def(font, thetext)
+
+                svg.append('<use xlink:href="#%s" transform="translate(%s,%s)scale(%s)"/>\n' %
+                           (charid, new_x, -new_y_mtc, fontsize / self.FONT_SCALE))
+            svg.append('</g>\n')
+        else: # not rcParams['svg.embed_char_paths']
+            svg = ['<text style="%s" x="%f" y="%f"' % (style, x, y)]
+
+            if angle != 0:
+                svg.append(' transform="translate(%f,%f) rotate(%1.1f) translate(%f,%f)"'
+                           % (x,y,-angle,-x,-y) ) # Inkscape doesn't support rotate(angle x y)
+            svg.append('>\n')
+
+            curr_x,curr_y = 0.0,0.0
+
+            for font, fontsize, thetext, new_x, new_y_mtc, metrics in svg_glyphs:
+                new_y = - new_y_mtc
+                style = "font-size: %f; font-family: %s" % (fontsize, font.family_name)
+
+                svg.append('<tspan style="%s"' % style)
+                xadvance = metrics.advance
+                svg.append(' textLength="%s"' % xadvance)
+
+                dx = new_x - curr_x
+                if dx != 0.0:
+                    svg.append(' dx="%s"' % dx)
+
+                dy = new_y - curr_y
+                if dy != 0.0:
+                    svg.append(' dy="%s"' % dy)
+
+                thetext = escape_xml_text(thetext)
+
+                svg.append('>%s</tspan>\n' % thetext)
+
+                curr_x = new_x + xadvance
+                curr_y = new_y
+
+            svg.append('</text>\n')
+
+        if len(svg_rects):
+            style = "fill: %s; stroke: none" % color
+            svg.append('<g style="%s" transform="' % style)
+            if angle != 0:
+                svg.append('translate(%s,%s) rotate(%1.1f)'
+                           % (x,y,-angle) )
+            else:
+                svg.append('translate(%s,%s)' % (x, y))
+            svg.append('">\n')
+
+            for x, y, width, height in svg_rects:
+                svg.append('<rect x="%s" y="%s" width="%s" height="%s" fill="black" stroke="none" />' % (x, -y + height, width, height))
+            svg.append("</g>")
+
+        self._svgwriter.write (''.join(svg))
         self.close_group("mathtext")
 
     def finish(self):
-        self._svgwriter.write('</svg>\n')
+        write = self._svgwriter.write
+        if len(self._char_defs):
+            write('<defs id="fontpaths">\n')
+            for char_num, path in self._char_defs.values():
+                write(path)
+            write('</defs>\n')
+        write('</svg>\n')
 
     def flipy(self):
         return True
@@ -297,46 +477,59 @@ class RendererSVG(RendererBase):
     def get_canvas_width_height(self):
         return self.width, self.height
 
-    def get_text_width_height(self, s, prop, ismath):
+    def get_text_width_height_descent(self, s, prop, ismath):
         if ismath:
-            width, height, trash = math_parse_s_ft2font_svg(
-                s, 72, prop.get_size_in_points())
-            return width, height
+            width, height, descent, trash, used_characters = \
+                self.mathtext_parser.parse(s, 72, prop)
+            return width, height, descent
         font = self._get_font(prop)
-        font.set_text(s, 0.0)
+        font.set_text(s, 0.0, flags=LOAD_NO_HINTING)
         w, h = font.get_width_height()
         w /= 64.0  # convert from subpixels
         h /= 64.0
-        return w, h
+        d = font.get_descent()
+        d /= 64.0
+        return w, h, d
 
 
 class FigureCanvasSVG(FigureCanvasBase):
+    filetypes = {'svg': 'Scalable Vector Graphics',
+                 'svgz': 'Scalable Vector Graphics'}
 
-    def print_figure(self, filename, dpi, facecolor='w', edgecolor='w',
-                     orientation='portrait', **kwargs):
-        # save figure settings
-        origDPI       = self.figure.dpi.get()
-        origfacecolor = self.figure.get_facecolor()
-        origedgecolor = self.figure.get_edgecolor()
+    def print_svg(self, filename, *args, **kwargs):
+        if is_string_like(filename):
+            fh_to_close = svgwriter = codecs.open(filename, 'w', 'utf-8')
+        elif is_writable_file_like(filename):
+            svgwriter = codecs.EncodedFile(filename, 'utf-8')
+            fh_to_close = None
+        else:
+            raise ValueError("filename must be a path or a file-like object")
+        return self._print_svg(filename, svgwriter, fh_to_close)
 
+    def print_svgz(self, filename, *args, **kwargs):
+        if is_string_like(filename):
+            gzipwriter = gzip.GzipFile(filename, 'w')
+            fh_to_close = svgwriter = codecs.EncodedFile(gzipwriter, 'utf-8')
+        elif is_writable_file_like(filename):
+            fh_to_close = gzipwriter = gzip.GzipFile(fileobj=filename, mode='w')
+            svgwriter = codecs.EncodedFile(gzipwriter, 'utf-8')
+        else:
+            raise ValueError("filename must be a path or a file-like object")
+        return self._print_svg(filename, svgwriter, fh_to_close)
+
+    def _print_svg(self, filename, svgwriter, fh_to_close=None):
         self.figure.dpi.set(72)
-        self.figure.set_facecolor(facecolor)
-        self.figure.set_edgecolor(edgecolor)
         width, height = self.figure.get_size_inches()
         w, h = width*72, height*72
 
-        basename, ext = os.path.splitext(filename)
-        if not len(ext): filename += '.svg'
-        svgwriter = codecs.open( filename, 'w', 'utf-8' )
-        renderer = RendererSVG(w, h, svgwriter, basename)
+        renderer = RendererSVG(w, h, svgwriter, filename)
         self.figure.draw(renderer)
         renderer.finish()
+        if fh_to_close is not None:
+            svgwriter.close()
 
-        # restore figure settings
-        self.figure.dpi.set(origDPI)
-        self.figure.set_facecolor(origfacecolor)
-        self.figure.set_edgecolor(origedgecolor)
-        svgwriter.close()
+    def get_default_filetype(self):
+        return 'svg'
 
 class FigureManagerSVG(FigureManagerBase):
     pass
@@ -348,7 +541,7 @@ svgProlog = """\
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <!-- Created with matplotlib (http://matplotlib.sourceforge.net/) -->
-<svg width="%i" height="%i" viewBox="0 0 %i %i"
+<svg width="%ipt" height="%ipt" viewBox="0 0 %i %i"
    xmlns="http://www.w3.org/2000/svg"
    xmlns:xlink="http://www.w3.org/1999/xlink"
    version="1.1"

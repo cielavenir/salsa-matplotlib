@@ -19,14 +19,13 @@ from matplotlib._pylab_helpers import Gcf
 from matplotlib.backend_bases import RendererBase, GraphicsContextBase, \
      FigureManagerBase, FigureCanvasBase, NavigationToolbar2, cursors
 from matplotlib.backends.backend_gdk import RendererGDK, FigureCanvasGDK
-from matplotlib.cbook import is_string_like, enumerate
+from matplotlib.cbook import is_string_like, is_writable_file_like, enumerate
 from matplotlib.colors import colorConverter
 from matplotlib.figure import Figure
-import matplotlib.numerix as numerix
-from matplotlib.numerix import asarray, fromstring, UInt8, zeros, \
-     where, transpose, nonzero, indices, ones, nx
 from matplotlib.widgets import SubplotTool
 
+from matplotlib import lines
+from matplotlib import cbook
 
 backend_version = "%d.%d.%d" % gtk.pygtk_version
 
@@ -36,14 +35,6 @@ _debug = False
 # the true dots per inch on the screen; should be display dependent
 # see http://groups.google.com/groups?q=screen+dpi+x11&hl=en&lr=&ie=UTF-8&oe=UTF-8&safe=off&selm=7077.26e81ad5%40swift.cs.tcd.ie&rnum=5 for some info about screen dpi
 PIXELS_PER_INCH = 96
-
-# Image formats that this backend supports - for FileChooser and print_figure()
-IMAGE_FORMAT = ['bmp', 'eps', 'jpg', 'png', 'ps', 'svg']
-# pdf not ready yet
-#IMAGE_FORMAT  = ['bmp', 'eps', 'jpg', 'png', 'pdf', 'ps', 'svg']
-IMAGE_FORMAT.sort()
-IMAGE_FORMAT_DEFAULT  = 'png'
-
 
 cursord = {
     cursors.MOVE          : gdk.Cursor(gdk.FLEUR),
@@ -67,6 +58,7 @@ def draw_if_interactive():
         if figManager is not None:
             figManager.canvas.draw()
 
+
 def show(mainloop=True):
     """
     Show all the figures and enter the gtk main loop
@@ -82,7 +74,7 @@ def new_figure_manager(num, *args, **kwargs):
     """
     Create a new figure manager instance
     """
-    FigureClass = kwargs.pop('FigureClass', Figure)    
+    FigureClass = kwargs.pop('FigureClass', Figure)
     thisFig = FigureClass(*args, **kwargs)
     canvas = FigureCanvasGTK(thisFig)
     manager = FigureManagerGTK(canvas, num)
@@ -102,7 +94,57 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
                65362 : 'up',
                65363 : 'right',
                65364 : 'down',
+               65307 : 'escape',
+               65470 : 'f1',
+               65471 : 'f2',
+               65472 : 'f3',
+               65473 : 'f4',
+               65474 : 'f5',
+               65475 : 'f6',
+               65476 : 'f7',
+               65477 : 'f8',
+               65478 : 'f9',
+               65479 : 'f10',
+               65480 : 'f11',
+               65481 : 'f12',
+               65300 : 'scroll_lock',
+               65299 : 'break',
+               65288 : 'backspace',
+               65293 : 'enter',
+               65379 : 'insert',
+               65535 : 'delete',
+               65360 : 'home',
+               65367 : 'end',
+               65365 : 'pageup',
+               65366 : 'pagedown',
+               65438 : '0',
+               65436 : '1',
+               65433 : '2',
+               65435 : '3',
+               65430 : '4',
+               65437 : '5',
+               65432 : '6',
+               65429 : '7',
+               65431 : '8',
+               65434 : '9',
+               65451 : '+',
+               65453 : '-',
+               65450 : '*',
+               65455 : '/',
+               65439 : 'dec',
+               65421 : 'enter',
                }
+
+    # Setting this as a static constant prevents
+    # this resulting expression from leaking
+    event_mask = (gdk.BUTTON_PRESS_MASK   |
+                  gdk.BUTTON_RELEASE_MASK |
+                  gdk.EXPOSURE_MASK       |
+                  gdk.KEY_PRESS_MASK      |
+                  gdk.KEY_RELEASE_MASK    |
+                  gdk.LEAVE_NOTIFY_MASK   |
+                  gdk.POINTER_MOTION_MASK |
+                  gdk.POINTER_MOTION_HINT_MASK)
 
     def __init__(self, figure):
         if _debug: print 'FigureCanvasGTK.%s' % fn_name()
@@ -115,6 +157,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         self._pixmap_height = -1
         self._lastCursor    = None
 
+        self.connect('scroll_event',   self.scroll_event)
         self.connect('button_press_event',   self.button_press_event)
         self.connect('button_release_event', self.button_release_event)
         self.connect('configure_event',      self.configure_event)
@@ -123,20 +166,24 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         self.connect('key_release_event',    self.key_release_event)
         self.connect('motion_notify_event',  self.motion_notify_event)
 
-        self.set_events(
-            gdk.BUTTON_PRESS_MASK   |
-            gdk.BUTTON_RELEASE_MASK |
-            gdk.EXPOSURE_MASK       |
-            gdk.KEY_PRESS_MASK      |
-            gdk.KEY_RELEASE_MASK    |
-            gdk.LEAVE_NOTIFY_MASK   |
-            gdk.POINTER_MOTION_MASK |
-            gdk.POINTER_MOTION_HINT_MASK)
+        self.set_events(self.__class__.event_mask)
 
         self.set_double_buffered(False)
         self.set_flags(gtk.CAN_FOCUS)
         self._renderer_init()
 
+
+    def scroll_event(self, widget, event):
+        if _debug: print 'FigureCanvasGTK.%s' % fn_name()
+        x = event.x
+        # flipy so y=0 is bottom of canvas
+        y = self.allocation.height - event.y
+        if event.direction==gdk.SCROLL_UP:
+            direction = 'up'
+        else:
+            direction = 'down'
+        FigureCanvasBase.scroll_event(self, x, y, direction)
+        return False  # finish event propagation?
 
     def button_press_event(self, widget, event):
         if _debug: print 'FigureCanvasGTK.%s' % fn_name()
@@ -289,105 +336,57 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
                                        self._pixmap, x, y, x, y, w, h)
         return False  # finish event propagation?
 
+    filetypes = FigureCanvasBase.filetypes.copy()
+    filetypes['jpg'] = 'JPEG'
+    filetypes['jpeg'] = 'JPEG'
+    filetypes['png'] = 'Portable Network Graphics'
 
-    def print_figure(self, filename, dpi=None, facecolor='w', edgecolor='w',
-                     orientation='portrait', **kwargs):
-        # TODO - use gdk/cairo/agg print_figure?
-        if dpi is None: dpi = matplotlib.rcParams['savefig.dpi']
-        root, ext = os.path.splitext(filename)
-        ext = ext[1:]
-        if ext == '':
-            ext      = IMAGE_FORMAT_DEFAULT
-            filename = filename + '.' + ext
+    def print_jpeg(self, filename, *args, **kwargs):
+        return self._print_image(filename, 'jpeg')
+    print_jpg = print_jpeg
 
-        # save figure settings
-        origDPI       = self.figure.dpi.get()
-        origfacecolor = self.figure.get_facecolor()
-        origedgecolor = self.figure.get_edgecolor()
-        origWIn, origHIn = self.figure.get_size_inches()
+    def print_png(self, filename, *args, **kwargs):
+        return self._print_image(filename, 'png')
 
+    def _print_image(self, filename, format):
         if self.flags() & gtk.REALIZED == 0:
             # for self.window(for pixmap) and has a side effect of altering
             # figure width,height (via configure-event?)
             gtk.DrawingArea.realize(self)
-
-        self.figure.dpi.set(dpi)
-        self.figure.set_facecolor(facecolor)
-        self.figure.set_edgecolor(edgecolor)
-
-        ext = ext.lower()
-        if ext in ('jpg', 'png'):          # native printing
-            width, height = self.get_width_height()
-            pixmap = gdk.Pixmap (self.window, width, height)
-            self._renderer.set_pixmap (pixmap)
-            self._render_figure(pixmap, width, height)
-
-            # jpg colors don't match the display very well, png colors match
-            # better
-            pixbuf = gdk.Pixbuf(gdk.COLORSPACE_RGB, 0, 8, width, height)
-            pixbuf.get_from_drawable(pixmap, pixmap.get_colormap(),
+        
+        width, height = self.get_width_height()
+        pixmap = gdk.Pixmap (self.window, width, height)
+        self._renderer.set_pixmap (pixmap)
+        self._render_figure(pixmap, width, height)
+        
+        # jpg colors don't match the display very well, png colors match
+        # better
+        pixbuf = gdk.Pixbuf(gdk.COLORSPACE_RGB, 0, 8, width, height)
+        pixbuf.get_from_drawable(pixmap, pixmap.get_colormap(),
                                      0, 0, 0, 0, width, height)
 
-            # pixbuf.save() recognises 'jpeg' not 'jpg'
-            if ext == 'jpg': ext = 'jpeg'
+        if is_string_like(filename):
             try:
-                pixbuf.save(filename, ext)
+                pixbuf.save(filename, format)
             except gobject.GError, exc:
                 error_msg_gtk('Save figure failure:\n%s' % (exc,), parent=self)
-
-        elif ext in ('eps', 'ps', 'svg',):
-            if ext == 'svg':
-                from backend_svg import FigureCanvasSVG as FigureCanvas
+        elif is_writable_file_like(filename):
+            if hasattr(pixbuf, 'save_to_callback'):
+                def save_callback(buf, data=None):
+                    data.write(buf)
+                try:
+                    pixbuf.save_to_callback(save_callback, format, user_data=filename)
+                except gobject.GError, exc:
+                    error_msg_gtk('Save figure failure:\n%s' % (exc,), parent=self)
             else:
-                from backend_ps  import FigureCanvasPS  as FigureCanvas
-
-            try:
-                fc = self.switch_backends(FigureCanvas)
-                fc.print_figure(filename, dpi, facecolor, edgecolor,
-                                orientation, **kwargs)
-            except IOError, exc:
-                error_msg_gtk("Save figure failure:\n%s: %s" %
-                          (exc.filename, exc.strerror), parent=self)
-            except Exception, exc:
-                error_msg_gtk("Save figure failure:\n%s" % exc, parent=self)
-
-        elif ext in ('bmp', 'raw', 'rgb',):
-            try:
-                from backend_agg import FigureCanvasAgg  as FigureCanvas
-            except:
-                error_msg_gtk('Save figure failure:\n'
-                          'Agg must be installed to save as bmp, raw and rgb',
-                          parent=self)
-            else:
-                fc = self.switch_backends(FigureCanvas)
-                fc.print_figure(filename, dpi, facecolor, edgecolor,
-                                orientation, **kwargs)
-
-        elif ext in ('pdf',):
-            try:
-                from backend_cairo import FigureCanvasCairo  as FigureCanvas
-            except:
-                error_msg_gtk('Save figure failure:\n'
-                          'Cairo must be installed to save as pdf',
-                          parent=self)
-            else:
-                fc = self.switch_backends(FigureCanvas)
-                fc.print_figure(filename, dpi, facecolor, edgecolor,
-                                orientation, **kwargs)
-
+                raise ValueError("Saving to a Python file-like object is only supported by PyGTK >= 2.8")
         else:
-            error_msg_gtk('Format "%s" is not supported.\nSupported formats are %s.' %
-                      (ext, ', '.join(IMAGE_FORMAT)),
-                      parent=self)
+            raise ValueError("filename must be a path or a file-like object")
+            
+    def get_default_filetype(self):
+        return 'png'
 
-        # restore figure settings
-        self.figure.dpi.set(origDPI)
-        self.figure.set_facecolor(origfacecolor)
-        self.figure.set_edgecolor(origedgecolor)
-        self.figure.set_size_inches(origWIn, origHIn)
-        self.figure.set_canvas(self)
-
-
+            
 class FigureManagerGTK(FigureManagerBase):
     """
     Public attributes
@@ -404,12 +403,16 @@ class FigureManagerGTK(FigureManagerBase):
 
         self.window = gtk.Window()
         self.window.set_title("Figure %d" % num)
-
+        
         self.vbox = gtk.VBox()
         self.window.add(self.vbox)
         self.vbox.show()
 
         self.canvas.show()
+
+        # attach a show method to the figure  for pylab ease of use
+        self.canvas.figure.show = lambda *args: self.window.show()
+
         self.vbox.pack_start(self.canvas, True, True)
 
         self.toolbar = self._get_toolbar(canvas)
@@ -449,7 +452,10 @@ class FigureManagerGTK(FigureManagerBase):
                gtk.main_level() >= 1:
             gtk.main_quit()
 
-
+    def show(self):
+        # show the figure window
+        self.window.show()
+        
     def full_screen_toggle (self):
         self._full_screen_flag = not self._full_screen_flag
         if self._full_screen_flag:
@@ -470,6 +476,8 @@ class FigureManagerGTK(FigureManagerBase):
             toolbar = None
         return toolbar
 
+    def set_window_title(self, title):
+        self.window.set_title(title)
 
     def resize(self, width, height):
         'set the canvas size in pixels'
@@ -498,6 +506,10 @@ class NavigationToolbar2GTK(NavigationToolbar2, gtk.Toolbar):
         gtk.Toolbar.__init__(self)
         NavigationToolbar2.__init__(self, canvas)
         self._idleId = 0
+
+        def destroy(*args):
+            self.fileselect.destroy()
+        self.connect("destroy", destroy)
 
     def set_message(self, s):
         if self._idleId == 0:
@@ -622,14 +634,20 @@ class NavigationToolbar2GTK(NavigationToolbar2, gtk.Toolbar):
 
         self.show_all()
 
-        self.fileselect = FileChooserDialog(title='Save the figure',
-                                            parent=self.win,)
+        self.fileselect = FileChooserDialog(
+            title='Save the figure',
+            parent=self.win,
+            filetypes=self.canvas.get_supported_filetypes(),
+            default_filetype=self.canvas.get_default_filetype())
 
 
     def save_figure(self, button):
-        fname = self.fileselect.get_filename_from_user()
+        fname, format = self.fileselect.get_filename_from_user()
         if fname:
-            self.canvas.print_figure(fname)
+            try:
+                self.canvas.print_figure(fname, format=format)
+            except Exception, e:
+                error_msg_gtk(str(e), parent=self)
 
     def configure_subplots(self, button):
         toolfig = Figure(figsize=(6,3))
@@ -714,8 +732,11 @@ class NavigationToolbar(gtk.Toolbar):
         if gtk.pygtk_version >= (2,4,0):
             self._create_toolitems_2_4()
             self.update = self._update_2_4
-            self.fileselect = FileChooserDialog(title='Save the figure',
-                                                parent=self.win,)
+            self.fileselect = FileChooserDialog(
+                title='Save the figure',
+                parent=self.win,
+                formats=self.canvas.get_supported_filetypes(),
+                default_type=self.canvas.get_default_filetype())
         else:
             self._create_toolitems_2_2()
             self.update = self._update_2_2
@@ -724,19 +745,24 @@ class NavigationToolbar(gtk.Toolbar):
         self.show_all()
         self.update()
 
+        def destroy(*args):
+            self.fileselect.destroy()
+            del self.fileselect
+        self.connect("destroy", destroy)
 
     def _create_toolitems_2_4(self):
         # use the GTK+ 2.4 GtkToolbar API
         iconSize = gtk.ICON_SIZE_SMALL_TOOLBAR
         self.tooltips = gtk.Tooltips()
 
-        for text, tooltip_text, image, callback, callback_arg, scroll \
+        for text, tooltip_text, image_num, callback, callback_arg, scroll \
                 in self.toolitems:
             if text is None:
                 self.insert( gtk.SeparatorToolItem(), -1 )
                 continue
-            tbutton = gtk.ToolButton(gtk.image_new_from_stock(image, iconSize),
-                                     text)
+            image = gtk.Image()
+            image.set_from_stock(image_num, iconSize)
+            tbutton = gtk.ToolButton(image, text)
             self.insert(tbutton, -1)
             if callback_arg:
                 tbutton.connect('clicked', getattr(self, callback),
@@ -804,13 +830,14 @@ class NavigationToolbar(gtk.Toolbar):
         # use the GTK+ 2.2 (and lower) GtkToolbar API
         iconSize = gtk.ICON_SIZE_SMALL_TOOLBAR
 
-        for text, tooltip_text, image, callback, callback_arg, scroll \
+        for text, tooltip_text, image_num, callback, callback_arg, scroll \
                 in self.toolitems:
             if text is None:
                 self.append_space()
                 continue
-            item = self.append_item(text, tooltip_text, 'Private',
-                                    gtk.image_new_from_stock(image, iconSize),
+            image = gtk.Image()
+            image.set_from_stock(image_num, iconSize)
+            item = self.append_item(text, tooltip_text, 'Private', image,
                                     getattr(self, callback), callback_arg)
             if scroll:
                 item.connect("scroll_event", getattr(self, callback))
@@ -930,34 +957,12 @@ class NavigationToolbar(gtk.Toolbar):
 
 
     def save_figure(self, button):
-        fname = self.fileselect.get_filename_from_user()
+        fname, format = self.fileselect.get_filename_from_user()
         if fname:
-            self.canvas.print_figure(fname)
-
-
-class FileSelection(gtk.FileSelection):
-    """GTK+ 2.2 and lower file selector which remembers the last
-    file/directory selected
-    """
-    def __init__(self, path=None, title='Select a file', parent=None):
-        super(FileSelection, self).__init__(title)
-
-        if path: self.path = path
-        else:    self.path = os.getcwd() + os.sep
-
-        if parent: self.set_transient_for(parent)
-
-    def get_filename_from_user(self, path=None, title=None):
-        if path:  self.path = path
-        if title: self.set_title(title)
-        self.set_filename(self.path)
-
-        filename = None
-        if self.run() == gtk.RESPONSE_OK:
-            self.path = filename = self.get_filename()
-        self.hide()
-        return filename
-
+            try:
+                self.canvas.print_figure(fname, format=format)
+            except Exception, e:
+                error_msg_gtk(str(e), parent=self)
 
 if gtk.pygtk_version >= (2,4,0):
     class FileChooserDialog(gtk.FileChooserDialog):
@@ -971,72 +976,99 @@ if gtk.pygtk_version >= (2,4,0):
                       buttons = (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
                                  gtk.STOCK_SAVE,   gtk.RESPONSE_OK),
                       path    = None,
+                      filetypes = [],
+                      default_filetype = None
                       ):
             super (FileChooserDialog, self).__init__ (title, parent, action,
                                                       buttons)
             self.set_default_response (gtk.RESPONSE_OK)
 
-            if path: self.path = path
-            else:    self.path = os.getcwd() + os.sep
+            if not path: path = os.getcwd() + os.sep
 
             # create an extra widget to list supported image formats
-            self.set_current_folder (self.path)
-            self.set_current_name ('image.' + IMAGE_FORMAT_DEFAULT)
+            self.set_current_folder (path)
+            self.set_current_name ('image.' + default_filetype)
 
             hbox = gtk.HBox (spacing=10)
-            hbox.pack_start (gtk.Label ("Image Format:"), expand=False)
+            hbox.pack_start (gtk.Label ("File Format:"), expand=False)
 
-            self.cbox = gtk.combo_box_new_text()
-            hbox.pack_start (self.cbox)
+            liststore = gtk.ListStore(gobject.TYPE_STRING)
+            cbox = gtk.ComboBox(liststore)
+            cell = gtk.CellRendererText()
+            cbox.pack_start(cell, True)
+            cbox.add_attribute(cell, 'text', 0)
+            hbox.pack_start (cbox)
 
-            for item in IMAGE_FORMAT:
-                self.cbox.append_text (item)
-            self.cbox.set_active (IMAGE_FORMAT.index (IMAGE_FORMAT_DEFAULT))
+            self.filetypes = filetypes
+            self.sorted_filetypes = filetypes.items()
+            self.sorted_filetypes.sort()
+            default = 0
+            for i, (ext, name) in enumerate(self.sorted_filetypes):
+                cbox.append_text ("%s (*.%s)" % (name, ext))
+                if ext == default_filetype:
+                    default = i
+            cbox.set_active(default)
+            self.ext = default_filetype
 
             def cb_cbox_changed (cbox, data=None):
                 """File extension changed"""
                 head, filename = os.path.split(self.get_filename())
                 root, ext = os.path.splitext(filename)
                 ext = ext[1:]
-                new_ext = IMAGE_FORMAT[cbox.get_active()]
+                new_ext = self.sorted_filetypes[cbox.get_active()][0]
+                self.ext = new_ext
 
-                if ext in IMAGE_FORMAT:
-                    filename = filename.replace(ext, new_ext)
+                if ext in self.filetypes:
+                    filename = root + '.' + new_ext
                 elif ext == '':
                     filename = filename.rstrip('.') + '.' + new_ext
 
                 self.set_current_name (filename)
-            self.cbox.connect ("changed", cb_cbox_changed)
+            cbox.connect ("changed", cb_cbox_changed)
 
             hbox.show_all()
             self.set_extra_widget(hbox)
 
-
         def get_filename_from_user (self):
             while True:
                 filename = None
-                if self.run() != gtk.RESPONSE_OK:
+                if self.run() != int(gtk.RESPONSE_OK):
                     break
                 filename = self.get_filename()
-                menu_ext  = IMAGE_FORMAT[self.cbox.get_active()]
-                root, ext = os.path.splitext (filename)
-                ext = ext[1:]
-                if ext == '':
-                    ext = menu_ext
-                    filename += '.' + ext
-
-                if ext in IMAGE_FORMAT:
-                    self.path = filename
-                    break
-                else:
-                    error_msg_gtk ('Image format "%s" is not supported' % ext,
-                                   parent=self)
-                    self.set_current_name (os.path.split(root)[1] + '.' +
-                                           menu_ext)
-
+                break
+                
             self.hide()
-            return filename
+            return filename, self.ext
+else:
+    class FileSelection(gtk.FileSelection):
+        """GTK+ 2.2 and lower file selector which remembers the last
+        file/directory selected
+        """
+        def __init__(self, path=None, title='Select a file', parent=None):
+            super(FileSelection, self).__init__(title)
 
+            if path: self.path = path
+            else:    self.path = os.getcwd() + os.sep
+
+            if parent: self.set_transient_for(parent)
+
+        def get_filename_from_user(self, path=None, title=None):
+            if path:  self.path = path
+            if title: self.set_title(title)
+            self.set_filename(self.path)
+
+            filename = None
+            if self.run() == int(gtk.RESPONSE_OK):
+                self.path = filename = self.get_filename()
+            self.hide()
+
+            ext = None
+            if filename is not None:
+                ext = os.path.splitext(filename)[1]
+                if ext.startswith('.'):
+                    ext = ext[1:]
+            return filename, ext
+        
 
 class DialogLineprops:
     """
@@ -1052,46 +1084,16 @@ class DialogLineprops:
         'on_dialog_lineprops_cancelbutton_clicked',
         )
 
-    linestyles = (
-        '-'    ,
-        '--'   ,
-        '-.'   ,
-        ','    ,
-        'steps',
-        'None' ,
-    )
-
+    linestyles = [ls for ls in lines.Line2D.lineStyles if ls.strip()]
     linestyled = dict([ (s,i) for i,s in enumerate(linestyles)])
 
 
-    markers =  (
-        'None',
-        '.'  ,
-        ','  ,
-        'o'  ,
-        'v'  ,
-        '^'  ,
-        '<'  ,
-        '>'  ,
-        '1'  ,
-        '2'  ,
-        '3'  ,
-        '4'  ,
-        's'  ,
-        'p'  ,
-        'h'  ,
-        'H'  ,
-        '+'  ,
-        'x'  ,
-        'D'  ,
-        'd'  ,
-        '|'  ,
-        '_'  ,
-        )
+    markers =  [m for m in lines.Line2D.markers if cbook.is_string_like(m)]
 
     markerd = dict([(s,i) for i,s in enumerate(markers)])
 
     def __init__(self, lines):
+        import gtk.glade
 
         datadir = matplotlib.get_data_path()
         gladefile = os.path.join(datadir, 'lineprops.glade')
@@ -1230,11 +1232,17 @@ class DialogLineprops:
     def on_dialog_lineprops_cancelbutton_clicked(self, button):
         self.dlg.hide()
 
-# set icon used when windows are minimized, it requires
-# gtk.pygtk_version >= (2,2,0) with a GDK pixbuf loader for SVG installed
+# set icon used when windows are minimized
+# Unfortunately, the SVG renderer (rsvg) leaks memory under earlier
+# versions of pygtk, so we have to use a PNG file instead.
 try:
+
+    if gtk.pygtk_version < (2, 8, 0):
+        icon_filename = 'matplotlib.png'
+    else:
+        icon_filename = 'matplotlib.svg'
     gtk.window_set_default_icon_from_file (
-        os.path.join (matplotlib.rcParams['datapath'], 'images', 'matplotlib.svg'))
+        os.path.join (matplotlib.rcParams['datapath'], 'images', icon_filename))
 except:
     verbose.report('Could not load matplotlib icon: %s' % sys.exc_info()[1])
 

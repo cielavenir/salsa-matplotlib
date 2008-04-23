@@ -3,14 +3,87 @@ A collection of utility functions and classes.  Many (but not all)
 from the Python Cookbook -- hence the name cbook
 """
 from __future__ import generators
-import re, os, errno, sys, StringIO, traceback
-import matplotlib.numerix as nx
+import re, os, errno, sys, StringIO, traceback, locale
+import time, datetime
+import numpy as npy
 
 try: set
 except NameError:
     from sets import Set as set
 
 major, minor1, minor2, s, tmp = sys.version_info
+
+
+# on some systems, locale.getpreferredencoding returns None, which can break unicode
+preferredencoding = locale.getpreferredencoding()
+
+def unicode_safe(s):
+    if preferredencoding is None: return unicode(s)
+    else: return unicode(s, preferredencoding)
+
+class converter:
+    """
+    Base class for handling string -> python type with support for
+    missing values
+    """
+    def __init__(self, missing='Null', missingval=None):
+        self.missing = missing
+        self.missingval = missingval
+    def __call__(self, s):
+        if s==self.missing: return self.missingval
+        return s
+
+    def is_missing(self, s):
+        return not s.strip() or s==self.missing
+
+class tostr(converter):
+    'convert to string or None'
+    def __init__(self, missing='Null', missingval=''):
+        converter.__init__(self, missing=missing, missingval=missingval)
+
+class todatetime(converter):
+    'convert to a datetime or None'
+    def __init__(self, fmt='%Y-%m-%d', missing='Null', missingval=None):
+        'use a time.strptime format string for conversion'
+        converter.__init__(self, missing, missingval)
+        self.fmt = fmt
+
+    def __call__(self, s):
+        if self.is_missing(s): return self.missingval
+        tup = time.strptime(s, self.fmt)
+        return datetime.datetime(*tup[:6])
+
+
+
+class todate(converter):
+    'convert to a date or None'
+    def __init__(self, fmt='%Y-%m-%d', missing='Null', missingval=None):
+        'use a time.strptime format string for conversion'
+        converter.__init__(self, missing, missingval)
+        self.fmt = fmt
+    def __call__(self, s):
+        if self.is_missing(s): return self.missingval
+        tup = time.strptime(s, self.fmt)
+        return datetime.date(*tup[:3])
+
+class tofloat(converter):
+    'convert to a float or None'
+    def __init__(self, missing='Null', missingval=None):
+        converter.__init__(self, missing)
+        self.missingval = missingval
+    def __call__(self, s):
+        if self.is_missing(s): return self.missingval
+        return float(s)
+
+
+class toint(converter):
+    'convert to an int or None'
+    def __init__(self, missing='Null', missingval=None):
+        converter.__init__(self, missing)
+
+    def __call__(self, s):
+        if self.is_missing(s): return self.missingval
+        return int(s)
 
 class CallbackRegistry:
     """
@@ -57,7 +130,7 @@ class CallbackRegistry:
     def connect(self, s, func):
         """
         register func to be called when a signal s is generated
-        func will be called with args and kwargs
+        func will be called
         """
         self._check_signal(s)
         self._cid +=1
@@ -122,8 +195,8 @@ class Bunch:
    """
    def __init__(self, **kwds):
       self.__dict__.update(kwds)
-      
-      
+
+
 def unique(x):
    'Return a list of unique elements of x'
    return dict([ (val, 1) for val in x]).keys()
@@ -135,19 +208,13 @@ def iterable(obj):
 
 
 def is_string_like(obj):
-    if hasattr(obj, 'shape'): return 0 # this is a workaround
-                                       # for a bug in numeric<23.1
+    if hasattr(obj, 'shape'): return 0
     try: obj + ''
     except (TypeError, ValueError): return 0
     return 1
 
-
-def is_file_like(obj):
-    if hasattr(obj, 'shape'): return 0 # this is a workaround
-                                       # for a bug in numeric<23.1
-    try: obj + ''
-    except (TypeError, ValueError): return 0
-    return 1
+def is_writable_file_like(obj):
+    return hasattr(obj, 'write') and callable(obj.write)
 
 def is_scalar(obj):
     return is_string_like(obj) or not iterable(obj)
@@ -156,6 +223,28 @@ def is_numlike(obj):
     try: obj+1
     except TypeError: return False
     else: return True
+
+def to_filehandle(fname, flag='r', return_opened=False):
+    """
+    fname can be a filename or a file handle.  Support for gzipped
+    files is automatic, if the filename ends in .gz.  flag is a
+    read/write flag for file
+    """
+    if is_string_like(fname):
+        if fname.endswith('.gz'):
+            import gzip
+            fh = gzip.open(fname, flag)
+        else:
+            fh = file(fname, flag)
+        opened = True
+    elif hasattr(fname, 'seek'):
+        fh = fname
+        opened = False
+    else:
+        raise ValueError('fname must be a string or file handle')
+    if return_opened:
+        return fh, opened
+    return fh
 
 def flatten(seq, scalarp=is_scalar):
     """
@@ -315,6 +404,21 @@ def mkdirs(newdir, mode=0777):
          raise
 
 
+class GetRealpathAndStat:
+    def __init__(self):
+        self._cache = {}
+
+    def __call__(self, path):
+        result = self._cache.get(path)
+        if result is None:
+            realpath = os.path.realpath(path)
+            stat = os.stat(realpath)
+            stat_key = (stat.st_ino, stat.st_dev)
+            result = realpath, stat_key
+            self._cache[path] = result
+        return result
+get_realpath_and_stat = GetRealpathAndStat()
+
 def dict_delall(d, keys):
     'delete all of the keys from the dict d'
     for key in keys:
@@ -367,6 +471,19 @@ except:
             yield i, seq[i]
 
 
+# use reversed builtin if available, else use python version
+try:
+    import __builtin__
+    reversed = __builtin__.reversed
+except:
+    def reversed(seq):
+        """Python equivalent to the enumerate builtin function
+        enumerate() is new in Python 2.3
+        """
+        for i in range(len(seq)-1,-1,-1):
+            yield seq[i]
+
+
 # use itertools.izip if available, else use python version
 try:
     import itertools
@@ -415,6 +532,12 @@ def wrap(prefix, text, cols):
         ret += pad + ' '.join(line) + '\n'
     return ret
 
+# A regular expression used to determine the amount of space to
+# remove.  It looks for the first sequence of spaces immediately
+# following the first newline, or at the beginning of the string.
+_find_dedent_regex = re.compile("(?:(?:\n\r?)|^)( *)\S")
+# A cache to hold the regexs that actually remove the indent.
+_dedent_regex = {}
 def dedent(s):
     """
     Remove excess indentation from docstrings.
@@ -425,20 +548,35 @@ def dedent(s):
     first line. It differs from textwrap.dedent in its
     deletion of leading blank lines and its use of the
     first non-blank line to determine the indentation.
+
+    It is also faster in most cases.
     """
+    # This implementation has a somewhat obtuse use of regular
+    # expressions.  However, this function accounted for almost 30% of
+    # matplotlib startup time, so it is worthy of optimization at all
+    # costs.
+
     if not s:      # includes case of s is None
         return ''
-    lines = s.splitlines(True)
-    ii = 0
-    while lines[ii].strip() == '':
-        ii += 1
-    lines = lines[ii:]
-    nshift = len(lines[0]) - len(lines[0].lstrip())
-    for i, line in enumerate(lines):
-        nwhite = len(line) - len(line.lstrip())
-        lines[i] = line[min(nshift, nwhite):]
-    return ''.join(lines)
 
+    match = _find_dedent_regex.match(s)
+    if match is None:
+        return s
+
+    # This is the number of spaces to remove from the left-hand side.
+    nshift = match.end(1) - match.start(1)
+    if nshift == 0:
+        return s
+
+    # Get a regex that will remove *up to* nshift spaces from the
+    # beginning of each line.  If it isn't in the cache, generate it.
+    unindent = _dedent_regex.get(nshift, None)
+    if unindent is None:
+        unindent = re.compile("\n\r? {0,%d}" % nshift)
+        _dedent_regex[nshift] = unindent
+
+    result = unindent.sub("\n", s).strip()
+    return result
 
 
 def listFiles(root, patterns='*', recurse=1, return_folders=0):
@@ -704,10 +842,20 @@ def report_memory(i=0):  # argument may go away
 
     return mem
 
+_safezip_msg = 'In safezip, len(args[0])=%d but len(args[%d])=%d'
+def safezip(*args):
+    'make sure args are equal len before zipping'
+    Nx = len(args[0])
+    for i, arg in enumerate(args[1:]):
+        if len(arg) != Nx:
+            raise ValueError(_safezip_msg % (Nx, i+1, len(arg)))
+    return zip(*args)
+
+
 class MemoryMonitor:
     def __init__(self, nmax=20000):
         self._nmax = nmax
-        self._mem = nx.zeros((self._nmax,), nx.Int32)
+        self._mem = npy.zeros((self._nmax,), npy.int32)
         self.clear()
 
     def clear(self):
@@ -743,15 +891,83 @@ class MemoryMonitor:
             print "Warning: array size was too small for the number of calls."
 
     def xy(self, i0=0, isub=1):
-        x = nx.arange(i0, self._n, isub)
+        x = npy.arange(i0, self._n, isub)
         return x, self._mem[i0:self._n:isub]
 
-    def plot(self, i0=0, isub=1):
-        from pylab import figure, show
-        fig = figure()
+    def plot(self, i0=0, isub=1, fig=None):
+        if fig is None:
+            from pylab import figure, show
+            fig = figure()
+
         ax = fig.add_subplot(111)
         ax.plot(*self.xy(i0, isub))
-        show()
+        fig.canvas.draw()
+
+
+def print_cycles(objects, outstream=sys.stdout, show_progress=False):
+    """
+    objects:       A list of objects to find cycles in.  It is often useful
+                   to pass in gc.garbage to find the cycles that are
+                   preventing some objects from being garbage collected.
+    outstream:     The stream for output.
+    show_progress: If True, print the number of objects reached as they are
+                   found.
+    """
+    import gc
+    from types import FrameType
+
+    def print_path(path):
+        for i, step in enumerate(path):
+            # next "wraps around"
+            next = path[(i + 1) % len(path)]
+
+            outstream.write("   %s -- " % str(type(step)))
+            if isinstance(step, dict):
+                for key, val in step.items():
+                    if val is next:
+                        outstream.write("[%s]" % repr(key))
+                        break
+                    if key is next:
+                        outstream.write("[key] = %s" % repr(val))
+                        break
+            elif isinstance(step, list):
+                outstream.write("[%d]" % step.index(next))
+            elif isinstance(step, tuple):
+                outstream.write("( tuple )")
+            else:
+                outstream.write(repr(step))
+            outstream.write(" ->\n")
+        outstream.write("\n")
+
+    def recurse(obj, start, all, current_path):
+        if show_progress:
+            outstream.write("%d\r" % len(all))
+
+        all[id(obj)] = None
+
+        referents = gc.get_referents(obj)
+        for referent in referents:
+            # If we've found our way back to the start, this is
+            # a cycle, so print it out
+            if referent is start:
+                print_path(current_path)
+
+            # Don't go back through the original list of objects, or
+            # through temporary references to the object, since those
+            # are just an artifact of the cycle detector itself.
+            elif referent is objects or isinstance(referent, FrameType):
+                continue
+
+            # We haven't seen this object before, so recurse
+            elif id(referent) not in all:
+                recurse(referent, start, all, current_path + [obj])
+
+    for obj in objects:
+        outstream.write("Examining: %r\n" % (obj,))
+        recurse(obj, obj, { }, [])
+
+
+
 
 
 if __name__=='__main__':

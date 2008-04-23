@@ -13,8 +13,7 @@ import text
 import art3d
 import proj3d
 
-from numerix import sin, cos, pi, cumsum, dot, asarray, array, \
-     where, nonzero, equal, sqrt
+import numpy as npy
 
 def norm_angle(a):
     """Return angle between -180 and +180"""
@@ -30,7 +29,7 @@ def text_update_coords(self, renderer):
     better, although the text bounding boxes look a little
     inconsistent
     """
-    
+
     (x, y) = self.get_position()
     dashlength = self.get_dashlength()
 
@@ -47,13 +46,13 @@ def text_update_coords(self, renderer):
 
     angle = text.get_rotation(dashrotation)
 
-    theta = pi*(angle/180.0+dashdirection-1)
-    cos_theta, sin_theta = cos(theta), sin(theta)
+    theta = math.pi*(angle/180.0+dashdirection-1)
+    cos_theta, sin_theta = math.cos(theta), math.sin(theta)
 
     # Compute the dash end points
     # The 'c' prefix is for canvas coordinates
-    cxy = array(transform.xy_tup((x, y)))
-    cd = array([cos_theta, sin_theta])
+    cxy = npy.array(transform.xy_tup((x, y)))
+    cd = npy.array([cos_theta, sin_theta])
     c1 = cxy+dashpush*cd
     c2 = cxy+(dashpush+dashlength)*cd
     (x1, y1) = transform.inverse_xy_tup(tuple(c1))
@@ -76,18 +75,18 @@ def text_update_coords(self, renderer):
     # well enough yet.
     we = self._mytext.get_window_extent(renderer=renderer)
     w, h = we.width(), we.height()
-    off = array([cos_theta*(w/2+2)-1,sin_theta*(h+1)-1])
-    off = array([cos_theta*(w/2),sin_theta*(h/2)])
-    dir = array([cos_theta,sin_theta])*dashpad
+    off = npy.array([cos_theta*(w/2+2)-1,sin_theta*(h+1)-1])
+    off = npy.array([cos_theta*(w/2),sin_theta*(h/2)])
+    dir = npy.array([cos_theta,sin_theta])*dashpad
     cw = c2 + off +dir
-    
+
     self._mytext.set_position(transform.inverse_xy_tup(tuple(cw)))
     # Now set the window extent
     # I'm not at all sure this is the right way to do this.
     we = self._mytext.get_window_extent(renderer=renderer)
     self._window_extent = we.deepcopy()
     self._window_extent.update(((c1[0], c1[1]),), False)
-    
+
     # Finally, make text align center
     self._mytext.set_horizontalalignment('center')
     self._mytext.set_verticalalignment('center')
@@ -162,7 +161,7 @@ class Axis(axis.XAxis):
         self.pane.set_edgecolor(self.pane_fg_color)
         self.pane.set_facecolor(self.pane_fg_color)
         self.pane.set_alpha(self.pane_fg_color[-1])
-        
+
     def set_pane_bg(self, xys):
         self.pane.xy = xys
         self.pane.set_edgecolor(self.pane_bg_color)
@@ -236,10 +235,10 @@ class Axis(axis.XAxis):
                 nxyz = [(x,maxy,minz) for x in majorLocs]
                 lxyz = [(x,maxy,maxz) for x in majorLocs]
                 aoff = 90
-                
+
                 ly = miny - dy
                 lz = minz - dz
-                
+
         elif self.adir == 'y':
             # cube 3 is minx,maxy,minz
             # cube 2 is maxx,maxy,minz
@@ -257,7 +256,7 @@ class Axis(axis.XAxis):
                 #
                 lx = maxx + dx
                 lz = minz - dz
-                
+
             else:
                 # yaxis at back
                 self.set_pane_bg([tc[1],tc[5],tc[6],tc[2]])
@@ -270,7 +269,7 @@ class Axis(axis.XAxis):
                 #
                 lx = minx - dx
                 lz = minz - dz
-                
+
         elif self.adir == 'z':
             nxyz = None
             self.set_pane_bg([tc[0],tc[1],tc[2],tc[3]])
@@ -346,13 +345,13 @@ class Axis(axis.XAxis):
                 self.label.set_rotation(la + erra)
             else:
                 self.label.set_rotation(la)
-                
+
         #
         self.label.draw(renderer)
         #
         angle = angle + aoff
 
-        if xyz: 
+        if xyz:
             points = proj3d.proj_points(xyz,renderer.M)
         if nxyz:
             tnxyz = proj3d.proj_points(nxyz,renderer.M)
@@ -384,7 +383,7 @@ class Axis(axis.XAxis):
                     ticklabelBoxes2.append(extent)
         #
         renderer.close_group('axis3d')
-    
+
     def get_view_interval(self):
         """return the Interval instance for this axis view limits
         """

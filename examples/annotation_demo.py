@@ -10,6 +10,7 @@ annotated points and text location, respectively.  Optionally, you can specify t
   'axes points'     : points from lower left corner of axes
   'axes pixels'     : pixels from lower left corner of axes
   'axes fraction'   : 0,1 is lower left of axes and 1,1 is upper right
+  'offset points'   : Specify an offset (in points) from the xy value
   'data'            : use the axes data coordinate system
 
 Optionally, you can specify arrow properties which draws and arrow
@@ -32,8 +33,10 @@ analogous to negative indexing of sequences.
 """
 
 
-from pylab import figure, show, nx
+from matplotlib.pyplot import figure, show
 from matplotlib.patches import Ellipse
+import numpy as npy
+
 
 if 1:
     # if only one location is given, the text and xypoint being
@@ -41,8 +44,8 @@ if 1:
     fig = figure()
     ax = fig.add_subplot(111, autoscale_on=False, xlim=(-1,5), ylim=(-3,5))
 
-    t = nx.arange(0.0, 5.0, 0.01)
-    s = nx.cos(2*nx.pi*t)
+    t = npy.arange(0.0, 5.0, 0.01)
+    s = npy.cos(2*npy.pi*t)
     line, = ax.plot(t, s, lw=3, color='purple')
 
     ax.annotate('axes center', xy=(.5, .5),  xycoords='axes fraction',
@@ -51,6 +54,12 @@ if 1:
     ax.annotate('pixels', xy=(20, 20),  xycoords='figure pixels')
 
     ax.annotate('points', xy=(100, 300),  xycoords='figure points')
+
+    ax.annotate('offset', xy=(1, 1),  xycoords='data',
+                xytext=(-15, 10), textcoords='offset points',
+                arrowprops=dict(facecolor='black', shrink=0.05),
+                horizontalalignment='right', verticalalignment='bottom',
+                )
 
     ax.annotate('local max', xy=(3, 1),  xycoords='data',
                 xytext=(0.8, 0.95), textcoords='axes fraction',
@@ -85,8 +94,8 @@ if 1:
     # respected
     fig = figure()
     ax = fig.add_subplot(111, polar=True)
-    r = nx.arange(0,1,0.001)
-    theta = 2*2*nx.pi*r
+    r = npy.arange(0,1,0.001)
+    theta = 2*2*npy.pi*r
     line, = ax.plot(theta, r, color='#ee8d18', lw=3)
 
     ind = 800
@@ -115,20 +124,20 @@ if 1:
     ax.add_artist(el)
     el.set_clip_box(ax.bbox)
     ax.annotate('the top',
-                xy=(nx.pi/2., 10.),      # theta, radius
-                xytext=(nx.pi/3, 20.),   # theta, radius
+                xy=(npy.pi/2., 10.),      # theta, radius
+                xytext=(npy.pi/3, 20.),   # theta, radius
                 xycoords='polar',
                 textcoords='polar',
                 arrowprops=dict(facecolor='black', shrink=0.05),
                 horizontalalignment='left',
                 verticalalignment='bottom',
-		clip_on=True, # clip to the axes bounding box
+                clip_on=True, # clip to the axes bounding box
      )
-                   
+
     ax.set_xlim(-20, 20)
     ax.set_ylim(-20, 20)
     fig.savefig('annotation_ellipse')
-    
+
 
 
 #fig.savefig('annotation_demo.png')

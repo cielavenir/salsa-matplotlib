@@ -2,7 +2,7 @@
 A module for finding, managing, and using fonts across-platforms.
 
 This module provides a single FontManager that can be shared across
-backends and platforms.  The findfont() method returns the best
+backends and platforms.  The findfont() function returns the best
 TrueType (TTF) font file in the local or system font path that matches
 the specified FontProperties.  The FontManager also handles Adobe Font
 Metrics (AFM) font files for use by the PostScript backend.
@@ -34,25 +34,31 @@ License   : matplotlib license (PSF compatible)
 """
 
 import os, sys, glob, shutil
+from sets import Set
 import matplotlib
 from matplotlib import afm
 from matplotlib import ft2font
 from matplotlib import rcParams, get_home, get_configdir
+from matplotlib.cbook import is_string_like
+from matplotlib.fontconfig_pattern import \
+    parse_fontconfig_pattern, generate_fontconfig_pattern
 
 try:
     import cPickle as pickle
 except ImportError:
     import pickle
 
+USE_FONTCONFIG = False
+
 verbose = matplotlib.verbose
 
 font_scalings = {'xx-small': 0.579, 'x-small': 0.694, 'small': 0.833,
                  'medium': 1.0, 'large': 1.200, 'x-large': 1.440,
-                 'xx-large': 1.728}
+                 'xx-large': 1.728, 'larger': 1.2, 'smaller': 0.833}
 
 weight_dict = {'light': 200, 'normal': 400, 'regular': 400, 'book': 400,
-              'medium': 500, 'roman': 500, 'semibold': 600, 'demibold': 600,
-              'demi': 600, 'bold': 700, 'heavy': 800, 'extra bold': 800,
+               'medium': 500, 'roman': 500, 'semibold': 600, 'demibold': 600,
+               'demi': 600, 'bold': 700, 'heavy': 800, 'extra bold': 800,
                'black': 900}
 
 #  OS Font paths
@@ -80,11 +86,18 @@ OSXFontDirectories = [
     "/System/Library/Fonts/"
 ]
 
-home = os.environ.get('HOME')
-if home is not None:
-    # user fonts on OSX
-    path = os.path.join(home, 'Library', 'Fonts')
-    OSXFontDirectories.append(path)
+if not USE_FONTCONFIG:
+    home = os.environ.get('HOME')
+    if home is not None:
+        # user fonts on OSX
+        path = os.path.join(home, 'Library', 'Fonts')
+        OSXFontDirectories.append(path)
+        path = os.path.join(home, '.fonts')
+        X11FontDirectories.append(path)
+
+def get_fontext_synonyms(fontext):
+    return {'ttf': ('ttf', 'otf'),
+            'afm': ('afm',)}[fontext]
 
 def win32FontDirectory():
     """Return the user-specified font directory for Win32."""
@@ -92,14 +105,17 @@ def win32FontDirectory():
     try:
         import _winreg
     except ImportError:
-        return os.path.join(os.environ['WINDIR'], 'Fonts')
+        pass # Fall through to default
     else:
         user = _winreg.OpenKey(_winreg.HKEY_CURRENT_USER, MSFolders)
         try:
-            return _winreg.QueryValueEx(user, 'Fonts')[0]
+            try:
+                return _winreg.QueryValueEx(user, 'Fonts')[0]
+            except OSError:
+                pass # Fall through to default
         finally:
             _winreg.CloseKey(user)
-    return None
+    return os.path.join(os.environ['WINDIR'], 'Fonts')
 
 def win32InstalledFonts(directory=None, fontext='ttf'):
     """
@@ -112,6 +128,8 @@ def win32InstalledFonts(directory=None, fontext='ttf'):
     if directory is None:
         directory = win32FontDirectory()
 
+    fontext = get_fontext_synonyms(fontext)
+
     key, items = None, {}
     for fontdir in MSFontDirectories:
         try:
@@ -120,7 +138,10 @@ def win32InstalledFonts(directory=None, fontext='ttf'):
             continue
 
         if not local:
-            return glob.glob(os.path.join(directory, '*.'+fontext))
+            files = []
+            for ext in fontext:
+                files.extend(glob.glob(os.path.join(directory, '*.'+ext)))
+            return files
         try:
             for j in range(_winreg.QueryInfoKey(local)[1]):
                 try:
@@ -128,7 +149,7 @@ def win32InstalledFonts(directory=None, fontext='ttf'):
                     if not os.path.dirname(direc):
                         direc = os.path.join(directory, direc)
                     direc = os.path.abspath(direc).lower()
-                    if direc[-4:] == '.'+fontext:
+                    if os.path.splitext(direc)[1][1:] in fontext:
                         items[direc] = 1
                 except EnvironmentError:
                     continue
@@ -154,18 +175,21 @@ def OSXFontDirectory():
             pass
     return fontpaths
 
-def OSXInstalledFonts(directory=None, fontext=None):
+def OSXInstalledFonts(directory=None, fontext='ttf'):
     """Get list of font files on OS X - ignores font suffix by default"""
     if directory is None:
         directory = OSXFontDirectory()
+
+    fontext = get_fontext_synonyms(fontext)
 
     files = []
     for path in directory:
         if fontext is None:
             files.extend(glob.glob(os.path.join(path,'*')))
         else:
-            files.extend(glob.glob(os.path.join(path, '*.'+fontext)))
-            files.extend(glob.glob(os.path.join(path, '*.'+fontext.upper())))
+            for ext in fontext:
+                files.extend(glob.glob(os.path.join(path, '*.'+ext)))
+                files.extend(glob.glob(os.path.join(path, '*.'+ext.upper())))
     return files
 
 
@@ -183,16 +207,40 @@ def x11FontDirectory():
             pass
     return fontpaths
 
+def get_fontconfig_fonts(fontext='ttf'):
+    """Grab a list of all the fonts that are being tracked by fontconfig.
+    This is an easy way to grab all of the fonts the user wants to be made
+    available to applications, without knowing where all of them reside."""
+    try:
+        import commands
+    except ImportError:
+        return {}
+
+    fontext = get_fontext_synonyms(fontext)
+
+    fontfiles = {}
+    status, output = commands.getstatusoutput("fc-list file")
+    if status == 0:
+        for line in output.split('\n'):
+            fname = line.split(':')[0]
+            if (os.path.splitext(fname)[1][1:] in fontext and
+                os.path.exists(fname)):
+                fontfiles[fname] = 1
+
+    return fontfiles
+
 def findSystemFonts(fontpaths=None, fontext='ttf'):
     """
-    Search for fonts in the specified font paths, or use the system
-    paths if none given.  A list of TrueType fonts are returned by default
-    with AFM fonts as an option.
+    Search for fonts in the specified font paths.  If no paths are
+    given, will use a standard set of system paths, as well as the
+    list of fonts tracked by fontconfig if fontconfig is installed and
+    available.  A list of TrueType fonts are returned by default with
+    AFM fonts as an option.
     """
     fontfiles = {}
+    fontexts = get_fontext_synonyms(fontext)
 
     if fontpaths is None:
-
         if sys.platform == 'win32':
             fontdir = win32FontDirectory()
 
@@ -200,21 +248,26 @@ def findSystemFonts(fontpaths=None, fontext='ttf'):
             # now get all installed fonts directly...
             for f in win32InstalledFonts(fontdir):
                 base, ext = os.path.splitext(f)
-                if len(ext)>1 and ext[1:].lower()==fontext:
+                if len(ext)>1 and ext[1:].lower() in fontexts:
                     fontfiles[f] = 1
         else:
             fontpaths = x11FontDirectory()
             # check for OS X & load its fonts if present
             if sys.platform == 'darwin':
-                for f in OSXInstalledFonts():
+                for f in OSXInstalledFonts(fontext=fontext):
                     fontfiles[f] = 1
+
+            for f in get_fontconfig_fonts(fontext):
+                fontfiles[f] = 1
 
     elif isinstance(fontpaths, (str, unicode)):
         fontpaths = [fontpaths]
 
     for path in fontpaths:
-        files = glob.glob(os.path.join(path, '*.'+fontext))
-        files.extend(glob.glob(os.path.join(path, '*.'+fontext.upper())))
+        files = []
+        for ext in fontexts:
+            files.extend(glob.glob(os.path.join(path, '*.'+ext)))
+            files.extend(glob.glob(os.path.join(path, '*.'+ext.upper())))
         for fname in files:
             fontfiles[os.path.abspath(fname)] = 1
 
@@ -445,12 +498,12 @@ def createFontDict(fontfiles, fontext='ttf'):
     seen = {}
     for fpath in fontfiles:
         verbose.report('createFontDict: %s' % (fpath), 'debug')
-        fname = fpath.split('/')[-1]
+        fname = os.path.split(fpath)[1]
         if seen.has_key(fname):  continue
         else: seen[fname] = 1
         if fontext == 'afm':
             try:
-                fh = open(fpath)
+                fh = open(fpath, 'r')
             except:
                 verbose.report("Could not open font file %s" % fpath)
                 continue
@@ -477,24 +530,6 @@ def createFontDict(fontfiles, fontext='ttf'):
             except: continue
 
         add_filename(fontdict, prop, fpath)
-
-        #  !!!!  Default font algorithm needs improvement
-        if   prop.name.lower() in ['bitstream vera serif', 'times']:
-            prop.name = 'serif'
-            add_filename(fontdict, prop, fpath)
-        elif prop.name.lower() in ['bitstream vera sans', 'helvetica']:
-            prop.name = 'sans-serif'
-            add_filename(fontdict, prop, fpath)
-        elif prop.name.lower() in ['zapf chancery', 'itc zapf chancery']:
-            prop.name = 'cursive'
-            add_filename(fontdict, prop, fpath)
-        elif prop.name.lower() in ['western', 'itc avant garde gothic']:
-            prop.name = 'fantasy'
-            add_filename(fontdict, prop, fpath)
-        elif prop.name.lower() in ['bitstream vera sans mono', 'courier']:
-            prop.name = 'monospace'
-            add_filename(fontdict, prop, fpath)
-
     return fontdict
 
 def setWeights(font):
@@ -544,8 +579,7 @@ def setWeights(font):
             for j in [600, 700, 800, 900]:
                 font[j] = temp[700]
 
-
-class FontProperties:
+class FontProperties(object):
     """
     A class for storing and manipulating font properties.
 
@@ -574,31 +608,36 @@ class FontProperties:
     The default font property for TrueType fonts is: sans-serif, normal,
     normal, normal, 400, scalable.
 
-    The preferred usage of font sizes is to use the absolute values, e.g.
+    The preferred usage of font sizes is to use the relative values, e.g.
     large, instead of absolute font sizes, e.g. 12.  This approach allows
     all text sizes to be made larger or smaller based on the font manager's
     default font size, i.e. by using the set_default_size() method of the
     font manager.
 
-    Examples:
+    This class will also accept a fontconfig pattern, if it is the only
+    argument provided.  fontconfig patterns are described here:
 
-      #  Load default font properties
-      >>> p = FontProperties()
-      >>> p.get_family()
-      ['Bitstream Vera Sans', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucida', 'Arial', 'Helvetica', 'sans-serif']
+      http://www.fontconfig.org/fontconfig-user.html
 
-      #  Change font family to 'fantasy'
-      >>> p.set_family('fantasy')
-      >>> p.get_family()
-      ['Comic Sans MS', 'Chicago', 'Charcoal', 'Impact', 'Western', 'fantasy']
-
-      #  Make these fonts highest priority in font family
-      >>> p.set_name(['foo', 'fantasy', 'bar', 'baz'])
-      Font name 'fantasy' is a font family. It is being deleted from the list.
-      >>> p.get_family()
-      ['foo', 'bar', 'baz', 'Comic Sans MS', 'Chicago', 'Charcoal', 'Impact', 'Western', 'fantasy']
-
+    Note that matplotlib's internal font manager and fontconfig use a
+    different algorithm to lookup fonts, so the results of the same pattern
+    may be different in matplotlib than in other applications that use
+    fontconfig.
     """
+
+    class FontPropertiesSet(object):
+        """This class contains all of the default properties at the
+        class level, which are then overridden (only if provided) at
+        the instance level."""
+        family = rcParams['font.' + rcParams['font.family']]
+        if is_string_like(family):
+            family = [family]
+        slant = [rcParams['font.style']]
+        variant = [rcParams['font.variant']]
+        weight = [rcParams['font.weight']]
+        stretch = [rcParams['font.stretch']]
+        size = [rcParams['font.size']]
+        file = None
 
     def __init__(self,
                  family = None,
@@ -607,163 +646,179 @@ class FontProperties:
                  weight = None,
                  stretch= None,
                  size   = None,
-                 fname = None, # if this is set, it's a hardcoded filename to use
+                 fname  = None, # if this is set, it's a hardcoded filename to use
+                 _init   = None  # used only by copy()
                  ):
 
+        self.__props = self.FontPropertiesSet()
 
-        if family is None: family = rcParams['font.'+rcParams['font.family']]
-        if style is None: style  = rcParams['font.style']
-        if variant is None: variant= rcParams['font.variant']
-        if weight is None: weight = rcParams['font.weight']
-        if stretch is None: stretch= rcParams['font.stretch']
-        if size is None: size   = rcParams['font.size']
+        # This is used only by copy()
+        if _init is not None:
+            self.__props.__dict__.update(_init)
+            return
 
-        if isinstance(family, str):
+        if is_string_like(family):
+            # Treat family as a fontconfig pattern if it is the only
+            # parameter provided.
+            if (style is None and
+                variant is None and
+                weight is None and
+                stretch is None and
+                size is None and
+                fname is None):
+                self.__props.__dict__ = self._parse_fontconfig_pattern(family)
+                return
             family = [family]
-        self.__family  = family
-        self.__style   = style
-        self.__variant = variant
-        self.__weight  = weight
-        self.__stretch = stretch
-        self.__size    = size
-        self.__parent_size = fontManager.get_default_size()
-        self.fname = fname
+
+        self.set_family(family)
+        self.set_style(style)
+        self.set_variant(variant)
+        self.set_weight(weight)
+        self.set_stretch(stretch)
+        self.set_file(fname)
+        self.set_size(size)
+
+    def _parse_fontconfig_pattern(self, pattern):
+        return parse_fontconfig_pattern(pattern)
 
     def __hash__(self):
-        return hash( (
-            tuple(self.__family), self.__style, self.__variant,
-            self.__weight, self.__stretch, self.__size,
-            self.__parent_size, self.fname))
+        return hash(repr(self.__props.__dict__))
 
     def __str__(self):
-        return str((self.__family, self.__style, self.__variant,
-                    self.__weight, self.__stretch, self.__size))
+        return self.get_fontconfig_pattern()
 
     def get_family(self):
         """Return a list of font names that comprise the font family.
         """
-        return self.__family
+        return self.__props.family
 
     def get_name(self):
         """Return the name of the font that best matches the font properties."""
-        return ft2font.FT2Font(str(fontManager.findfont(self))).family_name
+        return ft2font.FT2Font(str(findfont(self))).family_name
 
     def get_style(self):
         """Return the font style.  Values are: normal, italic or oblique."""
-        return self.__style
+        return self.__props.slant[0]
 
     def get_variant(self):
         """Return the font variant.  Values are: normal or small-caps."""
-        return self.__variant
+        return self.__props.variant[0]
 
     def get_weight(self):
         """
         Return the font weight.  See the FontProperties class for a
         a list of possible values.
         """
-        return self.__weight
+        return self.__props.weight[0]
 
     def get_stretch(self):
         """
         Return the font stretch or width.  Options are: normal,
         narrow, condensed, or wide.
         """
-        return self.__stretch
+        return self.__props.stretch[0]
 
     def get_size(self):
         """Return the font size."""
-        return self.__size
+        return float(self.__props.size[0])
+
+    def get_file(self):
+        if self.__props.file is not None:
+            return self.__props.file[0]
+        else:
+            return None
+
+    def get_fontconfig_pattern(self):
+        return generate_fontconfig_pattern(self.__props.__dict__)
 
     def set_family(self, family):
         """
-        Change the font family.  Options are: serif, sans-serif, cursive,
-        fantasy, or monospace.
+        Change the font family.  May be either an alias (generic name
+        is CSS parlance), such as: serif, sans-serif, cursive,
+        fantasy, or monospace, or a real font name.
         """
-        try:
-            self.__family = rcParams['font.'+family]
-            if isinstance(self.__family, str):
-                self.__family = [self.__family]
-        except KeyError:
-            raise KeyError, '%s - use serif, sans-serif, cursive, fantasy, or monospace.' % family
-
-    def set_name(self, names):
-        """
-        Add one or more font names to the font family list.  If the
-    font name is already in the list, then the font is given a higher
-    priority in the font family list.  To change the font family, use the
-    set_family() method.
-    """
-
-        msg = "Font name '%s' is a font family. It is being deleted from the list."
-        font_family = ['serif', 'sans-serif', 'cursive', 'fantasy',
-                       'monospace']
-
-        if isinstance(names, str):
-            names = [names]
-
-        #  Remove family names from list of font names.
-        for name in names[:]:
-            if name.lower() in font_family:
-                verbose.report( msg % name)
-                while name in names:
-                    names.remove(name.lower())
-
-        #  Remove font names from family list.
-        for name in names:
-            while name in self.__family:
-                self.__family.remove(name)
-
-        self.__family = names + self.__family
+        if family is None:
+            self.__props.__dict__.pop('family', None)
+        else:
+            if is_string_like(family):
+                family = [family]
+            self.__props.family = family
+    set_name = set_family
 
     def set_style(self, style):
         """Set the font style.  Values are: normal, italic or oblique."""
-        self.__style = style
+        if style is None:
+            self.__props.__dict__.pop('style', None)
+        else:
+            if style not in ('normal', 'italic', 'oblique'):
+                raise ValueError("style must be normal, italic or oblique")
+            self.__props.slant = [style]
 
     def set_variant(self, variant):
         """Set the font variant.  Values are: normal or small-caps."""
-        self.__variant = variant
+        if variant is None:
+            self.__props.__dict__.pop('variant', None)
+        else:
+            if variant not in ('normal', 'small-caps'):
+                raise ValueError("variant must be normal or small-caps")
+            self.__props.variant = [variant]
 
     def set_weight(self, weight):
         """
         Set the font weight.  See the FontProperties class for a
         a list of possible values.
         """
-        self.__weight = weight
+        if weight is None:
+            self.__props.__dict__.pop('weight', None)
+        else:
+            if (weight not in weight_dict and
+                weight not in weight_dict.keys()):
+                raise ValueError("weight is invalid")
+            self.__props.weight = [weight]
 
     def set_stretch(self, stretch):
         """
         Set the font stretch or width.  Options are: normal, narrow,
         condensed, or wide.
         """
-        self.__stretch = stretch
+        if stretch is None:
+            self.__props.__dict__.pop('stretch', None)
+        else:
+            self.__props.stretch = [stretch]
 
     def set_size(self, size):
         """Set the font size."""
-        self.__size = size
-
-    def get_size_in_points(self, parent_size=None):
-        """
-        Return the size property as a numeric value.  String values
-        are converted to their corresponding numeric value.
-        """
-        if self.__size in font_scalings.keys():
-            size = fontManager.get_default_size()*font_scalings[self.__size]
-        elif self.__size == 'larger':
-            size = self.__parent_size*1.2
-        elif self.__size == 'smaller':
-            size = self.__parent_size/1.2
+        if size is None:
+            self.__props.__dict__.pop('size', None)
         else:
-            size = self.__size
-        return float(size)
+            if is_string_like(size):
+                parent_size = fontManager.get_default_size()
+                scaling = font_scalings.get(size)
+                if scaling is not None:
+                    size = parent_size * scaling
+                else:
+                    size = parent_size
+            if isinstance(size, (int, float)):
+                size = [size]
+            self.__props.size = size
+
+    def set_file(self, file):
+        if file is None:
+            self.__props.__dict__.pop('file', None)
+        else:
+            self.__props.file = [file]
+
+    get_size_in_points = get_size
+
+    def set_fontconfig_pattern(self, pattern):
+        self.__props.__dict__ = self._parse_fontconfig_pattern(pattern)
+
+    def add_property_pair(self, key, val):
+        self.__props.setdefault(key, []).append(val)
 
     def copy(self):
         """Return a deep copy of self"""
-        return FontProperties(self.__family,
-                              self.__style,
-                              self.__variant,
-                              self.__weight,
-                              self.__stretch,
-                              self.__size)
+        return FontProperties(_init = self.__props.__dict__)
 
 def ttfdict_to_fnames(d):
     'flatten a ttfdict to all the filenames it contains'
@@ -808,10 +863,9 @@ class FontManager:
     """
 
     def __init__(self, size=None, weight='normal'):
-        if not size : size = rcParams['font.size']
-        self.__default_size = size
         self.__default_weight = weight
-        
+        self.default_size = size
+
         paths = [os.path.join(rcParams['datapath'],'fonts','ttf'),
                  os.path.join(rcParams['datapath'],'fonts','afm')]
 
@@ -841,41 +895,22 @@ class FontManager:
             # use anything
             self.defaultFont = self.ttffiles[0]
 
-        cache_message = \
-"""Saving TTF font cache for non-PS backends to %s.
-Delete this file to have matplotlib rebuild the cache."""
+        self.ttfdict = createFontDict(self.ttffiles)
 
-        oldcache = os.path.join(get_home(), 'ttffont.cache')
-        ttfcache = os.path.join(get_configdir(), 'ttffont.cache')
-        if os.path.exists(oldcache):
-            print >> sys.stderr, 'Moving old ttfcache location "%s" to new location "%s"'%(oldcache, ttfcache)
-            shutil.move(oldcache, ttfcache)
-
-        def rebuild():
-            self.ttfdict = createFontDict(self.ttffiles)
-            pickle_dump(self.ttfdict, ttfcache)
-            verbose.report(cache_message % ttfcache)
-
-        try:
-            self.ttfdict = pickle_load(ttfcache)
-        except:
-            rebuild()
+        if rcParams['pdf.use14corefonts']:
+            # Load only the 14 PDF core fonts. These fonts do not need to be
+            # embedded; every PDF viewing application is required to have them:
+            # Helvetica, Helvetica-Bold, Helvetica-Oblique, Helvetica-BoldOblique,
+            # Courier, Courier-Bold, Courier-Oblique, Courier-BoldOblique,
+            # Times-Roman, Times-Bold, Times-Italic, Times-BoldItalic, Symbol,
+            # ZapfDingbats.
+            afmpath = os.path.join(rcParams['datapath'],'fonts','pdfcorefonts')
+            afmfiles = findSystemFonts(afmpath, fontext='afm')
+            self.afmdict = createFontDict(afmfiles, fontext='afm')
         else:
-            # verify all the cached fnames still exist; if not rebuild
-            for fname in ttfdict_to_fnames(self.ttfdict):
-                if not os.path.exists(fname):
-                    rebuild()
-                    break
-            verbose.report('loaded ttfcache file %s'%ttfcache)
-
-        #self.ttfdict = createFontDict(self.ttffiles)
-
-        #  Load AFM fonts for PostScript
-        #  Only load file names at this stage, the font dictionary will be
-        #  created when needed.
-        self.afmfiles = findSystemFonts(paths, fontext='afm') + \
-                        findSystemFonts(fontext='afm')
-        self.afmdict = {}
+            self.afmfiles = findSystemFonts(paths, fontext='afm') + \
+                            findSystemFonts(fontext='afm')
+            self.afmdict = createFontDict(self.afmfiles, fontext='afm')
 
     def get_default_weight(self):
         "Return the default font weight."
@@ -883,7 +918,9 @@ Delete this file to have matplotlib rebuild the cache."""
 
     def get_default_size(self):
         "Return the default font size."
-        return self.__default_size
+        if self.default_size is None:
+            return rcParams['font.size']
+        return self.default_size
 
     def set_default_weight(self, weight):
         "Set the default font weight.  The initial value is 'normal'."
@@ -916,118 +953,190 @@ Delete this file to have matplotlib rebuild the cache."""
         documentation for a description of the font finding algorithm.
         """
         debug = False
-        if prop.fname is not None:
-            fname = prop.fname
+        if is_string_like(prop):
+            prop = FontProperties(prop)
+        fname = prop.get_file()
+        if fname is not None:
             verbose.report('findfont returning %s'%fname, 'debug')
             return fname
 
         if fontext == 'afm':
-            if len(self.afmdict) == 0:
-                self.afmdict = self._get_afm_font_dict()
             fontdict = self.afmdict
         else:
             fontdict = self.ttfdict
 
-        name    = prop.get_family()[0]
-        style   = prop.get_style()
-        variant = prop.get_variant()
-        weight  = weight_as_number(prop.get_weight())
-        stretch = prop.get_stretch()
-        size    = str(prop.get_size_in_points())
+        original_name = prop.get_family()[0]
+        style         = prop.get_style()
+        variant       = prop.get_variant()
+        weight        = weight_as_number(prop.get_weight())
+        stretch       = prop.get_stretch()
+        size          = str(prop.get_size_in_points())
 
-        try:
-            fname = fontdict[name][style][variant][weight][stretch][size]
-            verbose.report('\tfindfont cached %(name)s, %(style)s, %(variant)s, %(weight)s, %(stretch)s, %(size)s'%locals(), 'debug')
-            verbose.report('findfont returning %s'%fname, 'debug')
-            return fname
-        except KeyError:
-            pass
+        def lookup_name(name):
+            try:
+                fname = fontdict[name][style][variant][weight][stretch][size]
+                verbose.report('\tfindfont cached %(name)s, %(style)s, %(variant)s, %(weight)s, %(stretch)s, %(size)s'%locals(), 'debug')
+                verbose.report('findfont returning %s'%fname, 'debug')
+                return fname
+            except KeyError:
+                pass
 
-        for name in prop.get_family():
+            fname = None
             font = fontdict
             if font.has_key(name):
                 font = font[name]
             else:
                 verbose.report('\tfindfont failed %(name)s'%locals(), 'debug')
-                continue
+                return None
 
             if font.has_key(style):
                 font = font[style]
-            elif style == 'italics' and font.has_key('oblique'):
+            elif style == 'italic' and font.has_key('oblique'):
                 font = font['oblique']
+            elif style == 'oblique' and font.has_key('italic'):
+                font = font['italic']
             else:
                 verbose.report('\tfindfont failed %(name)s, %(style)s'%locals(), 'debug')
-                continue
+                return None
 
             if font.has_key(variant):
                 font = font[variant]
             else:
                 verbose.report('\tfindfont failed %(name)s, %(style)s, %(variant)s'%locals(), 'debug')
-                continue
+                return None
 
             if not font.has_key(weight):
                 setWeights(font)
+            if not font.has_key(weight):
+                return None
             font = font[weight]
 
-            # !!!!  need improvement
             if font.has_key(stretch):
-                font = font[stretch]
-            else:
+                stretch_font = font[stretch]
+                if stretch_font.has_key('scalable'):
+                    fname = stretch_font['scalable']
+                elif stretch_font.has_key(size):
+                    fname = stretch_font[size]
+
+            if fname is None:
+                for val in font.values():
+                    if val.has_key('scalable'):
+                        fname = val['scalable']
+                        break
+
+            if fname is None:
+                for val in font.values():
+                    if val.has_key(size):
+                        fname = val[size]
+                        break
+
+            if fname is None:
                 verbose.report('\tfindfont failed %(name)s, %(style)s, %(variant)s %(weight)s, %(stretch)s'%locals(), 'debug')
-                continue
-
-            if font.has_key('scalable'):
-                fname = font['scalable']
-            elif font.has_key(size):
-                fname = font[size]
             else:
-                verbose.report('\tfindfont failed %(name)s, %(style)s, %(variant)s %(weight)s, %(stretch)s, %(size)s'%locals(), 'debug')
-                continue
-
-            fontkey = FontKey(name, style, variant, weight, stretch, size)
-            add_filename(fontdict, fontkey, fname)
-            verbose.report('\tfindfont found %(name)s, %(style)s, %(variant)s %(weight)s, %(stretch)s, %(size)s'%locals(), 'debug')
-            verbose.report('findfont returning %s'%fname, 'debug')
-
+                fontkey = FontKey(",".join(prop.get_family()), style, variant, weight, stretch, size)
+                add_filename(fontdict, fontkey, fname)
+                verbose.report('\tfindfont found %(name)s, %(style)s, %(variant)s %(weight)s, %(stretch)s, %(size)s'%locals(), 'debug')
+                verbose.report('findfont returning %s'%fname, 'debug')
             return fname
 
-        fontkey = FontKey(name, style, variant, weight, stretch, size)
-        add_filename(fontdict, fontkey, self.defaultFont)
-        verbose.report('Could not match %s, %s, %s.  Returning %s' % (name, style, variant, self.defaultFont))
+        font_family_aliases = Set(['serif', 'sans-serif', 'cursive',
+                                   'fantasy', 'monospace', 'sans'])
 
-        return self.defaultFont
+        for name in prop.get_family():
+            if name in font_family_aliases:
+                if name == 'sans':
+                    name = 'sans-serif'
+                for name2 in rcParams['font.' + name]:
+                    fname = lookup_name(name2)
+                    if fname:
+                        break
+            else:
+                fname = lookup_name(name)
+            if fname:
+                break
 
-    def _get_afm_font_dict(self):
-        cache_message = "Saving AFM font cache for PS and PDF backends to %s.\n" \
-                        "Delete this file to have matplotlib rebuild the cache."
-        
-        if rcParams['pdf.use14corefonts']:
-            # Load only the 14 PDF core fonts. These fonts do not need to be 
-            # embedded; every PDF viewing application is required to have them:
-            # Helvetica, Helvetica-Bold, Helvetica-Oblique, Helvetica-BoldOblique, 
-            # Courier, Courier-Bold, Courier-Oblique, Courier-BoldOblique, 
-            # Times-Roman, Times-Bold, Times-Italic, Times-BoldItalic, Symbol, 
-            # ZapfDingbats.
-            afmcache = os.path.join(get_configdir(), 'pdfcorefont.cache')
-            try:
-                fontdict = pickle_load(afmcache)
-            except:
-                afmpath = os.path.join(rcParams['datapath'],'fonts','pdfcorefonts')
-                afmfiles = findSystemFonts(afmpath, fontext='afm')
-                fontdict = createFontDict(afmfiles, fontext='afm')
-                pickle_dump(fontdict, afmcache)
-                verbose.report(cache_message % afmcache)
-        else:
-            # Load all available AFM fonts
-            afmcache = os.path.join(get_configdir(), '.afmfont.cache')
-            try:
-                fontdict = pickle_load(afmcache)
-            except:
-                fontdict = createFontDict(self.afmfiles, fontext='afm')
-                pickle_dump(fontdict, afmcache)
-                verbose.report(cache_message % afmcache)
-        
-        return fontdict
+        if not fname:
+            fontkey = FontKey(",".join(prop.get_family()), style, variant, weight, stretch, size)
+            add_filename(fontdict, fontkey, self.defaultFont)
+            verbose.report('Could not match %s, %s, %s.  Returning %s' % (name, style, weight, self.defaultFont))
+            return self.defaultFont
+        return fname
 
 
-fontManager = FontManager()
+_is_opentype_cff_font_cache = {}
+def is_opentype_cff_font(filename):
+    """
+    Returns True if the given font is a Postscript Compact Font Format
+    Font embedded in an OpenType wrapper.
+    """
+    if os.path.splitext(filename)[1].lower() == '.otf':
+        result = _is_opentype_cff_font_cache.get(filename)
+        if result is None:
+            fd = open(filename, 'rb')
+            tag = fd.read(4)
+            fd.close()
+            result = (tag == 'OTTO')
+            _is_opentype_cff_font_cache[filename] = result
+        return result
+    return False
+
+
+if USE_FONTCONFIG and sys.platform != 'win32':
+    import re
+
+    def fc_match(pattern, fontext):
+        import commands
+        fontexts = get_fontext_synonyms(fontext)
+        ext = "." + fontext
+        status, output = commands.getstatusoutput('fc-match -sv "%s"' % pattern)
+        if status == 0:
+            for match in _fc_match_regex.finditer(output):
+                file = match.group(1)
+                if os.path.splitext(file)[1][1:] in fontexts:
+                    return file
+        return None
+
+    _fc_match_regex = re.compile(r'\sfile:\s+"([^"]*)"')
+    _fc_match_cache = {}
+
+    def findfont(prop, fontext='ttf'):
+        if not is_string_like(prop):
+            prop = prop.get_fontconfig_pattern()
+        cached = _fc_match_cache.get(prop)
+        if cached is not None:
+            return cached
+
+        result = fc_match(prop, fontext)
+        if result is None:
+            result = fc_match(':', fontext)
+
+        _fc_match_cache[prop] = result
+        return result
+
+else:
+    _fmcache = os.path.join(get_configdir(), 'fontManager.cache')
+
+    fontManager = None
+
+    def _rebuild():
+        global fontManager
+        fontManager = FontManager()
+        pickle_dump(fontManager, _fmcache)
+        verbose.report("generated new fontManager")
+
+    try:
+        fontManager = pickle_load(_fmcache)
+        fontManager.default_size = None
+        verbose.report("Using fontManager instance from %s" % _fmcache)
+    except:
+        _rebuild()
+
+    def findfont(prop, **kw):
+        global fontManager
+        font = fontManager.findfont(prop, **kw)
+        if not os.path.exists(font):
+            verbose.report("%s returned by pickled fontManager does not exist" % font)
+            _rebuild()
+            font =  fontManager.findfont(prop, **kw)
+        return font
+

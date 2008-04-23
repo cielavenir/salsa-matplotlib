@@ -16,9 +16,9 @@ Requirements:
 Backends:
 
   Only supported on *Agg and PS backends currently
-  
 
-For raster output, you can get RGBA numerix arrays from TeX expressions
+
+For raster output, you can get RGBA numpy arrays from TeX expressions
 as follows
 
   texmanager = TexManager()
@@ -33,26 +33,23 @@ rc('text', usetex=True)
 
 """
 
-import glob, md5, os, shutil, sys, warnings
-from tempfile import gettempdir
-from matplotlib import get_configdir, get_home, get_data_path, \
-     rcParams, verbose
+import copy, glob, md5, os, shutil, sys, warnings
+import numpy as npy
+import matplotlib as mpl
+from matplotlib import rcParams
 from matplotlib._image import readpng
-from matplotlib.numerix import ravel, where, array, \
-     zeros, Float, absolute, nonzero, sqrt
-     
-debug = False
+
+DEBUG = False
 
 if sys.platform.startswith('win'): cmd_split = '&'
 else: cmd_split = ';'
-
 
 def get_dvipng_version():
     stdin, stdout = os.popen4('dvipng -version')
     for line in stdout:
         if line.startswith('dvipng '):
             version = line.split()[-1]
-            verbose.report('Found dvipng version %s'% version, 
+            mpl.verbose.report('Found dvipng version %s'% version,
                 'helpful')
             return version
     raise RuntimeError('Could not obtain dvipng version')
@@ -63,14 +60,13 @@ class TexManager:
     Convert strings to dvi files using TeX, caching the results to a
     working dir
     """
-    
-    oldpath = get_home()
-    if oldpath is None: oldpath = get_data_path()
+
+    oldpath = mpl.get_home()
+    if oldpath is None: oldpath = mpl.get_data_path()
     oldcache = os.path.join(oldpath, '.tex.cache')
 
-    configdir = get_configdir()
+    configdir = mpl.get_configdir()
     texcache = os.path.join(configdir, 'tex.cache')
-    
 
     if os.path.exists(oldcache):
         print >> sys.stderr, """\
@@ -82,21 +78,26 @@ WARNING: found a TeX cache dir in the deprecated location "%s".
 
     dvipngVersion = get_dvipng_version()
 
-    arrayd = {}
+    # mappable cache of
+    rgba_arrayd = {}
+    grey_arrayd = {}
     postscriptd = {}
     pscnt = 0
-    
+
     serif = ('cmr', '')
     sans_serif = ('cmss', '')
     monospace = ('cmtt', '')
     cursive = ('pzc', r'\usepackage{chancery}')
     font_family = 'serif'
-    
-    font_info = {'new century schoolbook': ('pnc', r'\renewcommand{\rmdefault}{pnc}'),
+    font_families = ('serif', 'sans-serif', 'cursive', 'monospace')
+
+    font_info = {'new century schoolbook': ('pnc',
+                                            r'\renewcommand{\rmdefault}{pnc}'),
                 'bookman': ('pbk', r'\renewcommand{\rmdefault}{pbk}'),
                 'times': ('ptm', r'\usepackage{mathptmx}'),
                 'palatino': ('ppl', r'\usepackage{mathpazo}'),
                 'zapf chancery': ('pzc', r'\usepackage{chancery}'),
+                'cursive': ('pzc', r'\usepackage{chancery}'),
                 'charter': ('pch', r'\usepackage{charter}'),
                 'serif': ('cmr', ''),
                 'sans-serif': ('cmss', ''),
@@ -108,94 +109,102 @@ WARNING: found a TeX cache dir in the deprecated location "%s".
                 'computer modern sans serif': ('cmss', ''),
                 'computer modern typewriter': ('cmtt', '')}
 
+    _rc_cache = None
+    _rc_cache_keys = ('text.latex.preamble', )\
+                     + tuple(['font.'+n for n in ('family', ) + font_families])
+
     def __init__(self):
-        
+
         if not os.path.isdir(self.texcache):
             os.mkdir(self.texcache)
-        if rcParams['font.family'].lower() in ('serif', 'sans-serif', 'cursive', 'monospace'):
-            self.font_family = rcParams['font.family'].lower()
+        ff = rcParams['font.family'].lower()
+        if ff in self.font_families:
+            self.font_family = ff
         else:
-            warnings.warn('The %s font family is not compatible with LaTeX. serif will be used by default.' % ff)
+            mpl.verbose.report('The %s font family is not compatible with LaTeX. serif will be used by default.' % ff, 'helpful')
             self.font_family = 'serif'
-        self._fontconfig = self.font_family
-        for font in rcParams['font.serif']:
-            try:
-                self.serif = self.font_info[font.lower()]
-            except KeyError:
-                continue
+
+        fontconfig = [self.font_family]
+        for font_family, font_family_attr in \
+            [(ff, ff.replace('-', '_')) for ff in self.font_families]:
+            for font in rcParams['font.'+font_family]:
+                if font.lower() in self.font_info:
+                    found_font = self.font_info[font.lower()]
+                    setattr(self, font_family_attr,
+                            self.font_info[font.lower()])
+                    if DEBUG:
+                        print 'family: %s, font: %s, info: %s'%(font_family,
+                                    font, self.font_info[font.lower()])
+                    break
+                else:
+                    if DEBUG: print '$s font is not compatible with usetex'
             else:
-                break
-        self._fontconfig += self.serif[0]
-        for font in rcParams['font.sans-serif']:
-            try:
-                self.sans_serif = self.font_info[font.lower()]
-            except KeyError:
-                continue
-            else:
-                break
-        self._fontconfig += self.sans_serif[0]
-        for font in rcParams['font.monospace']:
-            try:
-                self.monospace = self.font_info[font.lower()]
-            except KeyError:
-                continue
-            else:
-                break                
-        self._fontconfig += self.monospace[0]
-        for font in rcParams['font.cursive']:
-            try:
-                self.cursive = self.font_info[font.lower()]
-            except KeyError:
-                continue
-            else:
-                break                
-        self._fontconfig += self.cursive[0]
-        
-        # The following packages and commands need to be included in the latex 
+                mpl.verbose.report('No LaTeX-compatible font found for the %s font family in rcParams. Using default.' % ff, 'helpful')
+                setattr(self, font_family_attr, self.font_info[font_family])
+            fontconfig.append(getattr(self, font_family_attr)[0])
+        self._fontconfig = ''.join(fontconfig)
+
+        # The following packages and commands need to be included in the latex
         # file's preamble:
         cmd = [self.serif[1], self.sans_serif[1], self.monospace[1]]
         if self.font_family == 'cursive': cmd.append(self.cursive[1])
         while r'\usepackage{type1cm}' in cmd:
             cmd.remove(r'\usepackage{type1cm}')
         cmd = '\n'.join(cmd)
-        self._font_preamble = '\n'.join([r'\usepackage{type1cm}',
-                             cmd,
-                             r'\usepackage{textcomp}'])
-        
+        self._font_preamble = '\n'.join([r'\usepackage{type1cm}', cmd,
+                                         r'\usepackage{textcomp}'])
+
     def get_basefile(self, tex, fontsize, dpi=None):
-        s = tex + self._fontconfig + ('%f'%fontsize) + self.get_custom_preamble()
-        if dpi: s += ('%s'%dpi)
-        bytes = unicode(s).encode('utf-8') # make sure hash is consistent for all strings, regardless of encoding
+        s = ''.join([tex, self.get_font_config(), '%f'%fontsize,
+                     self.get_custom_preamble(), str(dpi or '')])
+        # make sure hash is consistent for all strings, regardless of encoding:
+        bytes = unicode(s).encode('utf-8')
         return os.path.join(self.texcache, md5.md5(bytes).hexdigest())
-        
+
     def get_font_config(self):
+        "Reinitializes self if rcParams self depends on have changed."
+        if self._rc_cache is None:
+            self._rc_cache = dict([(k,None) for k in self._rc_cache_keys])
+        changed = [par for par in self._rc_cache_keys if rcParams[par] != \
+                   self._rc_cache[par]]
+        if changed:
+            if DEBUG: print 'DEBUG following keys changed:', changed
+            for k in changed:
+                if DEBUG:
+                    print 'DEBUG %-20s: %-10s -> %-10s' % \
+                            (k, self._rc_cache[k], rcParams[k])
+                # deepcopy may not be necessary, but feels more future-proof
+                self._rc_cache[k] = copy.deepcopy(rcParams[k])
+            if DEBUG: print 'DEBUG RE-INIT\nold fontconfig:', self._fontconfig
+            self.__init__()
+        if DEBUG: print 'DEBUG fontconfig:', self._fontconfig
         return self._fontconfig
-        
+
     def get_font_preamble(self):
         return self._font_preamble
-    
+
     def get_custom_preamble(self):
         return '\n'.join(rcParams['text.latex.preamble'])
-        
+
     def get_shell_cmd(self, *args):
         """
-        On windows, changing directories can be complicated by the presence of 
+        On windows, changing directories can be complicated by the presence of
         multiple drives. get_shell_cmd deals with this issue.
         """
-        if sys.platform == 'win32': 
+        if sys.platform == 'win32':
             command = ['%s'% os.path.splitdrive(self.texcache)[0]]
         else:
             command = []
         command.extend(args)
         return ' && '.join(command)
-        
+
     def make_tex(self, tex, fontsize):
         basefile = self.get_basefile(tex, fontsize)
         texfile = '%s.tex'%basefile
         fh = file(texfile, 'w')
         custom_preamble = self.get_custom_preamble()
         fontcmd = {'sans-serif' : r'{\sffamily %s}',
-                   'monospace'  : r'{\ttfamily %s}'}.get(self.font_family, 
+                   'monospace'  : r'{\ttfamily %s}'}.get(self.font_family,
                                                          r'{\rmfamily %s}')
         tex = fontcmd % tex
 
@@ -204,7 +213,7 @@ WARNING: found a TeX cache dir in the deprecated location "%s".
 \usepackage[utf8x]{inputenc}"""
         else:
             unicode_preamble = ''
-        
+
         s = r"""\documentclass{article}
 %s
 %s
@@ -222,34 +231,33 @@ WARNING: found a TeX cache dir in the deprecated location "%s".
             try:
                 fh.write(s)
             except UnicodeEncodeError, err:
-                verbose.report("You are using unicode and latex, but have "
-                               "not enabled the matplotlib 'text.latex.unicode' "
-                               "rcParam.", 'helpful')
+                mpl.verbose.report("You are using unicode and latex, but have "
+                            "not enabled the matplotlib 'text.latex.unicode' "
+                            "rcParam.", 'helpful')
                 raise
-                
+
         fh.close()
-        
+
         return texfile
-        
-    def make_dvi(self, tex, fontsize, force=0):
-        if debug: force = True
+
+    def make_dvi(self, tex, fontsize):
 
         basefile = self.get_basefile(tex, fontsize)
         dvifile = '%s.dvi'% basefile
 
-        if force or not os.path.exists(dvifile):
+        if DEBUG or not os.path.exists(dvifile):
             texfile = self.make_tex(tex, fontsize)
             outfile = basefile+'.output'
-            command = self.get_shell_cmd('cd "%s"'% self.texcache, 
+            command = self.get_shell_cmd('cd "%s"'% self.texcache,
                             'latex -interaction=nonstopmode %s > "%s"'\
                             %(os.path.split(texfile)[-1], outfile))
-            verbose.report(command, 'debug')
+            mpl.verbose.report(command, 'debug')
             exit_status = os.system(command)
             fh = file(outfile)
             if exit_status:
                 raise RuntimeError(('LaTeX was not able to process the following \
 string:\n%s\nHere is the full report generated by LaTeX: \n\n'% repr(tex)) + fh.read())
-            else: verbose.report(fh.read(), 'debug')
+            else: mpl.verbose.report(fh.read(), 'debug')
             fh.close()
             for fname in glob.glob(basefile+'*'):
                 if fname.endswith('dvi'): pass
@@ -258,54 +266,51 @@ string:\n%s\nHere is the full report generated by LaTeX: \n\n'% repr(tex)) + fh.
 
         return dvifile
 
-    def make_png(self, tex, fontsize, dpi, force=0):
-        if debug: force = True
-
+    def make_png(self, tex, fontsize, dpi):
         basefile = self.get_basefile(tex, fontsize, dpi)
         pngfile = '%s.png'% basefile
 
         # see get_rgba for a discussion of the background
-        if force or not os.path.exists(pngfile):
+        if DEBUG or not os.path.exists(pngfile):
             dvifile = self.make_dvi(tex, fontsize)
             outfile = basefile+'.output'
-            command = self.get_shell_cmd('cd "%s"' % self.texcache, 
+            command = self.get_shell_cmd('cd "%s"' % self.texcache,
                         'dvipng -bg Transparent -D %s -T tight -o \
-                        "%s" "%s" > "%s"'%(dpi, os.path.split(pngfile)[-1], 
+                        "%s" "%s" > "%s"'%(dpi, os.path.split(pngfile)[-1],
                         os.path.split(dvifile)[-1], outfile))
-            verbose.report(command, 'debug')
+            mpl.verbose.report(command, 'debug')
             exit_status = os.system(command)
             fh = file(outfile)
             if exit_status:
                 raise RuntimeError('dvipng was not able to \
 process the flowing file:\n%s\nHere is the full report generated by dvipng: \
 \n\n'% dvifile + fh.read())
-            else: verbose.report(fh.read(), 'debug')
+            else: mpl.verbose.report(fh.read(), 'debug')
             fh.close()
             os.remove(outfile)
 
         return pngfile
 
-    def make_ps(self, tex, fontsize, force=0):
-        if debug: force = True
+    def make_ps(self, tex, fontsize):
 
         basefile = self.get_basefile(tex, fontsize)
         psfile = '%s.epsf'% basefile
 
-        if force or not os.path.exists(psfile):
+        if DEBUG or not os.path.exists(psfile):
             dvifile = self.make_dvi(tex, fontsize)
             outfile = basefile+'.output'
-            command = self.get_shell_cmd('cd "%s"'% self.texcache, 
+            command = self.get_shell_cmd('cd "%s"'% self.texcache,
                         'dvips -q -E -o "%s" "%s" > "%s"'\
-                        %(os.path.split(psfile)[-1], 
+                        %(os.path.split(psfile)[-1],
                           os.path.split(dvifile)[-1], outfile))
-            verbose.report(command, 'debug')
+            mpl.verbose.report(command, 'debug')
             exit_status = os.system(command)
             fh = file(outfile)
             if exit_status:
                 raise RuntimeError('dvipng was not able to \
 process the flowing file:\n%s\nHere is the full report generated by dvipng: \
 \n\n'% dvifile + fh.read())
-            else: verbose.report(fh.read(), 'debug')
+            else: mpl.verbose.report(fh.read(), 'debug')
             fh.close()
             os.remove(outfile)
 
@@ -318,7 +323,25 @@ process the flowing file:\n%s\nHere is the full report generated by dvipng: \
             if line.startswith('%%BoundingBox:'):
                 return [int(val) for val in line.split()[1:]]
         raise RuntimeError('Could not parse %s'%psfile)
-        
+
+    def get_grey(self, tex, fontsize=None, dpi=None):
+        key = tex, self.get_font_config(), fontsize, dpi
+        alpha = self.grey_arrayd.get(key)
+
+        if alpha is None:
+            pngfile = self.make_png(tex, fontsize, dpi)
+            X = readpng(os.path.join(self.texcache, pngfile))
+
+            if (self.dvipngVersion < '1.6') or rcParams['text.dvipnghack']:
+                # hack the alpha channel as described in comment above
+                alpha = npy.sqrt(1-X[:,:,0])
+            else:
+                alpha = X[:,:,-1]
+
+            self.grey_arrayd[key] = alpha
+        return alpha
+
+
     def get_rgba(self, tex, fontsize=None, dpi=None, rgb=(0,0,0)):
         """
         Return tex string as an rgba array
@@ -346,25 +369,17 @@ process the flowing file:\n%s\nHere is the full report generated by dvipng: \
         if not fontsize: fontsize = rcParams['font.size']
         if not dpi: dpi = rcParams['savefig.dpi']
         r,g,b = rgb
-        key = tex, fontsize, dpi, tuple(rgb)
-        Z = self.arrayd.get(key)
+        key = tex, self.get_font_config(), fontsize, dpi, tuple(rgb)
+        Z = self.rgba_arrayd.get(key)
 
         if Z is None:
-            # force=True to skip cacheing while debugging
-            pngfile = self.make_png(tex, fontsize, dpi, force=False)
-            X = readpng(os.path.join(self.texcache, pngfile))
+            alpha = self.get_grey(tex, fontsize, dpi)
 
-            if (self.dvipngVersion < '1.6') or rcParams['text.dvipnghack']:
-                # hack the alpha channel as described in comment above
-                alpha = sqrt(1-X[:,:,0])
-            else:
-                alpha = X[:,:,-1]
-
-            Z = zeros(X.shape, Float)
+            Z = npy.zeros((X.shape[0], X.shape[1], 4), npy.float)
             Z[:,:,0] = r
             Z[:,:,1] = g
             Z[:,:,2] = b
             Z[:,:,3] = alpha
-            self.arrayd[key] = Z
+            self.rgba_arrayd[key] = Z
 
         return Z

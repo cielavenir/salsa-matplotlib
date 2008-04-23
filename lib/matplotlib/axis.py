@@ -7,14 +7,9 @@ import math
 import re
 import sys
 
-from numerix import arange, array, asarray, ones, zeros, \
-     nonzero, take, Float, log10, logical_and, \
-     dot, sin, cos, tan, pi, sqrt
-
 from artist import Artist, setp
 from cbook import enumerate, silent_list, popall, CallbackRegistry
 from lines import Line2D, TICKLEFT, TICKRIGHT, TICKUP, TICKDOWN
-from mlab import linspace
 from matplotlib import rcParams
 from patches import bbox_artist
 from ticker import NullFormatter, FixedFormatter, ScalarFormatter, LogFormatter
@@ -116,15 +111,14 @@ class Tick(Artist):
         children = [self.tick1line, self.tick2line, self.gridline, self.label1, self.label2]
         return children
 
-    def pick(self, mouseevent):
-        """
-        pick(mouseevent)
+    def contains(self, mouseevent):
+        """Test whether the mouse event occured in the Tick marks.
 
-        each child artist will fire a pick event if mouseevent is over
-        the artist and the artist has picker set
+        This function always returns false.  It is more useful to test if the
+        axis as a whole contains the mouse rather than the set of tick marks.
         """
-        for a in self.get_children():
-            a.pick(mouseevent)
+        if callable(self._contains): return self._contains(self,mouseevent)
+        return False,{}
 
     def set_pad(self, val):
         """
@@ -493,7 +487,11 @@ class Axis(Artist):
     LABELPAD = 5
     OFFSETTEXTPAD = 3
 
-    def __init__(self, axes):
+    def __str__(self):
+        return str(self.__class__).split('.')[-1] \
+            + "(%d,%d)"%self.axes.transAxes.xy_tup((0,0))
+
+    def __init__(self, axes, pickradius=15):
         """
         Init the axis with the parent Axes instance
         """
@@ -515,24 +513,18 @@ class Axis(Artist):
         self.offsetText = self._get_offset_text()
         self.majorTicks = []
         self.minorTicks = []
+        self.pickradius = pickradius
 
         self.cla()
 
     def get_children(self):
         children = [self.label]
-        children.extend(self.majorTicks)
-        children.extend(self.minorTicks)
+        majorticks = self.get_major_ticks()
+        minorticks = self.get_minor_ticks()
+
+        children.extend(majorticks)
+        children.extend(minorticks)
         return children
-
-    def pick(self, mouseevent):
-        """
-        pick(mouseevent)
-
-        each child artist will fire a pick event if mouseevent is over
-        the artist and the artist has picker set
-        """
-        for a in self.get_children():
-            a.pick(mouseevent)
 
     def cla(self):
         'clear the current axis'
@@ -540,6 +532,9 @@ class Axis(Artist):
         self.set_major_formatter(ScalarFormatter())
         self.set_minor_locator(NullLocator())
         self.set_minor_formatter(NullFormatter())
+
+        # Clear the callback registry for this axis, or it may "leak"
+        self.callbacks = CallbackRegistry(('units', 'units finalize'))
 
         # whether the grids are on
         self._gridOnMajor = rcParams['axes.grid']
@@ -620,10 +615,10 @@ class Axis(Artist):
             tick.set_label2(label)
 
             tick.draw(renderer)
-            if tick.label1On:
+            if tick.label1On and tick.label1.get_visible():
                 extent = tick.label1.get_window_extent(renderer)
                 ticklabelBoxes.append(extent)
-            if tick.label2On:
+            if tick.label2On and tick.label2.get_visible():
                 extent = tick.label2.get_window_extent(renderer)
                 ticklabelBoxes2.append(extent)
 
@@ -654,7 +649,8 @@ class Axis(Artist):
 
     def get_gridlines(self):
         'Return the grid lines as a list of Line2D instance'
-        return silent_list('Line2D gridline', [tick.gridline for tick in self.majorTicks])
+        ticks = self.get_major_ticks()
+        return silent_list('Line2D gridline', [tick.gridline for tick in ticks])
 
     def get_label(self):
         'Return the axis label as a Text instance'
@@ -664,22 +660,66 @@ class Axis(Artist):
         'Return the axis offsetText as a Text instance'
         return self.offsetText
 
-    def get_ticklabels(self):
-        'Return a list of Text instances for ticklabels'
-        labels1 = [tick.label1 for tick in self.majorTicks if tick.label1On]
-        labels2 = [tick.label2 for tick in self.majorTicks if tick.label2On]
-        return silent_list('Text ticklabel', labels1+labels2)
+    def get_pickradius(self):
+        'Return the depth of the axis used by the picker'
+        return self.pickradius
 
-    def get_ticklines(self):
-        'Return the ticklines lines as a list of Line2D instance'
+    def get_majorticklabels(self):
+        'Return a list of Text instances for the major ticklabels'
+        ticks = self.get_major_ticks()
+        labels1 = [tick.label1 for tick in ticks if tick.label1On]
+        labels2 = [tick.label2 for tick in ticks if tick.label2On]
+        return silent_list('Text major ticklabel', labels1+labels2)
+
+    def get_minorticklabels(self):
+        'Return a list of Text instances for the minor ticklabels'
+        ticks = self.get_minor_ticks()
+        labels1 = [tick.label1 for tick in ticks if tick.label1On]
+        labels2 = [tick.label2 for tick in ticks if tick.label2On]
+        return silent_list('Text minor ticklabel', labels1+labels2)
+
+    def get_ticklabels(self, minor=False):
+        'Return a list of Text instances for ticklabels'
+        if minor:
+            return self.get_minorticklabels()
+        return self.get_majorticklabels()
+
+    def get_majorticklines(self):
+        'Return the major tick lines as a list of Line2D instances'
         lines = []
-        for tick in self.majorTicks:
+        ticks = self.get_major_ticks()
+        for tick in ticks:
             lines.append(tick.tick1line)
             lines.append(tick.tick2line)
         return silent_list('Line2D ticklines', lines)
 
-    def get_ticklocs(self):
-        "Get the tick locations in data coordinates as a Numeric array"
+    def get_minorticklines(self):
+        'Return the minor tick lines as a list of Line2D instances'
+        lines = []
+        ticks = self.get_minor_ticks()
+        for tick in ticks:
+            lines.append(tick.tick1line)
+            lines.append(tick.tick2line)
+        return silent_list('Line2D ticklines', lines)
+
+    def get_ticklines(self, minor=False):
+        'Return the tick lines as a list of Line2D instances'
+        if minor:
+            return self.get_minorticklines()
+        return self.get_majorticklines()
+
+    def get_majorticklocs(self):
+        "Get the major tick locations in data coordinates as a numpy array"
+        return self.major.locator()
+
+    def get_minorticklocs(self):
+        "Get the minor tick locations in data coordinates as a numpy array"
+        return self.minor.locator()
+
+    def get_ticklocs(self, minor=False):
+        "Get the tick locations in data coordinates as a numpy array"
+        if minor:
+            return self.minor.locator()
         return self.major.locator()
 
     def _get_tick(self, major):
@@ -719,15 +759,12 @@ class Axis(Artist):
 
     def get_major_ticks(self):
         'get the tick instances; grow as necessary'
-
         numticks = len(self.major.locator())
-
         if len(self.majorTicks)<numticks:
             # update the new tick label properties from the old
             protoTick = self.majorTicks[0]
             for i in range(numticks-len(self.majorTicks)):
                 tick = self._get_tick(major=True)
-                #tick = protoTick
                 if self._gridOnMajor: tick.gridOn = True
                 self._copy_tick_props(protoTick, tick)
                 self.majorTicks.append(tick)
@@ -825,7 +862,7 @@ class Axis(Artist):
 
     def have_units(self):
         return self.converter is not None or self.units is not None
-    
+
     def convert_units(self, x):
         if self.converter is None:
             self.converter = units.registry.get_converter(x)
@@ -835,7 +872,7 @@ class Axis(Artist):
             return x
 
         ret =  self.converter.convert(x, self.units)
-        #print 'convert_units converting: units=%s, converter=%s, in=%s, out=%s'%(self.units, self.converter, x, ret)
+        #print 'convert_units converting: axis=%s, units=%s, converter=%s, in=%s, out=%s'%(self, self.units, self.converter, x, ret)
         return ret
 
     def set_units(self, u):
@@ -904,38 +941,54 @@ class Axis(Artist):
         self.minor.locator.set_view_interval( self.get_view_interval() )
         self.minor.locator.set_data_interval( self.get_data_interval() )
 
+    def set_pickradius(self, pickradius):
+        """
+        Set the depth of the axis used by the picker
+
+        ACCEPTS: a distance in points
+        """
+        self.pickradius = pickradius
+
 
     def set_ticklabels(self, ticklabels, *args, **kwargs):
         """
         Set the text values of the tick labels. Return a list of Text
-        instances.
+        instances.  Use kwarg minor=True to select minor ticks.
 
         ACCEPTS: sequence of strings
         """
         #ticklabels = [str(l) for l in ticklabels]
-
-        self.set_major_formatter( FixedFormatter(ticklabels) )
-
+        minor = kwargs.pop('minor', False)
+        if minor:
+            self.set_minor_formatter(FixedFormatter(ticklabels))
+            ticks = self.get_minor_ticks()
+        else:
+            self.set_major_formatter( FixedFormatter(ticklabels) )
+            ticks = self.get_major_ticks()
 
         ret = []
-        for i, tick in enumerate(self.get_major_ticks()):
+        for i, tick in enumerate(ticks):
             if i<len(ticklabels):
                 tick.label1.set_text(ticklabels[i])
                 ret.append(tick.label1)
             tick.label1.update(kwargs)
         return ret
 
-    def set_ticks(self, ticks):
+    def set_ticks(self, ticks, minor=False):
         """
         Set the locations of the tick marks from sequence ticks
 
         ACCEPTS: sequence of floats
         """
         ### XXX if the user changes units, the information will be lost here
-        ticks = self.convert_units(ticks) 
-        self.set_major_locator( FixedLocator(ticks) )
+        ticks = self.convert_units(ticks)
         self.get_view_interval().update(ticks,0)
-        return self.get_major_ticks()
+        if minor:
+            self.set_minor_locator(FixedLocator(ticks))
+            return self.get_minor_ticks()
+        else:
+            self.set_major_locator( FixedLocator(ticks) )
+            return self.get_major_ticks()
 
     def _update_label_position(self, bboxes, bboxes2):
         """
@@ -961,6 +1014,20 @@ class Axis(Artist):
 
 class XAxis(Axis):
     __name__ = 'xaxis'
+
+    def contains(self,mouseevent):
+        """Test whether the mouse event occured in the x axis.
+        """
+        if callable(self._contains): return self._contains(self,mouseevent)
+
+        xpixel,ypixel = mouseevent.x,mouseevent.y
+        try:
+            xaxes,yaxes = self.axes.transAxes.inverse_xy_tup((xpixel,ypixel))
+            xorigin,yorigin = self.axes.transAxes.xy_tup((0,0))
+        except ValueError:
+            return False, {}
+        inaxis = xaxes>=0 and xaxes<=1 and ypixel<yorigin and ypixel>yorigin-self.pickradius
+        return inaxis, {}
 
     def _get_tick(self, major):
         return XTick(self.axes, 0, '', major=major)
@@ -1066,8 +1133,9 @@ class XAxis(Axis):
         """
         assert position == 'top' or position == 'bottom' or position == 'both' or position == 'default'
 
-        ticks = list(self.majorTicks)  # a copy
-        ticks.extend( self.minorTicks )
+
+        ticks = list( self.get_major_ticks() )  # a copy
+        ticks.extend( self.get_minor_ticks() )
 
         if position == 'top':
             for t in ticks:
@@ -1132,6 +1200,22 @@ class XAxis(Axis):
 
 class YAxis(Axis):
     __name__ = 'yaxis'
+
+    def contains(self,mouseevent):
+        """Test whether the mouse event occurred in the y axis.
+
+        Returns T/F, {}
+        """
+        if callable(self._contains): return self._contains(self,mouseevent)
+
+        xpixel,ypixel = mouseevent.x,mouseevent.y
+        try:
+            xaxes,yaxes = self.axes.transAxes.inverse_xy_tup((xpixel,ypixel))
+            xorigin,yorigin = self.axes.transAxes.xy_tup((0,0))
+        except ValueError:
+            return False, {}
+        inaxis = yaxes>=0 and yaxes<=1 and xpixel<xorigin and xpixel>xorigin-self.pickradius
+        return inaxis, {}
 
     def _get_tick(self, major):
         return YTick(self.axes, 0, '', major=major)
@@ -1246,8 +1330,8 @@ class YAxis(Axis):
         """
         assert position == 'left' or position == 'right' or position == 'both' or position == 'default'
 
-        ticks = list(self.majorTicks) # a copy
-        ticks.extend( self.minorTicks )
+        ticks = list( self.get_major_ticks() ) # a copy
+        ticks.extend( self.get_minor_ticks() )
 
         if position == 'right':
             self.set_offset_position('right')

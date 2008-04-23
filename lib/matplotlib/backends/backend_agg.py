@@ -26,8 +26,9 @@ INSTALLING
 
   REQUIREMENTs
 
-    python2.2+
-    Numeric 22+
+    python2.3+
+    numpy 1.0 +
+
     agg2 (see below)
     freetype 2
     libpng
@@ -69,35 +70,27 @@ INSTALLING
 
 """
 from __future__ import division
-
 import os, sys
+
+import numpy as npy
+
 import matplotlib
 from matplotlib import verbose, rcParams
-from matplotlib.numerix import array, Float, zeros, transpose
 from matplotlib._image import fromarray
 from matplotlib._pylab_helpers import Gcf
 from matplotlib.backend_bases import RendererBase,\
      GraphicsContextBase, FigureManagerBase, FigureCanvasBase
-
-from matplotlib.cbook import enumerate, is_string_like, exception_to_str
+from matplotlib.cbook import enumerate, is_string_like, exception_to_str, \
+    maxdict
 from matplotlib.figure import Figure
-from matplotlib.font_manager import fontManager
-from matplotlib.ft2font import FT2Font
-from matplotlib.mathtext import math_parse_s_ft2font
+from matplotlib.font_manager import findfont
+from matplotlib.ft2font import FT2Font, LOAD_FORCE_AUTOHINT
+from matplotlib.mathtext import MathTextParser
 from matplotlib.transforms import lbwh_to_bbox
-from matplotlib.numerix.mlab import fliplr
-import matplotlib.numerix
 
-if matplotlib.numerix.which[0] == "numarray":
-    from _na_backend_agg import RendererAgg as _RendererAgg
-elif matplotlib.numerix.which[0] == "numeric":
-    from _nc_backend_agg import RendererAgg as _RendererAgg
-else:
-    from _ns_backend_agg import RendererAgg as _RendererAgg
+from _backend_agg import RendererAgg as _RendererAgg
 
 backend_version = 'v2.2'
-_fontd = {}     # a map from fname to font instances
-
 
 class RendererAgg(RendererBase):
     """
@@ -106,7 +99,8 @@ class RendererAgg(RendererBase):
     """
 
     debug=1
-    texd = {}  # a cache of tex image rasters
+    texd = maxdict(50)  # a cache of tex image rasters
+    _fontd = maxdict(50)
     def __init__(self, width, height, dpi):
         if __debug__: verbose.report('RendererAgg.__init__', 'debug-annoying')
         RendererBase.__init__(self)
@@ -132,7 +126,7 @@ class RendererAgg(RendererBase):
 
         self.copy_from_bbox = self._renderer.copy_from_bbox
         self.restore_region = self._renderer.restore_region
-
+        self.mathtext_parser = MathTextParser('Agg')
 
         self.bbox = lbwh_to_bbox(0,0, self.width, self.height)
         if __debug__: verbose.report('RendererAgg.__init__ done',
@@ -151,7 +145,7 @@ class RendererAgg(RendererBase):
         """
         if __debug__: verbose.report('RendererAgg.draw_arc', 'debug-annoying')
         self._renderer.draw_ellipse(
-            gcEdge, rgbFace, x, y, width/2, height/2, rotation)  # ellipse takes radius
+            gcEdge, rgbFace, x, y, width/2., height/2., rotation)  # ellipse takes radius
 
 
     def draw_line(self, gc, x1, y1, x2, y2):
@@ -160,8 +154,8 @@ class RendererAgg(RendererBase):
         point in x, y
         """
         if __debug__: verbose.report('RendererAgg.draw_line', 'debug-annoying')
-        x = array([x1,x2], typecode=Float)
-        y = array([y1,y2], typecode=Float)
+        x = npy.array([x1,x2], float)
+        y = npy.array([y1,y2], float)
         self._renderer.draw_lines(gc, x, y)
 
 
@@ -173,32 +167,24 @@ class RendererAgg(RendererBase):
         rgbFace = gc.get_rgb()
         self._renderer.draw_ellipse(
             gc, rgbFace, x, y, 0.5, 0.5, 0.0)
-            
+
     def draw_mathtext(self, gc, x, y, s, prop, angle):
         """
         Draw the math text using matplotlib.mathtext
         """
         if __debug__: verbose.report('RendererAgg.draw_mathtext',
                                      'debug-annoying')
-        size = prop.get_size_in_points()
-        width, height, fonts = math_parse_s_ft2font(
-            s, self.dpi.get(), size, angle)
+        ox, oy, width, height, descent, font_image, used_characters = \
+            self.mathtext_parser.parse(s, self.dpi.get(), prop)
 
-        if angle == 90:
-            width, height = height, width
-        for font in fonts:
-            if angle == 90:
-                font.horiz_image_to_vert_image() # <-- Rotate
-                self._renderer.draw_text( font, int(x)-width, int(y)-height, gc)
-            else:
-                self._renderer.draw_text( font, int(x), int(y)-height, gc)
+        x = int(x) + ox
+        y = int(y) - oy
+        self._renderer.draw_text_image(font_image, x, y + 1, angle, gc)
         if 0:
             self._renderer.draw_rectangle(gc, None,
                                           int(x),
                                           self.height-int(y),
                                           width, height)
-
-
 
     def draw_text(self, gc, x, y, s, prop, angle, ismath):
         """
@@ -211,19 +197,20 @@ class RendererAgg(RendererBase):
 
         font = self._get_agg_font(prop)
         if font is None: return None
-        if len(s)==1 and ord(s)>127:
-
-            font.load_char(ord(s))
+        if len(s) == 1 and ord(s) > 127:
+            font.load_char(ord(s), flags=LOAD_FORCE_AUTOHINT)
         else:
-            font.set_text(s, angle)
+            font.set_text(s, 0, flags=LOAD_FORCE_AUTOHINT)
         font.draw_glyphs_to_bitmap()
 
         #print x, y, int(x), int(y)
 
-        self._renderer.draw_text(font, int(x), int(y), gc)
+        # We pass '0' for angle here, since is has already been rotated
+        # (in vector space) in the above call to font.set_text.
+        self._renderer.draw_text_image(font.get_image(), int(x), int(y) + 1, angle, gc)
 
 
-    def get_text_width_height(self, s, prop, ismath, rgb=(0,0,0)):
+    def get_text_width_height_descent(self, s, prop, ismath):
         """
         get the width and height in display coords of the string s
         with FontPropertry prop
@@ -232,66 +219,42 @@ class RendererAgg(RendererBase):
         # texmanager more efficient.  It is not meant to be used
         # outside the backend
         """
-
         if ismath=='TeX':
             # todo: handle props
             size = prop.get_size_in_points()
             texmanager = self.get_texmanager()
-            Z = texmanager.get_rgba(s, size, self.dpi.get(), rgb)
-            m,n,tmp = Z.shape
-            return n,m
+            Z = texmanager.get_grey(s, size, self.dpi.get())
+            m,n = Z.shape
+            # TODO: descent of TeX text (I am imitating backend_ps here -JKS)
+            return n, m, 0
 
         if ismath:
-            width, height, fonts = math_parse_s_ft2font(
-                s, self.dpi.get(), prop.get_size_in_points())
-            return width, height
+            ox, oy, width, height, descent, fonts, used_characters = \
+                self.mathtext_parser.parse(s, self.dpi.get(), prop)
+            return width, height, descent
         font = self._get_agg_font(prop)
-        font.set_text(s, 0.0)  # the width and height of unrotated string
+        font.set_text(s, 0.0, flags=LOAD_FORCE_AUTOHINT)  # the width and height of unrotated string
         w, h = font.get_width_height()
+        d = font.get_descent()
         w /= 64.0  # convert from subpixels
         h /= 64.0
-        return w, h
+        d /= 64.0
+        return w, h, d
 
     def draw_tex(self, gc, x, y, s, prop, angle):
         # todo, handle props, angle, origins
-        rgb = gc.get_rgb()
         size = prop.get_size_in_points()
         dpi = self.dpi.get()
 
-        flip = angle==90
-        w,h = self.get_text_width_height(s, prop, 'TeX', rgb)
-        if flip:
-            w,h = h,w
-            x -= w
-
         texmanager = self.get_texmanager()
-        key = s, size, dpi, rgb, angle, texmanager.get_font_config()
+        key = s, size, dpi, angle, texmanager.get_font_config()
         im = self.texd.get(key)
         if im is None:
-            Z = texmanager.get_rgba(s, size, dpi, rgb)
-            if flip:
-                r = Z[:,:,0]
-                g = Z[:,:,1]
-                b = Z[:,:,2]
-                a = Z[:,:,3]
-                m,n,tmp = Z.shape
+            Z = texmanager.get_grey(s, size, dpi)
+            Z = npy.array(Z * 255.0, npy.uint8)
 
-                def func(x):
-                    return transpose(fliplr(x))
+        self._renderer.draw_text_image(Z, x, y, angle, gc)
 
-                Z = zeros((n,m,4), typecode=Float)
-                Z[:,:,0] = func(r)
-                Z[:,:,1] = func(g)
-                Z[:,:,2] = func(b)
-                Z[:,:,3] = func(a)
-            im = fromarray(Z, 1)
-            im.flipud_out()
-            self.texd[key] = im
-
-        cliprect = gc.get_clip_rectangle()
-        if cliprect is None: bbox = None
-        else: bbox = lbwh_to_bbox(*cliprect)
-        self.draw_image(x, self.height-y, im, bbox)
 
     def get_canvas_width_height(self):
         'return the canvas width and height in display coords'
@@ -306,12 +269,15 @@ class RendererAgg(RendererBase):
                                      'debug-annoying')
 
         key = hash(prop)
-        font = _fontd.get(key)
+        font = self._fontd.get(key)
 
         if font is None:
-            fname = fontManager.findfont(prop)
-            font = FT2Font(str(fname))
-            _fontd[key] = font
+            fname = findfont(prop)
+            font = self._fontd.get(fname)
+            if font is None:
+                font = FT2Font(str(fname))
+                self._fontd[fname] = font
+            self._fontd[key] = font
 
         font.clear()
         size = prop.get_size_in_points()
@@ -388,8 +354,8 @@ class FigureCanvasAgg(FigureCanvasBase):
         """
         if __debug__: verbose.report('FigureCanvasAgg.draw', 'debug-annoying')
 
-        renderer = self.get_renderer()
-        self.figure.draw(renderer)
+        self.renderer = self.get_renderer()
+        self.figure.draw(self.renderer)
 
     def get_renderer(self):
         l,b,w,h = self.figure.bbox.get_bounds()
@@ -418,95 +384,15 @@ class FigureCanvasAgg(FigureCanvasBase):
                                      'debug-annoying')
         return self.renderer.buffer_rgba(x,y)
 
-    def print_figure(self, filename, dpi=None, facecolor='w', edgecolor='w',
-                     orientation='portrait', **kwargs):
-        """
-        Render the figure to hardcopy.  Set the figure patch face and
-        edge colors.  This is useful because some of the GUIs have a
-        gray figure face color background and you'll probably want to
-        override this on hardcopy
+    def get_default_filetype(self):
+        return 'png'
 
-        If the extension matches PNG, write a PNG file
-
-        If the extension matches BMP or RAW, write an RGBA bitmap file
-
-        If filename is a fileobject, write png to file object (thus
-        you can, for example, write the png to stdout
-        """
-        if __debug__: verbose.report('FigureCanvasAgg.print_figure',
-                                     'debug-annoying')
-        if dpi is None: dpi = matplotlib.rcParams['savefig.dpi']
-
-        # store the orig figure dpi, color and size information so we
-        # can restore them later.  For image creation alone, this is
-        # not important since after the print the figure is done.  But
-        # backend_agg may be used as a renderer for a GUI figure, and
-        # restoring figure props will be important in that case.
-        # TODO: move most of this functionality into backend_bases
-
-        origDPI = self.figure.dpi.get()
-        origfacecolor = self.figure.get_facecolor()
-        origedgecolor = self.figure.get_edgecolor()
-
-        self.figure.dpi.set(dpi)
-        self.figure.set_facecolor(facecolor)
-        self.figure.set_edgecolor(edgecolor)
-
-        # render the printed figure
+    def print_raw(self, filename, *args, **kwargs):
         self.draw()
+        self.get_renderer()._renderer.write_rgba(str(filename))
+    print_rgba = print_raw
 
-        printfunc = None
-        if not is_string_like(filename):
-            # assume png and write to fileobject
-            self.renderer._renderer.write_png(filename)
-            #pass
-        else:
-            # take a look at the extension and choose the print handler
-            basename, ext = os.path.splitext(filename)
-            if not len(ext):
-                ext = '.png'
-                filename += ext
+    def print_png(self, filename, *args, **kwargs):
+        self.draw()
+        self.get_renderer()._renderer.write_png(filename, self.figure.dpi.get())
 
-            ext = ext.lower()
-            if (ext.find('rgb')>=0 or
-                ext.find('raw')>=0 or
-                ext.find('bmp')>=0 ):
-                # agg doesn't handle unicode yet
-                self.renderer._renderer.write_rgba(str(filename))
-            elif ext.find('png')>=0:
-                # agg doesn't handle unicode yet
-                self.renderer._renderer.write_png(str(filename))
-                #pass
-            elif ext.find('svg')>=0:
-                from backend_svg import FigureCanvasSVG
-                svg = self.switch_backends(FigureCanvasSVG)
-                printfunc = svg.print_figure
-            elif ext.find('ps')>=0 or ext.find('ep')>=0:
-                from backend_ps import FigureCanvasPS # lazy import
-                ps = self.switch_backends(FigureCanvasPS)
-                printfunc = ps.print_figure
-            elif ext.find('pdf')>=0:
-                from backend_pdf import FigureCanvasPdf
-                pdf = self.switch_backends(FigureCanvasPdf)
-                printfunc = pdf.print_figure
-            else:
-                raise IOError('Do not know know to handle extension *%s' % ext)
-
-        if printfunc is not None:
-            try:
-                printfunc(filename, dpi, facecolor, edgecolor, orientation, **kwargs)
-            except:
-                # restore the original figure properties
-                self.figure.dpi.set(origDPI)
-                self.figure.set_facecolor(origfacecolor)
-                self.figure.set_edgecolor(origedgecolor)
-                self.figure.set_canvas(self)            
-                raise
-
-        # restore the original figure properties
-        self.figure.dpi.set(origDPI)
-        self.figure.set_facecolor(origfacecolor)
-        self.figure.set_edgecolor(origedgecolor)
-        self.figure.set_canvas(self)
-            
-            

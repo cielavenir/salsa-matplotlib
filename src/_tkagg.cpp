@@ -1,6 +1,6 @@
 /*
  * The Python Imaging Library.
- * $Id: _tkagg.cpp 2145 2006-03-14 21:06:52Z jdh2358 $
+ * $Id: _tkagg.cpp 3508 2007-07-13 14:25:06Z mdboom $
  *
  */
 
@@ -53,6 +53,11 @@ PyAggImagePhoto(ClientData clientdata, Tcl_Interp* interp,
 
     long mode;
     long nval;
+    if (Tk_MainWindow(interp) == NULL) {
+        // Will throw a _tkinter.TclError with "this isn't a Tk application"
+        return TCL_ERROR;
+    }
+
     if (argc != 5) {
         Tcl_AppendResult(interp, "usage: ", argv[0],
                          " destPhoto srcImage", (char *) NULL);

@@ -34,8 +34,8 @@ AUTHOR:
   John D. Hunter <jdhunter@ace.bsd.uchicago.edu>
 """
 
-
 import sys, os
+from _mathtext_data import uni2type1
 
 #Convert string the a python type
 _to_int = int
@@ -53,7 +53,27 @@ def _to_bool(s):
     else: return True
 
 
-    
+def _sanity_check(fh):
+    """
+    Check if the file at least looks like AFM. 
+    If not, raise RuntimeError.
+    """
+
+    # Remember the file position in case the caller wants to
+    # do something else with the file.
+    pos = fh.tell()
+    try:
+        line = fh.readline()
+    finally:
+        fh.seek(pos, 0)
+
+    # AFM spec, Section 4: The StartFontMetrics keyword [followed by a
+    # version number] must be the first line in the file, and the
+    # EndFontMetrics keyword must be the last non-empty line in the
+    # file. We just check the first line.
+    if not line.startswith('StartFontMetrics'):
+        raise RuntimeError('Not an AFM file')
+
 def _parse_header(fh):
     """
     Reads the font metrics header (up to the char metrics) and returns
@@ -83,7 +103,8 @@ def _parse_header(fh):
         'Version': _to_str,
         'Notice': _to_str,
         'EncodingScheme': _to_str,
-        'CapHeight': _to_float,
+        'CapHeight': _to_float, # Is the second version a mistake, or
+        'Capheight': _to_float, # do some AFM files contain 'Capheight'? -JKS
         'XHeight': _to_float,
         'Ascender': _to_float,
         'Descender': _to_float,
@@ -92,7 +113,6 @@ def _parse_header(fh):
         'StartCharMetrics': _to_int,
         'CharacterSet': _to_str,
         'Characters': _to_int,
-        'Capheight': _to_int,
         }
 
     d = {}
@@ -110,10 +130,10 @@ def _parse_header(fh):
            val = ''
         #key, val = line.split(' ', 1)
         try: d[key] = headerConverters[key](val)
-        except ValueError: 
+        except ValueError:
             print >>sys.stderr, 'Value error parsing header in AFM:', key, val
             continue
-        except KeyError: 
+        except KeyError:
             print >>sys.stderr, 'Found an unknown keyword in AFM header (was %s)' % key
             continue
         if key=='StartCharMetrics': return d
@@ -132,24 +152,26 @@ def _parse_char_metrics(fh):
     all the sample afm files I have
     """
 
-    d = {}
+    ascii_d = {}
+    name_d  = {}
     while 1:
         line = fh.readline()
         if not line: break
         line = line.rstrip()
-        if line.startswith('EndCharMetrics'): return d
+        if line.startswith('EndCharMetrics'): return ascii_d, name_d
         vals = line.split(';')[:4]
         if len(vals) !=4 : raise RuntimeError('Bad char metrics line: %s' % line)
         num = _to_int(vals[0].split()[1])
         wx = _to_float(vals[1].split()[1])
         name = vals[2].split()[1]
         bbox = _to_list_of_ints(vals[3][2:])
-        # Workaround: If the character name is 'Euro', give it the corresponding 
+        # Workaround: If the character name is 'Euro', give it the corresponding
         # character code, according to WinAnsiEncoding (see PDF Reference).
         if name == 'Euro':
             num = 128
         if num != -1:
-            d[num] = (wx, name, bbox)
+            ascii_d[num] = (wx, name, bbox)
+        name_d[name] = (wx, bbox)
     raise RuntimeError('Bad parse')
 
 def _parse_kern_pairs(fh):
@@ -168,7 +190,7 @@ def _parse_kern_pairs(fh):
     line = fh.readline()
     if not line.startswith('StartKernPairs'):
         raise RuntimeError('Bad start of kern pairs data: %s'%line)
-    
+
     d = {}
     while 1:
         line = fh.readline()
@@ -180,7 +202,7 @@ def _parse_kern_pairs(fh):
             return d
         vals = line.split()
         if len(vals)!=4 or vals[0]!='KPX':
-            raise RuntimeError('Bad kern pairs line: %s'%line)        
+            raise RuntimeError('Bad kern pairs line: %s'%line)
         c1, c2, val = vals[1], vals[2], _to_float(vals[3])
         d[(c1,c2)] = val
     raise RuntimeError('Bad kern pairs parse')
@@ -197,7 +219,7 @@ def _parse_composites(fh):
     will be represented as
 
       d['Aacute'] = [ ('A', 0, 0), ('acute', 160, 170) ]
-      
+
     """
     d = {}
     while 1:
@@ -239,12 +261,12 @@ def _parse_optional(fh):
         line = line.rstrip()
         if len(line)==0: continue
         key = line.split()[0]
-        
+
         if optional.has_key(key): d[key] = optional[key](fh)
 
     l = ( d['StartKernData'], d['StartComposites'] )
     return l
-    
+
 def parse_afm(fh):
     """
     Parse the Adobe Font Metics file in file handle fh
@@ -255,10 +277,11 @@ def parse_afm(fh):
     dkernpairs : a parse_kern_pairs dict, possibly {}
     dcomposite : a parse_composites dict , possibly {}
     """
+    _sanity_check(fh)
     dhead =  _parse_header(fh)
-    dcmetrics =  _parse_char_metrics(fh)
+    dcmetrics_ascii, dcmetrics_name = _parse_char_metrics(fh)
     doptional = _parse_optional(fh)
-    return dhead, dcmetrics, doptional[0], doptional[1]
+    return dhead, dcmetrics_ascii, dcmetrics_name, doptional[0], doptional[1]
 
 
 class AFM:
@@ -267,10 +290,12 @@ class AFM:
         """
         Parse the AFM file in file object fh
         """
-        (dhead, dcmetrics, dkernpairs, dcomposite) = parse_afm(fh)
+        (dhead, dcmetrics_ascii, dcmetrics_name, dkernpairs, dcomposite) = \
+            parse_afm(fh)
         self._header = dhead
         self._kern = dkernpairs
-        self._metrics = dcmetrics
+        self._metrics = dcmetrics_ascii
+        self._metrics_by_name = dcmetrics_name
         self._composite = dcomposite
 
 
@@ -278,7 +303,7 @@ class AFM:
         if not isord: c=ord(c)
         wx, name, bbox = self._metrics[c]
         return bbox
-    
+
     def string_width_height(self, s):
         """
         Return the string width (including kerning) and string height
@@ -293,12 +318,12 @@ class AFM:
             if c == '\n': continue
             wx, name, bbox = self._metrics[ord(c)]
             l,b,w,h = bbox
-            
+
             # find the width with kerning
             try: kp = self._kern[ (namelast, name) ]
             except KeyError: kp = 0
             totalw += wx + kp
-            
+
             # find the max y
             thismax = b+h
             if thismax>maxy: maxy = thismax
@@ -309,7 +334,7 @@ class AFM:
 
         return totalw, maxy-miny
 
-    def get_str_bbox(self, s):
+    def get_str_bbox_and_descent(self, s):
         """
         Return the string bounding box
         """
@@ -319,16 +344,23 @@ class AFM:
         miny = 1e9
         maxy = 0
         left = 0
+        if not isinstance(s, unicode):
+            s = s.decode()
         for c in s:
             if c == '\n': continue
-            wx, name, bbox = self._metrics[ord(c)]
+            name = uni2type1.get(ord(c), 'question')
+            try:
+                wx, bbox = self._metrics_by_name[name]
+            except KeyError:
+                name = 'question'
+                wx, bbox = self._metrics_by_name[name]
             l,b,w,h = bbox
             if l<left: left = l
             # find the width with kerning
             try: kp = self._kern[ (namelast, name) ]
             except KeyError: kp = 0
             totalw += wx + kp
-            
+
             # find the max y
             thismax = b+h
             if thismax>maxy: maxy = thismax
@@ -337,14 +369,21 @@ class AFM:
             thismin = b
             if thismin<miny: miny = thismin
 
-        return left, miny, totalw, maxy-miny
+        return left, miny, totalw, maxy-miny, -miny
 
 
-    def get_name_char(self, c):
+    def get_str_bbox(self, s):
+        """
+        Return the string bounding box
+        """
+        return self.get_str_bbox_and_descent(s)[:4]
+    
+    def get_name_char(self, c, isord=False):
         """
         Get the name of the character, ie, ';' is 'semicolon'
         """
-        wx, name, bbox = self._metrics[ord(c)]
+        if not isord: c=ord(c)
+        wx, name, bbox = self._metrics[c]
         return name
 
     def get_width_char(self, c, isord=False):
@@ -356,6 +395,13 @@ class AFM:
         wx, name, bbox = self._metrics[c]
         return wx
 
+    def get_width_from_char_name(self, name):
+        """
+        Get the width of the character from a type1 character name
+        """
+        wx, bbox = self._metrics_by_name[name]
+        return wx
+        
     def get_height_char(self, c, isord=False):
         """
         Get the height of character c from the bounding box.  This is
@@ -371,9 +417,16 @@ class AFM:
         c2
         """
         name1, name2 = self.get_name_char(c1), self.get_name_char(c2)
-        try: return self._kern[ (name1, name2) ]
-        except: return 0        
+        return self.get_kern_dist_from_name(name1, name2)
 
+    def get_kern_dist_from_name(self, name1, name2):
+        """
+        Return the kerning pair distance (possibly 0) for chars c1 and
+        c2
+        """
+        try: return self._kern[ (name1, name2) ]
+        except: return 0
+        
     def get_fontname(self):
         "Return the font name, eg, Times-Roman"
         return self._header['FontName']
@@ -385,7 +438,7 @@ class AFM:
     def get_familyname(self):
         "Return the font family name, eg, Times"
         return self._header['FamilyName']
-    
+
     def get_weight(self):
         "Return the font weight, eg, 'Bold' or 'Roman'"
         return self._header['Weight']
@@ -394,7 +447,32 @@ class AFM:
         "Return the fontangle as float"
         return self._header['ItalicAngle']
 
+    def get_capheight(self):
+        "Return the cap height as float"
+        return self._header['CapHeight']
 
+    def get_xheight(self):
+        "Return the xheight as float"
+        return self._header['XHeight']
+
+    def get_underline_thickness(self):
+        "Return the underline thickness as float"
+        return self._header['UnderlineThickness']
+
+    def get_horizontal_stem_width(self):
+        """
+        Return the standard horizontal stem width as float, or None if
+        not specified in AFM file.
+        """
+        return self._header.get('StdHW', None)
+
+    def get_vertical_stem_width(self):
+        """
+        Return the standard vertical stem width as float, or None if
+        not specified in AFM file.
+        """
+        return self._header.get('StdVW', None)
+    
 
 if __name__=='__main__':
     #pathname = '/usr/local/lib/R/afm/'
@@ -406,4 +484,4 @@ if __name__=='__main__':
         w,h =  afm.string_width_height('John Hunter is the Man!')
 
 
-            
+

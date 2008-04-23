@@ -11,7 +11,6 @@ usage:
 """
 from pylab import *
 
-rc('text', usetex=True)
 rates_to_bases={'r1':'AT', 'r2':'TA', 'r3':'GA','r4':'AG','r5':'CA','r6':'AC', \
             'r7':'GT', 'r8':'TG', 'r9':'CT','r10':'TC','r11':'GC','r12':'CG'}
 numbered_bases_to_rates = dict([(v,k) for k, v in rates_to_bases.items()])
@@ -205,7 +204,7 @@ def make_arrow_plot(data, size=4, display='length', shape='right', \
 
 
         M = array([[cx, sx],[-sx,cx]])
-        coords = matrixmultiply(orig_position, M) + [[x_pos, y_pos]]
+        coords = dot(orig_position, M) + [[x_pos, y_pos]]
         x, y = ravel(coords)
         orig_label = rate_labels[pair]
         label = '$%s_{_{\mathrm{%s}}}$' % (orig_label[0], orig_label[1:])
@@ -280,6 +279,7 @@ sample_data = {
 
 if __name__ == '__main__':
     from sys import argv
+    d = None
     if len(argv) > 1:
         if argv[1] == 'full':
             d = all_on_max
@@ -293,7 +293,7 @@ if __name__ == '__main__':
         elif argv[1] == 'sample':
             d = sample_data
             scaled = True
-    else:
+    if d is None:
         d = all_on_max
         scaled=False
     if len(argv) > 2:
@@ -308,6 +308,6 @@ if __name__ == '__main__':
         normalize_data=scaled, head_starts_at_zero=True, size=size)
 
     draw()
-    savefig('arrows.png')
-    print 'Example saved to file "arrows.png"'
+    #savefig('arrows.png')
+    #print 'Example saved to file "arrows.png"'
     show()

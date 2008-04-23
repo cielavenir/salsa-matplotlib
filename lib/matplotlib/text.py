@@ -2,71 +2,23 @@
 Figure and Axes text
 """
 from __future__ import division
-import re
+import re, math
+
+import numpy as npy
+
+import matplotlib
 from matplotlib import verbose
 from matplotlib import cbook
-import matplotlib
-import math
+from matplotlib import rcParams
+import artist
 from artist import Artist
 from cbook import enumerate, is_string_like, maxdict, is_numlike
 from font_manager import FontProperties
-from matplotlib import rcParams
 from patches import bbox_artist, YAArrow
-from numerix import sin, cos, pi, cumsum, dot, asarray, array, \
-     where, nonzero, equal, sqrt
 from transforms import lbwh_to_bbox, bbox_all, identity_transform
 from lines import Line2D
 
 import matplotlib.nxutils as nxutils
-import artist
-
-def scanner(s):
-    """
-    Split a string into mathtext and non-mathtext parts.  mathtext is
-    surrounded by $ symbols.  quoted \$ are ignored
-
-    All slash quotes dollar signs are ignored
-
-    The number of unquoted dollar signs must be even
-
-    Return value is a list of (substring, inmath) tuples
-    """
-    if not len(s): return [(s, False)]
-    #print 'testing', s, type(s)
-    inddollar = nonzero(asarray(equal(s,'$')))
-    quoted = dict([ (ind,1) for ind in nonzero(asarray(equal(s,'\\')))])
-    indkeep = [ind for ind in inddollar if not quoted.has_key(ind-1)]
-    if len(indkeep)==0:
-        return [(s, False)]
-    if len(indkeep)%2:
-        raise ValueError('Illegal string "%s" (must have balanced dollar signs)'%s)
-
-    Ns = len(s)
-
-    indkeep = [ind for ind in indkeep]
-    # make sure we start with the first element
-    if indkeep[0]!=0: indkeep.insert(0,0)
-    # and end with one past the end of the string
-    indkeep.append(Ns+1)
-
-    Nkeep = len(indkeep)
-    results = []
-
-    inmath = s[0] == '$'
-    for i in range(Nkeep-1):
-        i0, i1 = indkeep[i], indkeep[i+1]
-        if not inmath:
-            if i0>0: i0 +=1
-        else:
-            i1 += 1
-        if i0>=Ns: break
-
-        results.append((s[i0:i1], inmath))
-        inmath = not inmath
-
-    return results
-
-
 
 def _process_text_args(override, fontdict=None, **kwargs):
     "Return an override dict.  See 'text' docstring for info"
@@ -94,45 +46,46 @@ _unit_box = lbwh_to_bbox(0,0,1,1)
 # class is build so we define an initial set here for the init
 # function and they will be overridden after object defn
 artist.kwdocd['Text'] =  """\
-            alpha: float
-            animated: [True | False]
-            backgroundcolor: any matplotlib color
-            bbox: rectangle prop dict plus key 'pad' which is a pad in points
-            clip_box: a matplotlib.transform.Bbox instance
-            clip_on: [True | False]
-            color: any matplotlib color
-            family: [ 'serif' | 'sans-serif' | 'cursive' | 'fantasy' | 'monospace' ]
-            figure: a matplotlib.figure.Figure instance
-            fontproperties: a matplotlib.font_manager.FontProperties instance
-            horizontalalignment or ha: [ 'center' | 'right' | 'left' ]
-            label: any string
-            lod: [True | False]
-            multialignment: ['left' | 'right' | 'center' ]
-            name or fontname: string eg, ['Sans' | 'Courier' | 'Helvetica' ...]
-            position: (x,y)
-            rotation: [ angle in degrees 'vertical' | 'horizontal'
-            size or fontsize: [ size in points | relative size eg 'smaller', 'x-large' ]
-            style or fontstyle: [ 'normal' | 'italic' | 'oblique']
-            text: string
-            transform: a matplotlib.transform transformation instance
-            variant: [ 'normal' | 'small-caps' ]
-            verticalalignment or va: [ 'center' | 'top' | 'bottom' ]
-            visible: [True | False]
-            weight or fontweight: [ 'normal' | 'bold' | 'heavy' | 'light' | 'ultrabold' | 'ultralight']
-            x: float
-            y: float
-            zorder: any number
-            """
+    alpha: float
+    animated: [True | False]
+    backgroundcolor: any matplotlib color
+    bbox: rectangle prop dict plus key 'pad' which is a pad in points
+    clip_box: a matplotlib.transform.Bbox instance
+    clip_on: [True | False]
+    color: any matplotlib color
+    family: [ 'serif' | 'sans-serif' | 'cursive' | 'fantasy' | 'monospace' ]
+    figure: a matplotlib.figure.Figure instance
+    fontproperties: a matplotlib.font_manager.FontProperties instance
+    horizontalalignment or ha: [ 'center' | 'right' | 'left' ]
+    label: any string
+    linespacing: float
+    lod: [True | False]
+    multialignment: ['left' | 'right' | 'center' ]
+    name or fontname: string eg, ['Sans' | 'Courier' | 'Helvetica' ...]
+    position: (x,y)
+    rotation: [ angle in degrees 'vertical' | 'horizontal'
+    size or fontsize: [ size in points | relative size eg 'smaller', 'x-large' ]
+    style or fontstyle: [ 'normal' | 'italic' | 'oblique']
+    text: string
+    transform: a matplotlib.transform transformation instance
+    variant: [ 'normal' | 'small-caps' ]
+    verticalalignment or va: [ 'center' | 'top' | 'bottom' | 'baseline' ]
+    visible: [True | False]
+    weight or fontweight: [ 'normal' | 'bold' | 'heavy' | 'light' | 'ultrabold' | 'ultralight']
+    x: float
+    y: float
+    zorder: any number
+    """
 
 class Text(Artist):
     """
     Handle storing and drawing of text in window or data coordinates
 
     """
-    # special case superscripting to speedup logplots
-    _rgxsuper = re.compile('\$([\-+0-9]+)\^\{(-?[0-9]+)\}\$')
-
     zorder = 3
+    def __str__(self):
+        return "Text(%g,%g,%s)"%(self._y,self._y,self._text)
+
     def __init__(self,
                  x=0, y=0, text='',
                  color=None,          # defaults to rc params
@@ -141,11 +94,14 @@ class Text(Artist):
                  multialignment=None,
                  fontproperties=None, # defaults to FontProperties()
                  rotation=None,
+                 linespacing=None,
                  **kwargs
                  ):
         """
-        Create a Text instance at x,y with string text.  Valid kwargs are
-            %(Text)s
+        Create a Text instance at x,y with string text.
+
+        Valid kwargs are
+        %(Text)s
         """
 
         Artist.__init__(self)
@@ -154,9 +110,10 @@ class Text(Artist):
 
         if color is None: color = rcParams['text.color']
         if fontproperties is None: fontproperties=FontProperties()
+        elif is_string_like(fontproperties): fontproperties=FontProperties(fontproperties)
 
-        self.set_color(color)
         self.set_text(text)
+        self.set_color(color)
         self._verticalalignment = verticalalignment
         self._horizontalalignment = horizontalalignment
         self._multialignment = multialignment
@@ -164,30 +121,32 @@ class Text(Artist):
         self._fontproperties = fontproperties
         self._bbox = None
         self._renderer = None
+        if linespacing is None:
+            linespacing = 1.2   # Maybe use rcParam later.
+        self._linespacing = linespacing
         self.update(kwargs)
         #self.set_bbox(dict(pad=0))
     __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
-    def pick(self, mouseevent):
+    def contains(self,mouseevent):
+        """Test whether the mouse event occurred in the patch.
+
+        Returns T/F, {}
         """
-        if the mouse click is inside the vertices defining the
-        bounding box of the text, fire off a backend_bases.PickEvent
-        """
-        if not self.pickable(): return
-        picker = self.get_picker()
-        if callable(picker):
-            hit, props = picker(self, mouseevent)
-            if hit:
-                self.figure.canvas.pick_event(mouseevent, self, **props)
-        elif picker:
+        if callable(self._contains): return self._contains(self,mouseevent)
+
+        try:
             l,b,w,h = self.get_window_extent().get_bounds()
-            r = l+w
-            t = b+h
-            xyverts = (l,b), (l, t), (r, t), (r, b)
-            x, y = mouseevent.x, mouseevent.y
-            inside = nxutils.pnpoly(x, y, xyverts)
-            if inside:
-                self.figure.canvas.pick_event(mouseevent, self)
+        except:
+            # TODO: why does this error occur
+            #print str(self),"error looking at get_window_extent"
+            return False,{}
+        r = l+w
+        t = b+h
+        xyverts = (l,b), (l, t), (r, t), (r, b)
+        x, y = mouseevent.x, mouseevent.y
+        inside = nxutils.pnpoly(x, y, xyverts)
+        return inside,{}
 
     def _get_xy_display(self):
         'get the (possibly unit converted) transformed x,y in display coords'
@@ -200,20 +159,7 @@ class Text(Artist):
 
     def get_rotation(self):
         'return the text angle as float'
-        #return 0
-
-#         if self._rotation in ('horizontal', None):
-#             angle = 0.
-#         elif self._rotation == 'vertical':
-#             angle = 90.
-#         else:
-#             angle = float(self._rotation)
-#         return angle%360
-
-        # Since the get_rotation logic was extracted
-        # into a function for TextWithDash, this
-        # method could now read as follows.
-        return get_rotation(self._rotation)
+        return get_rotation(self._rotation)  # string_or_number -> number
 
     def update_from(self, other):
         'Copy properties from other to self'
@@ -225,6 +171,7 @@ class Text(Artist):
         self._fontproperties = other._fontproperties.copy()
         self._rotation = other._rotation
         self._picker = other._picker
+        self._linespacing = other._linespacing
 
     def _get_layout(self, renderer):
 
@@ -234,30 +181,29 @@ class Text(Artist):
         key = self.get_prop_tup()
         if self.cached.has_key(key): return self.cached[key]
         horizLayout = []
-        pad =2
         thisx, thisy = self._get_xy_display()
         width = 0
         height = 0
 
         xmin, ymin = thisx, thisy
-        if self.is_math_text():
-            lines = [self._text]
-        else:
-            lines = self._text.split('\n')
+        lines = self._text.split('\n')
 
         whs = []
-        tmp, heightt = renderer.get_text_width_height(
-                'T', self._fontproperties, ismath=False)
+        # Find full vertical extent of font,
+        # including ascenders and descenders:
+        tmp, heightt, bl = renderer.get_text_width_height_descent(
+                'lp', self._fontproperties, ismath=False)
+        offsety = heightt * self._linespacing
 
-        heightt += 3  # 3 pixel pad
+        baseline = None
         for line in lines:
-            w,h = renderer.get_text_width_height(
-                line, self._fontproperties, ismath=self.is_math_text())
-
+            w, h, d = renderer.get_text_width_height_descent(
+                line, self._fontproperties, ismath=self.is_math_text(line))
+            if baseline is None:
+                baseline = h - d
             whs.append( (w,h) )
-            offsety = heightt+pad
             horizLayout.append((line, thisx, thisy, w, h))
-            thisy -= offsety  # now translate down by text height, window coords
+            thisy -= offsety
             width = max(width, w)
 
         ymin = horizLayout[-1][2]
@@ -285,7 +231,7 @@ class Text(Artist):
 
         # now rotate the bbox
 
-        cornersRotated = [dot(M,array([[thisx],[thisy],[1]])) for thisx, thisy in cornersHoriz]
+        cornersRotated = [npy.dot(M,npy.array([[thisx],[thisy],[1]])) for thisx, thisy in cornersHoriz]
 
         txs = [float(v[0][0]) for v in cornersRotated]
         tys = [float(v[1][0]) for v in cornersRotated]
@@ -310,6 +256,7 @@ class Text(Artist):
 
         if valign=='center': offsety = ty - (ymin + height/2.0)
         elif valign=='top': offsety  = ty - (ymin + height)
+        elif valign=='baseline': offsety = ty - (ymin + height) + baseline
         else: offsety = ty - ymin
 
         xmin += offsetx
@@ -321,7 +268,7 @@ class Text(Artist):
 
 
         # now rotate the positions around the first x,y position
-        xys = [dot(M,array([[thisx],[thisy],[1]])) for thisx, thisy in offsetLayout]
+        xys = [npy.dot(M,npy.array([[thisx],[thisy],[1]])) for thisx, thisy in offsetLayout]
 
 
         tx = [float(v[0][0])+offsetx for v in xys]
@@ -367,49 +314,9 @@ class Text(Artist):
             bbox_artist(self, renderer, self._bbox)
         angle = self.get_rotation()
 
-        ismath = self.is_math_text()
-
-        if angle==0:
-            #print 'text', self._text
-            if ismath=='TeX': m = None
-            else: m = self._rgxsuper.match(self._text)
-            if m is not None:
-                bbox, info = self._get_layout_super(self._renderer, m)
-                base, xt, yt = info[0]
-                renderer.draw_text(gc, xt, yt, base,
-                                   self._fontproperties, angle,
-                                   ismath=False)
-
-                exponent, xt, yt, fp = info[1]
-                renderer.draw_text(gc, xt, yt, exponent,
-                                   fp, angle,
-                                   ismath=False)
-                return
-
-
-        if len(self._substrings)>1:
-            # embedded mathtext
-            thisx, thisy = self._get_xy_display()
-
-            for s,ismath in self._substrings:
-                w, h = renderer.get_text_width_height(
-                    s, self._fontproperties, ismath)
-
-                renderx, rendery = thisx, thisy
-                if renderer.flipy():
-                    canvasw, canvash = renderer.get_canvas_width_height()
-                    rendery = canvash-rendery
-
-                renderer.draw_text(gc, renderx, rendery, s,
-                                   self._fontproperties, angle,
-                                   ismath)
-                thisx += w
-
-
-            return
         bbox, info = self._get_layout(renderer)
         trans = self.get_transform()
-        if ismath=='TeX':
+        if rcParams['text.usetex']:
             canvasw, canvash = renderer.get_canvas_width_height()
             for line, wh, x, y in info:
                 x, y = trans.xy_tup((x, y))
@@ -429,7 +336,7 @@ class Text(Artist):
 
             renderer.draw_text(gc, x, y, line,
                                self._fontproperties, angle,
-                               ismath=self.is_math_text())
+                               ismath=self.is_math_text(line))
 
     def get_color(self):
         "Return the color of the text"
@@ -480,6 +387,11 @@ class Text(Artist):
         "Return the horizontal alignment as string"
         return self._horizontalalignment
 
+
+    def _get_xy_display(self):
+        'get the (possibly unit converted) transformed x,y in display coords'
+        return self.get_transform().xy_tup((self._x, self._y))
+
     def get_position(self):
         "Return x, y as tuple"
         x = float(self.convert_xunits(self._x))
@@ -526,13 +438,6 @@ class Text(Artist):
             raise RuntimeError('Cannot get window extent w/o renderer')
 
         angle = self.get_rotation()
-        if angle==0:
-            ismath = self.is_math_text()
-            if ismath=='TeX': m = None
-            else: m = self._rgxsuper.match(self._text)
-            if m is not None:
-                bbox, tmp = self._get_layout_super(self._renderer, m)
-                return bbox
         bbox, info = self._get_layout(self._renderer)
         return bbox
 
@@ -540,24 +445,24 @@ class Text(Artist):
 
     def get_rotation_matrix(self, x0, y0):
 
-        theta = pi/180.0*self.get_rotation()
+        theta = npy.pi/180.0*self.get_rotation()
         # translate x0,y0 to origin
-        Torigin = array([ [1, 0, -x0],
+        Torigin = npy.array([ [1, 0, -x0],
                            [0, 1, -y0],
                            [0, 0, 1  ]])
 
         # rotate by theta
-        R = array([ [cos(theta),  -sin(theta), 0],
-                     [sin(theta), cos(theta), 0],
+        R = npy.array([ [npy.cos(theta),  -npy.sin(theta), 0],
+                     [npy.sin(theta), npy.cos(theta), 0],
                      [0,           0,          1]])
 
         # translate origin back to x0,y0
-        Tback = array([ [1, 0, x0],
+        Tback = npy.array([ [1, 0, x0],
                          [0, 1, y0],
                          [0, 0, 1  ]])
 
 
-        return dot(dot(Tback,R), Torigin)
+        return npy.dot(npy.dot(Tback,R), Torigin)
 
     def set_backgroundcolor(self, color):
         """
@@ -619,6 +524,15 @@ class Text(Artist):
             raise ValueError('Horizontal alignment must be one of %s' % str(legal))
         self._multialignment = align
 
+    def set_linespacing(self, spacing):
+        """
+        Set the line spacing as a multiple of the font size.
+        Default is 1.2.
+
+        ACCEPTS: float
+        """
+        self._linespacing = spacing
+
     def set_family(self, fontname):
         """
         Set the font family
@@ -641,11 +555,11 @@ class Text(Artist):
 
         ACCEPTS: string eg, ['Sans' | 'Courier' | 'Helvetica' ...]
         """
-        self._fontproperties.set_name(fontname)
+        self._fontproperties.set_family(fontname)
 
     def set_fontname(self, fontname):
         'alias for set_name'
-        self.set_name(fontname)
+        self.set_family(fontname)
 
     def set_style(self, fontstyle):
         """
@@ -728,9 +642,9 @@ class Text(Artist):
         """
         Set the vertical alignment
 
-        ACCEPTS: [ 'center' | 'top' | 'bottom' ]
+        ACCEPTS: [ 'center' | 'top' | 'bottom' | 'baseline' ]
         """
-        legal = ('top', 'bottom', 'center')
+        legal = ('top', 'bottom', 'center', 'baseline')
         if align not in legal:
             raise ValueError('Vertical alignment must be one of %s' % str(legal))
 
@@ -743,15 +657,17 @@ class Text(Artist):
         ACCEPTS: string or anything printable with '%s' conversion
         """
         self._text = '%s' % (s,)
-        #self._substrings = scanner(s)  # support embedded mathtext
-        self._substrings = []           # ignore embedded mathtext for now
 
-    def is_math_text(self):
+    def is_math_text(self, s):
         if rcParams['text.usetex']: return 'TeX'
-        if not matplotlib._havemath: return False
-        if len(self._text)<2: return False
-        return ( self._text.startswith('$') and
-                 self._text.endswith('$') )
+
+        # Did we find an even number of non-escaped dollar signs?
+        # If so, treat is as math text.
+        dollar_count = s.count(r'$') - s.count(r'\$')
+        if dollar_count > 0 and dollar_count % 2 == 0:
+            return True
+
+        return False
 
     def set_fontproperties(self, fp):
         """
@@ -759,61 +675,11 @@ class Text(Artist):
 
         ACCEPTS: a matplotlib.font_manager.FontProperties instance
         """
+        if is_string_like(fp):
+            fp = FontProperties(fp)
         self._fontproperties = fp
 
-
-
-
-    def _get_layout_super(self, renderer, m):
-        """
-        a special case optimization if a log super and angle = 0
-        Basically, mathtext is slow and we can do simple superscript layout "by hand"
-        """
-
-        key = self.get_prop_tup()
-        if self.cached.has_key(key): return self.cached[key]
-
-        base, exponent = m.group(1), m.group(2)
-        size =  self._fontproperties.get_size_in_points()
-        fpexp = self._fontproperties.copy()
-        fpexp.set_size(0.7*size)
-        wb,hb = renderer.get_text_width_height(base, self._fontproperties, False)
-        we,he = renderer.get_text_width_height(exponent, fpexp, False)
-
-        w = wb+we
-
-        xb, yb = self._get_xy_display()
-        xe = xb+1.1*wb
-        ye = yb+0.5*hb
-        h = ye+he-yb
-
-
-
-
-        if self._horizontalalignment=='center':  xo = -w/2.
-        elif self._horizontalalignment=='right':  xo = -w
-        else: xo = 0
-        if self._verticalalignment=='center':    yo = -hb/2.
-        elif self._verticalalignment=='top':  yo = -hb
-        else: yo = 0
-
-        xb += xo
-        yb += yo
-        xe += xo
-        ye += yo
-        bbox = lbwh_to_bbox(xb, yb, w, h)
-
-        if renderer.flipy():
-            canvasw, canvash = renderer.get_canvas_width_height()
-            yb = canvash-yb
-            ye = canvash-ye
-
-
-        val = ( bbox, ((base, xb, yb), (exponent, xe, ye, fpexp)))
-        self.cached[key] = val
-
-        return val
-
+artist.kwdocd['Text'] = artist.kwdoc(Text)
 
 
 class TextWithDash(Text):
@@ -831,7 +697,7 @@ class TextWithDash(Text):
     dashlength is the length of the dash in canvas units.
     (default=0.0).
 
-    dashdirection is one of 0 or 1, where 0 draws the dash
+    dashdirection is one of 0 or 1, npy.where 0 draws the dash
     after the text and 1 before.
     (default=0).
 
@@ -865,6 +731,8 @@ class TextWithDash(Text):
     """
     __name__ = 'textwithdash'
 
+    def __str__(self):
+        return "TextWithDash(%g,%g,%s)"%(self._x,self._y,self._text)
     def __init__(self,
                  x=0, y=0, text='',
                  color=None,          # defaults to rc params
@@ -873,6 +741,7 @@ class TextWithDash(Text):
                  multialignment=None,
                  fontproperties=None, # defaults to FontProperties()
                  rotation=None,
+                 linespacing=None,
                  dashlength=0.0,
                  dashdirection=0,
                  dashrotation=None,
@@ -885,7 +754,9 @@ class TextWithDash(Text):
                       verticalalignment=verticalalignment,
                       horizontalalignment=horizontalalignment,
                       multialignment=multialignment,
-                      fontproperties=fontproperties, rotation=rotation)
+                      fontproperties=fontproperties,
+                      rotation=rotation,
+                      linespacing=linespacing)
 
         # The position (x,y) values for text and dashline
         # are bogus as given in the instantiation; they will
@@ -906,7 +777,26 @@ class TextWithDash(Text):
 
         #self.set_bbox(dict(pad=0))
 
+    def get_position(self):
+        "Return x, y as tuple"
+        x = float(self.convert_xunits(self._dashx))
+        y = float(self.convert_yunits(self._dashy))
+        return x, y
+
+    def get_prop_tup(self):
+        """
+        Return a hashable tuple of properties
+
+        Not intended to be human readable, but useful for backends who
+        want to cache derived information about text (eg layouts) and
+        need to know if the text has changed
+        """
+        props = [p for p in Text.get_prop_tup(self)]
+        props.extend([self._x, self._y, self._dashlength, self._dashdirection, self._dashrotation, self._dashpad, self._dashpush])
+        return tuple(props)
+
     def draw(self, renderer):
+        self.cached = dict()
         self.update_coords(renderer)
         Text.draw(self, renderer)
         if self.get_dashlength() > 0.0:
@@ -932,15 +822,15 @@ class TextWithDash(Text):
         dashpush = self.get_dashpush()
 
         angle = get_rotation(dashrotation)
-        theta = pi*(angle/180.0+dashdirection-1)
-        cos_theta, sin_theta = cos(theta), sin(theta)
+        theta = npy.pi*(angle/180.0+dashdirection-1)
+        cos_theta, sin_theta = npy.cos(theta), npy.sin(theta)
 
         transform = self.get_transform()
 
         # Compute the dash end points
         # The 'c' prefix is for canvas coordinates
-        cxy = array(transform.xy_tup((dashx, dashy)))
-        cd = array([cos_theta, sin_theta])
+        cxy = npy.array(transform.xy_tup((dashx, dashy)))
+        cd = npy.array([cos_theta, sin_theta])
         c1 = cxy+dashpush*cd
         c2 = cxy+(dashpush+dashlength)*cd
 
@@ -978,11 +868,15 @@ class TextWithDash(Text):
             if dy > h or dy < -h:
                 dy = h
                 dx = h/tan_theta
-        cwd = array([dx, dy])/2
-        cwd *= 1+dashpad/sqrt(dot(cwd,cwd))
+        cwd = npy.array([dx, dy])/2
+        cwd *= 1+dashpad/npy.sqrt(npy.dot(cwd,cwd))
         cw = c2+(dashdirection*2-1)*cwd
 
-        self._x, self._y = transform.inverse_xy_tup(tuple(cw))
+
+
+        newx, newy = transform.inverse_xy_tup(tuple(cw))
+
+        self._x, self._y = newx, newy
 
         # Now set the window extent
         # I'm not at all sure this is the right way to do this.
@@ -1066,9 +960,6 @@ class TextWithDash(Text):
         """
         self._dashpush = dp
 
-    def get_position(self):
-        "Return x, y as tuple"
-        return self._dashx, self._dashy
 
     def set_position(self, xy):
         """
@@ -1117,15 +1008,18 @@ class TextWithDash(Text):
         Text.set_figure(self, fig)
         self.dashline.set_figure(fig)
 
+artist.kwdocd['TextWithDash'] = artist.kwdoc(TextWithDash)
 
 class Annotation(Text):
     """
     A Text class to make annotating things in the figure: Figure,
     Axes, Point, Rectangle, etc... easier
     """
+    def __str__(self):
+        return "Annotation(%g,%g,%s)"%(self.xy[0],self.xy[1],self._text)
     def __init__(self, s, xy,
-                 xycoords='data',
                  xytext=None,
+                 xycoords='data',
                  textcoords=None,
                  arrowprops=None,
                  **kwargs):
@@ -1149,7 +1043,7 @@ class Annotation(Text):
             endpoints.  ie, shrink=0.05 is 5%%
           - any key for matplotlib.patches.polygon
 
-        xycoords and textcoords are a string that indicates the
+        xycoords and textcoords are strings that indicate the
         coordinates of xy and xytext.
 
            'figure points'   : points from the lower left corner of the figure
@@ -1158,6 +1052,7 @@ class Annotation(Text):
            'axes pixels'     : pixels from lower left corner of axes
            'axes fraction'   : 0,1 is lower left of axes and 1,1 is upper right
            'data'            : use the coordinate system of the object being annotated (default)
+           'offset points'     : Specify an offset (in points) from the xy value
            'polar'           : you can specify theta, r for the annotation, even
                                in cartesian plots.  Note that if you
                                are using a polar axes, you do not need
@@ -1174,7 +1069,7 @@ class Annotation(Text):
 
         Additional kwargs are Text properties:
 
-          %(Text)s
+        %(Text)s
 
         """
         if xytext is None:
@@ -1191,6 +1086,14 @@ class Annotation(Text):
         self.textcoords = textcoords
     __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
+    def contains(self,event):
+        t,tinfo = Text.contains(self,event)
+        if self.arrow is not None:
+            a,ainfo=self.arrow.contains(event)
+            t = t or a
+        return t,tinfo
+
+
     def set_clip_box(self, clipbox):
         """
         Set the artist's clip Bbox
@@ -1202,11 +1105,33 @@ class Annotation(Text):
     def _get_xy(self, x, y, s):
         if s=='data':
             trans = self.axes.transData
+            x = float(self.convert_xunits(x))
+            y = float(self.convert_yunits(y))
             return trans.xy_tup((x,y))
+        elif s=='offset points':
+            # convert the data point
+            dx, dy = self.xy
+
+            # prevent recursion
+            if self.xycoords == 'offset points':
+               return self._get_xy(dx, dy, 'data')
+
+            dx, dy = self._get_xy(dx, dy, self.xycoords)
+
+            # convert the offset
+            dpi = self.figure.dpi.get()
+            x *= dpi/72.
+            y *= dpi/72.
+
+            # add the offset to the data point
+            x += dx
+            y += dy
+
+            return x, y
         elif s=='polar':
             theta, r = x, y
-            x = r*cos(theta)
-            y = r*sin(theta)
+            x = r*npy.cos(theta)
+            y = r*npy.sin(theta)
             trans = self.axes.transData
             return trans.xy_tup((x,y))
         elif s=='figure points':
@@ -1326,6 +1251,4 @@ class Annotation(Text):
         Text.draw(self, renderer)
 
 
-artist.kwdocd['Text'] = artist.kwdoc(Text)
-artist.kwdocd['TextWithDash'] = artist.kwdoc(TextWithDash)
-artist.kwdocd['Annotation'] = artist.kwdoc(Annotation)
+artist.kwdocd['Annotation'] = Annotation.__init__.__doc__

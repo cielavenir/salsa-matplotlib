@@ -2,25 +2,26 @@
 """
 pcolormesh uses a QuadMesh, a faster generalization of pcolor, but
 with some restrictions.
+
+This demo illustrates a bug in quadmesh with masked data.
 """
 
-from matplotlib.mlab import linspace, meshgrid
-import matplotlib.numerix as nx
-from pylab import figure,show
-import matplotlib.numerix.ma as ma
+import numpy as npy
+from matplotlib.pyplot import figure, show
 from matplotlib import cm, colors
+from matplotlib.numerix import npyma as ma
 
 n = 56
-x = linspace(-1.5,1.5,n)
-X,Y = meshgrid(x,x);
-Qx = nx.cos(Y) - nx.cos(X)
-Qz = nx.sin(Y) + nx.sin(X)
+x = npy.linspace(-1.5,1.5,n)
+X,Y = npy.meshgrid(x,x);
+Qx = npy.cos(Y) - npy.cos(X)
+Qz = npy.sin(Y) + npy.sin(X)
 Qx = (Qx + 1.1)
-Z = nx.sqrt(X**2 + Y**2)/5;
-Z = (Z - nx.mlab.amin(Z)) / (nx.mlab.amax(Z) - nx.mlab.amin(Z))
+Z = npy.sqrt(X**2 + Y**2)/5;
+Z = (Z - Z.min()) / (Z.max() - Z.min())
 
 # The color array can include masked values:
-Zm = ma.masked_where(nx.fabs(Qz) < 0.5*nx.mlab.amax(Qz), Z)
+Zm = ma.masked_where(npy.fabs(Qz) < 0.5*npy.amax(Qz), Z)
 
 
 fig = figure()

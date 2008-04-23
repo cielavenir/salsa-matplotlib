@@ -12,7 +12,7 @@ import text
 from colors import Normalize
 from cm import jet
 
-import numerix as nx
+import numpy as npy
 import proj3d
 
 class Wrap2D:
@@ -254,8 +254,8 @@ class Poly3DCollection(Wrap2D):
             segis.append((si,ei))
             si = ei
         xs,ys,zs = zip(*points)
-        ones = nx.ones(len(xs))
-        self.vec = nx.array([xs,ys,zs,ones])
+        ones = npy.ones(len(xs))
+        self.vec = npy.array([xs,ys,zs,ones])
         self.segis = segis
 
     def draw3d(self, renderer):
@@ -327,7 +327,7 @@ def image_draw(image,renderer):
     source = image._A
     w,h,p = source.shape
     X,Y = meshgrid(arange(w),arange(h))
-    Z = zeros((w,h))
+    Z = npy.zeros((w,h))
     tX,tY,tZ = proj3d.transform(X.flat,Y.flat,Z.flat,M)
     tX = reshape(tX,(w,h))
     tY = reshape(tY,(w,h))
@@ -369,7 +369,7 @@ def zalpha(colors, zs):
     """Modify the alphas of the color list according to depth"""
     colors = get_colors(colors,len(zs))
     norm = Normalize(min(zs),max(zs))
-    sats = 1 - norm(zs)*0.7 
+    sats = 1 - norm(zs)*0.7
     colors = [(c[0],c[1],c[2],c[3]*s) for c,s in zip(colors,sats)]
     return colors
 

@@ -20,6 +20,7 @@ import sys, os, struct
 from matplotlib import rcParams, verbose
 
 which = None, None
+use_maskedarray = None
 
 # First, see if --numarray or --Numeric was specified on the command
 # line:
@@ -30,14 +31,25 @@ for a in sys.argv:
              "--NumPy", "--numpy", "--NUMPY", "--Numpy",
              ]:
         which = a[2:], "command line"
-        break
-    del a
+    if a == "--maskedarray":
+        use_maskedarray = True
+    if a == "--ma":
+        use_maskedarray = False
+
+try: del a
+except NameError: pass
 
 if which[0] is None:
     try:  # In theory, rcParams always has *some* value for numerix.
         which = rcParams['numerix'], "rc"
     except KeyError:
         pass
+
+if use_maskedarray is None:
+    try:
+        use_maskedarray = rcParams['maskedarray']
+    except KeyError:
+        use_maskedarray = False
 
 # If all the above fail, default to Numeric. Most likely not used.
 if which[0] is None:
@@ -51,7 +63,7 @@ if which[0] == "numarray":
     import warnings
     warnings.warn("numarray use as a numerix backed for matplotlib is deprecated",
                   DeprecationWarning, stacklevel=1)
-    
+
     #from na_imports import *
     from numarray import *
     from _na_imports import nx, inf, infinity, Infinity, Matrix, isnan, all
@@ -60,12 +72,12 @@ if which[0] == "numarray":
     import numarray
     version = 'numarray %s'%numarray.__version__
     nan = struct.unpack('d', struct.pack('Q', 0x7ff8000000000000))[0]
-        
+
 elif which[0] == "numeric":
     import warnings
     warnings.warn("Numeric use as a numerix backed for matplotlib is deprecated",
                   DeprecationWarning, stacklevel=1)
-    
+
     #from nc_imports import *
     from Numeric import *
     from _nc_imports import nx, inf, infinity, Infinity, isnan, all, any
@@ -73,9 +85,9 @@ elif which[0] == "numeric":
     import Numeric
     version = 'Numeric %s'%Numeric.__version__
     nan = struct.unpack('d', struct.pack('Q', 0x7ff8000000000000))[0]
-    
+
 elif which[0] == "numpy":
-    try:        
+    try:
         import numpy.oldnumeric as numpy
         from numpy.oldnumeric import *
     except ImportError:

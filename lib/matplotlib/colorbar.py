@@ -15,18 +15,17 @@ function is a thin wrapper over Figure.colorbar().
 
 '''
 
-import matplotlib.numerix as nx
-from matplotlib.mlab import meshgrid, linspace
-from matplotlib.numerix.mlab import amin, amax
-from matplotlib import colors, cm, ticker
-from matplotlib.cbook import iterable, is_string_like
-from matplotlib.transforms import Interval, Value, PBox
-from matplotlib.lines import Line2D
-from matplotlib.patches import Polygon
-from matplotlib import rcParams
-from matplotlib.collections import LineCollection
-from matplotlib.contour import ContourSet
-from matplotlib.axes import Axes
+import numpy as npy
+import matplotlib as mpl
+import matplotlib.colors as colors
+import matplotlib.cm as cm
+import matplotlib.ticker as ticker
+import matplotlib.cbook as cbook
+import matplotlib.transforms as transforms
+import matplotlib.lines as lines
+import matplotlib.patches as patches
+import matplotlib.collections as collections
+import matplotlib.contour as contour
 
 make_axes_kw_doc = '''
         fraction    = 0.15; fraction of original axes to use for colorbar
@@ -71,21 +70,27 @@ colormap_kw_doc = '''
 colorbar_doc = '''
 Add a colorbar to a plot.
 
-Function signatures:
+Function signatures for the pyplot interface; all but the first are
+also method signatures for the Figure.colorbar method:
 
     colorbar(**kwargs)
-
     colorbar(mappable, **kwargs)
+    colorbar(mappable, cax=cax, **kwargs)
+    colorbar(mappable, ax=ax, **kwargs)
 
-    colorbar(mappable, cax, **kwargs)
+    arguments:
+        mappable: the image, ContourSet, etc. to which the colorbar applies;
+                    this argument is mandatory for the Figure.colorbar
+                    method but optional for the pyplot.colorbar function,
+                    which sets the default to the current image.
 
-The optional arguments mappable and cax may be included in the kwargs;
-they are image, ContourSet, etc. to which the colorbar applies, and
-the axes object in which the colorbar will be drawn.  Defaults are
-the current image and a new axes object created next to that image
-after resizing the image.
+    keyword arguments:
+        cax: None | axes object into which the colorbar will be drawn
+        ax:  None | parent axes object from which space for a new
+                     colorbar axes will be stolen
 
-kwargs are in two groups:
+
+**kwargs are in two groups:
     axes properties:
 %s
     colorbar properties:
@@ -110,6 +115,18 @@ axes properties kwargs.
 
 class ColorbarBase(cm.ScalarMappable):
     '''
+    Draw a colorbar in an existing axes.
+
+    This is a base class for the Colorbar class, which is
+    the basis for the colorbar method and pylab function.
+
+    It is also useful by itself for showing a colormap.  If
+    the cmap kwarg is given but boundaries and values are left
+    as None, then the colormap will be displayed on a 0-1 scale.
+    To show the under- and over-value colors, specify the norm
+    as colors.Normalize(clip=False).
+    To show the colors versus index instead of on the 0-1 scale,
+    use norm=colors.NoNorm.
     '''
     _slice_dict = {'neither': slice(0,1000000),
                    'both': slice(1,-1),
@@ -144,7 +161,8 @@ class ColorbarBase(cm.ScalarMappable):
         self.filled = filled
         self.solids = None
         self.lines = None
-        if iterable(ticks):
+        self.set_label('')
+        if cbook.iterable(ticks):
             self.locator = ticker.FixedLocator(ticks, nbins=len(ticks))
         else:
             self.locator = ticks    # Handle default in _ticker()
@@ -153,7 +171,7 @@ class ColorbarBase(cm.ScalarMappable):
                 self.formatter = ticker.LogFormatter()
             else:
                 self.formatter = ticker.ScalarFormatter()
-        elif is_string_like(format):
+        elif cbook.is_string_like(format):
             self.formatter = ticker.FormatStrFormatter(format)
         else:
             self.formatter = format  # Assume it is a Formatter
@@ -168,10 +186,11 @@ class ColorbarBase(cm.ScalarMappable):
         self._process_values()
         self._find_range()
         X, Y = self._mesh()
-        C = self._values[:,nx.NewAxis]
+        C = self._values[:,npy.newaxis]
         self._config_axes(X, Y)
         if self.filled:
             self._add_solids(X, Y, C)
+        self._set_label()
 
     def _config_axes(self, X, Y):
         '''
@@ -181,14 +200,14 @@ class ColorbarBase(cm.ScalarMappable):
         ax.set_frame_on(False)
         ax.set_navigate(False)
         x, y = self._outline(X, Y)
-        ax.set_xlim(amin(x), amax(x))
-        ax.set_ylim(amin(y), amax(y))
+        ax.set_xlim(npy.amin(x), npy.amax(x))
+        ax.set_ylim(npy.amin(y), npy.amax(y))
         ax.update_datalim_numerix(x, y)
-        self.outline = Line2D(x, y, color=rcParams['axes.edgecolor'],
-                                    linewidth=rcParams['axes.linewidth'])
+        self.outline = lines.Line2D(x, y, color=mpl.rcParams['axes.edgecolor'],
+                                    linewidth=mpl.rcParams['axes.linewidth'])
         ax.add_artist(self.outline)
-        c = rcParams['axes.facecolor']
-        self.patch = Polygon(zip(x,y), edgecolor=c,
+        c = mpl.rcParams['axes.facecolor']
+        self.patch = patches.Polygon(zip(x,y), edgecolor=c,
                  facecolor=c,
                  linewidth=0.01,
                  zorder=-1)
@@ -209,21 +228,27 @@ class ColorbarBase(cm.ScalarMappable):
             ax.set_xticklabels(ticklabels)
             ax.xaxis.get_major_formatter().set_offset_string(offset_string)
 
-    def set_label(self, label, **kw):
+    def _set_label(self):
         if self.orientation == 'vertical':
-            self.ax.set_ylabel(label, **kw)
+            self.ax.set_ylabel(self._label, **self._labelkw)
         else:
-            self.ax.set_xlabel(label, **kw)
+            self.ax.set_xlabel(self._label, **self._labelkw)
+
+    def set_label(self, label, **kw):
+        self._label = label
+        self._labelkw = kw
+        self._set_label()
+
 
     def _outline(self, X, Y):
         '''
         Return x, y arrays of colorbar bounding polygon,
         taking orientation into account.
         '''
-        N = nx.shape(X)[0]
+        N = X.shape[0]
         ii = [0, 1, N-2, N-1, 2*N-1, 2*N-2, N+1, N, 0]
-        x = nx.take(nx.ravel(nx.transpose(X)), ii)
-        y = nx.take(nx.ravel(nx.transpose(Y)), ii)
+        x = npy.take(npy.ravel(npy.transpose(X)), ii)
+        y = npy.take(npy.ravel(npy.transpose(Y)), ii)
         if self.orientation == 'horizontal':
             return y,x
         return x,y
@@ -232,7 +257,7 @@ class ColorbarBase(cm.ScalarMappable):
         '''
         Return the separator line segments; helper for _add_solids.
         '''
-        N = nx.shape(X)[0]
+        N = X.shape[0]
         # Using the non-array form of these line segments is much
         # simpler than making them into arrays.
         if self.orientation == 'vertical':
@@ -249,17 +274,17 @@ class ColorbarBase(cm.ScalarMappable):
         if self.orientation == 'vertical':
             args = (X, Y, C)
         else:
-            args = (nx.transpose(Y), nx.transpose(X), nx.transpose(C))
+            args = (npy.transpose(Y), npy.transpose(X), npy.transpose(C))
         kw = {'cmap':self.cmap, 'norm':self.norm,
                     'shading':'flat', 'alpha':self.alpha}
         col = self.ax.pcolor(*args, **kw)
         #self.add_observer(col) # We should observe, not be observed...
         self.solids = col
         if self.drawedges:
-            self.dividers = LineCollection(self._edges(X,Y),
-                                           colors=(rcParams['axes.edgecolor'],),
-                                           linewidths=(0.5*rcParams['axes.linewidth'],)
-                                           )
+            self.dividers = collections.LineCollection(self._edges(X,Y),
+                              colors=(mpl.rcParams['axes.edgecolor'],),
+                              linewidths=(0.5*mpl.rcParams['axes.linewidth'],)
+                              )
             self.ax.add_collection(self.dividers)
 
     def add_lines(self, levels, colors, linewidths):
@@ -270,13 +295,13 @@ class ColorbarBase(cm.ScalarMappable):
         dummy, y = self._locate(levels)
         if len(y) <> N:
             raise ValueError("levels are outside colorbar range")
-        x = nx.array([0.0, 1.0])
-        X, Y = meshgrid(x,y)
+        x = npy.array([0.0, 1.0])
+        X, Y = npy.meshgrid(x,y)
         if self.orientation == 'vertical':
             xy = [zip(X[i], Y[i]) for i in range(N)]
         else:
             xy = [zip(Y[i], X[i]) for i in range(N)]
-        col = LineCollection(xy, linewidths=linewidths)
+        col = collections.LineCollection(xy, linewidths=linewidths)
         self.lines = col
         col.set_color(colors)
         self.ax.add_collection(col)
@@ -303,14 +328,16 @@ class ColorbarBase(cm.ScalarMappable):
                 b = self._boundaries[self._inside]
                 locator = ticker.FixedLocator(b, nbins=10)
         if isinstance(self.norm, colors.NoNorm):
-            intv = Interval(Value(self._values[0]), Value(self._values[-1]))
+            intv = transforms.Interval(transforms.Value(self._values[0]),
+                                       transforms.Value(self._values[-1]))
         else:
-            intv = Interval(Value(self.vmin), Value(self.vmax))
+            intv = transforms.Interval(transforms.Value(self.vmin),
+                                       transforms.Value(self.vmax))
         locator.set_view_interval(intv)
         locator.set_data_interval(intv)
         formatter.set_view_interval(intv)
         formatter.set_data_interval(intv)
-        b = nx.array(locator())
+        b = npy.array(locator())
         b, ticks = self._locate(b)
         formatter.set_locs(b)
         ticklabels = [formatter(t) for t in b]
@@ -326,30 +353,48 @@ class ColorbarBase(cm.ScalarMappable):
         if b is None:
             b = self.boundaries
         if b is not None:
-            self._boundaries = nx.array(b)
+            self._boundaries = npy.array(b)
             if self.values is None:
                 self._values = 0.5*(self._boundaries[:-1]
                                         + self._boundaries[1:])
                 if isinstance(self.norm, colors.NoNorm):
-                    self._values = (self._values + 0.00001).astype(nx.Int16)
+                    self._values = (self._values + 0.00001).astype(npy.int16)
                 return
-            self._values = nx.array(self.values)
+            self._values = npy.array(self.values)
             return
         if self.values is not None:
-            self._values = nx.array(self.values)
+            self._values = npy.array(self.values)
             if self.boundaries is None:
-                b = nx.zeros(len(self.values)+1, 'd')
+                b = npy.zeros(len(self.values)+1, 'd')
                 b[1:-1] = 0.5*(self._values[:-1] - self._values[1:])
                 b[0] = 2.0*b[1] - b[2]
                 b[-1] = 2.0*b[-2] - b[-3]
                 self._boundaries = b
                 return
-            self._boundaries = nx.array(self.boundaries)
+            self._boundaries = npy.array(self.boundaries)
             return
+        # Neither boundaries nor values are specified;
+        # make reasonable ones based on cmap and norm.
         if isinstance(self.norm, colors.NoNorm):
-            b = nx.arange(self.norm.vmin, self.norm.vmax + 2) - 0.5
+            b = self._uniform_y(self.cmap.N+1) * self.cmap.N - 0.5
+            v = npy.zeros((len(b)-1,), dtype=npy.int16)
+            v[self._inside] = npy.arange(self.cmap.N, dtype=npy.int16)
+            if self.extend in ('both', 'min'):
+                v[0] = -1
+            if self.extend in ('both', 'max'):
+                v[-1] = self.cmap.N
+            self._boundaries = b
+            self._values = v
+            return
         else:
+            if not self.norm.scaled():
+                self.norm.vmin = 0
+                self.norm.vmax = 1
             b = self.norm.inverse(self._uniform_y(self.cmap.N+1))
+            if self.extend in ('both', 'min'):
+                b[0] = b[0] - 1
+            if self.extend in ('both', 'max'):
+                b[-1] = b[-1] + 1
         self._process_values(b)
 
     def _find_range(self):
@@ -388,19 +433,19 @@ class ColorbarBase(cm.ScalarMappable):
         spaced boundaries, plus ends if required.
         '''
         if self.extend == 'neither':
-            y = linspace(0, 1, N)
+            y = npy.linspace(0, 1, N)
         else:
             if self.extend == 'both':
-                y = nx.zeros(N + 2, 'd')
+                y = npy.zeros(N + 2, 'd')
                 y[0] = -0.05
                 y[-1] = 1.05
             elif self.extend == 'min':
-                y = nx.zeros(N + 1, 'd')
+                y = npy.zeros(N + 1, 'd')
                 y[0] = -0.05
             else:
-                y = nx.zeros(N + 1, 'd')
+                y = npy.zeros(N + 1, 'd')
                 y[-1] = 1.05
-            y[self._inside] = linspace(0, 1, N)
+            y[self._inside] = npy.linspace(0, 1, N)
         return y
 
     def _proportional_y(self):
@@ -425,13 +470,13 @@ class ColorbarBase(cm.ScalarMappable):
         transposition for a horizontal colorbar are done outside
         this function.
         '''
-        x = nx.array([0.0, 1.0])
+        x = npy.array([0.0, 1.0])
         if self.spacing == 'uniform':
             y = self._uniform_y(self._central_N())
         else:
             y = self._proportional_y()
         self._y = y
-        X, Y = meshgrid(x,y)
+        X, Y = npy.meshgrid(x,y)
         if self.extend in ('min', 'both'):
             X[0,:] = 0.5
         if self.extend in ('max', 'both'):
@@ -457,19 +502,19 @@ class ColorbarBase(cm.ScalarMappable):
             # floating point errors.
             xn = self.norm(x, clip=False).filled()
             in_cond = (xn > -0.001) & (xn < 1.001)
-            xn = nx.compress(in_cond, xn)
-            xout = nx.compress(in_cond, x)
+            xn = npy.compress(in_cond, xn)
+            xout = npy.compress(in_cond, x)
         # The rest is linear interpolation with clipping.
         y = self._y
         N = len(b)
-        ii = nx.minimum(nx.searchsorted(b, xn), N-1)
-        i0 = nx.maximum(ii - 1, 0)
-        #db = b[ii] - b[i0]  (does not work with Numeric)
-        db = nx.take(b, ii) - nx.take(b, i0)
-        db = nx.where(i0==ii, 1.0, db)
+        ii = npy.minimum(npy.searchsorted(b, xn), N-1)
+        i0 = npy.maximum(ii - 1, 0)
+        #db = b[ii] - b[i0] 
+        db = npy.take(b, ii) - npy.take(b, i0)
+        db = npy.where(i0==ii, 1.0, db)
         #dy = y[ii] - y[i0]
-        dy = nx.take(y, ii) - nx.take(y, i0)
-        z = nx.take(y, i0) + (xn-nx.take(b,i0))*dy/db
+        dy = npy.take(y, ii) - npy.take(y, i0)
+        z = npy.take(y, i0) + (xn-npy.take(b,i0))*dy/db
         return xout, z
 
     def set_alpha(self, alpha):
@@ -486,7 +531,7 @@ class Colorbar(ColorbarBase):
         kw['cmap'] = mappable.cmap
         kw['norm'] = mappable.norm
         kw['alpha'] = mappable.get_alpha()
-        if isinstance(mappable, ContourSet):
+        if isinstance(mappable, contour.ContourSet):
             CS = mappable
             kw['boundaries'] = CS._levels
             kw['values'] = CS.cvalues
@@ -505,7 +550,7 @@ class Colorbar(ColorbarBase):
         '''
         Add the lines from a non-filled ContourSet to the colorbar.
         '''
-        if not isinstance(CS, ContourSet) or CS.filled:
+        if not isinstance(CS, contour.ContourSet) or CS.filled:
             raise ValueError('add_lines is only for a ContourSet of lines')
         tcolors = [c[0] for c in CS.tcolors]
         tlinewidths = [t[0] for t in CS.tlinewidths]
@@ -525,12 +570,16 @@ class Colorbar(ColorbarBase):
         is changed.
         '''
         cm.ScalarMappable.notify(self, mappable)
+        # We are using an ugly brute-force method: clearing and
+        # redrawing the whole thing.  The problem is that if any
+        # properties have been changed by methods other than the
+        # colorbar methods, those changes will be lost.
         self.ax.cla()
         self.draw_all()
         #if self.vmin != self.norm.vmin or self.vmax != self.norm.vmax:
         #    self.ax.cla()
         #    self.draw_all()
-        if isinstance(self.mappable, ContourSet):
+        if isinstance(self.mappable, contour.ContourSet):
             CS = self.mappable
             if not CS.filled:
                 self.add_lines(CS)
@@ -547,8 +596,8 @@ def make_axes(parent, **kw):
     fraction = kw.pop('fraction', 0.15)
     shrink = kw.pop('shrink', 1.0)
     aspect = kw.pop('aspect', 20)
-    #pb = PBox(parent.get_position())
-    pb = PBox(parent.get_position(original=True))
+    #pb = transforms.PBox(parent.get_position())
+    pb = transforms.PBox(parent.get_position(original=True))
     if orientation == 'vertical':
         pad = kw.pop('pad', 0.05)
         x1 = 1.0-fraction
@@ -591,14 +640,14 @@ the transforms work right only when fig.add_axes(rect) is used to
 generate the axes, not when the axes object is generated first and
 then fig.add_axes(ax) is called.  I don't understand this. - EF
 
-class ColorbarAxes(Axes):
+class ColorbarAxes(axes.Axes):
     def __init__(self, parent, **kw):
         orientation = kw.setdefault('orientation', 'vertical')
         fraction = kw.pop('fraction', 0.15)
         shrink = kw.pop('shrink', 1.0)
         aspect = kw.pop('aspect', 20)
         self.cbkw = kw
-        pb = PBox(parent.get_position())
+        pb = transforms.PBox(parent.get_position())
         if orientation == 'vertical':
             pb1, pbcb = pb.splitx(1.0-fraction)
             pbcb.shrink(1.0, shrink).anchor('C')
@@ -613,7 +662,7 @@ class ColorbarAxes(Axes):
         parent.set_position(pb1)
         parent.set_anchor(panchor)
         fig = parent.get_figure()
-        Axes.__init__(self, fig, pbcb)
+        axes.Axes.__init__(self, fig, pbcb)
         fig.add_axes(self)
         self.set_aspect(aspect, anchor=anchor, adjustable='box')
 

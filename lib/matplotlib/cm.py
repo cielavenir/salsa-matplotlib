@@ -2,14 +2,12 @@
 This module contains the instantiations of color mapping classes
 """
 
-import colors
-from matplotlib import verbose
-from matplotlib import rcParams
-from matplotlib.numerix import asarray
-from numerix import nx
-import numerix.ma as ma
-from cbook import iterable
-from _cm import *
+import numpy as npy
+import matplotlib as mpl
+import matplotlib.colors as colors
+import matplotlib.numerix.npyma as ma
+import matplotlib.cbook as cbook
+from matplotlib._cm import *
 
 
 
@@ -17,8 +15,8 @@ def get_cmap(name=None, lut=None):
     """
     Get a colormap instance, defaulting to rc values if name is None
     """
-    if name is None: name = rcParams['image.cmap']
-    if lut is None: lut = rcParams['image.lut']
+    if name is None: name = mpl.rcParams['image.cmap']
+    if lut is None: lut = mpl.rcParams['image.lut']
 
     assert(name in datad.keys())
     return colors.LinearSegmentedColormap(name,  datad[name], lut)
@@ -43,24 +41,45 @@ class ScalarMappable:
         self.cmap = cmap
         self.observers = []
         self.colorbar = None
+        self.update_dict = {'array':False}
 
     def set_colorbar(self, im, ax):
         'set the colorbar image and axes associated with mappable'
         self.colorbar = im, ax
 
-    def to_rgba(self, x, alpha=1.0):
+    def to_rgba(self, x, alpha=1.0, bytes=False):
         '''Return a normalized rgba array corresponding to x.
-        If x is already an rgb or rgba array, return it unchanged.
+        If x is already an rgb array, insert alpha; if it is
+        already rgba, return it unchanged.
+        If bytes is True, return rgba as 4 uint8s instead of 4 floats.
         '''
-        if hasattr(x, 'shape') and len(x.shape)>2: return x
+        try:
+            if x.ndim == 3:
+                if x.shape[2] == 3:
+                    if x.dtype == npy.uint8:
+                        alpha = npy.array(alpha*255, npy.uint8)
+                    m, n = x.shape[:2]
+                    xx = npy.empty(shape=(m,n,4), dtype = x.dtype)
+                    xx[:,:,:3] = x
+                    xx[:,:,3] = alpha
+                elif x.shape[2] == 4:
+                    xx = x
+                else:
+                    raise ValueError("third dimension must be 3 or 4")
+                if bytes and xx.dtype != npy.uint8:
+                    xx = (xx * 255).astype(npy.uint8)
+                return xx
+        except AttributeError:
+            pass
         x = ma.asarray(x)
         x = self.norm(x)
-        x = self.cmap(x, alpha)
+        x = self.cmap(x, alpha=alpha, bytes=bytes)
         return x
 
     def set_array(self, A):
-        'Set the image array from numeric/numarray A'
+        'Set the image array from numpy array A'
         self._A = A
+        self.update_dict['array'] = True
 
     def get_array(self):
         'Return the array'
@@ -78,7 +97,8 @@ class ScalarMappable:
 
         ACCEPTS: a length 2 sequence of floats
         """
-        if vmin is not None and vmax is None and iterable(vmin) and len(vmin)==2:
+        if (vmin is not None and vmax is None and
+                                cbook.iterable(vmin) and len(vmin)==2):
             vmin, vmax = vmin
 
         if vmin is not None: self.norm.vmin = vmin
@@ -122,6 +142,22 @@ class ScalarMappable:
         self.changed()
 
 
+    def add_checker(self, checker):
+        """
+        Add an entry to a dictionary of boolean flags
+        that are set to True when the mappable is changed.
+        """
+        self.update_dict[checker] = False
+
+    def check_update(self, checker):
+        """
+        If mappable has changed since the last check,
+        return True; else return False
+        """
+        if self.update_dict[checker]:
+            self.update_dict[checker] = False
+            return True
+        return False
 
     def add_observer(self, mappable):
         """
@@ -156,3 +192,6 @@ class ScalarMappable:
         """
         for observer in self.observers:
             observer.notify(self)
+        for key in self.update_dict:
+            self.update_dict[key] = True
+

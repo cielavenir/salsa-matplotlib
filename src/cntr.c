@@ -11,7 +11,7 @@
     was written by following the Python "Extending and Embedding"
     tutorial.
 
-  $Id: cntr.c 2927 2006-12-15 07:02:24Z efiring $
+  $Id: cntr.c 3439 2007-06-30 22:20:16Z nnemec $
  */
 
 #include <Python.h>
@@ -1322,6 +1322,11 @@ build_cntr_list_p(long *np, double *xp, double *yp, int nparts, long ntotal)
     return NULL;
 }
 
+
+#if 0
+/* the following function is not used, so it produces a warning
+ * commented it out NN - 070630 */
+
 /* Build a list of tuples (X, Y), where X and Y are 1-D arrays. */
 static PyObject *
 build_cntr_list_v(long *np, double *xp, double *yp, int nparts, long ntotal)
@@ -1357,12 +1362,13 @@ build_cntr_list_v(long *np, double *xp, double *yp, int nparts, long ntotal)
     Py_XDECREF(all_contours);
     return NULL;
 }
+#endif
 
 /* Build a list of XY 2-D arrays, shape (N,2) */
 static PyObject *
 build_cntr_list_v2(long *np, double *xp, double *yp, int nparts, long ntotal)
 {
-    PyObject *point, *all_contours;
+    PyObject *all_contours;
     PyArrayObject *xyv;
     int dims[2];
     int i;
@@ -1731,22 +1737,16 @@ static PyMethodDef module_methods[] = {
     {NULL}  /* Sentinel */
 };
 
-
-#ifdef NUMARRAY
-#if PY_MINOR_VERSION > 2
 PyMODINIT_FUNC
-#else
-DL_EXPORT(void)
-#endif
-init_na_cntr(void)
+init_cntr(void)
 {
     PyObject* m;
 
     if (PyType_Ready(&CntrType) < 0)
         return;
 
-    m = Py_InitModule3("_na_cntr", module_methods,
-                       "Contouring engine as an extension type (numarray).");
+    m = Py_InitModule3("_cntr", module_methods,
+                       "Contouring engine as an extension type (numpy).");
 
     if (m == NULL)
       return;
@@ -1755,55 +1755,5 @@ init_na_cntr(void)
     Py_INCREF(&CntrType);
     PyModule_AddObject(m, "Cntr", (PyObject *)&CntrType);
 }
-#endif
-#ifdef NUMERIC
-#if PY_MINOR_VERSION > 2
-PyMODINIT_FUNC
-#else
-DL_EXPORT(void)
-#endif
-init_nc_cntr(void)
-{
-    PyObject* m;
-
-    if (PyType_Ready(&CntrType) < 0)
-        return;
-
-    m = Py_InitModule3("_nc_cntr", module_methods,
-                       "Contouring engine as an extension type (Numeric).");
-
-    if (m == NULL)
-      return;
-
-    import_array();
-    Py_INCREF(&CntrType);
-    PyModule_AddObject(m, "Cntr", (PyObject *)&CntrType);
-}
-#endif
-
-#ifdef SCIPY
-#if PY_MINOR_VERSION > 2
-PyMODINIT_FUNC
-#else
-DL_EXPORT(void)
-#endif
-init_ns_cntr(void)
-{
-    PyObject* m;
-
-    if (PyType_Ready(&CntrType) < 0)
-        return;
-
-    m = Py_InitModule3("_ns_cntr", module_methods,
-                       "Contouring engine as an extension type (Scipy).");
-
-    if (m == NULL)
-      return;
-
-    import_array();
-    Py_INCREF(&CntrType);
-    PyModule_AddObject(m, "Cntr", (PyObject *)&CntrType);
-}
-#endif
 
 

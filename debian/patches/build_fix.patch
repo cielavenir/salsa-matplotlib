@@ -1,98 +1,19 @@
-Index: matplotlib-0.90.1/setup.py
+Index: matplotlib/setupext.py
 ===================================================================
---- matplotlib-0.90.1.orig/setup.py	2008-03-09 16:31:44.511489293 +0100
-+++ matplotlib-0.90.1/setup.py	2008-03-09 16:31:54.587540476 +0100
-@@ -28,13 +28,13 @@
- # it.  It makes very nice antialiased output and also supports alpha
- # blending
- BUILD_AGG          = 1
--BUILD_GTKAGG       = 'auto'
--BUILD_GTK          = 'auto'
-+BUILD_GTKAGG       = 1
-+BUILD_GTK          = 1
- 
- # build TK GUI with Agg renderer ; requires Tkinter Python extension
- # and Tk includes
- # Use False or 0 if you don't want to build
--BUILD_TKAGG        = 'auto'
-+BUILD_TKAGG        = 1
- 
- # build wxPython extension code to efficiently blit agg into wx.  Only
- # needed for wxpython <2.8 if you plan on doing animations
-@@ -43,7 +43,7 @@
- 
- # build a small extension to manage the focus on win32 platforms.
- #BUILD_WINDOWING        = 0
--BUILD_WINDOWING        = 'auto'
-+BUILD_WINDOWING        = 0
- 
- 
- VERBOSE = False # insert lots of diagnostic prints in extension code
-@@ -226,15 +226,25 @@
- 
- havegtk.gotit = None
- 
-+'''
- if BUILD_GTK and havegtk():
-     build_gdk(ext_modules, packages, NUMERIX)
-     rc['backend'] = 'GTK'
-+'''
-+build_gdk(ext_modules, packages, NUMERIX)
-+rc['backend'] = 'GTK'
- 
-+'''
- if BUILD_GTKAGG and havegtk():
-     BUILD_AGG = 1
-     build_gtkagg(ext_modules, packages, NUMERIX)
-     rc['backend'] = 'GTKAgg'
-+'''
- 
-+build_gtkagg(ext_modules, packages, NUMERIX)
-+rc['backend'] = 'GTKAgg'
-+
-+'''
- if BUILD_TKAGG:
-     try:
-         import Tkinter
-@@ -255,7 +265,12 @@
-             BUILD_AGG = 1
-             build_tkagg(ext_modules, packages, NUMERIX)
-             rc['backend'] = 'TkAgg'
-+'''
-+BUILD_AGG = 1
-+build_tkagg(ext_modules, packages, NUMERIX)
-+rc['backend'] = 'TkAgg'
- 
-+"""
- if BUILD_WXAGG:
-     try:
-         import wx
-@@ -270,7 +285,9 @@
-                 not (isinstance(BUILD_WXAGG, str) # don't abort if BUILD_WXAGG
-                      and BUILD_WXAGG.lower() == 'auto')) # is "auto"
-         rc['backend'] = 'WXAgg'
-+"""
- 
-+BUILD_AGG=1
- if BUILD_AGG:
-     build_agg(ext_modules, packages, NUMERIX)
-     if rc['backend'] == 'PS': rc['backend'] = 'Agg'
-Index: matplotlib-0.90.1/setupext.py
-===================================================================
---- matplotlib-0.90.1.orig/setupext.py	2008-03-09 16:31:44.527489655 +0100
-+++ matplotlib-0.90.1/setupext.py	2008-03-09 16:31:54.596520271 +0100
-@@ -45,8 +45,8 @@
+--- matplotlib.orig/setupext.py	2008-04-22 22:50:11.272065078 +0200
++++ matplotlib/setupext.py	2008-04-22 23:33:33.044331630 +0200
+@@ -47,8 +47,8 @@
  
  basedir = {
      'win32'  : ['win32_static',],
--    'linux2' : ['/usr/local', '/usr',],
+-    'linux2' : ['/usr/local', '/usr'],
 -    'linux'  : ['/usr/local', '/usr',],
-+    'linux2' : ['/usr',],
++    'linux2' : ['/usr'],
 +    'linux'  : ['/usr',],
      'cygwin' : ['/usr/local', '/usr',],
      'darwin' : ['/sw/lib/freetype2', '/sw/lib/freetype219', '/usr/local',
-                 '/usr', '/sw'],
-@@ -54,8 +54,8 @@
+                 '/usr', '/sw', '/usr/X11R6'],
+@@ -56,8 +56,8 @@
      'freebsd5' : ['/usr/local', '/usr'],
      'freebsd6' : ['/usr/local', '/usr'],
      'sunos5' : [os.getenv('MPLIB_BASE') or '/usr/local',],
@@ -103,20 +24,30 @@ Index: matplotlib-0.90.1/setupext.py
      'aix5' : ['/usr/local'],
  }
  
-@@ -357,11 +357,11 @@
-         print "Using default library and include directories for Tcl and Tk because a"
-         print "Tk window failed to open.  You may need to define DISPLAY for Tk to work"
-         print "so that setup can determine where your libraries are located."
--        o.tcl_lib = "/usr/local/lib"
--        o.tcl_inc = "/usr/local/include"
--        o.tk_lib = "/usr/local/lib"
--        o.tk_inc = "/usr/local/include"
--        o.tkv = ""
-+        o.tcl_lib = "/usr/lib"
-+        o.tcl_inc = "/usr/include/tcl8.4"
-+        o.tk_lib = "/usr/lib"
-+        o.tk_inc = "/usr/include/tcp8.4"
-+        o.tkv = "8.4"
-     else:
-         tk.withdraw()
-         o.tcl_lib = os.path.normpath(os.path.join(str(tk.getvar('tcl_library')), '../'))
+@@ -960,6 +960,9 @@
+             if not os.path.exists(tk_inc):
+                 tk_inc = os.path.normpath(os.path.join(tk_lib_dir, 
+                                           '../../include'))
++            if not os.path.exists(tk_inc):
++                tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
++                                          '../../../include/tcl' + tk_ver))
+             
+             if ((not os.path.exists(os.path.join(tk_inc,'tk.h'))) and
+                 os.path.exists(os.path.join(tcl_inc,'tk.h'))):
+@@ -977,11 +980,11 @@
+ Using default library and include directories for Tcl and Tk because a
+ Tk window failed to open.  You may need to define DISPLAY for Tk to work
+ so that setup can determine where your libraries are located."""
+-            tcl_inc = "/usr/local/include"
+-            tk_inc = "/usr/local/include"
+-            tcl_lib = "/usr/local/lib"
+-            tk_lib = "/usr/local/lib"
+-            tk_ver = ""
++            tcl_inc = "/usr/include/tcl8.4"
++            tk_inc = "/usr/include/tcl8.4"
++            tcl_lib = "/usr/lib"
++            tk_lib = "/usr/lib"
++            tk_ver = "8.4"
+         # Add final versions of directories and libraries to module lists
+         module.include_dirs.extend([tcl_inc, tk_inc])
+         module.library_dirs.extend([tcl_lib, tk_lib])

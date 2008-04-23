@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # Some functions to load a return data for the plot demos
 
-from matplotlib.numerix import fromstring, argsort, take, array, resize
+from numpy import fromstring, argsort, take, array, resize
+
 def get_two_stock_data():
     """
     load stock time and price data for two stocks The return values
@@ -14,7 +15,7 @@ def get_two_stock_data():
     M1 = resize(M1, (M1.shape[0]/2,2) )
 
     M2 = fromstring( file('data/%s.dat' % ticker2, 'rb').read(), '<d')
-    M2 = resize(M1, (M2.shape[0]/2,2) )
+    M2 = resize(M2, (M2.shape[0]/2,2) )
 
     d1, p1 = M1[:,0], M1[:,1]
     d2, p2 = M2[:,0], M2[:,1]
@@ -28,7 +29,7 @@ def get_daily_data():
       open, high, low, close, volume
 
     as numeric arrays
-    
+
     """
     class C: pass
 
@@ -37,7 +38,7 @@ def get_daily_data():
         lines = file( 'data/%s.csv' % ticker ).readlines()
         for line in lines[1:]:
             vals.append([float(val) for val in line.split(',')[1:]])
-            
+
         M = array(vals)
         c = C()
         c.open = M[:,0]

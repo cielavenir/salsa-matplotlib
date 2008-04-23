@@ -19,9 +19,10 @@ Naming Conventions
 """
 
 from __future__ import division
-import os
-import sys
-import warnings
+import os, sys, warnings, gzip
+
+import numpy as npy
+
 def _fn_name(): return sys._getframe(1).f_code.co_name
 
 import cairo
@@ -33,21 +34,18 @@ if cairo.version_info < _version_required:
 backend_version = cairo.version
 del _version_required
 
+from matplotlib import agg
 from matplotlib.backend_bases import RendererBase, GraphicsContextBase,\
      FigureManagerBase, FigureCanvasBase
-from matplotlib.cbook      import enumerate, izip
-from matplotlib.figure     import Figure
-from matplotlib.mathtext   import math_parse_s_ft2font
-import matplotlib.numerix as numx
-from matplotlib.transforms import Bbox
-
+from matplotlib.cbook        import enumerate, izip, is_string_like
+from matplotlib.figure       import Figure
+from matplotlib.mathtext     import MathTextParser
+from matplotlib.transforms   import Bbox
+from matplotlib.font_manager import ttfFontProperty
+from matplotlib import rcParams
 
 _debug = False
 #_debug = True
-
-# Image formats that this backend supports - for print_figure()
-IMAGE_FORMAT          = ['eps', 'pdf', 'png', 'ps', 'svg']
-IMAGE_FORMAT_DEFAULT  = 'png'
 
 # Image::color_conv(format) for draw_image()
 if sys.byteorder == 'little':
@@ -91,7 +89,7 @@ class RendererCairo(RendererBase):
         self.dpi = dpi
         self.text_ctx = cairo.Context (
            cairo.ImageSurface (cairo.FORMAT_ARGB32,1,1))
-
+        self.mathtext_parser = MathTextParser('Cairo')
 
     def set_ctx_from_surface (self, surface):
        self.ctx = cairo.Context (surface)
@@ -127,23 +125,48 @@ class RendererCairo(RendererBase):
 
         #_.ctx.restore() # revert to the default attributes
 
+    def draw_path(self, gc, rgbFace, path):
+        ctx = gc.ctx
+        ctx.new_path()
+
+        while 1:
+            code, xp, yp = path.vertex()
+            yp = self.height - yp
+
+            if code == agg.path_cmd_stop:
+                ctx.close_path()
+                break
+            elif code == agg.path_cmd_move_to:
+                ctx.move_to(xp, yp)
+            elif code == agg.path_cmd_line_to:
+                ctx.line_to(xp, yp)
+            elif code == agg.path_cmd_curve3:
+                _, xp1, yp1 = path.vertex()
+                yp1 = self.height - yp1
+                ctx.curve_to(xp, yp, xp, yp, xp1, yp1)
+            elif code == agg.path_cmd_curve4:
+                _, xp1, yp1 = path.vertex()
+                yp1 = self.height - yp1
+                _, xp2, yp2 = path.vertex()
+                yp2 = self.height - yp2
+                ctx.curve_to(xp, yp, xp1, yp1, xp2, yp2)
+            elif code == agg.path_cmd_end_poly:
+                ctx.close_path()
+        self._fill_and_stroke(ctx, rgbFace)
 
     def draw_arc(self, gc, rgbFace, x, y, width, height, angle1, angle2,
                  rotation):
         if _debug: print '%s.%s()' % (self.__class__.__name__, _fn_name())
-        # this implementation draws circular arcs where width=height
-        # FIXME
-        # to get a proper arc of width/height you can use translate() and
-        # scale(), see cairo_arc() manual page
-
         ctx = gc.ctx
         ctx.save()
-        ctx.new_path()  # prevent cairo_arc() adding to current path
+        ctx.translate(x, self.height - y)
         ctx.rotate(rotation)
-        radius = (height + width) / 4
-        ctx.arc (x, self.height - y, radius,
-                 angle1 * numx.pi/180.0, angle2 * numx.pi/180.0)
+        ctx.scale(width / 2.0, height / 2.0)
+        ctx.new_sub_path()
+        ctx.arc(0.0, 0.0, 1.0, npy.pi * angle1 / 180.,
+                npy.pi * angle2 / 180.)
         ctx.restore()
+
         self._fill_and_stroke (ctx, rgbFace)
 
 
@@ -155,8 +178,7 @@ class RendererCairo(RendererBase):
 
         rows, cols, buf = im.color_conv (BYTE_FORMAT)
         surface = cairo.ImageSurface.create_for_data (
-                      buf, cairo.FORMAT_ARGB32, rows, cols, rows*4)
-
+                      buf, cairo.FORMAT_ARGB32, cols, rows, cols*4)
         # function does not pass a 'gc' so use renderer.ctx
         ctx = self.ctx
         y = self.height - y - rows
@@ -247,7 +269,7 @@ class RendererCairo(RendererBase):
         # render by drawing a 0.5 radius circle
         ctx = gc.ctx
         ctx.new_path()
-        ctx.arc (x, self.height - y, 0.5, 0, 2*numx.pi)
+        ctx.arc (x, self.height - y, 0.5, 0, 2*npy.pi)
         self._fill_and_stroke (ctx, gc.get_rgb())
 
 
@@ -298,67 +320,46 @@ class RendererCairo(RendererBase):
 
            ctx.save()
            if angle:
-              ctx.rotate (-angle * numx.pi / 180)
+              ctx.rotate (-angle * npy.pi / 180)
            ctx.set_font_size (size)
-           ctx.show_text (s)
+           ctx.show_text (s.encode("utf-8"))
            ctx.restore()
-
 
     def _draw_mathtext(self, gc, x, y, s, prop, angle):
         if _debug: print '%s.%s()' % (self.__class__.__name__, _fn_name())
-        # mathtext using the gtk/gdk method
 
-        #if numx.which[0] == "numarray":
-        #   warnings.warn("_draw_mathtext() currently works for numpy, but "
-        #                 "not numarray")
-        #   return
+        ctx = gc.ctx
+        width, height, descent, glyphs, rects = self.mathtext_parser.parse(
+            s, self.dpi.get(), prop)
 
-        #if not HAVE_CAIRO_NUMPY:
-        #    warnings.warn("cairo with Numeric support is required for "
-        #                  "_draw_mathtext()")
-        #    return
+        ctx.save()
+        ctx.translate(x, y)
+        if angle:
+           ctx.rotate (-angle * npy.pi / 180)
 
-        size = prop.get_size_in_points()
-        width, height, fonts = math_parse_s_ft2font(
-            s, self.dpi.get(), size)
+        for font, fontsize, s, ox, oy in glyphs:
+           ctx.new_path()
+           ctx.move_to(ox, oy)
 
-        if angle==90:
-            width, height = height, width
-            x -= width
-        y -= height
+           fontProp = ttfFontProperty(font)
+           ctx.save()
+           ctx.select_font_face (fontProp.name,
+                                 self.fontangles [fontProp.style],
+                                 self.fontweights[fontProp.weight])
 
-        imw, imh, s = fonts[0].image_as_str()
-        N = imw*imh
+           # size = prop.get_size_in_points() * self.dpi.get() / 96.0
+           size = fontsize * self.dpi.get() / 72.0
+           ctx.set_font_size(size)
+           ctx.show_text(s.encode("utf-8"))
+           ctx.restore()
 
-        # a numpixels by num fonts array
-        Xall = numx.zeros((N,len(fonts)), typecode=numx.UInt8)
+        for ox, oy, w, h in rects:
+           ctx.new_path()
+           ctx.rectangle (ox, oy, w, h)
+           ctx.set_source_rgb (0, 0, 0)
+           ctx.fill_preserve()
 
-        for i, font in enumerate(fonts):
-            if angle == 90:
-                font.horiz_image_to_vert_image() # <-- Rotate
-            imw, imh, s = font.image_as_str()
-            Xall[:,i] = numx.fromstring(s, numx.UInt8)
-
-        # get the max alpha at each pixel
-        Xs = numx.mlab.max (Xall,1)
-
-        # convert it to it's proper shape
-        Xs.shape = imh, imw
-
-        pa = numx.zeros(shape=(imh,imw,4), typecode=numx.UInt8)
-        rgb = gc.get_rgb()
-        pa[:,:,0] = int(rgb[0]*255)
-        pa[:,:,1] = int(rgb[1]*255)
-        pa[:,:,2] = int(rgb[2]*255)
-        pa[:,:,3] = Xs
-
-        ## works for numpy pa, not a numarray pa
-        #surface = cairo.ImageSurface.create_for_array (pa)
-        surface = cairo.ImageSurface.create_for_data (pa, cairo.FORMAT_ARGB32,
-                                                      imw, imh, imw*4)
-        gc.ctx.set_source_surface (surface, x, y)
-        gc.ctx.paint()
-        #gc.ctx.show_surface (surface, imw, imh)
+        ctx.restore()
 
 
     def flipy(self):
@@ -373,12 +374,12 @@ class RendererCairo(RendererBase):
         return self.width, self.height
 
 
-    def get_text_width_height(self, s, prop, ismath):
+    def get_text_width_height_descent(self, s, prop, ismath):
         if _debug: print '%s.%s()' % (self.__class__.__name__, _fn_name())
         if ismath:
-            width, height, fonts = math_parse_s_ft2font(
-               s, self.dpi.get(), prop.get_size_in_points())
-            return width, height
+            width, height, descent, fonts, used_characters = self.mathtext_parser.parse(
+               s, self.dpi.get(), prop)
+            return width, height, descent
 
         ctx = self.text_ctx
         ctx.save()
@@ -397,10 +398,10 @@ class RendererCairo(RendererBase):
         # save/restore prevents the problem
         ctx.set_font_size (size)
 
-        w, h = ctx.text_extents (s)[2:4]
+        y_bearing, w, h = ctx.text_extents (s)[1:4]
         ctx.restore()
 
-        return w, h
+        return w, h, h + y_bearing
 
 
     def new_gc(self):
@@ -473,7 +474,7 @@ class GraphicsContextCairo(GraphicsContextBase):
             self.ctx.set_dash([], 0)  # switch dashes off
         else:
             self.ctx.set_dash (
-               self.renderer.points_to_pixels (numx.asarray(dashes)), offset)
+               self.renderer.points_to_pixels (npy.asarray(dashes)), offset)
 
 
     def set_foreground(self, fg, isRGB=None):
@@ -512,37 +513,7 @@ def new_figure_manager(num, *args, **kwargs): # called by backends/__init__.py
 
 
 class FigureCanvasCairo (FigureCanvasBase):
-    def print_figure(self, fo, dpi=150, facecolor='w', edgecolor='w',
-                     orientation='portrait', format=None, **kwargs):
-        if _debug: print '%s.%s()' % (self.__class__.__name__, _fn_name())
-        # settings for printing
-        self.figure.dpi.set(dpi)
-        self.figure.set_facecolor(facecolor)
-        self.figure.set_edgecolor(edgecolor)
-
-        if format is None and isinstance (fo, basestring):
-            # get format from filename extension
-            format = os.path.splitext(fo)[1][1:]
-
-        if format is not None:
-            format = format.lower()
-
-        if format == 'png':
-            self._save_png (fo)
-        elif format in ('pdf', 'ps', 'svg'):
-            self._save (fo, format, orientation, **kwargs)
-        elif format == 'eps': # backend_ps for eps
-            from backend_ps import FigureCanvasPS  as FigureCanvas
-            fc = FigureCanvas(self.figure)
-            fc.print_figure (filename, dpi, facecolor, edgecolor,
-                             orientation, **kwargs)
-        else:
-            warnings.warn('Format "%s" is not supported.\n'
-                          'Supported formats: '
-                          '%s.' % (format, ', '.join(IMAGE_FORMAT)))
-
-
-    def _save_png (self, fobj):
+    def print_png(self, fobj, *args, **kwargs):
         width, height = self.get_width_height()
 
         renderer = RendererCairo (self.figure.dpi)
@@ -553,8 +524,22 @@ class FigureCanvasCairo (FigureCanvasBase):
         self.figure.draw (renderer)
         surface.write_to_png (fobj)
 
+    def print_pdf(self, fobj, *args, **kwargs):
+        return self._save(fobj, 'pdf', *args, **kwargs)
 
-    def _save (self, fo, format, orientation, **kwargs):
+    def print_ps(self, fobj, *args, **kwargs):
+        return self._save(fobj, 'ps', *args, **kwargs)
+
+    def print_svg(self, fobj, *args, **kwargs):
+        return self._save(fobj, 'svg', *args, **kwargs)
+
+    def print_svgz(self, fobj, *args, **kwargs):
+        return self._save(fobj, 'svgz', *args, **kwargs)
+
+    def get_default_filetype(self):
+        return rcParams['cairo.format']
+
+    def _save (self, fo, format, **kwargs):
         # save PDF/PS/SVG
         orientation = kwargs.get('orientation', 'portrait')
 
@@ -577,10 +562,15 @@ class FigureCanvasCairo (FigureCanvasBase):
                 raise RuntimeError ('cairo has not been compiled with PDF '
                                     'support enabled')
             surface = cairo.PDFSurface (fo, width_in_points, height_in_points)
-        elif format == 'svg':
+        elif format in ('svg', 'svgz'):
             if not cairo.HAS_SVG_SURFACE:
                 raise RuntimeError ('cairo has not been compiled with SVG '
                                     'support enabled')
+            if format == 'svgz':
+                filename = fo
+                if is_string_like(fo):
+                    fo = open(fo, 'wb')
+                fo = gzip.GzipFile(None, 'wb', fileobj=fo)
             surface = cairo.SVGSurface (fo, width_in_points, height_in_points)
         else:
            warnings.warn ("unknown format: %s" % format)
@@ -593,7 +583,7 @@ class FigureCanvasCairo (FigureCanvasBase):
         ctx = renderer.ctx
 
         if orientation == 'landscape':
-            ctx.rotate (numx.pi/2)
+            ctx.rotate (npy.pi/2)
             ctx.translate (0, -height_in_points)
             # cairo/src/cairo_ps_surface.c
             # '%%Orientation: Portrait' is always written to the file header
