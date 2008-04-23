@@ -23,8 +23,10 @@ matplotlib (0.91.2-1) UNRELEASED; urgency=low
       2.0)" to Depends (sync from Ubuntu)
     - merged Recommends into Depends
     - removed Depends on python-pypaint since that package is unavailable
+  * debian/patches/bts-468977_memory_api_usage.patch
+    - fixes Python API memory usage (Closes: #468977)
 
- -- Sandro Tosi <matrixhasu@gmail.com>  Wed, 23 Apr 2008 00:55:05 +0200
+ -- Sandro Tosi <matrixhasu@gmail.com>  Wed, 23 Apr 2008 07:44:18 +0200
 
 matplotlib (0.90.1-4) unstable; urgency=low
 

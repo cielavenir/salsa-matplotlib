@@ -1,0 +1,13 @@
+Index: matplotlib/src/_subprocess.c
+===================================================================
+--- matplotlib.orig/src/_subprocess.c	2008-04-23 07:41:32.772888270 +0200
++++ matplotlib/src/_subprocess.c	2008-04-23 07:42:07.034840747 +0200
+@@ -60,7 +60,7 @@
+ {
+ 	sp_handle_object* self;
+ 
+-	self = PyObject_NEW(sp_handle_object, &sp_handle_type);
++	self = PyMem_NEW(sp_handle_object, &sp_handle_type);
+ 	if (self == NULL)
+ 		return NULL;
+ 
