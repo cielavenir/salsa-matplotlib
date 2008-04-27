@@ -1,4 +1,4 @@
-matplotlib (0.91.2-1) UNRELEASED; urgency=low
+matplotlib (0.91.2-1) unstable; urgency=low
 
   [ Piotr Ożarowski ]
   * Replace libwxgtk2.4-python with python-wxgtk2.6 in Depends
