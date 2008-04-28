@@ -39,6 +39,9 @@ clean-patched: patch
 	-rm -f *-stamp*
 	-rm -rf build *.pyc *.pyo
 	find ./lib -name '*.pyc' -exec rm {} \;
+
+	rm -f lib/matplotlib/mpl-data/matplotlib.conf lib/matplotlib/mpl-data/matplotlibrc
+
 	dh_clean
 
 # install
