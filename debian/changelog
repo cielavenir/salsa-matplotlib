@@ -1,11 +1,11 @@
-matplotlib (0.91.2-2) UNRELEASED; urgency=low
+matplotlib (0.91.2-2) unstable; urgency=medium
 
   * debian/patches/bts-478237_ftbfs_gcc43.patch
     - added (Closes: #478237)
   * debian/rules
     - removed some files changes during build
 
- -- Sandro Tosi <matrixhasu@gmail.com>  Mon, 28 Apr 2008 22:50:43 +0200
+ -- Sandro Tosi <matrixhasu@gmail.com>  Mon, 28 Apr 2008 23:17:55 +0200
 
 matplotlib (0.91.2-1) unstable; urgency=low
 
