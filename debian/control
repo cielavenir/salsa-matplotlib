@@ -5,7 +5,7 @@ Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.
 Uploaders: Marco Presi (Zufus) <zufus@debian.org>, Alexandre Fayolle <afayolle@debian.org>, Vittorio Palmisano <redclay81@gmail.com>, Ondrej Certik <ondrej@certik.cz>, Sandro Tosi <matrixhasu@gmail.com>
 Build-Depends: debhelper (>= 5.0.38), python-dateutil, python-all-dev (>= 2.3.5-7), python-central (>= 0.5.6), quilt, python-gtk2-dev, python-numpy (>= 1:1.0.4-6), libgtk2.0-dev, libfreetype6-dev, zlib1g-dev, libpng-dev, tk8.4-dev, python-tk, tcl8.4-dev, python-epydoc, python-tz, xbase-clients [!s390], dvipng, python-configobj, python-enthought-traits (>= 2.0), python-qt-dev, python-qt4-dev, python-wxgtk2.6
 XS-Python-Version: all
-Standards-Version: 3.7.3
+Standards-Version: 3.8.0
 XS-DM-Upload-Allowed: yes
 Homepage: http://matplotlib.sf.net/
 

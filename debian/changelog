@@ -1,3 +1,17 @@
+matplotlib (0.91.3-1) UNRELEASED; urgency=low
+
+  * (NOT RELEASED YET) New upstream release
+  * debian/patches/bts-468977_memory_api_usage.patch
+    - removed since merged upstream
+  * debian/patches/bts-478237_ftbfs_gcc43.patch
+    - removed since merged upstream
+  * debian/patches/build_fix.patch
+    - updated to match new upstream code
+  * debian/control
+    - bump Standards-Version to 3.8.0 (no changes needed)
+
+ -- Sandro Tosi <matrixhasu@gmail.com>  Thu, 12 Jun 2008 19:49:38 +0200
+
 matplotlib (0.91.2-2) unstable; urgency=medium
 
   * debian/patches/bts-478237_ftbfs_gcc43.patch
