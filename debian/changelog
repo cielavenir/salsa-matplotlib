@@ -9,8 +9,10 @@ matplotlib (0.91.3-1) UNRELEASED; urgency=low
     - updated to match new upstream code
   * debian/control
     - bump Standards-Version to 3.8.0 (no changes needed)
+    - removed build-dep on xbase-clients; it was a lintian error, but the
+      package works fine without it
 
- -- Sandro Tosi <matrixhasu@gmail.com>  Thu, 12 Jun 2008 19:49:38 +0200
+ -- Sandro Tosi <matrixhasu@gmail.com>  Fri, 13 Jun 2008 01:34:54 +0200
 
 matplotlib (0.91.2-2) unstable; urgency=medium
 
