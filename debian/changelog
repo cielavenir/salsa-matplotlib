@@ -1,6 +1,6 @@
 matplotlib (0.91.3-1) UNRELEASED; urgency=low
 
-  * (NOT RELEASED YET) New upstream release
+  * New upstream release; Closes: #485950
   * debian/patches/bts-468977_memory_api_usage.patch
     - removed since merged upstream
   * debian/patches/bts-478237_ftbfs_gcc43.patch
@@ -8,11 +8,13 @@ matplotlib (0.91.3-1) UNRELEASED; urgency=low
   * debian/patches/build_fix.patch
     - updated to match new upstream code
   * debian/control
-    - bump Standards-Version to 3.8.0 (no changes needed)
+    - bump Standards-Version to 3.8.0
     - removed build-dep on xbase-clients; it was a lintian error, but the
       package works fine without it
+  * debian/README.source
+    - added to reflect Policy 3.8.0
 
- -- Sandro Tosi <matrixhasu@gmail.com>  Fri, 13 Jun 2008 01:34:54 +0200
+ -- Sandro Tosi <matrixhasu@gmail.com>  Fri, 13 Jun 2008 08:43:33 +0200
 
 matplotlib (0.91.2-2) unstable; urgency=medium
 
