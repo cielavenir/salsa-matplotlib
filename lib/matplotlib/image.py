@@ -324,6 +324,7 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
 
     def get_filterrad(self):
         'return the filterrad setting'
+        return self._filterrad
 
 
 class NonUniformImage(AxesImage):
@@ -606,15 +607,35 @@ def imread(fname):
     """
     return image file in fname as numpy array
 
-    Return value is a MxNx4 array of 0-1 normalized floats
+    return value is a numpy array.  For grayscale images, the return
+    array is MxN.  For RGB images, the return value is MxNx3.  For
+    RGBA images the return value is MxNx4
 
+    matplotlib can only read PNGs natively, but if PIL is installed,
+    it will use it to load the image and return an array (if possible)
+    which can be used with imshow
+
+    TODO: support RGB and grayscale return values in _image.readpng
     """
+
+    def pilread():
+        'try to load the image with PIL or return None'
+        try: import Image
+        except ImportError: return None
+        image = Image.open( fname )
+        return pil_to_array(image)
+
+
     handlers = {'png' :_image.readpng,
                 }
     basename, ext = os.path.splitext(fname)
     ext = ext.lower()[1:]
+
     if ext not in handlers.keys():
-        raise ValueError('Only know how to handled extensions: %s' % handlers.keys())
+        im = pilread()
+        if im is None:
+            raise ValueError('Only know how to handle extensions: %s; with PIL installed matplotlib can handle more images' % handlers.keys())
+        return im
 
     handler = handlers[ext]
     return handler(fname)
@@ -622,15 +643,39 @@ def imread(fname):
 
 
 def pil_to_array( pilImage ):
+    """
+    load a PIL image and return it as a numpy array of uint8.  For
+    grayscale images, the return array is MxN.  For RGB images, the
+    return value is MxNx3.  For RGBA images the return value is MxNx4
+    """
+    def toarray(im):
+        'return a 1D array of floats'
+        x_str = im.tostring('raw',im.mode,0,-1)
+        x = npy.fromstring(x_str,npy.uint8)
+        return x
+
     if pilImage.mode in ('RGBA', 'RGBX'):
-        im = pilImage # no need to convert images in rgba format
+        im = pilImage # no need to convert images
+    elif pilImage.mode=='L':
+        im = pilImage # no need to luminance images
+        # return MxN luminance array
+        x = toarray(im)
+        x.shape = im.size[1], im.size[0]
+        return x
+    elif pilImage.mode=='RGB':
+        #return MxNx3 RGB array
+        im = pilImage # no need to RGB images                
+        x = toarray(im)
+        x.shape = im.size[1], im.size[0], 3
+        return x
+
     else: # try to convert to an rgba image
         try:
             im = pilImage.convert('RGBA')
         except ValueError:
             raise RuntimeError('Unknown image mode')
 
-    x_str = im.tostring('raw',im.mode,0,-1)
-    x = npy.fromstring(x_str,npy.uint8)
+    # return MxNx4 RGBA array
+    x = toarray(im)
     x.shape = im.size[1], im.size[0], 4
     return x

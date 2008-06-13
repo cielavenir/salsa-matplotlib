@@ -224,7 +224,35 @@ Py::Object BufferRegion::to_string(const Py::Tuple &args) {
   return Py::String(PyString_FromStringAndSize((const char*)aggbuf.data,aggbuf.height*aggbuf.stride), true);
 }
 
+Py::Object BufferRegion::to_string_argb(const Py::Tuple &args) {
+  // owned=true to prevent memory leak
+  Py_ssize_t length;
+  unsigned char* pix;
+  unsigned char* begin;
+  unsigned char* end;
+  unsigned char tmp;
+  size_t i, j;
 
+  PyObject* str = PyString_FromStringAndSize((const char*)aggbuf.data, aggbuf.height*aggbuf.stride);
+  if (PyString_AsStringAndSize(str, (char**)&begin, &length)) {
+    throw Py::TypeError("Could not create memory for blit");
+  }
+
+  pix = begin;
+  end = begin + (aggbuf.height * aggbuf.stride);
+  for (i = 0; i < aggbuf.height; ++i) {
+    pix = begin + i * aggbuf.stride;
+    for (j = 0; j < aggbuf.width; ++j) {
+      // Convert rgba to argb
+      tmp = pix[2];
+      pix[2] = pix[0];
+      pix[0] = tmp;
+      pix += 4;
+    }
+  }
+
+  return Py::String(str, true);
+}
 
 
 const size_t
@@ -1110,10 +1138,10 @@ RendererAgg::draw_quad_mesh(const Py::Tuple& args){
           newXCoords[k] += newXOffsets[k];
           newYCoords[k] += newYOffsets[k];
         }
-      delete xOffsets;
-      delete yOffsets;
-      delete newXOffsets;
-      delete newYOffsets;
+      delete[] xOffsets;
+      delete[] yOffsets;
+      delete[] newXOffsets;
+      delete[] newYOffsets;
     }
 
   for(q=0; q < Nverts; q++)
@@ -1129,8 +1157,8 @@ RendererAgg::draw_quad_mesh(const Py::Tuple& args){
   Py_XDECREF(xCoords);
   Py_XDECREF(yCoords);
   Py_XDECREF(colors);
-  delete newXCoords;
-  delete newYCoords;
+  delete[] newXCoords;
+  delete[] newYCoords;
   //printf("#2: %d\n", clock());
   return Py::Object();
 }
@@ -2247,14 +2275,34 @@ RendererAgg::write_rgba(const Py::Tuple& args) {
   _VERBOSE("RendererAgg::write_rgba");
 
   args.verify_length(1);
-  std::string fname = Py::String( args[0]);
 
-  std::ofstream of2( fname.c_str(), std::ios::binary|std::ios::out);
-  for (size_t i=0; i<NUMBYTES; i++) {
-    of2.write((char*)&(pixBuffer[i]), sizeof(char));
+  FILE *fp = NULL;
+  bool close_file = false;
+  Py::Object py_fileobj = Py::Object(args[0]);
+  if (py_fileobj.isString()) {
+    std::string fileName = Py::String(py_fileobj);
+    const char *file_name = fileName.c_str();
+    if ((fp = fopen(file_name, "wb")) == NULL)
+      throw Py::RuntimeError( Printf("Could not open file %s", file_name).str() );
+    fwrite(pixBuffer, 1, NUMBYTES, fp);
+    close_file = true;
+    fclose(fp);
+  } else if (PyFile_CheckExact(py_fileobj.ptr())) {
+    fp = PyFile_AsFile(py_fileobj.ptr());
+    fwrite(pixBuffer, 1, NUMBYTES, fp);
+  } else {
+    PyObject* write_method = PyObject_GetAttrString(py_fileobj.ptr(), "write");
+    if (!(write_method && PyCallable_Check(write_method))) {
+      Py_XDECREF(write_method);
+      throw Py::TypeError("Object does not appear to be a 8-bit string path or a Python file-like object");
+    }
+
+    PyObject_CallFunction(write_method, (char *)"s#", pixBuffer, NUMBYTES);
+
+    Py_XDECREF(write_method);
   }
-  return Py::Object();
 
+  return Py::Object();
 }
 
 static void write_png_data(png_structp png_ptr, png_bytep data, png_size_t length) {
@@ -2262,7 +2310,7 @@ static void write_png_data(png_structp png_ptr, png_bytep data, png_size_t lengt
   PyObject* write_method = PyObject_GetAttrString(py_file_obj, "write");
   PyObject* result = NULL;
   if (write_method)
-    result = PyObject_CallFunction(write_method, "s#", data, length);
+    result = PyObject_CallFunction(write_method, (char *)"s#", data, length);
   Py_XDECREF(write_method);
   Py_XDECREF(result);
 }
@@ -2272,7 +2320,7 @@ static void flush_png_data(png_structp png_ptr) {
   PyObject* flush_method = PyObject_GetAttrString(py_file_obj, "flush");
   PyObject* result = NULL;
   if (flush_method)
-    result = PyObject_CallFunction(flush_method, "");
+    result = PyObject_CallFunction(flush_method, (char *)"");
   Py_XDECREF(flush_method);
   Py_XDECREF(result);
 }
@@ -2288,18 +2336,22 @@ RendererAgg::write_png(const Py::Tuple& args)
   args.verify_length(1, 2);
 
   FILE *fp = NULL;
+  bool close_file = false;
   Py::Object py_fileobj = Py::Object(args[0]);
   if (py_fileobj.isString()) {
     std::string fileName = Py::String(py_fileobj);
     const char *file_name = fileName.c_str();
     if ((fp = fopen(file_name, "wb")) == NULL)
       throw Py::RuntimeError( Printf("Could not open file %s", file_name).str() );
+    close_file = true;
+  } else if (PyFile_CheckExact(py_fileobj.ptr())) {
+    fp = PyFile_AsFile(py_fileobj.ptr());
   }
   else {
     PyObject* write_method = PyObject_GetAttrString(py_fileobj.ptr(), "write");
     if (!(write_method && PyCallable_Check(write_method))) {
       Py_XDECREF(write_method);
-      throw Py::TypeError("Object does not appear to be a path or a Python file-like object");
+      throw Py::TypeError("Object does not appear to be a 8-bit string path or a Python file-like object");
     }
     Py_XDECREF(write_method);
   }
@@ -2368,7 +2420,7 @@ RendererAgg::write_png(const Py::Tuple& args)
     */
 
   } catch (...) {
-      if (fp) fclose(fp);
+      if (fp && close_file) fclose(fp);
       delete [] row_pointers;
       if (png_ptr && info_ptr) png_destroy_write_struct(&png_ptr, &info_ptr);
       throw;
@@ -2376,7 +2428,7 @@ RendererAgg::write_png(const Py::Tuple& args)
 
   png_destroy_write_struct(&png_ptr, &info_ptr);
   delete [] row_pointers;
-  if (fp) fclose(fp);
+  if (fp && close_file) fclose(fp);
 
   return Py::Object();
 }
@@ -2588,7 +2640,8 @@ void BufferRegion::init_type() {
 
   add_varargs_method("to_string", &BufferRegion::to_string,
 		     "to_string()");
-
+  add_varargs_method("to_string_argb", &BufferRegion::to_string_argb,
+		     "to_string_argb()");
 }
 
 

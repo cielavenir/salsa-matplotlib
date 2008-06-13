@@ -713,6 +713,13 @@ end"""
                     charprocDict['Type'] = Name('XObject')
                     charprocDict['Subtype'] = Name('Form')
                     charprocDict['BBox'] = bbox
+                    # Each glyph includes bounding box information,
+                    # but xpdf and ghostscript can't handle it in a
+                    # Form XObject (they segfault!!!), so we remove it
+                    # from the stream here.  It's not needed anyway,
+                    # since the Form XObject includes it in its BBox
+                    # value.
+                    stream = stream[stream.find("d1") + 2:]
                 charprocObject = self.reserveObject('charProc')
                 self.beginStream(charprocObject.id, None, charprocDict)
                 self.currentstream.write(stream)
@@ -795,8 +802,7 @@ end"""
                 ccode = ord(c)
                 gind = cmap.get(ccode) or 0
                 glyph = font.load_char(ccode, flags=LOAD_NO_HINTING)
-                # Why divided by 3.0 ??? Wish I knew... MGD
-                widths.append((ccode, cvt(glyph.horiAdvance) / 3.0))
+                widths.append((ccode, glyph.horiAdvance / 6))
                 if ccode < 65536:
                     cid_to_gid_map[ccode] = unichr(gind)
                 max_ccode = max(ccode, max_ccode)
@@ -1160,7 +1166,7 @@ class RendererPdf(RendererBase):
         self.tex_font_map = None
 
     def finalize(self):
-        self.gc.finalize()
+        self.file.output(*self.gc.finalize())
 
     def check_gc(self, gc, fillcolor=None):
         orig_fill = gc._fillcolor

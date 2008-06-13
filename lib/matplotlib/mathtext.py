@@ -552,7 +552,6 @@ class TruetypeFonts(Fonts):
     A generic base class for all font setups that use Truetype fonts
     (through ft2font)
     """
-    basepath = os.path.join( get_data_path(), 'fonts' )
     _fonts = {}
 
     class CachedFont:
@@ -652,12 +651,12 @@ class TruetypeFonts(Fonts):
             # Some fonts don't store the xHeight, so we do a poor man's xHeight
             metrics = self.get_metrics(font, 'it', 'x', fontsize, dpi)
             return metrics.iceberg
-        xHeight = pclt['xHeight'] / 64.0
+        xHeight = (pclt['xHeight'] / 64.0) * (fontsize / 12.0) * (dpi / 100.0)
         return xHeight
 
     def get_underline_thickness(self, font, fontsize, dpi):
         cached_font = self._get_font(font)
-        return max(1.0, cached_font.font.underline_thickness / 64.0 / fontsize * 10.0)
+        return cached_font.font.underline_thickness / 64.0 / fontsize * (10.0 * dpi / 100.0)
 
     def get_kern(self, font1, fontclass1, sym1, fontsize1,
                  font2, fontclass2, sym2, fontsize2, dpi):
@@ -686,7 +685,7 @@ class BakomaFonts(TruetypeFonts):
         TruetypeFonts.__init__(self, *args, **kwargs)
         if not len(self.fontmap):
             for key, val in self._fontmap.iteritems():
-                fullpath = os.path.join(self.basepath, 'ttf', val + ".ttf")
+                fullpath = findfont(val)
                 self.fontmap[key] = fullpath
                 self.fontmap[val] = fullpath
 
@@ -913,7 +912,7 @@ class StixFonts(UnicodeFonts):
         TruetypeFonts.__init__(self, *args, **kwargs)
         if not len(self.fontmap):
             for key, name in self._fontmap.iteritems():
-                fullpath = os.path.join(self.basepath, 'ttf', name + ".ttf")
+                fullpath = findfont(name)
                 self.fontmap[key] = fullpath
                 self.fontmap[name] = fullpath
 
@@ -2058,7 +2057,7 @@ class Parser(object):
                      ).setParseAction(self.customspace).setName('customspace')
 
         unicode_range = u"\U00000080-\U0001ffff"
-        symbol       =(Regex(UR"([a-zA-Z0-9 +\-*/<>=:,.;!'@()|%s])|(\\[%%${}\[\]_|])" % unicode_range)
+        symbol       =(Regex(UR"([a-zA-Z0-9 +\-*/<>=:,.;!'@()\[\]|%s])|(\\[%%${}\[\]_|])" % unicode_range)
                      | Combine(
                          bslash
                        + oneOf(tex2uni.keys())
@@ -2109,12 +2108,7 @@ class Parser(object):
                        )
                      + Optional(
                          Suppress(Literal("["))
-                       + Group(
-                           OneOrMore(
-                             (c_over_c | symbol)
-                           ^ font
-                           )
-                         )
+                       + Regex("[0-9]+")
                        + Suppress(Literal("]")),
                          default = None
                        )
@@ -2607,11 +2601,7 @@ class Parser(object):
         if root is None:
             root = Box(0., 0., 0.)
         else:
-            if not isinstance(root, ParseResults):
-                raise ParseFatalException(
-                    "Can not parse root of radical. "
-                    "Only simple symbols are allowed in the root.")
-            root = Hlist(root.asList())
+            root = Hlist([Char(x, state) for x in root])
             root.shrink()
             root.shrink()
 

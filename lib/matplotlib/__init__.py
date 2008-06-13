@@ -55,9 +55,9 @@ gmail.com and a host of others).
 """
 from __future__ import generators
 
-__version__  = '0.91.2'
-__revision__ = '$Revision: 4802 $'
-__date__     = '$Date: 2008-01-06 12:10:34 -0500 (Sun, 6 Jan 2008) $'
+__version__  = '0.91.3'
+__revision__ = '$Revision: 5313 $'
+__date__     = '$Date: 2008-05-29 23:07:39 -0400 (Thu, 29 May 2008) $'
 
 import md5, os, re, shutil, sys, warnings
 import distutils.sysconfig
@@ -397,7 +397,7 @@ def _get_configdir():
 
     if os.path.exists(p):
         if not _is_writable_dir(p):
-            raise RuntimeError("'%s' is not a writable dir; you must set %s/.matplotlib to be a writable dir.  You can also set environment variable MPLCONFIGDIR to any writable directory where you want matplotlib data stored "%h)
+            raise RuntimeError("'%s' is not a writable dir; you must set %s/.matplotlib to be a writable dir.  You can also set environment variable MPLCONFIGDIR to any writable directory where you want matplotlib data stored "% (h, h))
     else:
         if not _is_writable_dir(h):
             raise RuntimeError("Failed to create %s/.matplotlib; consider setting MPLCONFIGDIR to a writable directory for matplotlib configuration data"%h)

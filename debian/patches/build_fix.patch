@@ -1,7 +1,7 @@
-Index: matplotlib/setupext.py
+Index: matplotlib-0.91.3/setupext.py
 ===================================================================
---- matplotlib.orig/setupext.py	2008-04-22 22:50:11.272065078 +0200
-+++ matplotlib/setupext.py	2008-04-22 23:33:33.044331630 +0200
+--- matplotlib-0.91.3.orig/setupext.py	2008-05-30 00:47:15.000000000 +0200
++++ matplotlib-0.91.3/setupext.py	2008-06-12 19:45:43.380013219 +0200
 @@ -47,8 +47,8 @@
  
  basedir = {
@@ -24,17 +24,17 @@ Index: matplotlib/setupext.py
      'aix5' : ['/usr/local'],
  }
  
-@@ -960,6 +960,9 @@
+@@ -965,6 +965,9 @@
              if not os.path.exists(tk_inc):
-                 tk_inc = os.path.normpath(os.path.join(tk_lib_dir, 
+                 tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
                                            '../../include'))
 +            if not os.path.exists(tk_inc):
 +                tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
 +                                          '../../../include/tcl' + tk_ver))
-             
+ 
              if ((not os.path.exists(os.path.join(tk_inc,'tk.h'))) and
                  os.path.exists(os.path.join(tcl_inc,'tk.h'))):
-@@ -977,11 +980,11 @@
+@@ -982,11 +985,11 @@
  Using default library and include directories for Tcl and Tk because a
  Tk window failed to open.  You may need to define DISPLAY for Tk to work
  so that setup can determine where your libraries are located."""

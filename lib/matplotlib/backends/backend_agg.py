@@ -387,12 +387,17 @@ class FigureCanvasAgg(FigureCanvasBase):
     def get_default_filetype(self):
         return 'png'
 
-    def print_raw(self, filename, *args, **kwargs):
+    def print_raw(self, filename_or_obj, *args, **kwargs):
         self.draw()
-        self.get_renderer()._renderer.write_rgba(str(filename))
+        if is_string_like(filename_or_obj):
+            filename_or_obj = file(filename_or_obj, 'wb')
+        self.get_renderer()._renderer.write_rgba(filename_or_obj)
     print_rgba = print_raw
 
-    def print_png(self, filename, *args, **kwargs):
+    def print_png(self, filename_or_obj, *args, **kwargs):
         self.draw()
-        self.get_renderer()._renderer.write_png(filename, self.figure.dpi.get())
+        if is_string_like(filename_or_obj):
+            filename_or_obj = file(filename_or_obj, 'wb')
+        self.get_renderer()._renderer.write_png(filename_or_obj,
+                                                self.figure.dpi.get())
 

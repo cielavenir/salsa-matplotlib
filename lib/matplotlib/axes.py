@@ -331,7 +331,6 @@ class _process_plot_var_args:
                 self.set_patchprops(seg, **kwargs)
                 ret.append(seg)
 
-
             if self.command == 'plot': func = makeline
             else:                      func = makefill
             if multicol:
@@ -1007,7 +1006,7 @@ class Axes(martist.Artist):
 
         try: v[0]
         except IndexError:
-            emit = kwargs.get('emit', False)
+            emit = kwargs.get('emit', True)
             xmin = kwargs.get('xmin', None)
             xmax = kwargs.get('xmax', None)
 
@@ -2237,7 +2236,7 @@ class Axes(martist.Artist):
 
 
         #if t.get_clip_on():  t.set_clip_box(self.bbox)
-        if kwargs.has_key('clip_on'):  t.set_clip_box(self.bbox)
+        if kwargs.get('clip_on'):  t.set_clip_box(self.bbox)
         return t
     text.__doc__ = cbook.dedent(text.__doc__) % martist.kwdocd
 
@@ -2443,9 +2442,10 @@ class Axes(martist.Artist):
         y = npy.asarray(y)
 
         if len(xmin)==1:
-            xmin = xmin*npy.ones(y.shape, y.dtype)
+            xmin = npy.resize( xmin, y.shape )
         if len(xmax)==1:
-            xmax = xmax*npy.ones(y.shape, y.dtype)
+            xmax = npy.resize( xmax, y.shape )
+
 
         xmin = npy.asarray(xmin)
         xmax = npy.asarray(xmax)
@@ -2514,9 +2514,10 @@ class Axes(martist.Artist):
         ymax = npy.asarray(ymax)
 
         if len(ymin)==1:
-            ymin = ymin*npy.ones(x.shape, x.dtype)
+            ymin = npy.resize( ymin, x.shape )
         if len(ymax)==1:
-            ymax = ymax*npy.ones(x.shape, x.dtype)
+            ymax = npy.resize( ymax, x.shape )
+
 
         if len(ymin)!=len(x):
             raise ValueError, 'ymin and x are unequal sized sequences'
@@ -2533,12 +2534,17 @@ class Axes(martist.Artist):
         self.add_collection(coll)
         coll.update(kwargs)
 
-        minx = x.min()
-        maxx = x.max()
-        miny = min(ymin.min(), ymax.min())
-        maxy = max(ymin.max(), ymax.max())
-        minx, maxx = self.convert_xunits((minx, maxx))
-        miny, maxy = self.convert_yunits((miny, maxy))
+        # We do the conversion first since not all unitized data is uniform
+        xx = self.convert_xunits( x )
+        yymin = self.convert_yunits( ymin )
+        yymax = self.convert_yunits( ymax )
+
+        minx = min( xx )
+        maxx = max( xx )
+
+        miny = min( min(yymin), min(yymax) )
+        maxy = max( max(yymin), max(yymax) )
+
         corners = (minx, miny), (maxx, maxy)
         self.update_datalim(corners)
         self.autoscale_view()
@@ -2644,7 +2650,6 @@ class Axes(martist.Artist):
         autoscaled; default True.  See Axes.autoscale_view for more
         information
         """
-
         scalex = kwargs.pop( 'scalex', True)
         scaley = kwargs.pop( 'scaley', True)
 
@@ -3264,6 +3269,20 @@ class Axes(martist.Artist):
 
         patches = []
 
+        # lets do some conversions now since some types cannot be subtracted uniformly
+        if self.xaxis is not None:
+            xconv = self.xaxis.converter
+            if xconv is not None:
+                units = self.xaxis.get_units()
+                left = xconv.convert( left, units )
+                width = xconv.convert( width, units )
+
+        if self.yaxis is not None:
+            yconv = self.yaxis.converter
+            if yconv is not None :
+                units = self.yaxis.get_units()
+                bottom = yconv.convert( bottom, units )
+                height = yconv.convert( height, units )
 
         if align == 'edge':
             pass
@@ -4034,8 +4053,20 @@ class Axes(martist.Artist):
             'h' : hexagon
             '8' : octagon
 
-        If marker is None and verts is not None, verts is a sequence
-        of (x,y) vertices for a custom scatter symbol.
+        The marker can also be a tuple (numsides, style, angle), which will
+        create a custom, regular symbol.
+
+            numsides is the number of sides
+
+            style is the style of the regular symbol:
+              0 : a regular polygon
+              1 : a star-like symbol
+              2 : an asterisk
+
+            angle is the angle of rotation of the symbol
+
+        Finally, marker can be (verts, 0), verts is a sequence of (x,y)
+        vertices for a custom scatter symbol.
 
         s is a size argument in points squared.
 
