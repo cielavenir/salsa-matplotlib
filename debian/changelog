@@ -1,3 +1,15 @@
+matplotlib (0.98.0-1) UNRELEASED; urgency=low
+
+  * (NOT RELEASED YET) New upstream release
+  * debian/rules
+    - changed doc name
+  * debian/control
+    - bump build-dep to python-numpy to at least 1.1.0
+  * debian/patches/build_fix.patch
+    - updated to match new upstream source code
+
+ -- Sandro Tosi <matrixhasu@gmail.com>  Wed, 18 Jun 2008 21:28:42 +0200
+
 matplotlib (0.91.3-1) unstable; urgency=low
 
   * New upstream release; Closes: #485950
