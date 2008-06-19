@@ -4,11 +4,10 @@ operations.
 
 """
 from __future__ import division
-import sys, os, warnings
+import os, warnings
 
-import numpy as npy
-
-import matplotlib.numerix.npyma as ma
+import numpy as np
+from numpy import ma
 
 from matplotlib import rcParams
 from matplotlib import artist as martist
@@ -24,6 +23,31 @@ from matplotlib._image import *
 
 class AxesImage(martist.Artist, cm.ScalarMappable):
     zorder = 1
+    # map interpolation strings to module constants
+    _interpd = {
+        'nearest'  : _image.NEAREST,
+        'bilinear' : _image.BILINEAR,
+        'bicubic'  : _image.BICUBIC,
+        'spline16' : _image.SPLINE16,
+        'spline36' : _image.SPLINE36,
+        'hanning'  : _image.HANNING,
+        'hamming'  : _image.HAMMING,
+        'hermite'  : _image.HERMITE,
+        'kaiser'   : _image.KAISER,
+        'quadric'  : _image.QUADRIC,
+        'catrom'   : _image.CATROM,
+        'gaussian' : _image.GAUSSIAN,
+        'bessel'   : _image.BESSEL,
+        'mitchell' : _image.MITCHELL,
+        'sinc'     : _image.SINC,
+        'lanczos'  : _image.LANCZOS,
+        'blackman' : _image.BLACKMAN,
+    }
+
+    # reverse interp dict
+    _interpdr = dict([ (v,k) for k,v in _interpd.items()])
+
+    interpnames = _interpd.keys()
 
     def __init__(self, ax,
                  cmap = None,
@@ -57,33 +81,9 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
         self._extent = extent
         self.set_filternorm(filternorm)
         self.set_filterrad(filterrad)
+        self._filterrad = filterrad
 
 
-        # map interpolation strings to module constants
-        self._interpd = {
-            'nearest'  : _image.NEAREST,
-            'bilinear' : _image.BILINEAR,
-            'bicubic'  : _image.BICUBIC,
-            'spline16' : _image.SPLINE16,
-            'spline36' : _image.SPLINE36,
-            'hanning'  : _image.HANNING,
-            'hamming'  : _image.HAMMING,
-            'hermite'  : _image.HERMITE,
-            'kaiser'   : _image.KAISER,
-            'quadric'  : _image.QUADRIC,
-            'catrom'   : _image.CATROM,
-            'gaussian' : _image.GAUSSIAN,
-            'bessel'   : _image.BESSEL,
-            'mitchell' : _image.MITCHELL,
-            'sinc'     : _image.SINC,
-            'lanczos'  : _image.LANCZOS,
-            'blackman' : _image.BLACKMAN,
-        }
-
-        # reverse interp dict
-        self._interpdr = dict([ (v,k) for k,v in self._interpd.items()])
-
-        if interpolation is None: interpolation = rcParams['image.interpolation']
 
         self.set_interpolation(interpolation)
         self.axes = ax
@@ -116,6 +116,7 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
         update state
         """
         self._imcache = None
+        self._rgbacache = None
         cm.ScalarMappable.changed(self)
 
 
@@ -123,13 +124,61 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
         if self._A is None:
             raise RuntimeError('You must first set the image array or the image attribute')
 
+        xmin, xmax, ymin, ymax = self.get_extent()
+        dxintv = xmax-xmin
+        dyintv = ymax-ymin
+
+        # the viewport scale factor
+        sx = dxintv/self.axes.viewLim.width
+        sy = dyintv/self.axes.viewLim.height
+        numrows, numcols = self._A.shape[:2]
+        if sx > 2:
+            x0 = (self.axes.viewLim.x0-xmin)/dxintv * numcols
+            ix0 = max(0, int(x0 - self._filterrad))
+            x1 = (self.axes.viewLim.x1-xmin)/dxintv * numcols
+            ix1 = min(numcols, int(x1 + self._filterrad))
+            xslice = slice(ix0, ix1)
+            xmin_old = xmin
+            xmin = xmin_old + ix0*dxintv/numcols
+            xmax = xmin_old + ix1*dxintv/numcols
+            dxintv = xmax - xmin
+            sx = dxintv/self.axes.viewLim.width
+        else:
+            xslice = slice(0, numcols)
+
+        if sy > 2:
+            y0 = (self.axes.viewLim.y0-ymin)/dyintv * numrows
+            iy0 = max(0, int(y0 - self._filterrad))
+            y1 = (self.axes.viewLim.y1-ymin)/dyintv * numrows
+            iy1 = min(numrows, int(y1 + self._filterrad))
+            if self.origin == 'upper':
+                yslice = slice(numrows-iy1, numrows-iy0)
+            else:
+                yslice = slice(iy0, iy1)
+            ymin_old = ymin
+            ymin = ymin_old + iy0*dyintv/numrows
+            ymax = ymin_old + iy1*dyintv/numrows
+            dyintv = ymax - ymin
+            sy = dyintv/self.axes.viewLim.height
+        else:
+            yslice = slice(0, numrows)
+
+        if xslice != self._oldxslice or yslice != self._oldyslice:
+            self._imcache = None
+            self._oldxslice = xslice
+            self._oldyslice = yslice
+
         if self._imcache is None:
-            if self._A.dtype == npy.uint8 and len(self._A.shape) == 3:
-                im = _image.frombyte(self._A, 0)
+            if self._A.dtype == np.uint8 and len(self._A.shape) == 3:
+                im = _image.frombyte(self._A[xslice,yslice,:], 0)
                 im.is_grayscale = False
             else:
-                x = self.to_rgba(self._A, self._alpha)
-                im = _image.fromarray(x, 0)
+                if self._rgbacache is None:
+                    x = self.to_rgba(self._A, self._alpha)
+                    self._rgbacache = x
+                else:
+                    x = self._rgbacache
+                im = _image.fromarray(x[yslice,xslice], 0)
                 if len(self._A.shape) == 2:
                     im.is_grayscale = self.cmap.is_gray()
                 else:
@@ -151,36 +200,22 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
 
         im.set_interpolation(self._interpd[self._interpolation])
 
-        xmin, xmax, ymin, ymax = self.get_extent()
-        dxintv = xmax-xmin
-        dyintv = ymax-ymin
-
-        # the viewport scale factor
-        sx = dxintv/self.axes.viewLim.width()
-        sy = dyintv/self.axes.viewLim.height()
-
-        if im.get_interpolation()!=_image.NEAREST:
-            im.apply_translation(-1, -1)
 
         # the viewport translation
-        tx = (xmin-self.axes.viewLim.xmin())/dxintv * numcols
-        ty = (ymin-self.axes.viewLim.ymin())/dyintv * numrows
+        tx = (xmin-self.axes.viewLim.x0)/dxintv * numcols
+        ty = (ymin-self.axes.viewLim.y0)/dyintv * numrows
 
-        l, b, widthDisplay, heightDisplay = self.axes.bbox.get_bounds()
+        l, b, widthDisplay, heightDisplay = self.axes.bbox.bounds
         widthDisplay *= magnification
         heightDisplay *= magnification
-
         im.apply_translation(tx, ty)
-        im.apply_scaling(sx, sy)
 
         # resize viewport to display
         rx = widthDisplay / numcols
         ry = heightDisplay  / numrows
-        im.apply_scaling(rx, ry)
-
+        im.apply_scaling(rx*sx, ry*sy)
         im.resize(int(widthDisplay+0.5), int(heightDisplay+0.5),
                   norm=self._filternorm, radius=self._filterrad)
-
         return im
 
 
@@ -190,8 +225,9 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
             self.axes.get_yscale() != 'linear'):
             warnings.warn("Images are not supported on non-linear axes.")
         im = self.make_image(renderer.get_image_magnification())
-        l, b, widthDisplay, heightDisplay = self.axes.bbox.get_bounds()
-        renderer.draw_image(l, b, im, self.axes.bbox)
+        l, b, widthDisplay, heightDisplay = self.axes.bbox.bounds
+        renderer.draw_image(l, b, im, self.axes.bbox.frozen(),
+                            *self.get_transformed_clip_path_and_affine())
 
     def contains(self, mouseevent):
         """Test whether the mouse event occured within the image.
@@ -235,6 +271,9 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
         self._A = X
 
         self._imcache =None
+        self._rgbacache = None
+        self._oldxslice = None
+        self._oldyslice = None
 
     def set_array(self, A):
         """
@@ -278,7 +317,7 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
 
         ACCEPTS: ['bicubic' | 'bilinear' | 'blackman100' | 'blackman256' | 'blackman64', 'nearest' | 'sinc144' | 'sinc256' | 'sinc64' | 'spline16' | 'spline36']
         """
-
+        if s is None: s = rcParams['image.interpolation']
         s = s.lower()
         if not self._interpd.has_key(s):
             raise ValueError('Illegal interpolation string')
@@ -329,24 +368,17 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
 
 class NonUniformImage(AxesImage):
     def __init__(self, ax,
-                 cmap = None,
-                 norm = None,
-                 extent=None,
+                 **kwargs
                 ):
         AxesImage.__init__(self, ax,
-                           cmap = cmap,
-                           norm = norm,
-                           extent=extent,
-                           interpolation = 'nearest',
-                           origin = 'lower',
-                          )
+                           **kwargs)
 
     def make_image(self, magnification=1.0):
         if self._A is None:
             raise RuntimeError('You must first set the image array')
 
-        x0, y0, v_width, v_height = self.axes.viewLim.get_bounds()
-        l, b, width, height = self.axes.bbox.get_bounds()
+        x0, y0, v_width, v_height = self.axes.viewLim.bounds
+        l, b, width, height = self.axes.bbox.bounds
         width *= magnification
         height *= magnification
         im = _image.pcolor(self._Ax, self._Ay, self._A,
@@ -358,9 +390,9 @@ class NonUniformImage(AxesImage):
         return im
 
     def set_data(self, x, y, A):
-        x = npy.asarray(x,npy.float32)
-        y = npy.asarray(y,npy.float32)
-        A = npy.asarray(A)
+        x = np.asarray(x,np.float32)
+        y = np.asarray(y,np.float32)
+        A = np.asarray(A)
         if len(x.shape) != 1 or len(y.shape) != 1\
            or A.shape[0:2] != (y.shape[0], x.shape[0]):
             raise TypeError("Axes don't match array shape")
@@ -369,18 +401,18 @@ class NonUniformImage(AxesImage):
         if len(A.shape) == 3 and A.shape[2] not in [1, 3, 4]:
             raise TypeError("3D arrays must have three (RGB) or four (RGBA) color components")
         if len(A.shape) == 3 and A.shape[2] == 1:
-             A.shape = A.shape[0:2]
+            A.shape = A.shape[0:2]
         if len(A.shape) == 2:
-            if A.dtype != npy.uint8:
-                A = (self.cmap(self.norm(A))*255).astype(npy.uint8)
+            if A.dtype != np.uint8:
+                A = (self.cmap(self.norm(A))*255).astype(np.uint8)
             else:
-                A = npy.repeat(A[:,:,npy.newaxis], 4, 2)
+                A = np.repeat(A[:,:,np.newaxis], 4, 2)
                 A[:,:,3] = 255
         else:
-            if A.dtype != npy.uint8:
-                A = (255*A).astype(npy.uint8)
+            if A.dtype != np.uint8:
+                A = (255*A).astype(np.uint8)
             if A.shape[2] == 3:
-                B = zeros(tuple(list(A.shape[0:2]) + [4]), npy.uint8)
+                B = zeros(tuple(list(A.shape[0:2]) + [4]), np.uint8)
                 B[:,:,0:3] = A
                 B[:,:,3] = 255
                 A = B
@@ -393,8 +425,9 @@ class NonUniformImage(AxesImage):
         raise NotImplementedError('Method not supported')
 
     def set_interpolation(self, s):
-        if s != 'nearest':
+        if s != None and s != 'nearest':
             raise NotImplementedError('Only nearest neighbor supported')
+        AxesImage.set_interpolation(self, s)
 
     def get_extent(self):
         if self._A is None:
@@ -418,6 +451,12 @@ class NonUniformImage(AxesImage):
         cm.ScalarMappable.set_cmap(self, norm)
 
 class PcolorImage(martist.Artist, cm.ScalarMappable):
+    '''
+    Make a pcolor-style plot with an irregular rectangular grid.
+
+    This uses a variation of the original irregular image code,
+    and it is used by pcolorfast for the corresponding grid type.
+    '''
     def __init__(self, ax,
                  x=None,
                  y=None,
@@ -447,11 +486,9 @@ class PcolorImage(martist.Artist, cm.ScalarMappable):
             raise RuntimeError('You must first set the image array')
         fc = self.axes.get_frame().get_facecolor()
         bg = mcolors.colorConverter.to_rgba(fc, 0)
-        bg = (npy.array(bg)*255).astype(npy.uint8)
-        x0, y0, v_width, v_height = self.axes.viewLim.get_bounds()
-        l, b, width, height = self.axes.bbox.get_bounds()
-        width *= magnification
-        height *= magnification
+        bg = (np.array(bg)*255).astype(np.uint8)
+        width = self.axes.bbox.width * magnification
+        height = self.axes.bbox.height * magnification
         if self.check_update('array'):
             A = self.to_rgba(self._A, alpha=self._alpha, bytes=True)
             self._rgbacache = A
@@ -459,9 +496,11 @@ class PcolorImage(martist.Artist, cm.ScalarMappable):
                 self.is_grayscale = self.cmap.is_gray()
         else:
             A = self._rgbacache
+        vl = self.axes.viewLim
         im = _image.pcolor2(self._Ax, self._Ay, A,
-                           height, width,
-                           (x0, x0+v_width, y0, y0+v_height),
+                           height,
+                           width,
+                           (vl.x0, vl.x1, vl.y0, vl.y1),
                            bg)
         im.is_grayscale = self.is_grayscale
         return im
@@ -469,20 +508,23 @@ class PcolorImage(martist.Artist, cm.ScalarMappable):
     def draw(self, renderer, *args, **kwargs):
         if not self.get_visible(): return
         im = self.make_image(renderer.get_image_magnification())
-        l, b, widthDisplay, heightDisplay = self.axes.bbox.get_bounds()
-        renderer.draw_image(l, b, im, self.axes.bbox)
+        renderer.draw_image(self.axes.bbox.xmin,
+                            self.axes.bbox.ymin,
+                            im,
+                            self.axes.bbox.frozen(),
+                            *self.get_transformed_clip_path_and_affine())
 
 
     def set_data(self, x, y, A):
         A = ma.asarray(A)
         if x is None:
-            x = npy.arange(0, A.shape[1]+1, dtype=npy.float64)
+            x = np.arange(0, A.shape[1]+1, dtype=np.float64)
         else:
-            x = npy.asarray(x, npy.float64).ravel()
+            x = np.asarray(x, np.float64).ravel()
         if y is None:
-            y = npy.arange(0, A.shape[0]+1, dtype=npy.float64)
+            y = np.arange(0, A.shape[0]+1, dtype=np.float64)
         else:
-            y = npy.asarray(y, npy.float64).ravel()
+            y = np.asarray(y, np.float64).ravel()
 
         if A.shape[:2] != (y.size-1, x.size-1):
             print A.shape
@@ -596,7 +638,8 @@ class FigureImage(martist.Artist, cm.ScalarMappable):
     def draw(self, renderer, *args, **kwargs):
         if not self.get_visible(): return
         im = self.make_image()
-        renderer.draw_image(self.ox, self.oy, im, self.figure.bbox)
+        renderer.draw_image(self.ox, self.oy, im, self.figure.bbox,
+                            *self.get_transformed_clip_path_and_affine())
 
     def write_png(self, fname):
         """Write the image to png file with fname"""
@@ -651,7 +694,7 @@ def pil_to_array( pilImage ):
     def toarray(im):
         'return a 1D array of floats'
         x_str = im.tostring('raw',im.mode,0,-1)
-        x = npy.fromstring(x_str,npy.uint8)
+        x = np.fromstring(x_str,np.uint8)
         return x
 
     if pilImage.mode in ('RGBA', 'RGBX'):
@@ -664,7 +707,7 @@ def pil_to_array( pilImage ):
         return x
     elif pilImage.mode=='RGB':
         #return MxNx3 RGB array
-        im = pilImage # no need to RGB images                
+        im = pilImage # no need to RGB images
         x = toarray(im)
         x.shape = im.size[1], im.size[0], 3
         return x

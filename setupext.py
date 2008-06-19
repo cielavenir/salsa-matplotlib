@@ -37,7 +37,7 @@ WIN32 - VISUAL STUDIO 7.1 (2003)
   http://matplotlib.sourceforge.net/win32_static_vs.tar.gz and
   see the README in that dir
 
-  > python setup.py build bdist_wininst
+  > python setup.py build --compiler=msvc bdist_wininst
 
 """
 
@@ -69,6 +69,7 @@ from textwrap import fill
 from distutils.core import Extension
 import glob
 import ConfigParser
+import cStringIO
 
 major, minor1, minor2, s, tmp = sys.version_info
 if major<2 or (major==2 and minor1<3):
@@ -91,10 +92,10 @@ BUILT_NXUTILS   = False
 BUILT_TRAITS = False
 BUILT_CONTOUR   = False
 BUILT_GDK       = False
+BUILT_PATH      = False
 
+AGG_VERSION = 'agg24'
 TCL_TK_CACHE = None
-
-AGG_VERSION = 'agg23'
 
 # for nonstandard installation/build with --prefix variable
 numpy_inc_dirs = []
@@ -537,12 +538,16 @@ def check_for_pdftops():
         return False
 
 def check_for_numpy():
-    gotit = False
     try:
         import numpy
     except ImportError:
         print_status("numpy", "no")
-        print_message("You must install numpy to build matplotlib.")
+        print_message("You must install numpy 1.1 or later to build matplotlib.")
+        return False
+    nn = numpy.__version__.split('.')
+    if not (int(nn[0]) >= 1 and int(nn[1]) >= 1):
+        print_message(
+           'numpy 1.1 or later is required; you have %s' % numpy.__version__)
         return False
     module = Extension('test', [])
     add_numpy_flags(module)
@@ -551,16 +556,13 @@ def check_for_numpy():
     print_status("numpy", numpy.__version__)
     if not find_include_file(module.include_dirs, os.path.join("numpy", "arrayobject.h")):
         print_message("Could not find the headers for numpy.  You may need to install the development package.")
+        return False
     return True
 
 def add_numpy_flags(module):
     "Add the modules flags to build extensions which use numpy"
     import numpy
-    # TODO: Remove this try statement when it is no longer needed
-    try:
-        module.include_dirs.append(numpy.get_include())
-    except AttributeError:
-        module.include_dirs.append(numpy.get_numpy_include())
+    module.include_dirs.append(numpy.get_include())
 
 def add_agg_flags(module):
     'Add the module flags to build extensions which use agg'
@@ -569,7 +571,8 @@ def add_agg_flags(module):
     try_pkgconfig(module, 'libpng', 'png')
     module.libraries.append('z')
     add_base_flags(module)
-    module.include_dirs.extend(['src','swig', '%s/include'%AGG_VERSION, '.'])
+    add_numpy_flags(module)
+    module.include_dirs.extend(['src', '%s/include'%AGG_VERSION, '.'])
 
     # put these later for correct link order
     module.libraries.extend(std_libs)
@@ -594,6 +597,7 @@ def add_ft2font_flags(module):
             if os.path.exists(p): module.library_dirs.append(p)
     else:
         add_base_flags(module)
+        module.libraries.append('z')
 
     if sys.platform == 'win32' and win32_compiler == 'mingw32':
         module.libraries.append('gw32c')
@@ -885,6 +889,105 @@ def query_tcltk():
     TCL_TK_CACHE = tcl_lib_dir, tk_lib_dir, str(Tkinter.TkVersion)[:3]
     return TCL_TK_CACHE
 
+def parse_tcl_config(tcl_lib_dir, tk_lib_dir):
+    # This is where they live on Ubuntu Hardy (at least)
+    tcl_config = os.path.join(tcl_lib_dir, "tclConfig.sh")
+    tk_config = os.path.join(tk_lib_dir, "tkConfig.sh")
+    if not (os.path.exists(tcl_config) and os.path.exists(tk_config)):
+        # This is where they live on RHEL4 (at least)
+        tcl_config = "/usr/lib/tclConfig.sh"
+        tk_config = "/usr/lib/tkConfig.sh"
+        if not (os.path.exists(tcl_config) and os.path.exists(tk_config)):
+            return None
+
+    # These files are shell scripts that set a bunch of
+    # environment variables.  To actually get at the
+    # values, we use ConfigParser, which supports almost
+    # the same format, but requires at least one section.
+    # So, we push a "[default]" section to a copy of the
+    # file in a StringIO object.
+    try:
+        tcl_vars_str = cStringIO.StringIO(
+            "[default]\n" + open(tcl_config, "r").read())
+        tk_vars_str = cStringIO.StringIO(
+            "[default]\n" + open(tk_config, "r").read())
+    except IOError:
+        # if we can't read the file, that's ok, we'll try
+        # to guess instead
+        return None
+
+    tcl_vars_str.seek(0)
+    tcl_vars = ConfigParser.RawConfigParser()
+    tk_vars_str.seek(0)
+    tk_vars = ConfigParser.RawConfigParser()
+    try:
+        tcl_vars.readfp(tcl_vars_str)
+        tk_vars.readfp(tk_vars_str)
+    except ConfigParser.ParsingError:
+        # if we can't read the file, that's ok, we'll try
+        # to guess instead
+        return None
+
+    try:
+        tcl_lib = tcl_vars.get("default", "TCL_LIB_SPEC")[1:-1].split()[0][2:]
+        tcl_inc = tcl_vars.get("default", "TCL_INCLUDE_SPEC")[3:-1]
+        tk_lib = tk_vars.get("default", "TK_LIB_SPEC")[1:-1].split()[0][2:]
+        if tk_vars.has_option("default", "TK_INCLUDE_SPEC"):
+            # On Ubuntu 8.04
+            tk_inc = tk_vars.get("default", "TK_INCLUDE_SPEC")[3:-1]
+        else:
+            # On RHEL4
+            tk_inc = tcl_inc
+    except (ConfigParser.NoSectionError, ConfigParser.NoOptionError):
+        return None
+
+    if not os.path.exists(os.path.join(tk_inc, 'tk.h')):
+        return None
+
+    return tcl_lib, tcl_inc, tk_lib, tk_inc
+
+def guess_tcl_config(tcl_lib_dir, tk_lib_dir, tk_ver):
+    if not (os.path.exists(tcl_lib_dir) and os.path.exists(tk_lib_dir)):
+        return None
+
+    tcl_lib = os.path.normpath(os.path.join(tcl_lib_dir, '../'))
+    tk_lib = os.path.normpath(os.path.join(tk_lib_dir, '../'))
+
+    tcl_inc = os.path.normpath(os.path.join(tcl_lib_dir,
+                                                    '../../include/tcl' + tk_ver))
+    if not os.path.exists(tcl_inc):
+        tcl_inc = os.path.normpath(os.path.join(tcl_lib_dir,
+                                                '../../include'))
+
+    tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
+                                           '../../include/tk' + tk_ver))
+    if not os.path.exists(tk_inc):
+        tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
+                                                       '../../include'))
+
+    if not os.path.exists(os.path.join(tk_inc, 'tk.h')):
+        tk_inc = tcl_inc
+
+    if not os.path.exists(tcl_inc):
+        # this is a hack for suse linux, which is broken
+        if (sys.platform.startswith('linux') and
+            os.path.exists('/usr/include/tcl.h') and
+            os.path.exists('/usr/include/tk.h')):
+            tcl_inc = '/usr/include'
+            tk_inc = '/usr/include'
+
+    if not os.path.exists(os.path.join(tk_inc, 'tk.h')):
+        return None
+
+    return tcl_lib, tcl_inc, tk_lib, tk_inc
+
+def hardcoded_tcl_config():
+    tcl_inc = "/usr/local/include"
+    tk_inc = "/usr/local/include"
+    tcl_lib = "/usr/local/lib"
+    tk_lib = "/usr/local/lib"
+    return tcl_lib, tcl_inc, tk_lib, tk_inc
+
 def add_tk_flags(module):
     'Add the module flags to build extensions which use tk'
     message = None
@@ -948,46 +1051,39 @@ def add_tk_flags(module):
 
     # you're still here? ok we'll try it this way...
     else:
+        success = False
+        # There are 3 methods to try, in decreasing order of "smartness"
+        #
+        #   1. Parse the tclConfig.sh and tkConfig.sh files that have
+        #      all the information we need
+        #
+        #   2. Guess the include and lib dirs based on the location of
+        #      Tkinter's 'tcl_library' and 'tk_library' variables.
+        #
+        #   3. Use some hardcoded locations that seem to work on a lot
+        #      of distros.
+
         # Query Tcl/Tk system for library paths and version string
-        tcl_lib_dir, tk_lib_dir, tk_ver = query_tcltk() # todo: try/except
-
-        # Process base directories to obtain include + lib dirs
-        if tcl_lib_dir != '' and tk_lib_dir != '':
-            tcl_lib = os.path.normpath(os.path.join(tcl_lib_dir, '../'))
-            tk_lib = os.path.normpath(os.path.join(tk_lib_dir, '../'))
-            tcl_inc = os.path.normpath(os.path.join(tcl_lib_dir,
-                                       '../../include/tcl' + tk_ver))
-            if not os.path.exists(tcl_inc):
-                tcl_inc = os.path.normpath(os.path.join(tcl_lib_dir,
-                                           '../../include'))
-            tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
-                                      '../../include/tk' + tk_ver))
-            if not os.path.exists(tk_inc):
-                tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
-                                          '../../include'))
-
-            if ((not os.path.exists(os.path.join(tk_inc,'tk.h'))) and
-                os.path.exists(os.path.join(tcl_inc,'tk.h'))):
-                tk_inc = tcl_inc
-
-            if not os.path.exists(tcl_inc):
-                # this is a hack for suse linux, which is broken
-                if (sys.platform.startswith('linux') and
-                    os.path.exists('/usr/include/tcl.h') and
-                    os.path.exists('/usr/include/tk.h')):
-                    tcl_inc = '/usr/include'
-                    tk_inc = '/usr/include'
+        try:
+            tcl_lib_dir, tk_lib_dir, tk_ver = query_tcltk()
+        except:
+            result = hardcoded_tcl_config()
         else:
-            message = """\
+            result = parse_tcl_config(tcl_lib_dir, tk_lib_dir)
+            if result is None:
+                message = """\
+Guessing the library and include directories for Tcl and Tk because the
+tclConfig.sh and tkConfig.sh could not be found and/or parsed."""
+                result = guess_tcl_config(tcl_lib_dir, tk_lib_dir, tk_ver)
+                if result is None:
+                    message = """\
 Using default library and include directories for Tcl and Tk because a
 Tk window failed to open.  You may need to define DISPLAY for Tk to work
 so that setup can determine where your libraries are located."""
-            tcl_inc = "/usr/local/include"
-            tk_inc = "/usr/local/include"
-            tcl_lib = "/usr/local/lib"
-            tk_lib = "/usr/local/lib"
-            tk_ver = ""
+                    result = hardcoded_tcl_config()
+
         # Add final versions of directories and libraries to module lists
+        tcl_lib, tcl_inc, tk_lib, tk_inc = result
         module.include_dirs.extend([tcl_inc, tk_inc])
         module.library_dirs.extend([tcl_lib, tk_lib])
         module.libraries.extend(['tk' + tk_ver, 'tcl' + tk_ver])
@@ -1056,6 +1152,7 @@ def build_gtkagg(ext_modules, packages):
     add_agg_flags(module)
     add_ft2font_flags(module)
     add_pygtk_flags(module)
+    add_numpy_flags(module)
 
     ext_modules.append(module)
     BUILT_GTKAGG = True
@@ -1106,13 +1203,10 @@ def build_agg(ext_modules, packages):
 
     agg = (
            'agg_trans_affine.cpp',
-           'agg_path_storage.cpp',
            'agg_bezier_arc.cpp',
            'agg_curves.cpp',
            'agg_vcgen_dash.cpp',
            'agg_vcgen_stroke.cpp',
-           #'agg_vcgen_markers_term.cpp',
-           'agg_rasterizer_scanline_aa.cpp',
            'agg_image_filters.cpp',
            )
 
@@ -1138,13 +1232,41 @@ def build_agg(ext_modules, packages):
 
     BUILT_AGG = True
 
+def build_path(ext_modules, packages):
+    global BUILT_PATH
+    if BUILT_PATH: return # only build it if you you haven't already
+
+    agg = (
+           'agg_curves.cpp',
+           'agg_bezier_arc.cpp',
+           'agg_trans_affine.cpp',
+           'agg_vcgen_stroke.cpp',
+           )
+
+    deps = ['%s/src/%s'%(AGG_VERSION, name) for name in agg]
+    deps.extend(glob.glob('CXX/*.cxx'))
+    deps.extend(glob.glob('CXX/*.c'))
+
+    temp_copy('src/_path.cpp', 'src/path.cpp')
+    deps.extend(['src/path.cpp'])
+    module = Extension(
+        'matplotlib._path',
+        deps,
+        include_dirs=numpy_inc_dirs,
+        )
+
+    add_numpy_flags(module)
+
+    add_agg_flags(module)
+    ext_modules.append(module)
+
+    BUILT_PATH = True
+
 def build_image(ext_modules, packages):
     global BUILT_IMAGE
     if BUILT_IMAGE: return # only build it if you you haven't already
 
     agg = ('agg_trans_affine.cpp',
-           'agg_path_storage.cpp',
-           'agg_rasterizer_scanline_aa.cpp',
            'agg_image_filters.cpp',
            'agg_bezier_arc.cpp',
            )
@@ -1166,46 +1288,6 @@ def build_image(ext_modules, packages):
     ext_modules.append(module)
 
     BUILT_IMAGE = True
-
-def build_swigagg(ext_modules, packages):
-    # setup the swig agg wrapper
-    deps = ['src/agg.cxx']
-    deps.extend(['%s/src/%s'%(AGG_VERSION, fname) for fname in
-                 (
-        'agg_trans_affine.cpp',
-        'agg_path_storage.cpp',
-        'agg_bezier_arc.cpp',
-        'agg_vcgen_dash.cpp',
-        'agg_vcgen_stroke.cpp',
-        'agg_rasterizer_scanline_aa.cpp',
-        'agg_curves.cpp',
-        )
-                 ])
-
-
-    agg = Extension('matplotlib._agg',
-                    deps,
-                    )
-
-    agg.include_dirs.extend(['%s/include'%AGG_VERSION, 'src', 'swig'])
-    agg.libraries.extend(std_libs)
-    ext_modules.append(agg)
-
-def build_transforms(ext_modules, packages):
-    cxx = glob.glob('CXX/*.cxx')
-    cxx.extend(glob.glob('CXX/*.c'))
-    temp_copy("src/_transforms.cpp","src/transforms.cpp")
-    module = Extension('matplotlib._transforms',
-                         ['src/transforms.cpp',
-                          'src/mplutils.cpp'] + cxx,
-                         libraries = std_libs,
-                         include_dirs = ['src', '.']+numpy_inc_dirs,
-                         )
-
-
-    add_numpy_flags(module)
-    add_base_flags(module)
-    ext_modules.append(module)
 
 
 def build_traits(ext_modules, packages):
@@ -1277,10 +1359,3 @@ def build_gdk(ext_modules, packages):
 
     BUILT_GDK = True
 
-def build_subprocess(ext_modules, packages):
-    module = Extension(
-        'subprocess._subprocess',
-        ['src/_subprocess.c', ],
-        )
-    add_base_flags(module)
-    ext_modules.append(module)

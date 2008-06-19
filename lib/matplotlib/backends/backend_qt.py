@@ -5,7 +5,7 @@ import sys
 
 import matplotlib
 from matplotlib import verbose
-from matplotlib.cbook import is_string_like, enumerate, onetrue
+from matplotlib.cbook import is_string_like, onetrue
 from matplotlib.backend_bases import RendererBase, GraphicsContextBase, \
      FigureManagerBase, FigureCanvasBase, NavigationToolbar2, cursors
 from matplotlib._pylab_helpers import Gcf
@@ -102,7 +102,7 @@ class FigureCanvasQT( qt.QWidget, FigureCanvasBase ):
     def mousePressEvent( self, event ):
         x = event.pos().x()
         # flipy so y=0 is bottom of canvas
-        y = self.figure.bbox.height() - event.pos().y()
+        y = self.figure.bbox.height - event.pos().y()
         button = self.buttond[event.button()]
         FigureCanvasBase.button_press_event( self, x, y, button )
         if DEBUG: print 'button pressed:', event.button()
@@ -110,18 +110,17 @@ class FigureCanvasQT( qt.QWidget, FigureCanvasBase ):
     def mouseMoveEvent( self, event ):
         x = event.x()
         # flipy so y=0 is bottom of canvas
-        y = self.figure.bbox.height() - event.y()
+        y = self.figure.bbox.height - event.y()
         FigureCanvasBase.motion_notify_event( self, x, y )
         if DEBUG: print 'mouse move'
 
     def mouseReleaseEvent( self, event ):
         x = event.x()
         # flipy so y=0 is bottom of canvas
-        y = self.figure.bbox.height() - event.y()
+        y = self.figure.bbox.height - event.y()
         button = self.buttond[event.button()]
         FigureCanvasBase.button_release_event( self, x, y, button )
         if DEBUG: print 'button released'
-        self.draw()
 
     def keyPressEvent( self, event ):
         key = self._get_key( event )
@@ -139,7 +138,7 @@ class FigureCanvasQT( qt.QWidget, FigureCanvasBase ):
         w = event.size().width()
         h = event.size().height()
         if DEBUG: print "FigureCanvasQt.resizeEvent(", w, ",", h, ")"
-        dpival = self.figure.dpi.get()
+        dpival = self.figure.dpi
         winch = w/dpival
         hinch = h/dpival
         self.figure.set_size_inches( winch, hinch )
@@ -150,7 +149,7 @@ class FigureCanvasQT( qt.QWidget, FigureCanvasBase ):
         qt.QWidget.resize( self, w, h )
 
         # Resize the figure by converting pixels to inches.
-        pixelPerInch = self.figure.dpi.get()
+        pixelPerInch = self.figure.dpi
         wInch = w / pixelPerInch
         hInch = h / pixelPerInch
         self.figure.set_size_inches( wInch, hInch )
@@ -174,6 +173,9 @@ class FigureCanvasQT( qt.QWidget, FigureCanvasBase ):
             key = None
 
         return key
+
+    def flush_events(self):
+        qt.qApp.processEvents()
 
 class FigureManagerQT( FigureManagerBase ):
     """
@@ -236,7 +238,7 @@ class FigureManagerQT( FigureManagerBase ):
         def notify_axes_change( fig ):
            # This will be called whenever the current axes is changed
            if self.toolbar != None: self.toolbar.update()
-           self.canvas.figure.add_axobserver( notify_axes_change )
+        self.canvas.figure.add_axobserver( notify_axes_change )
 
     def _widgetclosed( self ):
         if self.window._destroying: return
@@ -367,7 +369,7 @@ class NavigationToolbar2QT( NavigationToolbar2, qt.QWidget ):
         qt.QApplication.setOverrideCursor( qt.QCursor( cursord[cursor] ) )
 
     def draw_rubberband( self, event, x0, y0, x1, y1 ):
-        height = self.canvas.figure.bbox.height()
+        height = self.canvas.figure.bbox.height
         y1 = height - y1
         y0 = height - y0
 
@@ -384,8 +386,8 @@ class NavigationToolbar2QT( NavigationToolbar2, qt.QWidget ):
 
         toolfig = Figure(figsize=(6,3))
         toolfig.subplots_adjust(top=0.9)
-        w = int (toolfig.bbox.width())
-        h = int (toolfig.bbox.height())
+        w = int (toolfig.bbox.width)
+        h = int (toolfig.bbox.height)
 
         canvas = self._get_canvas(toolfig)
         tool = SubplotTool(self.canvas.figure, toolfig)

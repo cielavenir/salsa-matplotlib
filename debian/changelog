@@ -1,3 +1,16 @@
+matplotlib (0.98.0-1) experimental; urgency=low
+
+  * New upstream release; Closes: #486074
+  * debian/rules
+    - changed doc name
+  * debian/control
+    - bump build-dep to python-numpy to at least 1.1.0
+    - added python-excelerator to Depends
+  * debian/patches/build_fix.patch
+    - updated to match new upstream source code
+
+ -- Sandro Tosi <matrixhasu@gmail.com>  Thu, 19 Jun 2008 20:40:43 +0200
+
 matplotlib (0.91.3-1) unstable; urgency=low
 
   * New upstream release; Closes: #485950

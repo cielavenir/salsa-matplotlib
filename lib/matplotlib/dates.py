@@ -76,12 +76,11 @@ Date formatters
   DateIndexFormatter - date plots with implicit x indexing.
 
 """
-import sys, re, time, math, datetime
-import locale
+import re, time, math, datetime
 
 import pytz
 import matplotlib
-import numpy as npy
+import numpy as np
 
 import matplotlib.units as units
 import matplotlib.cbook as cbook
@@ -207,17 +206,17 @@ def date2num(d):
     minutes, seconds) since 0001-01-01 00:00:00 UTC
     """
     if not cbook.iterable(d): return _to_ordinalf(d)
-    else: return npy.asarray([_to_ordinalf(val) for val in d])
+    else: return np.asarray([_to_ordinalf(val) for val in d])
 
 
 def julian2num(j):
     'convert a Julian date (or sequence) to a matplotlib date (or sequence)'
-    if cbook.iterable(j): j = npy.asarray(j)
+    if cbook.iterable(j): j = np.asarray(j)
     return j + 1721425.5
 
 def num2julian(n):
     'convert a matplotlib date (or seguence) to a Julian date (or sequence)'
-    if cbook.iterable(n): n = npy.asarray(n)
+    if cbook.iterable(n): n = np.asarray(n)
     return n - 1721425.5
 
 def num2date(x, tz=None):
@@ -243,7 +242,7 @@ def drange(dstart, dend, delta):
             delta.microseconds/MUSECONDS_PER_DAY)
     f1 = _to_ordinalf(dstart)
     f2 = _to_ordinalf(dend)
-    return npy.arange(f1, f2, step)
+    return np.arange(f1, f2, step)
 
 
 
@@ -429,13 +428,11 @@ class DateLocator(ticker.Locator):
         self.tz = tz
 
     def datalim_to_dt(self):
-        self.verify_intervals()
-        dmin, dmax = self.dataInterval.get_bounds()
+        dmin, dmax = self.axis.get_data_interval()
         return num2date(dmin, self.tz), num2date(dmax, self.tz)
 
     def viewlim_to_dt(self):
-        self.verify_intervals()
-        vmin, vmax = self.viewInterval.get_bounds()
+        vmin, vmax = self.axis.get_view_interval()
         return num2date(vmin, self.tz), num2date(vmax, self.tz)
 
     def _get_unit(self):
@@ -459,8 +456,6 @@ class RRuleLocator(DateLocator):
         self.rule = o
 
     def __call__(self):
-        self.verify_intervals()
-
         # if no data have been set, this will tank with a ValueError
         try: dmin, dmax = self.viewlim_to_dt()
         except ValueError: return []
@@ -500,7 +495,6 @@ class RRuleLocator(DateLocator):
         """
         Set the view limits to include the data range
         """
-        self.verify_intervals()
         dmin, dmax = self.datalim_to_dt()
         if dmin>dmax:
             dmax, dmin = dmin, dmax
@@ -537,6 +531,10 @@ class AutoDateLocator(DateLocator):
         self.refresh()
         return self._locator()
 
+    def set_axis(self, axis):
+        DateLocator.set_axis(self, axis)
+        self._locator.set_axis(axis)
+
     def refresh(self):
         'refresh internal information based on current lim'
         dmin, dmax = self.viewlim_to_dt()
@@ -563,8 +561,6 @@ class AutoDateLocator(DateLocator):
 
     def autoscale(self):
         'Try to choose the view limits intelligently'
-
-        self.verify_intervals()
         dmin, dmax = self.datalim_to_dt()
         self._locator = self.get_locator(dmin, dmax)
         return self._locator.autoscale()
@@ -667,9 +663,10 @@ class AutoDateLocator(DateLocator):
                               bysecond=bysecond )
 
         locator = RRuleLocator(rrule, self.tz)
+        locator.set_axis(self.axis)
 
-        locator.set_view_interval(self.viewInterval)
-        locator.set_data_interval(self.dataInterval)
+        locator.set_view_interval(*self.axis.get_view_interval())
+        locator.set_data_interval(*self.axis.get_data_interval())
         return locator
 
 
@@ -710,8 +707,6 @@ class YearLocator(DateLocator):
         return 365
 
     def __call__(self):
-        self.verify_intervals()
-
         dmin, dmax = self.viewlim_to_dt()
         ymin = self.base.le(dmin.year)
         ymax = self.base.ge(dmax.year)
@@ -728,7 +723,6 @@ class YearLocator(DateLocator):
         """
         Set the view limits to include the data range
         """
-        self.verify_intervals()
         dmin, dmax = self.datalim_to_dt()
 
         ymin = self.base.le(dmin.year)
@@ -909,14 +903,14 @@ def epoch2num(e):
     days since 0001
     """
     spd = 24.*3600.
-    return 719163 + npy.asarray(e)/spd
+    return 719163 + np.asarray(e)/spd
 
 def num2epoch(d):
     """
     convert days since 0001 to epoch.  d can be a number or sequence
     """
     spd = 24.*3600.
-    return (npy.asarray(d)-719163)*spd
+    return (np.asarray(d)-719163)*spd
 
 def mx2num(mxdates):
     """
@@ -1045,6 +1039,7 @@ if __name__=='__main__':
     delta = datetime.timedelta(hours=6)
     dates = drange(d1, d2, delta)
 
+    # MGDTODO: Broken on transforms branch
     #print 'orig', d1
     #print 'd2n and back', num2date(date2num(d1), tz)
     from _transforms import Value, Interval
@@ -1071,6 +1066,3 @@ if __name__=='__main__':
     #for t in  ticks: print formatter(t)
 
     for t in dates: print formatter(t)
-
-
-

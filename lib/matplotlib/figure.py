@@ -1,29 +1,26 @@
 """
 Figure class -- add docstring here!
 """
-import os
-import sys
-
-import numpy as npy
+import numpy as np
+import time
 
 import artist
 from artist import Artist
-from axes import Axes, Subplot, PolarSubplot, PolarAxes
+from axes import Axes, SubplotBase, subplot_class_factory
 from cbook import flatten, allequal, Stack, iterable, dedent
 import _image
 import colorbar as cbar
-from colors import Normalize, rgb2hex
 from image import FigureImage
 from matplotlib import rcParams
-from patches import Rectangle, Polygon
+from patches import Rectangle
 from text import Text, _process_text_args
 
 from legend import Legend
-from transforms import Bbox, Value, Point, get_bbox_transform, unit_bbox
-from ticker import FormatStrFormatter
-from cm import ScalarMappable
-from contour import ContourSet
-import warnings
+from transforms import Affine2D, Bbox, BboxTransformTo, TransformedBbox
+from projections import projection_factory, get_projection_names, \
+    get_projection_class
+
+import matplotlib.cbook as cbook
 
 class SubplotParams:
     """
@@ -102,10 +99,94 @@ class SubplotParams:
         setattr(self, s, val)
 
 
+class BlockingMouseInput(object):
+    """ Class that creates a callable object to retrieve mouse clicks in a
+        blocking way.
+    """
+    def __init__(self, fig):
+        self.fig = fig
+
+
+    def on_click(self, event):
+        """ Event handler that will be passed to the current figure to
+            retrieve clicks.
+        """
+        if event.button == 3:
+            # If it's a right click, pop the last coordinates.
+            if len(self.clicks) > 0:
+                self.clicks.pop()
+                if self.show_clicks:
+                    mark = self.marks.pop()
+                    mark.remove()
+                    self.fig.canvas.draw()
+        elif event.button == 2 and self.n < 0:
+            # If it's a middle click, and we are in infinite mode, finish
+            self.done = True
+        elif event.inaxes:
+            # If it's a valid click, append the coordinates to the list
+            self.clicks.append((event.xdata, event.ydata))
+            if self.verbose:
+                print "input %i: %f,%f" % (len(self.clicks),
+                                    event.xdata, event.ydata)
+            if self.show_clicks:
+                self.marks.extend(
+                    event.inaxes.plot([event.xdata,], [event.ydata,], 'r+') )
+                self.fig.canvas.draw()
+            if self.n > 0 and len(self.clicks) >= self.n:
+                self.done = True
+
+
+    def __call__(self, n=1, timeout=30, verbose=False, show_clicks=True):
+        """ Blocking call to retrieve n coordinate pairs through mouse
+            clicks.
+        """
+        self.verbose     = verbose
+        self.done        = False
+        self.clicks      = []
+        self.show_clicks = True
+        self.marks       = []
+
+        assert isinstance(n, int), "Requires an integer argument"
+        self.n = n
+
+        # Ensure that the figure is shown
+        self.fig.show()
+        # connect the click events to the on_click function call
+        self.callback = self.fig.canvas.mpl_connect('button_press_event',
+                                                    self.on_click)
+        # wait for n clicks
+        counter = 0
+        while not self.done:
+            self.fig.canvas.flush_events()
+            time.sleep(0.01)
+
+            # check for a timeout
+            counter += 1
+            if timeout > 0 and counter > timeout/0.01:
+                print "ginput timeout";
+                break;
+
+        # Disconnect the event, clean the figure, and return what we have
+        self.fig.canvas.mpl_disconnect(self.callback)
+        self.callback = None
+        if self.show_clicks:
+            for mark in self.marks:
+                mark.remove()
+            self.fig.canvas.draw()
+        return self.clicks
+
+
 class Figure(Artist):
 
+    """
+    The Figure instance supports callbacks through a callbacks
+    attribute which is a cbook.CallbackRegistry instance.  The events
+    you can connect to are 'dpi_changed', and the callback will be
+    called with func(fig) where fig is the Figure instance
+    """
+
     def __str__(self):
-        return "Figure(%gx%g)"%(self.figwidth.get(),self.figheight.get())
+        return "Figure(%gx%g)" % tuple(self.bbox.size)
 
     def __init__(self,
                  figsize   = None,  # defaults to rc figure.figsize
@@ -123,24 +204,21 @@ class Figure(Artist):
         """
         Artist.__init__(self)
 
+        self.callbacks = cbook.CallbackRegistry(('dpi_changed', ))
+
         if figsize is None  : figsize   = rcParams['figure.figsize']
         if dpi is None      : dpi       = rcParams['figure.dpi']
         if facecolor is None: facecolor = rcParams['figure.facecolor']
         if edgecolor is None: edgecolor = rcParams['figure.edgecolor']
 
-        self.dpi = Value(dpi)
-        self.figwidth = Value(figsize[0])
-        self.figheight = Value(figsize[1])
-        self.ll = Point( Value(0), Value(0) )
-        self.ur = Point( self.figwidth*self.dpi,
-                         self.figheight*self.dpi )
-        self.bbox = Bbox(self.ll, self.ur)
+        self.dpi_scale_trans = Affine2D()
+        self.dpi = dpi
+        self.bbox_inches = Bbox.from_bounds(0, 0, *figsize)
+        self.bbox = TransformedBbox(self.bbox_inches, self.dpi_scale_trans)
 
         self.frameon = frameon
 
-        self.transFigure = get_bbox_transform( unit_bbox(), self.bbox)
-
-
+        self.transFigure = BboxTransformTo(self.bbox)
 
         self.figurePatch = Rectangle(
             xy=(0,0), width=1, height=1,
@@ -162,6 +240,18 @@ class Figure(Artist):
         self.clf()
 
         self._cachedRenderer = None
+        self._autoLayout = rcParams['figure.autolayout']
+
+    def _get_dpi(self):
+        return self._dpi
+    def _set_dpi(self, dpi):
+        self._dpi = dpi
+        self.dpi_scale_trans.clear().scale(dpi, dpi)
+        self.callbacks.process('dpi_changed', self)
+    dpi = property(_get_dpi, _set_dpi)
+
+    def enable_auto_layout(self, setting=True):
+        self._autoLayout = setting
 
     def autofmt_xdate(self, bottom=0.2, rotation=30, ha='right'):
         """
@@ -176,11 +266,8 @@ class Figure(Artist):
         bottom : the bottom of the subplots for subplots_adjust
         rotation: the rotation of the xtick labels
         ha : the horizontal alignment of the xticklabels
-
-
         """
-
-        allsubplots = npy.alltrue([hasattr(ax, 'is_last_row') for ax in self.axes])
+        allsubplots = np.alltrue([hasattr(ax, 'is_last_row') for ax in self.axes])
         if len(self.axes)==1:
             for label in ax.get_xticklabels():
                 label.set_ha(ha)
@@ -197,7 +284,7 @@ class Figure(Artist):
                             label.set_visible(False)
                         ax.set_xlabel('')
 
-        if allsubplots:
+        if allsubplots and not self._autoLayout:
             self.subplots_adjust(bottom=bottom)
 
     def get_children(self):
@@ -337,11 +424,12 @@ class Figure(Artist):
             w,h = args[0]
         else:
             w,h = args
-        self.figwidth.set(w)
-        self.figheight.set(h)
+
+        dpival = self.dpi
+        self.bbox_inches.p1 = w, h
 
         if forward:
-            dpival = self.dpi.get()
+            dpival = self.dpi
             canvasw = w*dpival
             canvash = h*dpival
             manager = getattr(self.canvas, 'manager', None)
@@ -349,7 +437,7 @@ class Figure(Artist):
                 manager.resize(int(canvasw), int(canvash))
 
     def get_size_inches(self):
-        return self.figwidth.get(), self.figheight.get()
+        return self.bbox_inches.p1
 
     def get_edgecolor(self):
         'Get the edge color of the Figure rectangle'
@@ -361,15 +449,15 @@ class Figure(Artist):
 
     def get_figwidth(self):
         'Return the figwidth as a float'
-        return self.figwidth.get()
+        return self.bbox_inches.width
 
     def get_figheight(self):
         'Return the figheight as a float'
-        return self.figheight.get()
+        return self.bbox_inches.height
 
     def get_dpi(self):
         'Return the dpi as a float'
-        return self.dpi.get()
+        return self.dpi
 
     def get_frameon(self):
         'get the boolean indicating frameon'
@@ -397,7 +485,7 @@ class Figure(Artist):
 
         ACCEPTS: float
         """
-        self.dpi.set(val)
+        self.dpi = val
 
     def set_figwidth(self, val):
         """
@@ -405,7 +493,7 @@ class Figure(Artist):
 
         ACCEPTS: float
         """
-        self.figwidth.set(val)
+        self.bbox_inches.x1 = val
 
     def set_figheight(self, val):
         """
@@ -413,7 +501,7 @@ class Figure(Artist):
 
         ACCEPTS: float
         """
-        self.figheight.set(val)
+        self.bbox_inches.y1 = val
 
     def set_frameon(self, b):
         """
@@ -460,12 +548,17 @@ class Figure(Artist):
         """
         Add an a axes with axes rect [left, bottom, width, height] where all
         quantities are in fractions of figure width and height.  kwargs are
-        legal Axes kwargs plus "polar" which sets whether to create a polar axes
+        legal Axes kwargs plus "projection" which sets the projection type
+        of the axes.  (For backward compatibility, polar=True may also be
+        provided, which is equivalent to projection='polar').
+        Valid values for "projection" are: %s.  Some of these projections
+        support additional kwargs, which may be provided to add_axes.
 
             rect = l,b,w,h
             add_axes(rect)
             add_axes(rect, frameon=False, axisbg='g')
             add_axes(rect, polar=True)
+            add_axes(rect, projection='polar')
             add_axes(ax)   # add an Axes instance
 
 
@@ -483,8 +576,8 @@ class Figure(Artist):
         The Axes instance will be returned
 
         The following kwargs are supported:
-        %(Axes)s
-        """
+        %s
+        """ % (", ".join(get_projection_names()), '%(Axes)s')
 
         key = self._make_key(*args, **kwargs)
 
@@ -500,12 +593,16 @@ class Figure(Artist):
         else:
             rect = args[0]
             ispolar = kwargs.pop('polar', False)
-
+            projection = kwargs.pop('projection', None)
             if ispolar:
-                a = PolarAxes(self, rect, **kwargs)
-            else:
-                a = Axes(self, rect, **kwargs)
+                if projection is not None and projection != 'polar':
+                    raise ValueError(
+                        "polar=True, yet projection='%s'. " +
+                        "Only one of these arguments should be supplied." %
+                        projection)
+                projection = 'polar'
 
+            a = projection_factory(projection, self, rect, **kwargs)
 
         self.axes.append(a)
         self._axstack.push(a)
@@ -525,15 +622,21 @@ class Figure(Artist):
             add_subplot(111, polar=True)  # add a polar subplot
             add_subplot(sub)              # add Subplot instance sub
 
-        kwargs are legal Axes kwargs plus"polar" which sets whether to create a
-        polar axes.  The Axes instance will be returned.
+        kwargs are legal Axes kwargs plus "projection", which chooses
+        a projection type for the axes.  (For backward compatibility,
+        polar=True may also be provided, which is equivalent to
+        projection='polar').  Valid values for "projection" are: %s.
+        Some of these projections support additional kwargs, which may
+        be provided to add_axes.
+
+        The Axes instance will be returned.
 
         If the figure already has a subplot with key *args, *kwargs then it will
         simply make that subplot current and return it
 
         The following kwargs are supported:
-        %(Axes)s
-        """
+        %s
+        """ % (", ".join(get_projection_names()), "%(Axes)s")
 
         key = self._make_key(*args, **kwargs)
         if self._seen.has_key(key):
@@ -544,16 +647,22 @@ class Figure(Artist):
 
         if not len(args): return
 
-        if isinstance(args[0], Subplot) or isinstance(args[0], PolarSubplot):
+        if isinstance(args[0], SubplotBase):
             a = args[0]
             assert(a.get_figure() is self)
         else:
             ispolar = kwargs.pop('polar', False)
+            projection = kwargs.pop('projection', None)
             if ispolar:
-                a = PolarSubplot(self, *args, **kwargs)
-            else:
-                a = Subplot(self, *args, **kwargs)
+                if projection is not None and projection != 'polar':
+                    raise ValueError(
+                        "polar=True, yet projection='%s'. " +
+                        "Only one of these arguments should be supplied." %
+                        projection)
+                projection = 'polar'
 
+            projection_class = get_projection_class(projection)
+            a = subplot_class_factory(projection_class)(self, *args, **kwargs)
 
         self.axes.append(a)
         self._axstack.push(a)
@@ -566,6 +675,9 @@ class Figure(Artist):
         """
         Clear the figure
         """
+
+        self.callbacks = cbook.CallbackRegistry(('dpi_changed', ))
+
         for ax in tuple(self.axes):  # Iterate over the copy.
             ax.cla()
             self.delaxes(ax)         # removes ax from self.axes
@@ -596,7 +708,6 @@ class Figure(Artist):
         #print 'figure draw'
         if not self.get_visible(): return
         renderer.open_group('figure')
-        self.transFigure.freeze()  # eval the lazy objects
 
         if self.frameon: self.figurePatch.draw(renderer)
 
@@ -613,13 +724,69 @@ class Figure(Artist):
             mag = renderer.get_image_magnification()
             ims = [(im.make_image(mag), im.ox*mag, im.oy*mag)
                    for im in self.images]
-            im = _image.from_images(self.bbox.height()*mag,
-                                    self.bbox.width()*mag,
+            im = _image.from_images(self.bbox.height * mag,
+                                    self.bbox.width * mag,
                                     ims)
             im.is_grayscale = False
-            l, b, w, h = self.bbox.get_bounds()
-            renderer.draw_image(l, b, im, self.bbox)
+            l, b, w, h = self.bbox.bounds
+            renderer.draw_image(l, b, im, self.bbox,
+                                *self.get_transformed_clip_path_and_affine())
 
+        # update the positions of the axes
+        # This gives each of the axes the opportunity to resize itself
+        # based on the tick and axis labels etc., and then makes sure
+        # that any axes that began life aligned to another axes remains
+        # aligned after these adjustments
+        if self._autoLayout and len(self.axes) > 1:
+            aligned_positions = [{}, {}, {}, {}]
+            sizes = [{}, {}]
+            for a in self.axes:
+                a.update_layout(renderer)
+                orig_pos = a.get_position(True)
+                curr_pos = a.get_position()
+                for pos, orig, curr in zip(aligned_positions,
+                                           orig_pos.get_points().flatten(),
+                                           curr_pos.get_points().flatten()):
+                    if orig in pos:
+                        pos[orig][0].append(a)
+                        pos[orig][1].add(curr)
+                    else:
+                        pos[orig] = [[a], set([curr])]
+                for size, orig, curr in zip(sizes,
+                                            orig_pos.size,
+                                            curr_pos.size):
+                    orig = round(orig * 1000.0) / 1000.0
+                    if orig in size:
+                        size[orig][0].append(a)
+                        size[orig][1].add(curr)
+                    else:
+                        size[orig] = [[a], set([curr])]
+
+            for i, pos in enumerate(aligned_positions):
+                for axes, places in pos.values():
+                    if len(places) > 1:
+                        if i < 2:
+                            curr = max(places)
+                        else:
+                            curr = min(places)
+                        for a in axes:
+                            curr_pos = a.get_position().frozen()
+                            curr_pos.get_points()[i/2, i%2] = curr
+                            a.set_position(curr_pos, 'active')
+
+            for i, size in enumerate(sizes):
+                for axes, dims in size.values():
+                    new = min(dims)
+                    for a in axes:
+                        curr_pos = a.get_position().frozen()
+                        curr = curr_pos.size[i]
+                        if curr > new:
+                            extra = (curr - new) * 0.5
+                            curr_pos.get_points()[0, i] += extra
+                            curr_pos.get_points()[1, i] -= extra
+                            a.set_position(curr_pos, 'active')
+        elif self._autoLayout:
+            for a in self.axes: a.update_layout(renderer)
 
         # render the axes
         for a in self.axes: a.draw(renderer)
@@ -630,7 +797,6 @@ class Figure(Artist):
         for legend in self.legends:
             legend.draw(renderer)
 
-        self.transFigure.thaw()  # release the lazy objects
         renderer.close_group('figure')
 
         self._cachedRenderer = renderer
@@ -694,7 +860,6 @@ class Figure(Artist):
 
         handles = flatten(handles)
         l = Legend(self, handles, labels, *args, **kwargs)
-        self._set_artist_props(l)
         self.legends.append(l)
         return l
 
@@ -787,8 +952,16 @@ class Figure(Artist):
             ax = self.gca()
         if cax is None:
             cax, kw = cbar.make_axes(ax, **kw)
+        cax.hold(True)
         cb = cbar.Colorbar(cax, mappable, **kw)
-        mappable.add_observer(cb)
+
+        def on_changed(m):
+            #print 'calling on changed', m.get_cmap().name
+            cb.set_cmap(m.get_cmap())
+            cb.set_clim(m.get_clim())
+            cb.update_bruteforce(m)
+
+        self.cbid = mappable.callbacksSM.connect('changed', on_changed)
         mappable.set_colorbar(cb, cax)
         self.sca(ax)
         return cb
@@ -809,17 +982,33 @@ class Figure(Artist):
         self.subplotpars.update(*args, **kwargs)
         import matplotlib.axes
         for ax in self.axes:
-            if not isinstance(ax, matplotlib.axes.Subplot):
+            if not isinstance(ax, matplotlib.axes.SubplotBase):
                 # Check if sharing a subplots axis
-                if ax._sharex is not None and isinstance(ax._sharex, matplotlib.axes.Subplot):
+                if ax._sharex is not None and isinstance(ax._sharex, matplotlib.axes.SubplotBase):
                     ax._sharex.update_params()
-                    ax.set_position([ax._sharex.figLeft, ax._sharex.figBottom, ax._sharex.figW, ax._sharex.figH])
-                elif ax._sharey is not None and isinstance(ax._sharey, matplotlib.axes.Subplot):
+                    ax.set_position(ax._sharex.figbox)
+                elif ax._sharey is not None and isinstance(ax._sharey, matplotlib.axes.SubplotBase):
                     ax._sharey.update_params()
-                    ax.set_position([ax._sharey.figLeft, ax._sharey.figBottom, ax._sharey.figW, ax._sharey.figH])
+                    ax.set_position(ax._sharey.figbox)
             else:
                 ax.update_params()
-                ax.set_position([ax.figLeft, ax.figBottom, ax.figW, ax.figH])
+                ax.set_position(ax.figbox)
+
+    def ginput(self, n=1, timeout=30, verbose=False, show_clicks=True):
+        """
+        ginput(self, n=1, timeout=30, verbose=False, show_clicks=True)
+
+        Blocking call to interact with the figure.
+
+        This will wait for n clicks from the user and return a list of the
+        coordinates of each click. If timeout is negative, does not
+        timeout. If n is negative, accumulate clicks until a middle
+        click terminates the input. Right clicking cancels last input.
+        """
+
+        blocking_mouse_input = BlockingMouseInput(self)
+        return blocking_mouse_input(n=n, timeout=timeout,
+                                          verbose=verbose, show_clicks=True)
 
 
 
@@ -856,8 +1045,8 @@ def figaspect(arg):
 
     # min/max sizes to respect when autoscaling.  If John likes the idea, they
     # could become rc parameters, for now they're hardwired.
-    figsize_min = npy.array((4.0,2.0)) # min length for width/height
-    figsize_max = npy.array((16.0,16.0)) # max length for width/height
+    figsize_min = np.array((4.0,2.0)) # min length for width/height
+    figsize_max = np.array((16.0,16.0)) # max length for width/height
     #figsize_min = rcParams['figure.figsize_min']
     #figsize_max = rcParams['figure.figsize_max']
 
@@ -872,7 +1061,7 @@ def figaspect(arg):
     fig_height = rcParams['figure.figsize'][1]
 
     # New size for the figure, keeping the aspect ratio of the caller
-    newsize = npy.array((fig_height/arr_ratio,fig_height))
+    newsize = np.array((fig_height/arr_ratio,fig_height))
 
     # Sanity checks, don't drop either dimension below figsize_min
     newsize /= min(1.0,*(newsize/figsize_min))
@@ -882,7 +1071,7 @@ def figaspect(arg):
 
     # Finally, if we have a really funky aspect ratio, break it but respect
     # the min/max dimensions (we don't want figures 10 feet tall!)
-    newsize = npy.clip(newsize,figsize_min,figsize_max)
+    newsize = np.clip(newsize,figsize_min,figsize_max)
     return newsize
 
 artist.kwdocd['Figure'] = artist.kwdoc(Figure)

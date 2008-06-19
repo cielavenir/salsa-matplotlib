@@ -1,7 +1,7 @@
-Index: matplotlib-0.91.3/setupext.py
+Index: matplotlib-0.98.0/setupext.py
 ===================================================================
---- matplotlib-0.91.3.orig/setupext.py	2008-05-30 00:47:15.000000000 +0200
-+++ matplotlib-0.91.3/setupext.py	2008-06-12 19:45:43.380013219 +0200
+--- matplotlib-0.98.0.orig/setupext.py	2008-05-30 00:47:10.000000000 +0200
++++ matplotlib-0.98.0/setupext.py	2008-06-18 20:14:40.296926877 +0200
 @@ -47,8 +47,8 @@
  
  basedir = {
@@ -24,30 +24,29 @@ Index: matplotlib-0.91.3/setupext.py
      'aix5' : ['/usr/local'],
  }
  
-@@ -965,6 +965,9 @@
-             if not os.path.exists(tk_inc):
-                 tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
-                                           '../../include'))
-+            if not os.path.exists(tk_inc):
-+                tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
-+                                          '../../../include/tcl' + tk_ver))
+@@ -965,6 +965,10 @@
+         tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
+                                                        '../../include'))
  
-             if ((not os.path.exists(os.path.join(tk_inc,'tk.h'))) and
-                 os.path.exists(os.path.join(tcl_inc,'tk.h'))):
-@@ -982,11 +985,11 @@
- Using default library and include directories for Tcl and Tk because a
- Tk window failed to open.  You may need to define DISPLAY for Tk to work
- so that setup can determine where your libraries are located."""
--            tcl_inc = "/usr/local/include"
--            tk_inc = "/usr/local/include"
--            tcl_lib = "/usr/local/lib"
--            tk_lib = "/usr/local/lib"
--            tk_ver = ""
-+            tcl_inc = "/usr/include/tcl8.4"
-+            tk_inc = "/usr/include/tcl8.4"
-+            tcl_lib = "/usr/lib"
-+            tk_lib = "/usr/lib"
-+            tk_ver = "8.4"
-         # Add final versions of directories and libraries to module lists
-         module.include_dirs.extend([tcl_inc, tk_inc])
-         module.library_dirs.extend([tcl_lib, tk_lib])
++    if not os.path.exists(tk_inc):
++        tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
++                                               '../../../include/tcl' + tk_ver))
++
+     if not os.path.exists(os.path.join(tk_inc, 'tk.h')):
+         tk_inc = tcl_inc
+ 
+@@ -982,10 +986,10 @@
+     return tcl_lib, tcl_inc, tk_lib, tk_inc
+ 
+ def hardcoded_tcl_config():
+-    tcl_inc = "/usr/local/include"
+-    tk_inc = "/usr/local/include"
+-    tcl_lib = "/usr/local/lib"
+-    tk_lib = "/usr/local/lib"
++    tcl_inc = "/usr/include/tcl8.4"
++    tk_inc = "/usr/include/tcl8.4"
++    tcl_lib = "/usr/lib"
++    tk_lib = "/usr/lib"
+     return tcl_lib, tcl_inc, tk_lib, tk_inc
+ 
+ def add_tk_flags(module):

@@ -1,6 +1,6 @@
 /*
  * The Python Imaging Library.
- * $Id: _tkagg.cpp 5211 2008-05-21 13:06:51Z mdboom $
+ * $Id: _tkagg.cpp 5210 2008-05-21 13:03:36Z mdboom $
  *
  */
 
@@ -10,11 +10,13 @@
 #define USE_COMPOSITELESS_PHOTO_PUT_BLOCK
 
 #include <Python.h>
-#include <stdlib.h>
+#include <cstdlib>
+#include <cstdio>
+#include <sstream>
 
 #include "agg_basics.h"
 #include "_backend_agg.h"
-#include "_transforms.h"
+#include "agg_py_transforms.h"
 
 extern "C" {
 #ifdef __APPLE__
@@ -27,7 +29,7 @@ extern "C" {
 #else
 #  include <tk.h>
 #endif
-};
+}
 
 
 
@@ -46,11 +48,13 @@ PyAggImagePhoto(ClientData clientdata, Tcl_Interp* interp,
 
     // vars for blitting
     PyObject* bboxo;
-    Bbox* bbox;
+
+    unsigned long aggl, bboxl;
+    bool has_bbox;
     agg::int8u *destbuffer;
     double l,b,r,t;
     int destx, desty, destwidth, destheight, deststride;
-    unsigned long aggl, bboxl;
+    unsigned long tmp_ptr;
 
     long mode;
     long nval;
@@ -77,6 +81,12 @@ PyAggImagePhoto(ClientData clientdata, Tcl_Interp* interp,
         return TCL_ERROR;
     }
     aggo = (PyObject*)aggl;
+    //aggo = (PyObject*)atol(argv[2]);
+
+    //std::stringstream agg_ptr_ss;
+    //agg_ptr_ss.str(argv[2]);
+    //agg_ptr_ss >> tmp_ptr;
+    //aggo = (PyObject*)tmp_ptr;
     RendererAgg *aggRenderer = (RendererAgg *)aggo;
     int srcheight = (int)aggRenderer->get_height();
 
@@ -90,17 +100,19 @@ PyAggImagePhoto(ClientData clientdata, Tcl_Interp* interp,
     }
 
     /* check for bbox/blitting */
-    if (sscanf(argv[4], "%lu", &bboxl) != 1) {
-      Tcl_AppendResult(interp, "error casting pointer", (char *) NULL);
-      return TCL_ERROR;
+    if (sscanf (argv[4],"%lu",&bboxl) != 1) {
+        Tcl_AppendResult(interp, "error casting pointer", (char *) NULL);
+        return TCL_ERROR;
     }
     bboxo = (PyObject*)bboxl;
-    if (bboxo != Py_None) {
-      bbox = (Bbox*)bboxo;
-      l = bbox->ll_api()->x_api()->val();
-      b = bbox->ll_api()->y_api()->val();
-      r = bbox->ur_api()->x_api()->val();
-      t = bbox->ur_api()->y_api()->val();
+
+    //bboxo = (PyObject*)atol(argv[4]);
+    //std::stringstream bbox_ptr_ss;
+    //bbox_ptr_ss.str(argv[4]);
+    //bbox_ptr_ss >> tmp_ptr;
+    //bboxo = (PyObject*)tmp_ptr;
+    if (py_convert_bbox(bboxo, l, b, r, t)) {
+      has_bbox = true;
 
       destx = (int)l;
       desty = srcheight-(int)t;
@@ -122,7 +134,7 @@ PyAggImagePhoto(ClientData clientdata, Tcl_Interp* interp,
       destrb.copy_from(*aggRenderer->renderingBuffer, &region,
 		       -destx, -desty);
     } else {
-      bbox = NULL;
+      has_bbox = false;
       destbuffer = NULL;
       destx = desty = destwidth = destheight = deststride = 0;
     }
@@ -147,8 +159,7 @@ PyAggImagePhoto(ClientData clientdata, Tcl_Interp* interp,
         }
     }
 
-    if (bbox) {
-
+    if (has_bbox) {
       block.width  = destwidth;
       block.height = destheight;
       block.pitch = deststride;
@@ -222,5 +233,7 @@ static PyMethodDef functions[] = {
 extern "C"
 DL_EXPORT(void) init_tkagg(void)
 {
-    Py_InitModule("_tkagg", functions);
+  import_array();
+
+  Py_InitModule("_tkagg", functions);
 }

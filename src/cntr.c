@@ -11,7 +11,7 @@
     was written by following the Python "Extending and Embedding"
     tutorial.
 
-  $Id: cntr.c 3439 2007-06-30 22:20:16Z nnemec $
+  $Id: cntr.c 5111 2008-05-05 15:12:29Z mdboom $
  */
 
 #include <Python.h>
@@ -1688,7 +1688,7 @@ static PyMethodDef Cntr_methods[] = {
      "    Optional argument: nchunk; approximate number of grid points\n"
      "        per chunk. 0 (default) for no chunking.\n"
     },
-    {NULL}  /* Sentinel */
+    {0, 0, 0, 0}  /* Sentinel */
 };
 
 static PyTypeObject CntrType = {

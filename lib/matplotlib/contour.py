@@ -5,11 +5,11 @@ labelling for the axes class
 from __future__ import division
 import warnings
 import matplotlib as mpl
-import numpy as npy
-import matplotlib.numerix.npyma as ma
+import numpy as np
+from numpy import ma
 import matplotlib._cntr as _cntr
+import matplotlib.path as path
 import matplotlib.ticker as ticker
-import matplotlib.transforms as transforms
 import matplotlib.cm as cm
 import matplotlib.colors as colors
 import matplotlib.collections as collections
@@ -101,7 +101,7 @@ class ContourLabeler:
 
         if _colors == None:
             self.label_mappable = self
-            self.label_cvalues = npy.take(self.cvalues, self.label_indices)
+            self.label_cvalues = np.take(self.cvalues, self.label_indices)
         else:
             cmap = colors.ListedColormap(_colors, N=len(self.label_levels))
             self.label_cvalues = range(len(self.label_levels))
@@ -127,10 +127,10 @@ class ContourLabeler:
         if lcsize > 10 * labelwidth:
             return 1
 
-        xmax = npy.amax(npy.array(linecontour)[:,0])
-        xmin = npy.amin(npy.array(linecontour)[:,0])
-        ymax = npy.amax(npy.array(linecontour)[:,1])
-        ymin = npy.amin(npy.array(linecontour)[:,1])
+        xmax = np.amax(np.array(linecontour)[:,0])
+        xmin = np.amin(np.array(linecontour)[:,0])
+        ymax = np.amax(np.array(linecontour)[:,1])
+        ymin = np.amin(np.array(linecontour)[:,1])
 
         lw = labelwidth
         if (xmax - xmin) > 1.2* lw or (ymax - ymin) > 1.2 * lw:
@@ -141,7 +141,7 @@ class ContourLabeler:
     def too_close(self, x,y, lw):
         "if there's a label already nearby, find a better place"
         if self.cl_xy != []:
-            dist = [npy.sqrt((x-loc[0]) ** 2 + (y-loc[1]) ** 2)
+            dist = [np.sqrt((x-loc[0]) ** 2 + (y-loc[1]) ** 2)
                     for loc in self.cl_xy]
             for d in dist:
                 if d < 1.2*lw:
@@ -159,7 +159,7 @@ class ContourLabeler:
         """
 
         hysize = int(ysize/2)
-        adist = npy.argsort(distances)
+        adist = np.argsort(distances)
 
         for ind in adist:
             x, y = XX[ind][hysize], YY[ind][hysize]
@@ -205,18 +205,18 @@ class ContourLabeler:
         hlw = int(labelwidth/2)
 
         #length of label in screen coords
-        ylabel = abs(hlw * npy.sin(rot*npy.pi/180))
-        xlabel = abs(hlw * npy.cos(rot*npy.pi/180))
+        ylabel = abs(hlw * np.sin(rot*np.pi/180))
+        xlabel = abs(hlw * np.cos(rot*np.pi/180))
 
         trans = self.ax.transData
 
-        slc = trans.seq_xy_tups(linecontour)
+        slc = trans.transform(linecontour)
         x,y = slc[ind]
-        xx= npy.asarray(slc)[:,0].copy()
-        yy=npy.asarray(slc)[:,1].copy()
+        xx= np.asarray(slc)[:,0].copy()
+        yy=np.asarray(slc)[:,1].copy()
 
         #indices which are under the label
-        inds, = npy.nonzero(((xx < x+xlabel) & (xx > x-xlabel)) &
+        inds, = np.nonzero(((xx < x+xlabel) & (xx > x-xlabel)) &
                             ((yy < y+ylabel) & (yy > y-ylabel)))
 
         if len(inds) >0:
@@ -225,7 +225,7 @@ class ContourLabeler:
             #indices to be removed are
             #inds= [0,1,2,3,305,306,307]
             #should rewrite this in a better way
-            linds, = npy.nonzero(inds[1:]- inds[:-1] != 1)
+            linds, = np.nonzero(inds[1:]- inds[:-1] != 1)
             if inds[0] == 0 and len(linds) != 0:
                 ii = inds[linds[0]]
                 lc1 =linecontour[ii+1:inds[ii+1]]
@@ -247,31 +247,32 @@ class ContourLabeler:
             new_x1, new_y1 = x-xlabel, y-ylabel
             new_x2, new_y2 = x+xlabel, y+ylabel
 
-        new_x1d, new_y1d = trans.inverse_xy_tup((new_x1, new_y1))
-        new_x2d, new_y2d = trans.inverse_xy_tup((new_x2, new_y2))
-        new_xy1 = npy.array(((new_x1d, new_y1d),))
-        new_xy2 = npy.array(((new_x2d, new_y2d),))
+        inverse = trans.inverted()
+        new_x1d, new_y1d = inverse.transform_point((new_x1, new_y1))
+        new_x2d, new_y2d = inverse.transform_point((new_x2, new_y2))
+        new_xy1 = np.array(((new_x1d, new_y1d),))
+        new_xy2 = np.array(((new_x2d, new_y2d),))
 
 
         if rot > 0:
             if (len(lc1) > 0 and (lc1[-1][0] <= new_x1d)
                              and (lc1[-1][1] <= new_y1d)):
-                lc1 = npy.concatenate((lc1, new_xy1))
+                lc1 = np.concatenate((lc1, new_xy1))
                 #lc1.append((new_x1d, new_y1d))
 
             if (len(lc2) > 0 and (lc2[0][0] >= new_x2d)
                              and (lc2[0][1] >= new_y2d)):
-                lc2 = npy.concatenate((new_xy2, lc2))
+                lc2 = np.concatenate((new_xy2, lc2))
                 #lc2.insert(0, (new_x2d, new_y2d))
         else:
             if (len(lc1) > 0 and ((lc1[-1][0] <= new_x1d)
                              and (lc1[-1][1] >= new_y1d))):
-                lc1 = npy.concatenate((lc1, new_xy1))
+                lc1 = np.concatenate((lc1, new_xy1))
                 #lc1.append((new_x1d, new_y1d))
 
             if (len(lc2) > 0 and ((lc2[0][0] >= new_x2d)
                              and (lc2[0][1] <= new_y2d))):
-                lc2 = npy.concatenate((new_xy2, lc2))
+                lc2 = np.concatenate((new_xy2, lc2))
                 #lc2.insert(0, (new_x2d, new_y2d))
 
         return [lc1,lc2]
@@ -285,7 +286,7 @@ class ContourLabeler:
 
         nsize= len(linecontour)
         if labelwidth > 1:
-            xsize = int(npy.ceil(nsize/labelwidth))
+            xsize = int(np.ceil(nsize/labelwidth))
         else:
             xsize = 1
         if xsize == 1:
@@ -293,20 +294,20 @@ class ContourLabeler:
         else:
             ysize = labelwidth
 
-        XX = npy.resize(npy.asarray(linecontour)[:,0],(xsize, ysize))
-        YY = npy.resize(npy.asarray(linecontour)[:,1],(xsize, ysize))
+        XX = np.resize(np.asarray(linecontour)[:,0],(xsize, ysize))
+        YY = np.resize(np.asarray(linecontour)[:,1],(xsize, ysize))
         #I might have fouled up the following:
         yfirst = YY[:,0].reshape(xsize, 1)
         ylast = YY[:,-1].reshape(xsize, 1)
         xfirst = XX[:,0].reshape(xsize, 1)
         xlast = XX[:,-1].reshape(xsize, 1)
         s = (yfirst-YY) * (xlast-xfirst) - (xfirst-XX) * (ylast-yfirst)
-        L = npy.sqrt((xlast-xfirst)**2+(ylast-yfirst)**2).ravel()
-        dist = npy.add.reduce(([(abs(s)[i]/L[i]) for i in range(xsize)]),-1)
+        L = np.sqrt((xlast-xfirst)**2+(ylast-yfirst)**2).ravel()
+        dist = np.add.reduce(([(abs(s)[i]/L[i]) for i in range(xsize)]),-1)
         x,y,ind = self.get_label_coords(dist, XX, YY, ysize, labelwidth)
         #print 'ind, x, y', ind, x, y
-        angle = npy.arctan2(ylast - yfirst, xlast - xfirst).ravel()
-        rotation = angle[ind]*180/npy.pi
+        angle = np.arctan2(ylast - yfirst, xlast - xfirst).ravel()
+        rotation = angle[ind]*180/np.pi
         if rotation > 90:
             rotation = rotation -180
         if rotation < -90:
@@ -324,7 +325,8 @@ class ContourLabeler:
         levels = self.label_levels
         fslist = self.fslist
         trans = self.ax.transData
-        _colors = self.label_mappable.to_rgba(self.label_cvalues)
+        _colors = self.label_mappable.to_rgba(self.label_cvalues,
+                                                        alpha=self.alpha)
         fmt = self.fmt
         for icon, lev, color, cvalue, fsize in zip(self.label_indices,
                                           self.label_levels,
@@ -333,20 +335,22 @@ class ContourLabeler:
             con = self.collections[icon]
             lw = self.get_label_width(lev, fmt, fsize)
             additions = []
-            for segNum, linecontour in enumerate(con._segments):
+            paths = con.get_paths()
+            for segNum, linepath in enumerate(paths):
+                linecontour = linepath.vertices
                 # for closed contours add one more point to
                 # avoid division by zero
-                if npy.all(linecontour[0] == linecontour[-1]):
-                    linecontour = npy.concatenate((linecontour,
-                                               linecontour[1][npy.newaxis,:]))
+                if np.all(linecontour[0] == linecontour[-1]):
+                    linecontour = np.concatenate((linecontour,
+                                                   linecontour[1][np.newaxis,:]))
                     #linecontour.append(linecontour[1])
                 # transfer all data points to screen coordinates
-                slc = trans.seq_xy_tups(linecontour)
+                slc = trans.transform(linecontour)
                 if self.print_label(slc,lw):
                     x,y, rotation, ind  = self.locate_label(slc, lw)
                     # transfer the location of the label back to
                     # data coordinates
-                    dx,dy = trans.inverse_xy_tup((x,y))
+                    dx,dy = trans.inverted().transform_point((x,y))
                     t = text.Text(dx, dy, rotation = rotation,
                              horizontalalignment='center',
                              verticalalignment='center')
@@ -355,11 +359,13 @@ class ContourLabeler:
                     self.cl.append(t)
                     self.cl_cvalues.append(cvalue)
                     if inline:
-                        new = self.break_linecontour(linecontour, rotation,
-                                                       lw, ind)
-                        con._segments[segNum] = new[0]
-                        additions.append(new[1])
-            con._segments.extend(additions)
+                        new = self.break_linecontour(linecontour, rotation, lw, ind)
+                        if len(new[0]):
+                            paths[segNum] = path.Path(new[0])
+                        if len(new[1]):
+                            additions.append(path.Path(new[1]))
+            paths.extend(additions)
+
 
 class ContourSet(cm.ScalarMappable, ContourLabeler):
     """
@@ -391,7 +397,7 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         self.filled = kwargs.get('filled', False)
         self.linewidths = kwargs.get('linewidths', None)
         self.linestyles = kwargs.get('linestyles', 'solid')
-        
+
         self.alpha = kwargs.get('alpha', 1.0)
         self.origin = kwargs.get('origin', None)
         self.extent = kwargs.get('extent', None)
@@ -451,7 +457,8 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
                         nchunk = self.nchunk)
                 col = collections.PolyCollection(nlist,
                                      antialiaseds = (self.antialiased,),
-                                     edgecolors= 'None')
+                                     edgecolors= 'none',
+                                     alpha=self.alpha)
                 self.ax.add_collection(col)
                 self.collections.append(col)
 
@@ -464,13 +471,14 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
                 nlist = C.trace(level, points = 0)
                 col = collections.LineCollection(nlist,
                                      linewidths = width,
-                                     linestyle = lstyle)
+                                     linestyle = lstyle,
+                                     alpha=self.alpha)
 
                 if level < 0.0 and self.monochrome:
                     ls = mpl.rcParams['contour.negative_linestyle']
                     col.set_linestyle(ls)
                 col.set_label('_nolegend_')
-                self.ax.add_collection(col)
+                self.ax.add_collection(col, False)
                 self.collections.append(col)
         self.changed() # set the colors
         x0 = ma.minimum(x)
@@ -486,8 +494,10 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
                                 self.to_rgba(self.cvalues, alpha=self.alpha)]
         self.tcolors = tcolors
         for color, collection in zip(tcolors, self.collections):
+            collection.set_alpha(self.alpha)
             collection.set_color(color)
         for label, cv in zip(self.cl, self.cl_cvalues):
+            label.set_alpha(self.alpha)
             label.set_color(self.label_mappable.to_rgba(cv))
         # add label colors
         cm.ScalarMappable.changed(self)
@@ -509,11 +519,11 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
                 self.locator = ticker.LogLocator()
             else:
                 self.locator = ticker.MaxNLocator(N+1)
-        locator = self.locator
+        self.locator.create_dummy_axis()
         zmax = self.zmax
         zmin = self.zmin
-        locator.set_bounds(zmin, zmax)
-        lev = locator()
+        self.locator.set_bounds(zmin, zmax)
+        lev = self.locator()
         zmargin = (zmax - zmin) * 0.000001 # so z < (zmax + zmargin)
         if zmax >= lev[-1]:
             lev[-1] += zmargin
@@ -546,12 +556,12 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             Ny, Nx = z.shape
         if self.origin is None:  # Not for image-matching.
             if self.extent is None:
-                return npy.meshgrid(npy.arange(Nx), npy.arange(Ny))
+                return np.meshgrid(np.arange(Nx), np.arange(Ny))
             else:
                 x0,x1,y0,y1 = self.extent
-                x = npy.linspace(x0, x1, Nx)
-                y = npy.linspace(y0, y1, Ny)
-                return npy.meshgrid(x, y)
+                x = np.linspace(x0, x1, Nx)
+                y = np.linspace(y0, y1, Ny)
+                return np.meshgrid(x, y)
         # Match image behavior:
         if self.extent is None:
             x0,x1,y0,y1 = (0, Nx, 0, Ny)
@@ -559,11 +569,11 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             x0,x1,y0,y1 = self.extent
         dx = float(x1 - x0)/Nx
         dy = float(y1 - y0)/Ny
-        x = x0 + (npy.arange(Nx) + 0.5) * dx
-        y = y0 + (npy.arange(Ny) + 0.5) * dy
+        x = x0 + (np.arange(Nx) + 0.5) * dx
+        y = y0 + (np.arange(Ny) + 0.5) * dy
         if self.origin == 'upper':
             y = y[::-1]
-        return npy.meshgrid(x,y)
+        return np.meshgrid(x,y)
 
     def _check_xyz(self, args):
         '''
@@ -574,9 +584,9 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         Possible change: I think we should make and use an ArgumentError
         Exception class (here and elsewhere).
         '''
-        x = npy.asarray(args[0], dtype=npy.float64)
-        y = npy.asarray(args[1], dtype=npy.float64)
-        z = ma.asarray(args[2], dtype=npy.float64)
+        x = np.asarray(args[0], dtype=np.float64)
+        y = np.asarray(args[1], dtype=np.float64)
+        z = ma.asarray(args[2], dtype=np.float64)
         if z.ndim != 2:
             raise TypeError("Input z must be a 2D array.")
         else: Ny, Nx = z.shape
@@ -589,7 +599,7 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         if nx != Nx or ny != Ny:
             raise TypeError("Length of x must be number of columns in z,\n" +
                             "and length of y must be number of rows.")
-        x,y = npy.meshgrid(x,y)
+        x,y = np.meshgrid(x,y)
         return x,y,z
 
 
@@ -599,7 +609,7 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         else:           fn = 'contour'
         Nargs = len(args)
         if Nargs <= 2:
-            z = ma.asarray(args[0], dtype=npy.float64)
+            z = ma.asarray(args[0], dtype=np.float64)
             x, y = self._initialize_x_y(z)
         elif Nargs <=4:
             x,y,z = self._check_xyz(args[:3])
@@ -621,7 +631,7 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
                     if type(level_arg) == int:
                         lev = self._autolev(z, level_arg)
                     else:
-                        lev = npy.asarray(level_arg).astype(npy.float64)
+                        lev = np.asarray(level_arg).astype(np.float64)
                 except:
                     raise TypeError(
                         "Last %s arg must give levels; see help(%s)" % (fn,fn))
@@ -640,9 +650,9 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             self._levels.insert(0, min(self.levels[0],self.zmin) - 1)
         if self.extend in ('both', 'max'):
             self._levels.append(max(self.levels[-1],self.zmax) + 1)
-        self._levels = npy.asarray(self._levels)
-        self.vmin = npy.amin(self.levels)  # alternative would be self.layers
-        self.vmax = npy.amax(self.levels)
+        self._levels = np.asarray(self._levels)
+        self.vmin = np.amin(self.levels)  # alternative would be self.layers
+        self.vmax = np.amax(self.levels)
         if self.extend in ('both', 'min'):
             self.vmin = 2 * self.levels[0] - self.levels[1]
         if self.extend in ('both', 'max'):
@@ -694,12 +704,12 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             tlinewidths = [(mpl.rcParams['lines.linewidth'],)] *Nlev
         else:
             if cbook.iterable(linewidths) and len(linewidths) < Nlev:
-                linewidths = list(linewidths) * int(npy.ceil(Nlev/len(linewidths)))
+                linewidths = list(linewidths) * int(np.ceil(Nlev/len(linewidths)))
             elif not cbook.iterable(linewidths) and type(linewidths) in [int, float]:
                 linewidths = [linewidths] * Nlev
             tlinewidths = [(w,) for w in linewidths]
         return tlinewidths
-    
+
     def _process_linestyles(self):
         linestyles = self.linestyles
         Nlev = len(self.levels)
@@ -709,15 +719,15 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             if cbook.is_string_like(linestyles):
                 tlinestyles = [linestyles] * Nlev
             elif cbook.iterable(linestyles) and len(linestyles) <= Nlev:
-                tlinestyles = list(linestyles) * int(npy.ceil(Nlev/len(linestyles)))
+                tlinestyles = list(linestyles) * int(np.ceil(Nlev/len(linestyles)))
         return tlinestyles
 
     def get_alpha(self):
-        '''For compatibility with artists, return self.alpha'''
+        '''returns alpha to be applied to all ContourSet artists'''
         return self.alpha
 
     def set_alpha(self, alpha):
-        '''For compatibility with artists, set self.alpha'''
+        '''sets alpha for all ContourSet artists'''
         self.alpha = alpha
         self.changed()
 
@@ -833,5 +843,3 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
               removed.  Chunking introduces artifacts at the chunk
               boundaries unless antialiased = False
         """
-
-
