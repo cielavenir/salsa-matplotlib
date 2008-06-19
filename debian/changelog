@@ -5,10 +5,11 @@ matplotlib (0.98.0-1) UNRELEASED; urgency=low
     - changed doc name
   * debian/control
     - bump build-dep to python-numpy to at least 1.1.0
+    - added python-excelerator to Depends
   * debian/patches/build_fix.patch
     - updated to match new upstream source code
 
- -- Sandro Tosi <matrixhasu@gmail.com>  Wed, 18 Jun 2008 21:28:42 +0200
+ -- Sandro Tosi <matrixhasu@gmail.com>  Thu, 19 Jun 2008 20:25:24 +0200
 
 matplotlib (0.91.3-1) unstable; urgency=low
 
