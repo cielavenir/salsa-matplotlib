@@ -1,3 +1,9 @@
+matplotlib (0.98.1-1) unstable; urgency=low
+
+  * New upstream release; Closes: #486074
+
+ -- Sandro Tosi <matrixhasu@gmail.com>  Mon, 23 Jun 2008 21:13:50 +0200
+
 matplotlib (0.98.0-1) experimental; urgency=low
 
   * New upstream release; Closes: #486074
