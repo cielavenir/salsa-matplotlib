@@ -158,7 +158,7 @@ class RendererPS(RendererBase):
         realpath, stat_key = get_realpath_and_stat(font.fname)
         used_characters = self.used_characters.setdefault(
             stat_key, (realpath, Set()))
-        used_characters[1].update(s)
+        used_characters[1].update([ord(x) for x in s])
 
     def merge_used_characters(self, other):
         for stat_key, (realpath, set) in other.items():
@@ -501,7 +501,7 @@ grestore
 
         tpath = trans.transform_path(path)
         for x, y in tpath.vertices:
-            ps_cmd.append("%1.3g %1.3g o" % (x, y))
+            ps_cmd.append("%g %g o" % (x, y))
 
         ps = '\n'.join(ps_cmd)
         self._draw_ps(ps, gc, rgbFace, fill=False, stroke=False)
@@ -975,7 +975,7 @@ class FigureCanvasPS(FigureCanvasBase):
                     cmap = font.get_charmap()
                     glyph_ids = []
                     for c in chars:
-                        gind = cmap.get(ord(c)) or 0
+                        gind = cmap.get(c) or 0
                         glyph_ids.append(gind)
                     # The ttf to ps (subsetting) support doesn't work for
                     # OpenType fonts that are Postscript inside (like the

@@ -1,6 +1,6 @@
 from __future__ import division
 import re, warnings
-from cbook import iterable, flatten
+import matplotlib.cbook as cbook
 from transforms import Bbox, IdentityTransform, TransformedBbox, TransformedPath
 from path import Path
 
@@ -23,7 +23,8 @@ from path import Path
 
 class Artist(object):
     """
-    Abstract base class for someone who renders into a FigureCanvas
+    Abstract base class for someone who renders into a
+    :class:`FigureCanvas`.
     """
 
     aname = 'Artist'
@@ -52,12 +53,15 @@ class Artist(object):
 
     def remove(self):
         """
-        Remove the artist from the figure if possible.  The effect will not
-        be visible until the figure is redrawn, e.g., with ax.draw_idle().
-        Call ax.relim() to update the axes limits if desired.
+        Remove the artist from the figure if possible.  The effect
+        will not be visible until the figure is redrawn, e.g., with
+        :meth:`matplotlib.axes.Axes.draw_idle`.  Call
+        :meth:`matplotlib.axes.Axes.relim` to update the axes limits
+        if desired.
 
-        Note: relim() will not see collections even if the collection
-        was added to axes with autolim=True.
+        Note: :meth:`~matplotlib.axes.Axes.relim` will not see
+        collections even if the collection was added to axes with
+        *autolim* = True.
 
         Note: there is no support for removing the artist's legend entry.
         """
@@ -134,16 +138,18 @@ class Artist(object):
 
     def set_transform(self, t):
         """
-        set the Transformation instance used by this artist
-
-        ACCEPTS: a matplotlib.transform transformation instance
+        Set the :class:`~matplotlib.transforms.Transform` instance
+        used by this artist.
         """
         self._transform = t
         self._transformSet = True
         self.pchanged()
 
     def get_transform(self):
-        'return the Transformation instance used by this artist'
+        """
+        Return the :class:`~matplotlib.transforms.Transform`
+        instance used by this artist.
+        """
         if self._transform is None:
             self._transform = IdentityTransform()
         return self._transform
@@ -179,7 +185,7 @@ class Artist(object):
     def set_contains(self,picker):
         """Replace the contains test used by this artist. The new picker should
         be a callable function which determines whether the artist is hit by the
-        mouse event:
+        mouse event::
 
             hit, props = picker(artist, mouseevent)
 
@@ -228,26 +234,26 @@ class Artist(object):
           None -  picking is disabled for this artist (default)
 
           boolean - if True then picking will be enabled and the
-            artist will fire a pick event if the mouse event is over
-            the artist
+          artist will fire a pick event if the mouse event is over
+          the artist
 
           float - if picker is a number it is interpreted as an
-            epsilon tolerance in points and the the artist will fire
-            off an event if it's data is within epsilon of the mouse
-            event.  For some artists like lines and patch collections,
-            the artist may provide additional data to the pick event
-            that is generated, eg the indices of the data within
-            epsilon of the pick event
+          epsilon tolerance in points and the the artist will fire
+          off an event if it's data is within epsilon of the mouse
+          event.  For some artists like lines and patch collections,
+          the artist may provide additional data to the pick event
+          that is generated, eg the indices of the data within
+          epsilon of the pick event
 
           function - if picker is callable, it is a user supplied
-            function which determines whether the artist is hit by the
-            mouse event.
+          function which determines whether the artist is hit by the
+          mouse event::
 
               hit, props = picker(artist, mouseevent)
 
-            to determine the hit test.  if the mouse event is over the
-            artist, return hit=True and props is a dictionary of
-            properties you want added to the PickEvent attributes
+          to determine the hit test.  if the mouse event is over the
+          artist, return hit=True and props is a dictionary of
+          properties you want added to the PickEvent attributes.
 
         ACCEPTS: [None|float|boolean|callable]
         """
@@ -262,12 +268,16 @@ class Artist(object):
         return self.figure is not None
 
     def get_figure(self):
-        'return the figure instance'
+        """
+        Return the :class:`~matplotlib.figure.Figure` instance the
+        artist belongs to.
+        """
         return self.figure
 
     def set_figure(self, fig):
         """
-        Set the figure instance the artist belong to
+        Set the :class:`~matplotlib.figure.Figure` instance the artist
+        belongs to.
 
         ACCEPTS: a matplotlib.figure.Figure instance
         """
@@ -288,17 +298,18 @@ class Artist(object):
         """
         Set the artist's clip path, which may be:
 
-          a) a Patch (or subclass) instance
+          a) a :class:`~matplotlib.patches.Patch` (or subclass) instance
 
-          b) a Path instance, in which cas aoptional transform may
-             be provided, which will be applied to the path before using it
-             for clipping.
+          b) a :class:`~matplotlib.path.Path` instance, in which case
+             an optional :class:`~matplotlib.transforms.Transform`
+             instance may be provided, which will be applied to the
+             path before using it for clipping.
 
-          c) None, to remove the clipping path
+          c) *None*, to remove the clipping path
 
         For efficiency, if the path happens to be an axis-aligned
         rectangle, this method will set the clipping box to the
-        corresponding rectangle and set the clipping path to None.
+        corresponding rectangle and set the clipping path to *None*.
 
         ACCEPTS: a Path instance and a Transform instance, a Patch
         instance, or None
@@ -469,7 +480,7 @@ class Artist(object):
         self.pchanged()
 
     def update_from(self, other):
-        'copy properties from other to self'
+        'Copy properties from *other* to *self*.'
         self._transform = other._transform
         self._transformSet = other._transformSet
         self._visible = other._visible
@@ -497,24 +508,28 @@ class Artist(object):
 
 class ArtistInspector:
     """
-    A helper class to inspect an Artist and return information about
-    it's settable properties and their current values
+    A helper class to inspect an :class:`~matplotlib.artist.Artist`
+    and return information about it's settable properties and their
+    current values.
     """
     def __init__(self, o):
         """
-        Initialize the artist inspector with an artist or sequence of
-        artists.  Id a sequence is used, we assume it is a homogeneous
-        sequence (all Artists are of the same type) and it is your
-        responsibility to make sure this is so.
+        Initialize the artist inspector with an
+        :class:`~matplotlib.artist.Artist` or sequence of
+        :class:`Artists`.  If a sequence is used, we assume it is a
+        homogeneous sequence (all :class:`Artists` are of the same
+        type) and it is your responsibility to make sure this is so.
         """
-        if iterable(o) and len(o): o = o[0]
+        if cbook.iterable(o) and len(o): o = o[0]
         self.o = o
         self.aliasd = self.get_aliases()
 
     def get_aliases(self):
         """
-        get a dict mapping fullname -> alias for each alias in o.
-        Eg for lines::
+        Get a dict mapping *fullname* -> *alias* for each alias in the
+        :class:`~matplotlib.artist.ArtistInspector`.
+
+        Eg., for lines::
 
           {'markerfacecolor': 'mfc',
            'linewidth'      : 'lw',
@@ -536,12 +551,12 @@ class ArtistInspector:
     _get_valid_values_regex = re.compile(r"\n\s*ACCEPTS:\s*(.*)\n")
     def get_valid_values(self, attr):
         """
-        get the legal arguments for the setter associated with attr
+        Get the legal arguments for the setter associated with *attr*.
 
-        This is done by querying the doc string of the function set_attr
+        This is done by querying the docstring of the function set_ *attr*
         for a line that begins with ACCEPTS:
 
-        Eg, for a line linestyle, return
+        Eg., for a line linestyle, return
         [ '-' | '--' | '-.' | ':' | 'steps' | 'None' ]
         """
 
@@ -563,8 +578,8 @@ class ArtistInspector:
 
     def get_setters(self):
         """
-        Get the attribute strings with setters for object h.  Eg, for a line,
-        return ['markerfacecolor', 'linewidth', ....]
+        Get the attribute strings with setters for object.  Eg., for a line,
+        return ``['markerfacecolor', 'linewidth', ....]``.
         """
 
         setters = []
@@ -578,7 +593,10 @@ class ArtistInspector:
         return setters
 
     def is_alias(self, o):
-        'return true if method object o is an alias for another function'
+        """
+        Return *True* if method object *o* is an alias for another
+        function.
+        """
         ds = o.__doc__
         if ds is None: return False
         return ds.startswith('alias for ')
@@ -598,12 +616,12 @@ class ArtistInspector:
 
     def pprint_setters(self, prop=None, leadingspace=2):
         """
-        if prop is None, return a list of strings of all settable properies
-        and their valid values
+        If *prop* is *None*, return a list of strings of all settable properies
+        and their valid values.
 
-        if prop is not None, it is a valid property name and that
+        If *prop* is not *None*, it is a valid property name and that
         property will be returned as a string of property : valid
-        values
+        values.
         """
         if leadingspace:
             pad = ' '*leadingspace
@@ -617,6 +635,28 @@ class ArtistInspector:
         attrs.sort()
         lines = []
 
+        ########
+        names = [self.aliased_name(prop) for prop in attrs]
+        accepts = [self.get_valid_values(prop) for prop in attrs]
+
+        col0_len = max([len(n) for n in names])
+        col1_len = max([len(a) for a in accepts])
+        table_formatstr = pad + '='*col0_len + '   ' + '='*col1_len
+
+        lines.append('')
+        lines.append(table_formatstr)
+        lines.append(pad + 'Property'.ljust(col0_len+3) + \
+                     'Description'.ljust(col1_len))
+        lines.append(table_formatstr)
+
+        lines.extend([pad + n.ljust(col0_len+3) + a.ljust(col1_len)
+                      for n, a in zip(names, accepts)])
+
+        lines.append(table_formatstr)
+        lines.append('')
+        return lines
+        ########
+
         for prop in attrs:
             accepts = self.get_valid_values(prop)
             name = self.aliased_name(prop)
@@ -626,7 +666,7 @@ class ArtistInspector:
 
     def pprint_getters(self):
         """
-        return the getters and actual values as list of strings'
+        Return the getters and actual values as list of strings.
         """
         getters = [name for name in dir(self.o)
                    if name.startswith('get_')
@@ -649,6 +689,8 @@ class ArtistInspector:
 
 def getp(o, *args):
     """
+    .. TODO: What are 's' and 'h' arguments described below?
+
     Return the value of handle property s
 
     h is an instance of a class, eg a Line2D or an Axes or Text.
@@ -685,44 +727,45 @@ get.__doc__ = getp.__doc__
 
 def setp(h, *args, **kwargs):
     """
-    matplotlib supports the use of setp ("set property") and getp to set
-    and get object properties, as well as to do introspection on the
-    object For example, to set the linestyle of a line to be dashed, you
-    can do
+    matplotlib supports the use of :func:`setp` ("set property") and
+    :func:`getp` to set and get object properties, as well as to do
+    introspection on the object.  For example, to set the linestyle of a
+    line to be dashed, you can do::
 
       >>> line, = plot([1,2,3])
       >>> setp(line, linestyle='--')
 
     If you want to know the valid types of arguments, you can provide the
-    name of the property you want to set without a value
+    name of the property you want to set without a value::
 
       >>> setp(line, 'linestyle')
           linestyle: [ '-' | '--' | '-.' | ':' | 'steps' | 'None' ]
 
     If you want to see all the properties that can be set, and their
-    possible values, you can do
-
+    possible values, you can do::
 
       >>> setp(line)
-          ... long output listing omitted'
+          ... long output listing omitted
 
-    setp operates on a single instance or a list of instances.  If you
-    are in query mode introspecting the possible values, only the first
-    instance in the sequence is used.  When actually setting values,
-    all the instances will be set.  Eg, suppose you have a list of two
-    lines, the following will make both lines thicker and red
+    :func:`setp` operates on a single instance or a list of instances.
+    If you are in query mode introspecting the possible values, only
+    the first instance in the sequence is used.  When actually setting
+    values, all the instances will be set.  Eg., suppose you have a
+    list of two lines, the following will make both lines thicker and
+    red::
 
-        >>> x = arange(0,1.0,0.01)
-        >>> y1 = sin(2*pi*x)
-        >>> y2 = sin(4*pi*x)
-        >>> lines = plot(x, y1, x, y2)
-        >>> setp(lines, linewidth=2, color='r')
+      >>> x = arange(0,1.0,0.01)
+      >>> y1 = sin(2*pi*x)
+      >>> y2 = sin(4*pi*x)
+      >>> lines = plot(x, y1, x, y2)
+      >>> setp(lines, linewidth=2, color='r')
 
-    setp works with the matlab(TM) style string/value pairs or with
-    python kwargs.  For example, the following are equivalent
+    :func:`setp` works with the matlab(TM) style string/value pairs or
+    with python kwargs.  For example, the following are equivalent
 
-        >>> setp(lines, 'linewidth', 2, 'color', r')  # matlab style
-        >>> setp(lines, linewidth=2, color='r')       # python style
+      >>> setp(lines, 'linewidth', 2, 'color', r')  # matlab style
+
+      >>> setp(lines, linewidth=2, color='r')       # python style
     """
 
     insp = ArtistInspector(h)
@@ -735,8 +778,8 @@ def setp(h, *args, **kwargs):
         print insp.pprint_setters(prop=args[0])
         return
 
-    if not iterable(h): h = [h]
-    else: h = flatten(h)
+    if not cbook.iterable(h): h = [h]
+    else: h = cbook.flatten(h)
 
 
     if len(args)%2:
@@ -754,10 +797,10 @@ def setp(h, *args, **kwargs):
             funcName = "set_%s"%s
             func = getattr(o,funcName)
             ret.extend( [func(val)] )
-    return [x for x in flatten(ret)]
+    return [x for x in cbook.flatten(ret)]
 
 def kwdoc(a):
-    return '\n'.join(ArtistInspector(a).pprint_setters(leadingspace=4))
+    return '\n'.join(ArtistInspector(a).pprint_setters(leadingspace=2))
 
 kwdocd = dict()
 kwdocd['Artist'] = kwdoc(Artist)

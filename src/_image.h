@@ -38,10 +38,11 @@ public:
   Py::Object get_interpolation(const Py::Tuple& args);
   Py::Object set_interpolation(const Py::Tuple& args);
   Py::Object set_aspect(const Py::Tuple& args);
-  Py::Object write_png(const Py::Tuple& args);
   Py::Object set_bg(const Py::Tuple& args);
   Py::Object flipud_out(const Py::Tuple& args);
   Py::Object flipud_in(const Py::Tuple& args);
+  Py::Object set_resample(const Py::Tuple& args);
+  Py::Object get_resample(const Py::Tuple& args);
 
 
   std::pair<agg::int8u*, bool> _get_output_buffer();
@@ -78,6 +79,7 @@ public:
 
   unsigned interpolation, aspect;
   agg::rgba bg;
+  bool resample;
 private:
   Py::Dict __dict__;
   agg::trans_affine srcMatrix, imageMatrix;
@@ -97,10 +99,11 @@ private:
   static char get_interpolation__doc__[];
   static char set_interpolation__doc__[];
   static char set_aspect__doc__[];
-  static char write_png__doc__[];
   static char set_bg__doc__[];
   static char flipud_out__doc__[];
   static char flipud_in__doc__[];
+  static char get_resample__doc__[];
+  static char set_resample__doc__[];
 
 };
 
@@ -128,8 +131,6 @@ public:
 		       "frombyte");
     add_varargs_method("frombuffer", &_image_module::frombuffer,
 		       "frombuffer");
-    add_varargs_method("readpng", &_image_module::readpng,
-		       "readpng");
     add_varargs_method("from_images", &_image_module::from_images,
 		       "from_images");
     add_varargs_method("pcolor", &_image_module::pcolor,
@@ -148,7 +149,6 @@ private:
   Py::Object fromarray2 (const Py::Tuple &args);
   Py::Object pcolor (const Py::Tuple &args);
   Py::Object pcolor2 (const Py::Tuple &args);
-  Py::Object readpng (const Py::Tuple &args);
   Py::Object from_images (const Py::Tuple &args);
 
   static char _image_module_fromarray__doc__[];

@@ -2,6 +2,9 @@
 #include "mplutils.h"
 #include <sstream>
 
+#define PY_ARRAY_TYPES_PREFIX NumPy
+#include "numpy/arrayobject.h"
+
 #define FIXED_MAJOR(val) (*((short *) &val+1))
 #define FIXED_MINOR(val) (*((short *) &val+0))
 
@@ -69,18 +72,20 @@ FT2Image::~FT2Image() {
   delete _rgbaCopy;
 }
 
-void FT2Image::resize(unsigned long width, unsigned long height) {
+void FT2Image::resize(long width, long height) {
+  if (width < 0) width = 1;
+  if (height < 0) height = 1;
   size_t numBytes = width*height;
 
-  if (width != _width || height != _height) {
+  if ((unsigned long)width != _width || (unsigned long)height != _height) {
     if (numBytes > _width*_height) {
       delete [] _buffer;
       _buffer = NULL;
       _buffer = new unsigned char [numBytes];
     }
 
-    _width = width;
-    _height = height;
+    _width = (unsigned long)width;
+    _height = (unsigned long)height;
   }
 
   memset(_buffer, 0, numBytes);
@@ -247,6 +252,41 @@ FT2Image::py_as_str(const Py::Tuple & args) {
     (PyString_FromStringAndSize((const char *)_buffer,
 				_width*_height)
      );
+}
+
+char FT2Image::as_array__doc__[] =
+"x = image.as_array()\n"
+"\n"
+"Return the image buffer as a width x height numpy array of ubyte \n"
+"\n"
+;
+Py::Object
+FT2Image::py_as_array(const Py::Tuple & args) {
+  _VERBOSE("FT2Image::as_array");
+  args.verify_length(0);
+
+  npy_intp dimensions[2];
+  dimensions[0] = get_height();  //numrows
+  dimensions[1] = get_width();   //numcols
+
+
+  PyArrayObject *A = (PyArrayObject *) PyArray_SimpleNewFromData(2, dimensions, PyArray_UBYTE, _buffer);
+
+  /*
+
+  PyArrayObject *A = (PyArrayObject *) PyArray_FromDims(2, dimensions, PyArray_UBYTE);
+
+
+  unsigned char *src		= _buffer;
+  unsigned char *src_end	= src + (dimensions[0] * dimensions[1]);
+  unsigned char *dst		= (unsigned char *)A->data;
+
+  while (src != src_end) {
+    *dst++ = *src++;
+  }
+  */
+
+  return Py::asObject((PyObject*)A);
 }
 
 void FT2Image::makeRgbCopy() {
@@ -1695,6 +1735,8 @@ FT2Image::init_type() {
 		    FT2Image::draw_rect__doc__);
  add_varargs_method("draw_rect_filled", &FT2Image::py_draw_rect_filled,
 		    FT2Image::draw_rect_filled__doc__);
+ add_varargs_method("as_array", &FT2Image::py_as_array,
+		    FT2Image::as_array__doc__);
  add_varargs_method("as_str", &FT2Image::py_as_str,
 		    FT2Image::as_str__doc__);
  add_varargs_method("as_rgb_str", &FT2Image::py_as_rgb_str,
@@ -1832,6 +1874,7 @@ void
 initft2font(void)
 {
   static ft2font_module* ft2font = new ft2font_module;
+  import_array();
 
   Py::Dict d = ft2font->moduleDictionary();
   d["SCALABLE"] 	= Py::Int(FT_FACE_FLAG_SCALABLE);
@@ -1883,5 +1926,6 @@ initft2font(void)
 }
 
 ft2font_module::~ft2font_module() {
+
   FT_Done_FreeType( _ft2Library );
 }

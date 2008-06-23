@@ -17,12 +17,13 @@ tested.
 
 from __future__ import division
 import os, time, sys, glob
-import matplotlib.backends as mplbe
 
-all_backends = [b.lower() for b in mplbe.all_backends]
+import matplotlib.rcsetup as rcsetup
+
+all_backends = list(rcsetup.all_backends)  # to leave the original list alone
 all_backends.extend(['cairo.png', 'cairo.ps', 'cairo.pdf', 'cairo.svg'])
 
-pylab_dir = os.path.join('..', 'pylab')
+pylab_dir = os.path.join('..', 'pylab_examples')
 pylab_files = [
     'alignment_test.py',
     'arctest.py',
@@ -48,7 +49,7 @@ pylab_files = [
     'errorbar_limits.py',
     'figimage_demo.py',
     'figlegend_demo.py',
-    'figtext.py',
+    'figure_title.py',
     'fill_demo.py',
     'finance_demo.py',
     'fonts_demo_kw.py',
@@ -131,9 +132,11 @@ try:
     import subprocess
     def run(arglist):
         try:
-            subprocess.call(arglist)
+            ret = subprocess.call(arglist)
         except KeyboardInterrupt:
             sys.exit()
+        else:
+            return ret
 except ImportError:
     def run(arglist):
         os.system(' '.join(arglist))
@@ -189,7 +192,7 @@ def drive(backend, python=['python'], switches = []):
                 line_lstrip.startswith('show')):
                 continue
             tmpfile.write(line)
-        if backend in mplbe.interactive_bk:
+        if backend in rcsetup.interactive_bk:
             tmpfile.write('show()')
         else:
             tmpfile.write('savefig("%s", dpi=150)' % outfile)
@@ -197,20 +200,22 @@ def drive(backend, python=['python'], switches = []):
         tmpfile.close()
         start_time = time.time()
         program = [x % {'name': basename} for x in python]
-        run(program + [tmpfile_name, switchstring])
+        ret = run(program + [tmpfile_name, switchstring])
         end_time = time.time()
-        print (end_time - start_time)
+        print (end_time - start_time), ret
         #os.system('%s %s %s' % (python, tmpfile_name, switchstring))
         os.remove(tmpfile_name)
 
+
 if __name__ == '__main__':
     times = {}
-    default_backends = ['Agg', 'PS', 'SVG', 'PDF', 'Template']
+    default_backends = ['agg', 'ps', 'svg', 'pdf', 'template']
     if len(sys.argv)==2 and sys.argv[1]=='--clean':
         localdirs = [d for d in glob.glob('*') if os.path.isdir(d)]
         all_backends_set = set(all_backends)
         for d in localdirs:
-            if d.lower() not in all_backends_set: continue
+            if d.lower() not in all_backends_set:
+                continue
             print 'removing %s'%d
             for fname in glob.glob(os.path.join(d, '*')):
                 os.remove(fname)
