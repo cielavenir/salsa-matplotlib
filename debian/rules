@@ -20,6 +20,10 @@ build: patch build-arch build-indep
 build-indep: build-indep-stamp
 build-indep-stamp:
 	dh_testdir
+
+	# build the doc
+	-( cd doc ; rm pyplots/tex_unicode_demo.py ; MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ PYTHONPATH=../build/lib.linux-x86_64-2.5/ ./make.py )
+
 	touch build-indep-stamp
 
 build-arch:$(PYVERS:%=build-stamp-%)
@@ -41,6 +45,9 @@ clean-patched: patch
 	find ./lib -name '*.pyc' -exec rm {} \;
 
 	rm -f lib/matplotlib/mpl-data/matplotlib.conf lib/matplotlib/mpl-data/matplotlibrc
+
+	# clean the doc
+	( cd doc ; ./make.py clean )
 
 	dh_clean
 
@@ -76,7 +83,7 @@ binary-indep: build-indep install-indep
 	dh_testdir -i
 	dh_testroot -i
 	dh_installchangelogs -i CHANGELOG
-	dh_installdocs -p$(pd) -i
+	dh_installdocs -p$(pd) -i doc/build/html/ doc/build/latex/Matplotlib.pdf
 	dh_installexamples -p$(pd) -i examples/*
 	dh_compress -i -Xexamples -Xexamples/data -Xpdf
 	dh_fixperms -i
