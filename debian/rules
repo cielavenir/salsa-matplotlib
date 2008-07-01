@@ -18,11 +18,13 @@ include /usr/share/quilt/quilt.make
 build: patch build-arch build-indep
 
 build-indep: build-indep-stamp
-build-indep-stamp:
+build-indep-stamp: $(DEFPY:%=build-stamp-%)
 	dh_testdir
 
 	# build the doc
-	-( cd doc ; rm pyplots/tex_unicode_demo.py ; MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ PYTHONPATH=../build/lib.linux-x86_64-2.5/ ./make.py )
+	-( cd doc ; rm pyplots/tex_unicode_demo.py;\
+		MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
+		PYTHONPATH=../build/lib.$(shell dpkg-architecture -qDEB_BUILD_ARCH_OS)-$(shell dpkg-architecture -qDEB_BUILD_GNU_CPU)-$(DEFPY) ./make.py )
 
 	touch build-indep-stamp
 
@@ -42,12 +44,14 @@ clean-patched: patch
 	for i in $(PYVERS); do python$(i) ./setup.py clean --all; done
 	-rm -f *-stamp*
 	-rm -rf build *.pyc *.pyo
-	find ./lib -name '*.pyc' -exec rm {} \;
 
 	rm -f lib/matplotlib/mpl-data/matplotlib.conf lib/matplotlib/mpl-data/matplotlibrc
 
 	# clean the doc
 	( cd doc ; ./make.py clean )
+	rm -f doc/_static/inheritance*
+	rm -f doc/_static/math-*.png
+	find . -name '*.pyc' -exec rm {} \;
 
 	dh_clean
 
