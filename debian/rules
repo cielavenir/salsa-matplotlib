@@ -22,9 +22,8 @@ build-indep-stamp: $(DEFPY:%=build-stamp-%)
 	dh_testdir
 
 	# build the doc
-	-( cd doc ; rm pyplots/tex_unicode_demo.py;\
-		MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
-		PYTHONPATH=../build/lib.$(shell dpkg-architecture -qDEB_BUILD_ARCH_OS)-$(shell dpkg-architecture -qDEB_BUILD_GNU_CPU)-$(DEFPY) ./make.py )
+	-( cd doc ; MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
+		    PYTHONPATH=../build/lib.$(shell dpkg-architecture -qDEB_BUILD_ARCH_OS)-$(shell dpkg-architecture -qDEB_BUILD_GNU_CPU)-$(DEFPY) ./make.py )
 
 	touch build-indep-stamp
 
@@ -51,6 +50,7 @@ clean-patched: patch
 	( cd doc ; ./make.py clean )
 	rm -f doc/_static/inheritance*
 	rm -f doc/_static/math-*.png
+	rm -f doc/test.png
 	find . -name '*.pyc' -exec rm {} \;
 
 	dh_clean
@@ -89,7 +89,10 @@ binary-indep: build-indep install-indep
 	dh_installchangelogs -i CHANGELOG
 	dh_installdocs -p$(pd) -i doc/build/html/ doc/build/latex/Matplotlib.pdf
 	dh_installexamples -p$(pd) -i examples/*
-	dh_compress -i -Xexamples -Xexamples/data -Xpdf
+	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js
+	ln -sf /usr/share/javascript/jquery/jquery.js \
+		$(CURDIR)/debian/$(pd)/usr/share/doc/python-matplotlib-doc/html/_static/jquery.js
+	dh_link -i
 	dh_fixperms -i
 	dh_installdeb -i
 	dh_gencontrol -i

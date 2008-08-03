@@ -1,20 +1,22 @@
-matplotlib (0.98.2-1) UNRELEASED; urgency=low
-
-  * DO NOT RELEASE!!! doc generation is still too hackish
+matplotlib (0.98.3-1) UNRELEASED; urgency=medium
 
   * New upstream release
+    - fixed memory leaks; Closes: #492735 (RC bug, hence urgency=medium)
   * debian/control
-    - added python-sphinx, graphviz, ipython, texlive-latex-extra build-deps
-      in order to build documentation
+    - added python-sphinx (versioned to easy Lenny entrance), graphviz,
+      ipython, texlive-latex-extra build-deps in order to build documentation
     - added Suggests on python-scipy; thanks to Chris Walker for the report;
       Closes: #488138
     - added Vcs-{Browser,Svn} fields
+    - added depend on libjs-jquery to replace embedded one
   * debian/rules
     - build and install documentation; Closes: #401629
+    - symlinked jquery.js from libjs-jquery instead of the embedded one
+    - added dh_link -i call for indep packages
   * debian/watch
     - removed comment lines since not needed
 
- -- Sandro Tosi <matrixhasu@gmail.com>  Tue, 01 Jul 2008 19:38:21 +0200
+ -- Sandro Tosi <matrixhasu@gmail.com>  Sun, 03 Aug 2008 21:43:18 +0200
 
 matplotlib (0.98.1-1) unstable; urgency=low
 
