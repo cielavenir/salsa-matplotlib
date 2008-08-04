@@ -1,2 +1,3 @@
 build_fix.patch
 matplotlibrc_fix.patch
+doc_graphviz_errors_fix.patch
