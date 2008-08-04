@@ -19,9 +19,18 @@
 # such as 0.75 - a legal html color name, eg red, blue, darkslategray
 
 #### CONFIGURATION BEGINS HERE
+
 # the default backend; one of GTK GTKAgg GTKCairo CocoaAgg FltkAgg
-# QtAgg Qt4Agg  TkAgg WX WXAgg Agg Cairo GDK PS PDF SVG Template
+# QtAgg Qt4Agg TkAgg WX WXAgg Agg Cairo GDK PS PDF SVG Template You
+# can also deploy your own backend outside of matplotlib by referring
+# to the module name (which must be in the PYTHONPATH) as
+# 'module://my_backend'
 backend      : %(backend)s
+
+# if you are runing pyplot inside a GUI and your backend choice
+# conflicts, we will automatically try and find a compatible one for
+# you if backend_fallback is True
+#backend_fallback: True
 numerix      : %(numerix)s  # numpy, Numeric or numarray
 #maskedarray : False       # True to use external maskedarray module
                            # instead of numpy.ma; this is a temporary

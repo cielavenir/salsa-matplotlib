@@ -1,13 +1,14 @@
 import sys
 
 import matplotlib
-from matplotlib import _pylab_helpers
+from matplotlib import _pylab_helpers, interactive
 from matplotlib.cbook import dedent, silent_list, is_string_like, is_numlike
 from matplotlib.figure import Figure, figaspect
 from matplotlib.backend_bases import FigureCanvasBase
 from matplotlib.image import imread as _imread
 from matplotlib import rcParams, rcParamsDefault, get_backend
-from matplotlib.artist import getp, get
+from matplotlib.rcsetup import interactive_bk as _interactive_bk
+from matplotlib.artist import getp, get, Artist
 from matplotlib.artist import setp as _setp
 from matplotlib.axes import Axes
 from matplotlib.projections import PolarAxes
@@ -32,11 +33,54 @@ from ticker import TickHelper, Formatter, FixedFormatter, NullFormatter,\
            MaxNLocator
 
 
+## Backend detection ##
+def _backend_selection():
+    """ If rcParams['backend_fallback'] is true, check to see if the
+        current backend is compatible with the current running event
+        loop, and if not switches to a compatible one.
+    """
+    backend = rcParams['backend']
+    if not rcParams['backend_fallback'] or \
+                     backend not in _interactive_bk:
+        return
+    is_agg_backend = rcParams['backend'].endswith('Agg')
+    if 'wx' in sys.modules and not backend in ('WX', 'WXAgg'):
+        import wx
+        if wx.App.IsMainLoopRunning():
+            rcParams['backend'] = 'wx' + 'Agg' * is_agg_backend
+    elif 'qt' in sys.modules and not backend == 'QtAgg':
+        import qt
+        if not qt.qApp.startingUp():
+            # The mainloop is running.
+            rcParams['backend'] = 'qtAgg'
+    elif 'PyQt4.QtCore' in sys.modules and not backend == 'Qt4Agg':
+        import PyQt4.QtGui
+        if not PyQt4.QtGui.qApp.startingUp():
+            # The mainloop is running.
+            rcParams['backend'] = 'qt4Agg'
+    elif 'gtk' in sys.modules and not backend in ('GTK', 'GTKAgg',
+                                                            'GTKCairo'):
+        import gobject
+        if gobject.MainLoop().is_running():
+            rcParams['backend'] = 'gtk' + 'Agg' * is_agg_backend
+    elif 'Tkinter' in sys.modules and not backend == 'TkAgg':
+        #import Tkinter
+        pass #what if anything do we need to do for tkinter?
+
+_backend_selection()
 
 ## Global ##
 
 from matplotlib.backends import pylab_setup
 new_figure_manager, draw_if_interactive, show = pylab_setup()
+
+
+
+def findobj(o=None, match=None):
+    if o is None:
+        o = gcf()
+    return o.findobj(match)
+findobj.__doc__ = Artist.findobj.__doc__
 
 def switch_backend(newbackend):
     """
@@ -202,6 +246,14 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
                                              frameon=frameon,
                                              FigureClass=FigureClass,
                                              **kwargs)
+
+        # make this figure current on button press event
+        def make_active(event):
+            _pylab_helpers.Gcf.set_active(figManager)
+
+        cid = figManager.canvas.mpl_connect('button_press_event', make_active)
+        figManager._cidgcf = cid
+
         _pylab_helpers.Gcf.set_active(figManager)
         figManager.canvas.figure.number = num
 
@@ -252,17 +304,21 @@ def close(*args):
     if len(args)==0:
         figManager = _pylab_helpers.Gcf.get_active()
         if figManager is None: return
-        else: _pylab_helpers.Gcf.destroy(figManager.num)
+        else:
+            figManager.canvas.mpl_disconnect(figManager._cidgcf)
+            _pylab_helpers.Gcf.destroy(figManager.num)
     elif len(args)==1:
         arg = args[0]
         if arg=='all':
             for manager in _pylab_helpers.Gcf.get_all_fig_managers():
+                manager.canvas.mpl_disconnect(manager._cidgcf)
                 _pylab_helpers.Gcf.destroy(manager.num)
         elif isinstance(arg, int):
             _pylab_helpers.Gcf.destroy(arg)
         elif isinstance(arg, Figure):
             for manager in _pylab_helpers.Gcf.get_all_fig_managers():
                 if manager.canvas.figure==arg:
+                    manager.canvas.mpl_disconnect(manager._cidgcf)
                     _pylab_helpers.Gcf.destroy(manager.num)
         else:
             raise TypeError('Unrecognized argument type %s to close'%type(arg))
@@ -299,6 +355,20 @@ def ginput(*args, **kwargs):
     return gcf().ginput(*args, **kwargs)
 if Figure.ginput.__doc__ is not None:
     ginput.__doc__ = dedent(Figure.ginput.__doc__)
+
+def waitforbuttonpress(*args, **kwargs):
+    """
+    Blocking call to interact with the figure.
+
+    This will wait for *n* key or mouse clicks from the user and
+    return a list containing True's for keyboard clicks and False's
+    for mouse clicks.
+
+    If *timeout* is negative, does not timeout.
+    """
+    return gcf().waitforbuttonpress(*args, **kwargs)
+if Figure.waitforbuttonpress.__doc__ is not None:
+    waitforbuttonpress.__doc__ = dedent(Figure.waitforbuttonpress.__doc__)
 
 
 # Putting things in figures
@@ -2267,6 +2337,28 @@ def xcorr(*args, **kwargs):
     return ret
 if Axes.xcorr.__doc__ is not None:
     xcorr.__doc__ = dedent(Axes.xcorr.__doc__) + """
+
+Additional kwargs: hold = [True|False] overrides default hold state"""
+
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
+def barbs(*args, **kwargs):
+    # allow callers to override the hold state by passing hold=True|False
+    b = ishold()
+    h = kwargs.pop('hold', None)
+    if h is not None:
+        hold(h)
+    try:
+        ret =  gca().barbs(*args, **kwargs)
+        draw_if_interactive()
+    except:
+        hold(b)
+        raise
+    
+    hold(b)
+    return ret
+if Axes.barbs.__doc__ is not None:
+    barbs.__doc__ = dedent(Axes.barbs.__doc__) + """
 
 Additional kwargs: hold = [True|False] overrides default hold state"""
 

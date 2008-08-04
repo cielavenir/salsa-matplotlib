@@ -1,23 +1,26 @@
-matplotlib (0.98.1-1+lenny1.1) testing-proposed-updates; urgency=low
+matplotlib (0.98.3-1) unstable; urgency=medium
 
-  * Non-maintainer upload.
-  * debian/rules:
-    - Force use of g++ to compile files, instead of gcc.
+  * New upstream release
+    - fixed memory leaks; Closes: #492735 (RC bug, hence urgency=medium)
+  * debian/control
+    - added python-sphinx (versioned to easy Lenny entrance), graphviz,
+      ipython, texlive-latex-extra build-deps in order to build documentation
+    - added Suggests on python-scipy; thanks to Chris Walker for the report;
+      Closes: #488138
+    - added Vcs-{Browser,Svn} fields
+    - added depend on libjs-jquery to replace embedded one
+  * debian/rules
+    - build and install documentation; Closes: #401629
+    - symlinked jquery.js from libjs-jquery instead of the embedded one
+    - added dh_link -i call for indep packages
+  * debian/watch
+    - removed comment lines since not needed
+  * debian/patches/doc_graphviz_errors_fix.patch
+    - added to fix graphviz errors during doc build (from upstream svn r5962)
+  * debian/copyright
+    - shortened some long line (to make lintian happy)
 
- -- Kumar Appaiah <akumar@debian.org>  Thu, 18 Sep 2008 07:53:48 -0500
-
-matplotlib (0.98.1-1+lenny1) testing-proposed-updates; urgency=low
-
-  [ Kumar Appaiah ]
-  * Backporting memory leak fix from new upstream release; Closes: #492735
-  * debian/patches/shared_axes_leak.patch
-    - Fix memory leak related to shared axes.
-  * debian/patches/ttconv_leak_fixes.patch
-    - Plug memory leaks in _ttconv.cpp.
-  * debian/patches/manifest_add_doc.patch
-    - Add the doc directory to MANIFEST.in.
-
- -- Sandro Tosi <matrixhasu@gmail.com>  Mon, 15 Sep 2008 21:09:15 +0200
+ -- Sandro Tosi <matrixhasu@gmail.com>  Mon, 04 Aug 2008 21:42:05 +0200
 
 matplotlib (0.98.1-1) unstable; urgency=low
 

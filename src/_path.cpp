@@ -846,7 +846,7 @@ Py::Object _path_module::clip_path_to_rect(const Py::Tuple &args)
 
     ::clip_to_rect(path, x0, y0, x1, y1, inside, results);
 
-    int dims[2];
+    npy_intp dims[2];
     dims[1] = 2;
     PyObject* py_results = PyList_New(results.size());
     if (!py_results)
@@ -857,7 +857,7 @@ Py::Object _path_module::clip_path_to_rect(const Py::Tuple &args)
         {
             size_t size = p->size();
             dims[0] = p->size();
-            PyArrayObject* pyarray = (PyArrayObject*)PyArray_FromDims(2, dims, PyArray_DOUBLE);
+            PyArrayObject* pyarray = (PyArrayObject*)PyArray_SimpleNew(2, dims, PyArray_DOUBLE);
             for (size_t i = 0; i < size; ++i)
             {
                 ((double *)pyarray->data)[2*i]	 = (*p)[i].x;

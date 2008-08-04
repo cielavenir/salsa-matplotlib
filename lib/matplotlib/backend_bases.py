@@ -23,7 +23,7 @@ graphics contexts must implement to serve as a matplotlib backend
 """
 
 from __future__ import division
-import os, warnings
+import os, warnings, time
 
 import numpy as np
 import matplotlib.cbook as cbook
@@ -472,7 +472,7 @@ class GraphicsContextBase:
     def get_clip_path(self):
         """
         Return the clip path in the form (path, transform), where path
-        is a :class:`~matplotlib.path.Path` instance, and transform as
+        is a :class:`~matplotlib.path.Path` instance, and transform is
         an affine transform to apply to the path before clipping.
         """
         if self._clippath is not None:
@@ -651,6 +651,12 @@ class Event:
         self.canvas = canvas
         self.guiEvent = guiEvent
 
+class IdleEvent(Event):
+    """
+    An event triggered by the GUI backend when it is idle -- useful
+    for passive animation
+    """
+    pass
 
 class DrawEvent(Event):
     """
@@ -762,6 +768,9 @@ class MouseEvent(LocationEvent):
     *key*
         the key pressed: None, chr(range(255), 'shift', 'win', or 'control'
 
+    *step*
+        number of scroll steps (positive for 'up', negative for 'down')
+
 
     Example usage::
 
@@ -777,16 +786,18 @@ class MouseEvent(LocationEvent):
     inaxes = None       # the Axes instance if mouse us over axes
     xdata  = None       # x coord of mouse in data coords
     ydata  = None       # y coord of mouse in data coords
+    step   = None       # scroll steps for scroll events
 
     def __init__(self, name, canvas, x, y, button=None, key=None,
-                 guiEvent=None):
+                 step=0, guiEvent=None):
         """
         x, y in figure coords, 0,0 = bottom, left
-        button pressed None, 1, 2, 3
+        button pressed None, 1, 2, 3, 'up', 'down'
         """
         LocationEvent.__init__(self, name, canvas, x, y, guiEvent=guiEvent)
         self.button = button
         self.key = key
+        self.step = step
 
 class PickEvent(Event):
     """
@@ -869,7 +880,7 @@ class FigureCanvasBase:
             A :class:`matplotlib.figure.Figure` instance
 
       """
-    events = (
+    events = [
         'resize_event',
         'draw_event',
         'key_press_event',
@@ -879,7 +890,8 @@ class FigureCanvasBase:
         'scroll_event',
         'motion_notify_event',
         'pick_event',
-        )
+        'idle_event',
+        ]
 
 
     def __init__(self, figure):
@@ -1043,7 +1055,7 @@ class FigureCanvasBase:
         event = PickEvent(s, self, mouseevent, artist, **kwargs)
         self.callbacks.process(s, event)
 
-    def scroll_event(self, x, y, button, guiEvent=None):
+    def scroll_event(self, x, y, step, guiEvent=None):
         """
         Backend derived classes should call this function on any
         scroll wheel event.  x,y are the canvas coords: 0,0 is lower,
@@ -1052,9 +1064,13 @@ class FigureCanvasBase:
         This method will be call all functions connected to the
         'scroll_event' with a :class:`MouseEvent` instance.
         """
-        self._button = button
+        if step >= 0:
+            self._button = 'up'
+        else:
+            self._button = 'down'
         s = 'scroll_event'
-        mouseevent = MouseEvent(s, self, x, y, button, self._key, guiEvent=guiEvent)
+        mouseevent = MouseEvent(s, self, x, y, self._button, self._key,
+                                step=step, guiEvent=guiEvent)
         self.callbacks.process(s, mouseevent)
 
 
@@ -1121,6 +1137,13 @@ class FigureCanvasBase:
         event = MouseEvent(s, self, x, y, self._button, self._key,
                            guiEvent=guiEvent)
         self.callbacks.process(s, event)
+
+    def idle_event(self, guiEvent=None):
+        'call when GUI is idle'
+        s = 'idle_event'
+        event = IdleEvent(s, self, guiEvent=guiEvent)
+        self.callbacks.process(s, event)
+
 
     def draw(self, *args, **kwargs):
         """
@@ -1376,6 +1399,75 @@ class FigureCanvasBase:
         backends with GUIs.
         """
         raise NotImplementedError
+
+    def start_event_loop(self,timeout):
+        """
+        Start an event loop.  This is used to start a blocking event
+        loop so that interactive functions, such as ginput and
+        waitforbuttonpress, can wait for events.  This should not be
+        confused with the main GUI event loop, which is always running
+        and has nothing to do with this.
+
+        This is implemented only for backends with GUIs.
+        """
+        raise NotImplementedError
+
+    def stop_event_loop(self):
+        """
+        Stop an event loop.  This is used to stop a blocking event
+        loop so that interactive functions, such as ginput and
+        waitforbuttonpress, can wait for events.
+
+        This is implemented only for backends with GUIs.
+        """
+        raise NotImplementedError
+
+    def start_event_loop_default(self,timeout=0):
+        """
+        Start an event loop.  This is used to start a blocking event
+        loop so that interactive functions, such as ginput and
+        waitforbuttonpress, can wait for events.  This should not be
+        confused with the main GUI event loop, which is always running
+        and has nothing to do with this.
+
+        This function provides default event loop functionality based
+        on time.sleep that is meant to be used until event loop
+        functions for each of the GUI backends can be written.  As
+        such, it throws a deprecated warning.
+
+        Call signature::
+
+            start_event_loop_default(self,timeout=0)
+
+        This call blocks until a callback function triggers
+        stop_event_loop() or *timeout* is reached.  If *timeout* is
+        <=0, never timeout.
+        """
+        str = "Using default event loop until function specific"
+        str += " to this GUI is implemented"
+        warnings.warn(str,DeprecationWarning)
+
+        if timeout <= 0: timeout = np.inf
+        timestep = 0.01
+        counter = 0
+        self._looping = True
+        while self._looping and counter*timestep < timeout:
+            self.flush_events()
+            time.sleep(timestep)
+            counter += 1
+
+    def stop_event_loop_default(self):
+        """
+        Stop an event loop.  This is used to stop a blocking event
+        loop so that interactive functions, such as ginput and
+        waitforbuttonpress, can wait for events.
+
+        Call signature::
+
+        stop_event_loop_default(self)
+        """
+        self._looping = False
+
 
 
 class FigureManagerBase:

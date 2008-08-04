@@ -55,6 +55,7 @@ class Patch(artist.Artist):
                  edgecolor=None,
                  facecolor=None,
                  linewidth=None,
+                 linestyle=None,
                  antialiased = None,
                  hatch = None,
                  fill=True,
@@ -67,11 +68,13 @@ class Patch(artist.Artist):
         artist.Artist.__init__(self)
 
         if linewidth is None: linewidth = mpl.rcParams['patch.linewidth']
+        if linestyle is None: linestyle = "solid"
         if antialiased is None: antialiased = mpl.rcParams['patch.antialiased']
 
         self.set_edgecolor(edgecolor)
         self.set_facecolor(facecolor)
         self.set_linewidth(linewidth)
+        self.set_linestyle(linestyle)
         self.set_antialiased(antialiased)
         self.set_hatch(hatch)
         self.fill = fill
@@ -118,6 +121,7 @@ class Patch(artist.Artist):
         self.set_fill(other.get_fill())
         self.set_hatch(other.get_hatch())
         self.set_linewidth(other.get_linewidth())
+        self.set_linestyle(other.get_linestyle())
         self.set_transform(other.get_data_transform())
         self.set_figure(other.get_figure())
         self.set_alpha(other.get_alpha())
@@ -149,6 +153,10 @@ class Patch(artist.Artist):
     def get_linewidth(self):
         return self._linewidth
     get_lw = get_linewidth
+
+    def get_linestyle(self):
+        return self._linestyle
+    get_ls = get_linestyle
 
     def set_antialiased(self, aa):
         """
@@ -189,6 +197,16 @@ class Patch(artist.Artist):
         if w is None: w = mpl.rcParams['patch.linewidth']
         self._linewidth = w
     set_lw = set_linewidth
+
+    def set_linestyle(self, ls):
+        """
+        Set the patch linestyle
+
+        ACCEPTS: ['solid' | 'dashed' | 'dashdot' | 'dotted']
+        """
+        if ls is None: ls = "solid"
+        self._linestyle = ls
+    set_ls = set_linestyle
 
     def set_fill(self, b):
         """
@@ -243,6 +261,7 @@ class Patch(artist.Artist):
         else:
             gc.set_foreground(self._edgecolor)
             gc.set_linewidth(self._linewidth)
+            gc.set_linestyle(self._linestyle)
 
         gc.set_alpha(self._alpha)
         gc.set_antialiased(self._antialiased)
@@ -382,6 +401,10 @@ class Rectangle(Patch):
         return self._rect_transform
 
     def contains(self, mouseevent):
+        # special case the degernate rectangle
+        if self._width==0 or self._height==0:
+            return False, {}
+
         x, y = self.get_transform().inverted().transform_point(
             (mouseevent.x, mouseevent.y))
         return (x >= 0.0 and x <= 1.0 and y >= 0.0 and y <= 1.0), {}
@@ -608,7 +631,7 @@ class Polygon(Patch):
 
 class Wedge(Patch):
     def __str__(self):
-        return "Wedge(%g,%g)"%self.xy[0]
+        return "Wedge(%g,%g)"%(self.theta1,self.theta2)
 
     def __init__(self, center, r, theta1, theta2, **kwargs):
         """
@@ -626,6 +649,7 @@ class Wedge(Patch):
         self.theta2 = theta2
         self._patch_transform = transforms.IdentityTransform()
         self._path = Path.wedge(self.theta1, self.theta2)
+    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def get_path(self):
         return self._path
@@ -838,6 +862,12 @@ class YAArrow(Patch):
         *y2*) of the returned points is *k*.
         """
         x1,y1,x2,y2,k = map(float, (x1,y1,x2,y2,k))
+
+        if y2-y1 == 0:
+            return x2, y2+k, x2, y2-k
+        elif x2-x1 == 0:
+            return x2+k, y2, x2-k, y2
+
         m = (y2-y1)/(x2-x1)
         pm = -1./m
         a = 1
@@ -912,6 +942,7 @@ class Ellipse(Patch):
         self._path = Path.unit_circle()
         self._patch_transform = transforms.IdentityTransform()
         self._recompute_transform()
+    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def _recompute_transform(self):
         center = (self.convert_xunits(self.center[0]),
@@ -1018,6 +1049,7 @@ class Arc(Ellipse):
 
         self.theta1 = theta1
         self.theta2 = theta2
+    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def draw(self, renderer):
         """

@@ -18,15 +18,20 @@ include /usr/share/quilt/quilt.make
 build: patch build-arch build-indep
 
 build-indep: build-indep-stamp
-build-indep-stamp:
+build-indep-stamp: $(DEFPY:%=build-stamp-%)
 	dh_testdir
+
+	# build the doc
+	-( cd doc ; MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
+		    PYTHONPATH=../build/lib.$(shell dpkg-architecture -qDEB_BUILD_ARCH_OS)-$(shell dpkg-architecture -qDEB_BUILD_GNU_CPU)-$(DEFPY) ./make.py )
+
 	touch build-indep-stamp
 
 build-arch:$(PYVERS:%=build-stamp-%)
 
 build-stamp-%:
 	dh_testdir
-	CC=g++ CXX=g++ python$* ./setup.py build $(PY_BUILD_FLAGS)
+	python$* ./setup.py build $(PY_BUILD_FLAGS)
 	touch $@
 
 
@@ -38,9 +43,15 @@ clean-patched: patch
 	for i in $(PYVERS); do python$(i) ./setup.py clean --all; done
 	-rm -f *-stamp*
 	-rm -rf build *.pyc *.pyo
-	find ./lib -name '*.pyc' -exec rm {} \;
 
 	rm -f lib/matplotlib/mpl-data/matplotlib.conf lib/matplotlib/mpl-data/matplotlibrc
+
+	# clean the doc
+	( cd doc ; ./make.py clean )
+	rm -f doc/_static/inheritance*
+	rm -f doc/_static/math-*.png
+	rm -f doc/test.png
+	find . -name '*.pyc' -exec rm {} \;
 
 	dh_clean
 
@@ -76,9 +87,12 @@ binary-indep: build-indep install-indep
 	dh_testdir -i
 	dh_testroot -i
 	dh_installchangelogs -i CHANGELOG
-	dh_installdocs -p$(pd) -i
+	dh_installdocs -p$(pd) -i doc/build/html/ doc/build/latex/Matplotlib.pdf
 	dh_installexamples -p$(pd) -i examples/*
-	dh_compress -i -Xexamples -Xexamples/data -Xpdf
+	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js
+	ln -sf /usr/share/javascript/jquery/jquery.js \
+		$(CURDIR)/debian/$(pd)/usr/share/doc/python-matplotlib-doc/html/_static/jquery.js
+	dh_link -i
 	dh_fixperms -i
 	dh_installdeb -i
 	dh_gencontrol -i

@@ -10,6 +10,7 @@ line segemnts)
 """
 import math, warnings
 import numpy as np
+import numpy.ma as ma
 import matplotlib as mpl
 import matplotlib.cbook as cbook
 import matplotlib.colors as _colors # avoid conflict with kwarg
@@ -89,11 +90,10 @@ class Collection(artist.Artist, cm.ScalarMappable):
         self._uniform_offsets = None
         self._offsets = np.array([], np.float_)
         if offsets is not None:
-            offsets = np.asarray(offsets, np.float_)
+            offsets = np.asarray(offsets)
             if len(offsets.shape) == 1:
                 offsets = offsets[np.newaxis,:]  # Make it Nx2.
             if transOffset is not None:
-                Affine2D = transforms.Affine2D
                 self._offsets = offsets
                 self._transOffset = transOffset
             else:
@@ -148,9 +148,9 @@ class Collection(artist.Artist, cm.ScalarMappable):
         result = result.inverse_transformed(transData)
         return result
 
-    def draw(self, renderer):
-        if not self.get_visible(): return
-        renderer.open_group(self.__class__.__name__)
+    def _prepare_points(self):
+        """Point prep for drawing and hit testing"""
+
         transform = self.get_transform()
         transOffset = self._transOffset
         offsets = self._offsets
@@ -171,12 +171,6 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
         offsets = np.asarray(offsets, np.float_)
 
-        self.update_scalarmappable()
-
-        clippath, clippath_trans = self.get_transformed_clip_path_and_affine()
-        if clippath_trans is not None:
-            clippath_trans = clippath_trans.frozen()
-
         if not transform.is_affine:
             paths = [transform.transform_path_non_affine(path) for path in paths]
             transform = transform.get_affine()
@@ -184,11 +178,25 @@ class Collection(artist.Artist, cm.ScalarMappable):
             offsets = transOffset.transform_non_affine(offsets)
             transOffset = transOffset.get_affine()
 
+        return transform, transOffset, offsets, paths
+
+    def draw(self, renderer):
+        if not self.get_visible(): return
+        renderer.open_group(self.__class__.__name__)
+
+        self.update_scalarmappable()
+
+        clippath, clippath_trans = self.get_transformed_clip_path_and_affine()
+        if clippath_trans is not None:
+            clippath_trans = clippath_trans.frozen()
+
+        transform, transOffset, offsets, paths = self._prepare_points()
+
         renderer.draw_path_collection(
             transform.frozen(), self.clipbox, clippath, clippath_trans,
             paths, self.get_transforms(),
             offsets, transOffset,
-            self._facecolors, self._edgecolors, self._linewidths,
+            self.get_facecolor(), self.get_edgecolor(), self._linewidths,
             self._linestyles, self._antialiaseds)
         renderer.close_group(self.__class__.__name__)
 
@@ -200,22 +208,44 @@ class Collection(artist.Artist, cm.ScalarMappable):
         item in itemlist contains the event.
         """
         if callable(self._contains): return self._contains(self,mouseevent)
+        if not self.get_visible(): return False,{}
 
-        transform = self.get_transform()
-        paths = self.get_paths()
-        if not transform.is_affine:
-            paths = [transform.transform_path_non_affine(path) for path in paths]
-            transform = transform.get_affine()
+        transform, transOffset, offsets, paths = self._prepare_points()
 
         ind = mpath.point_in_path_collection(
             mouseevent.x, mouseevent.y, self._pickradius,
             transform.frozen(), paths, self.get_transforms(),
-            np.asarray(self._offsets, np.float_),
-            self._transOffset.frozen(), len(self._facecolors))
+            offsets, transOffset, len(self._facecolors)>0)
         return len(ind)>0,dict(ind=ind)
 
     def set_pickradius(self,pickradius): self.pickradius = 5
     def get_pickradius(self): return self.pickradius
+
+    def set_offsets(self, offsets):
+        """
+        Set the offsets for the collection.  *offsets* can be a scalar
+        or a sequence.
+
+        ACCEPTS: float or sequence of floats
+        """
+        offsets = np.asarray(offsets, np.float_)
+        if len(offsets.shape) == 1:
+            offsets = offsets[np.newaxis,:]  # Make it Nx2.
+        #This decision is based on how they are initialized above
+        if self._uniform_offsets is None:
+            self._offsets = offsets
+        else:
+            self._uniform_offsets = offsets
+
+    def get_offsets(self):
+        """
+        Return the offsets for the collection.
+        """
+        #This decision is based on how they are initialized above in __init__()
+        if self._uniform_offsets is None:
+            return self._offsets
+        else:
+            return self._uniform_offsets
 
     def set_linewidths(self, lw):
         """
@@ -310,7 +340,10 @@ class Collection(artist.Artist, cm.ScalarMappable):
     get_facecolors = get_facecolor
 
     def get_edgecolor(self):
-        return self._edgecolors
+        if self._edgecolors == 'face':
+            return self.get_facecolors()
+        else:
+            return self._edgecolors
     get_edgecolors = get_edgecolor
 
     def set_edgecolor(self, c):
@@ -318,12 +351,18 @@ class Collection(artist.Artist, cm.ScalarMappable):
         Set the edgecolor(s) of the collection. *c* can be a
         matplotlib color arg (all patches have same color), or a
         sequence or rgba tuples; if it is a sequence the patches will
-        cycle through the sequence
+        cycle through the sequence.
+
+        If *c* is 'face', the edge color will always be the same as
+        the face color.
 
         ACCEPTS: matplotlib color arg or sequence of rgba tuples
         """
-        if c is None: c = mpl.rcParams['patch.edgecolor']
-        self._edgecolors = _colors.colorConverter.to_rgba_array(c, self._alpha)
+        if c == 'face':
+            self._edgecolors = 'face'
+        else:
+            if c is None: c = mpl.rcParams['patch.edgecolor']
+            self._edgecolors = _colors.colorConverter.to_rgba_array(c, self._alpha)
 
     set_edgecolors = set_edgecolor
 
@@ -458,7 +497,11 @@ class QuadMesh(Collection):
         """
         Path = mpath.Path
 
-        c = coordinates
+        if ma.isMaskedArray(coordinates):
+            c = coordinates.data
+        else:
+            c = coordinates
+
         # We could let the Path constructor generate the codes for us,
         # but this is faster, since we know they'll always be the same
         codes = np.array(
@@ -501,15 +544,25 @@ class QuadMesh(Collection):
         if clippath_trans is not None:
             clippath_trans = clippath_trans.frozen()
 
-        assert transform.is_affine
+        if not transform.is_affine:
+            coordinates = self._coordinates.reshape(
+                (self._coordinates.shape[0] *
+                 self._coordinates.shape[1],
+                 2))
+            coordinates = transform.transform(coordinates)
+            coordinates = coordinates.reshape(self._coordinates.shape)
+            transform = transforms.IdentityTransform()
+        else:
+            coordinates = self._coordinates
+
         if not transOffset.is_affine:
             offsets = transOffset.transform_non_affine(offsets)
             transOffset = transOffset.get_affine()
 
         renderer.draw_quad_mesh(
             transform.frozen(), self.clipbox, clippath, clippath_trans,
-            self._meshWidth, self._meshHeight, self._coordinates,
-            offsets, transOffset, self._facecolors, self._antialiased,
+            self._meshWidth, self._meshHeight, coordinates,
+            offsets, transOffset, self.get_facecolor(), self._antialiased,
             self._showedges)
         renderer.close_group(self.__class__.__name__)
 
@@ -520,8 +573,14 @@ class PolyCollection(Collection):
         *verts_i* is a sequence of *xy* tuples of vertices, or an
         equivalent :mod:`numpy` array of shape (*nv*, 2).
 
-        *sizes* gives the area of the circle circumscribing the
-        polygon in points^2.
+        *sizes* is *None* (default) or a sequence of floats that
+        scale the corresponding *verts_i*.  The scaling is applied
+        before the Artist master transform; if the latter is an identity
+        transform, then the overall scaling is such that if
+        *verts_i* specify a unit square, then *sizes_i* is the area
+        of that square in points^2.
+        If len(*sizes*) < *nv*, the additional values will be
+        taken cyclically from the array.
 
         *closed*, when *True*, will explicitly close the polygon.
 
@@ -548,12 +607,10 @@ class PolyCollection(Collection):
         return self._paths
 
     def draw(self, renderer):
-        # sizes is the area of the circle circumscribing the polygon
-        # in points^2
         if self._sizes is not None:
             self._transforms = [
                 transforms.Affine2D().scale(
-                    (np.sqrt(x) * renderer.dpi / 72.0))
+                    (np.sqrt(x) * self.figure.dpi / 72.0))
                 for x in self._sizes]
         return Collection.draw(self, renderer)
 
@@ -626,11 +683,9 @@ class RegularPolyCollection(Collection):
     __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def draw(self, renderer):
-        # sizes is the area of the circle circumscribing the polygon
-        # in points^2
         self._transforms = [
             transforms.Affine2D().rotate(-self._rotation).scale(
-                (np.sqrt(x) * renderer.dpi / 72.0) / np.sqrt(np.pi))
+                (np.sqrt(x) * self.figure.dpi / 72.0) / np.sqrt(np.pi))
             for x in self._sizes]
         return Collection.draw(self, renderer)
 
@@ -805,6 +860,33 @@ class LineCollection(Collection):
         return self._edgecolors
     get_colors = get_color  # for compatibility with old versions
 
+class CircleCollection(Collection):
+    """
+    A collection of circles, drawn using splines.
+    """
+    def __init__(self, sizes):
+        """
+        *sizes*
+            Gives the area of the circle in points^2
+
+        %(Collection)s
+        """
+        Collection.__init__(self,**kwargs)
+        self._sizes = sizes
+        self.set_transform(transforms.IdentityTransform())
+        self._paths = [mpath.Path.unit_circle()]
+    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
+
+    def draw(self, renderer):
+        # sizes is the area of the circle circumscribing the polygon
+        # in points^2
+        self._transforms = [
+            transforms.Affine2D().scale(
+                (np.sqrt(x) * self.figure.dpi / 72.0) / np.sqrt(np.pi))
+            for x in self._sizes]
+        return Collection.draw(self, renderer)
+
+
 class PatchCollection(Collection):
     """
     A generic collection of patches.
@@ -840,7 +922,7 @@ class PatchCollection(Collection):
 
         if match_original:
             def determine_facecolor(patch):
-                if patch.fill():
+                if patch.fill:
                     return patch.get_facecolor()
                 return [0, 0, 0, 0]
 
@@ -870,6 +952,6 @@ class PatchCollection(Collection):
 
 artist.kwdocd['Collection'] = patchstr = artist.kwdoc(Collection)
 for k in ('QuadMesh', 'PolyCollection', 'BrokenBarHCollection', 'RegularPolyCollection',
-          'StarPolygonCollection'):
+          'StarPolygonCollection', 'PatchCollection', 'CircleCollection'):
     artist.kwdocd[k] = patchstr
 artist.kwdocd['LineCollection'] = artist.kwdoc(LineCollection)

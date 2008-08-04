@@ -11,7 +11,7 @@
     was written by following the Python "Extending and Embedding"
     tutorial.
 
-  $Id: cntr.c 5111 2008-05-05 15:12:29Z mdboom $
+  $Id: cntr.c 5781 2008-07-17 19:15:58Z jdh2358 $
  */
 
 #include <Python.h>
@@ -1333,7 +1333,7 @@ build_cntr_list_v(long *np, double *xp, double *yp, int nparts, long ntotal)
 {
     PyObject *point, *all_contours;
     PyArrayObject *xv, *yv;
-    int dims[1];
+    npy_intp dims[1];
     int i;
     long j, k;
 
@@ -1343,8 +1343,8 @@ build_cntr_list_v(long *np, double *xp, double *yp, int nparts, long ntotal)
     for (i = 0; i < nparts; i++)
     {
         dims[0] = np[i];
-        xv = (PyArrayObject *) PyArray_FromDims(1, dims, PyArray_DOUBLE);
-        yv = (PyArrayObject *) PyArray_FromDims(1, dims, PyArray_DOUBLE);
+        xv = (PyArrayObject *) PyArray_SimpleNew(1, dims, PyArray_DOUBLE);
+        yv = (PyArrayObject *) PyArray_SimpleNew(1, dims, PyArray_DOUBLE);
         if (xv == NULL || yv == NULL)  goto error;
         for (j = 0; j < dims[0]; j++)
         {
@@ -1370,7 +1370,7 @@ build_cntr_list_v2(long *np, double *xp, double *yp, int nparts, long ntotal)
 {
     PyObject *all_contours;
     PyArrayObject *xyv;
-    int dims[2];
+    npy_intp dims[2];
     int i;
     long j, k;
 
@@ -1381,7 +1381,7 @@ build_cntr_list_v2(long *np, double *xp, double *yp, int nparts, long ntotal)
     {
         dims[0] = np[i];
         dims[1] = 2;
-        xyv = (PyArrayObject *) PyArray_FromDims(2, dims, PyArray_DOUBLE);
+        xyv = (PyArrayObject *) PyArray_SimpleNew(2, dims, PyArray_DOUBLE);
         if (xyv == NULL)  goto error;
         for (j = 0; j < dims[0]; j++)
         {

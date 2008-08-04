@@ -7,7 +7,7 @@ import matplotlib
 from matplotlib import verbose
 from matplotlib.cbook import is_string_like, onetrue
 from matplotlib.backend_bases import RendererBase, GraphicsContextBase, \
-     FigureManagerBase, FigureCanvasBase, NavigationToolbar2, cursors
+     FigureManagerBase, FigureCanvasBase, NavigationToolbar2, IdleEvent, cursors
 from matplotlib._pylab_helpers import Gcf
 from matplotlib.figure import Figure
 from matplotlib.mathtext import MathTextParser
@@ -94,9 +94,14 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
         FigureCanvasBase.__init__( self, figure )
         self.figure = figure
         self.setMouseTracking( True )
-
+        # hide until we can test and fix
+        #self.startTimer(backend_IdleEvent.milliseconds)
         w,h = self.get_width_height()
         self.resize( w, h )
+
+    def __timerEvent(self, event):
+        # hide until we can test and fix
+        self.mpl_idle_event(event)
 
     def mousePressEvent( self, event ):
         x = event.pos().x()
@@ -175,6 +180,14 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
 
     def flush_events(self):
         Qt.qApp.processEvents()
+
+    def start_event_loop(self,timeout):
+        FigureCanvasBase.start_event_loop_default(self,timeout)
+    start_event_loop.__doc__=FigureCanvasBase.start_event_loop_default.__doc__
+
+    def stop_event_loop(self):
+        FigureCanvasBase.stop_event_loop_default(self)
+    stop_event_loop.__doc__=FigureCanvasBase.stop_event_loop_default.__doc__
 
 class FigureManagerQT( FigureManagerBase ):
     """
@@ -305,13 +318,6 @@ class NavigationToolbar2QT( NavigationToolbar2, QtGui.QToolBar ):
 
         # reference holder for subplots_adjust window
         self.adj_window = None
-
-    def destroy( self ):
-        for text, tooltip_text, image_file, callback in self.toolitems:
-            if text is not None:
-                QtCore.QObject.disconnect( self.buttons[ text ],
-                                           QtCore.SIGNAL( 'clicked()' ),
-                                           getattr( self, callback ) )
 
     def dynamic_update( self ):
         self.canvas.draw()

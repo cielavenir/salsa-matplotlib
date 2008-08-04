@@ -17,59 +17,19 @@ from path import Path
 from transforms import Affine2D, Bbox, TransformedPath
 
 from matplotlib import rcParams
-
 # special-purpose marker identifiers:
 (TICKLEFT, TICKRIGHT, TICKUP, TICKDOWN,
     CARETLEFT, CARETRIGHT, CARETUP, CARETDOWN) = range(8)
 
+
 # COVERAGE NOTE: Never called internally or from examples
 def unmasked_index_ranges(mask, compressed = True):
-    '''
-    Calculate the good data ranges in a masked 1-D np.array, based on
-    mask.
+    warnings.warn("Import this directly from matplotlib.cbook",
+                   DeprecationWarning)
+    # Warning added 2008/07/22
+    from matplotlib.cbook import unmasked_index_ranges as _unmasked_index_ranges
+    return _unmasked_index_ranges(mask, compressed=compressed)
 
-    Returns Nx2 :class:`numpy.array` with each row the start and stop
-    indices for slices of the compressed :class:`numpy.array`
-    corresponding to each of *N* uninterrupted runs of unmasked
-    values.  If optional argument *compressed* is *False*, it returns
-    the start and stop indices into the original :class:`numpy.array`,
-    not the compressed :class:`numpy.array`.  Returns *None* if there
-    are no unmasked values.
-
-    Example::
-
-      y = ma.array(np.arange(5), mask = [0,0,1,0,0])
-      #ii = unmasked_index_ranges(y.mask())
-      ii = unmasked_index_ranges(ma.getmask(y))
-      # returns [[0,2,] [2,4,]]
-
-      y.compressed().filled()[ii[1,0]:ii[1,1]]
-      # returns np.array [3,4,]
-      # (The 'filled()' method converts the masked np.array to a numerix np.array.)
-
-      #i0, i1 = unmasked_index_ranges(y.mask(), compressed=False)
-      i0, i1 = unmasked_index_ranges(ma.getmask(y), compressed=False)
-      # returns [[0,3,] [2,5,]]
-
-      y.filled()[ii[1,0]:ii[1,1]]
-      # returns np.array [3,4,]
-
-    '''
-    m = np.concatenate(((1,), mask, (1,)))
-    indices = np.arange(len(mask) + 1)
-    mdif = m[1:] - m[:-1]
-    i0 = np.compress(mdif == -1, indices)
-    i1 = np.compress(mdif == 1, indices)
-    assert len(i0) == len(i1)
-    if len(i1) == 0:
-        return None
-    if not compressed:
-        return np.concatenate((i0[:, np.newaxis], i1[:, np.newaxis]), axis=1)
-    seglengths = i1 - i0
-    breakpoints = np.cumsum(seglengths)
-    ic0 = np.concatenate(((0,), breakpoints[:-1]))
-    ic1 = breakpoints
-    return np.concatenate((ic0[:, np.newaxis], ic1[:, np.newaxis]), axis=1)
 
 def segment_hits(cx,cy,x,y,radius):
     """Determine if any line segments are within radius of a point. Returns
@@ -215,12 +175,6 @@ class Line2D(Artist):
         if linestyle is None   : linestyle=rcParams['lines.linestyle']
         if marker is None      : marker=rcParams['lines.marker']
         if color is None       : color=rcParams['lines.color']
-        if markeredgecolor is None :
-            markeredgecolor='auto'
-        if markerfacecolor is None :
-            markerfacecolor='auto'
-        if markeredgewidth is None :
-            markeredgewidth=rcParams['lines.markeredgewidth']
 
         if markersize is None  : markersize=rcParams['lines.markersize']
         if antialiased is None : antialiased=rcParams['lines.antialiased']
@@ -282,31 +236,43 @@ class Line2D(Artist):
         if not is_numlike(self.pickradius):
             raise ValueError,"pick radius should be a distance"
 
-        # transform in backend
+        # Make sure we have data to plot
+        if self._invalid:
+            self.recache()
         if len(self._xy)==0: return False,{}
 
-        xyt = self._transformed_path.get_fully_transformed_path().vertices
-        xt = xyt[:, 0]
-        yt = xyt[:, 1]
+        # Convert points to pixels
+        path, affine = self._transformed_path.get_transformed_path_and_affine()
+        path = affine.transform_path(path)
+        xy = path.vertices
+        xt = xy[:, 0]
+        yt = xy[:, 1]
 
+        # Convert pick radius from points to pixels
         if self.figure == None:
-            print str(self),' has no figure set'
+            warning.warn('no figure set when check if mouse is on line')
             pixels = self.pickradius
         else:
             pixels = self.figure.dpi/72. * self.pickradius
 
-        if self._linestyle == 'None':
+        # Check for collision
+        if self._linestyle in ['None',None]:
             # If no line, return the nearby point(s)
-            d = np.sqrt((xt-mouseevent.x)**2 + (yt-mouseevent.y)**2)
-            ind, = np.nonzero(np.less_equal(d, pixels))
+            d = (xt-mouseevent.x)**2 + (yt-mouseevent.y)**2
+            ind, = np.nonzero(np.less_equal(d, pixels**2))
         else:
             # If line, return the nearby segment(s)
             ind = segment_hits(mouseevent.x,mouseevent.y,xt,yt,pixels)
-        if 0:
-            print 'xt', xt, mouseevent.x
-            print 'yt', yt, mouseevent.y
-            print 'd', (xt-mouseevent.x)**2., (yt-mouseevent.y)**2.
-            print d, pixels, ind
+
+        # Debugging message
+        if False and self._label != u'':
+            print "Checking line",self._label,"at",mouseevent.x,mouseevent.y
+            print 'xt', xt
+            print 'yt', yt
+            #print 'dx,dy', (xt-mouseevent.x)**2., (yt-mouseevent.y)**2.
+            print 'ind',ind
+
+        # Return the point(s) within radius
         return len(ind)>0,dict(ind=ind)
 
     def get_pickradius(self):
@@ -466,7 +432,7 @@ class Line2D(Artist):
             gc.set_alpha(self._alpha)
             funcname = self._markers.get(self._marker, '_draw_nothing')
             if funcname != '_draw_nothing':
-                tpath, affine = self._transformed_path.get_transformed_path_and_affine()
+                tpath, affine = self._transformed_path.get_transformed_points_and_affine()
                 markerFunc = getattr(self, funcname)
                 markerFunc(renderer, gc, tpath, affine.frozen())
 
@@ -628,6 +594,8 @@ class Line2D(Artist):
 
         ACCEPTS: any matplotlib color
         """
+        if ec is None :
+            ec = 'auto'
         self._markeredgecolor = ec
 
     def set_markeredgewidth(self, ew):
@@ -636,6 +604,8 @@ class Line2D(Artist):
 
         ACCEPTS: float value in points
         """
+        if ew is None :
+            ew = rcParams['lines.markeredgewidth']
         self._markeredgewidth = ew
 
     def set_markerfacecolor(self, fc):
@@ -644,6 +614,8 @@ class Line2D(Artist):
 
         ACCEPTS: any matplotlib color
         """
+        if fc is None :
+            fc = 'auto'
         self._markerfacecolor = fc
 
     def set_markersize(self, sz):
