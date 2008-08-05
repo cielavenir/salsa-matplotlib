@@ -1,10 +1,10 @@
-matplotlib (0.98.3-2) UNRELEASED; urgency=low
+matplotlib (0.98.3-2) unstable; urgency=low
 
   * debian/patches/build_fix.patch
     - added kfreebsd7/8 based systems; thanks to Petr Salinger for the patch;
       Closes: #493858
 
- -- Sandro Tosi <matrixhasu@gmail.com>  Tue, 05 Aug 2008 17:54:28 +0200
+ -- Sandro Tosi <matrixhasu@gmail.com>  Tue, 05 Aug 2008 19:39:18 +0200
 
 matplotlib (0.98.3-1) unstable; urgency=medium
 
