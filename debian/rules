@@ -8,6 +8,7 @@
 
 PYVERS := $(shell pyversions -v -r debian/control)
 DEFPY := $(shell pyversions -v -d)
+PY_PLATFORM=$(shell python -c 'from distutils.util import get_platform; print get_platform()')
 pd  := python-matplotlib-doc
 p   := python-matplotlib
 pdata := python-matplotlib-data
@@ -23,7 +24,7 @@ build-indep-stamp: $(DEFPY:%=build-stamp-%)
 
 	# build the doc
 	-( cd doc ; MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
-		    PYTHONPATH=../build/lib.$(shell dpkg-architecture -qDEB_BUILD_ARCH_OS)-*-$(DEFPY) ./make.py )
+		    PYTHONPATH=../build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py )
 
 	touch build-indep-stamp
 
