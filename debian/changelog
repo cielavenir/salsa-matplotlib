@@ -1,10 +1,10 @@
-matplotlib (0.98.3-3) unstable; urgency=low
+matplotlib (0.98.3-3) unstable; urgency=medium
 
   * debian/control
     - moved depends on libjs-jquery from binary to -doc package; thanks to
       Nicolas Évrard for the report; part of #490992 resolution
   * debian/rules
-    - used distutils to retrive the build directory for matplotlib, needed for doc
+    - used distutils to retrieve the build directory for matplotlib, needed for doc
       generation; thanks to Lucas Nussbaum for the report and to Piotr for the
       fix; Closes: #494236
 
