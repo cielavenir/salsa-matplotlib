@@ -7,6 +7,7 @@ Build-Depends: debhelper (>= 5.0.38),
                dvipng,
                graphviz,
                ipython,
+               libagg-dev,
                libfreetype6-dev,
                libgtk2.0-dev,
                libpng-dev,
@@ -41,12 +42,9 @@ Architecture: any
 XB-Python-Version: ${python:Versions}
 Depends: ${python:Depends},
          ${shlibs:Depends},
-         dvipng,
-	 python,
+         python,
          python-cairo,
-         python-configobj,
          python-dateutil,
-         python-enthought-traits (>= 2.0),
          python-excelerator,
          python-gd (>= 0.52) | python-gtk2 | python-wxgtk2.6 | python-qt3 | python-qt4,
          python-glade2,
@@ -60,7 +58,10 @@ Provides: ${python:Provides}
 Conflicts: python2.4-matplotlib
 Replaces: python2.4-matplotlib
 Enhances: ipython
+Recommends: dvipng
 Suggests: ipython (>= 0.6.3),
+          python-configobj,
+          python-enthought-traits (>= 2.0),
           python-matplotlib-doc,
           python-scipy,
           texlive-extra-utils,

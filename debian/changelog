@@ -1,12 +1,21 @@
 matplotlib (0.98.3-4) UNRELEASED; urgency=low
 
+  * Release in collaboration with Benjamin Drung, from Ubuntu
   * debian/control
     - applied Benjamin Drung patch to split dep fields a package per line;
       thanks to him; Closes: #495287
     - replaced dep on python-dev with python; thanks to Benjamin Drung for the
       notice
+    - depends reorganization: dvipng moved to recommends (optional tex
+      depends), python-configobj and python-enthought-traits to suggests
+      (experimental support); Closes: #490992
+    - added libagg-dev to build-dep; ************** INITIAL FIX FOR #377271 *************
+  * debian/README.debian
+    - removed outdated info, added notice for MATPLOTLIBDATA env variable
+  * debian/python-matplotlib-data.install
+    - added matplotlib.conf installation
 
- -- Sandro Tosi <matrixhasu@gmail.com>  Mon, 18 Aug 2008 16:01:58 +0200
+ -- Sandro Tosi <matrixhasu@gmail.com>  Thu, 21 Aug 2008 18:29:22 +0200
 
 matplotlib (0.98.3-3) unstable; urgency=medium
 

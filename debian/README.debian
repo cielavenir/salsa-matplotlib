@@ -1,19 +1,10 @@
-Dependency on Numeric/Numarray:
--------------------------------
+MatplotLib Data Directory
+-------------------------
 
-While numpy enters unstable, matplotlib is still depending on
-Numeric/numarray.
+For various functions to work, for example 
 
-Please update the field "numerix"  /etc/matplotlibrc or
-~/.matplotlib/matplotlibrc to your needs until numpy enters Debian
-archives.
+help() -> modules
 
+you need to set the enviromental variable:
 
-python-matplotlib documentation
--------------------------------
-
-You can find the latest version of matplotlib's docs here:
-
-  * pydoc documentation: <http://matplotlib.sourceforge.net/classdocs.html>
-  * pylab commands: <http://matplotlib.sourceforge.net/pylab_commands.html>
-
+export MATPLOTLIBDATA=/usr/share/matplotlib/
