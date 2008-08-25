@@ -1,3 +1,33 @@
+matplotlib (0.98.3-4) unstable; urgency=low
+
+  [ Sandro Tosi ]
+  * Release in collaboration with Benjamin Drung, from Ubuntu
+  * debian/control
+    - applied Benjamin Drung patch to split dep fields a package per line;
+      thanks to him; Closes: #495287
+    - replaced dep on python-dev with python; thanks to Benjamin Drung for the
+      notice
+    - depends reorganization: dvipng moved to recommends (optional tex
+      depends), python-configobj and python-enthought-traits to suggests
+      (experimental support); Closes: #490992
+    - added python-matplotlib-dbg package and python-all-dbg, python-numpy-dbg
+      to build-dep
+    - removed python-gd depends since no more needed
+  * debian/README.debian
+    - removed outdated info, added notice for MATPLOTLIBDATA env variable
+  * debian/python-matplotlib-data.install
+    - added matplotlib.conf installation
+  * debian/patches/matplotlibrc_fix.patch
+    - refreshed to match new upstream code
+  * debian/rules
+    - added build, clean and install for -dbg package
+
+  [ Ondrej Certik ]
+  * debian/patches/build_fix.patch updated thanks to Thiemo Seufer.
+      Closes: #501618
+
+ -- Sandro Tosi <matrixhasu@gmail.com>  Mon, 25 Aug 2008 23:28:30 +0200
+
 matplotlib (0.98.3-3) unstable; urgency=medium
 
   * debian/control
