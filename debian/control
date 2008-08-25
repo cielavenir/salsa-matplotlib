@@ -11,6 +11,7 @@ Build-Depends: debhelper (>= 5.0.38),
                libgtk2.0-dev,
                libpng-dev,
                python-all-dev (>= 2.3.5-7),
+               python-all-dbg (>= 2.4.4-6),
                python-central (>= 0.5.6),
                python-configobj,
                python-dateutil,
@@ -81,7 +82,7 @@ Description: Python based plotting system (data package)
  be accessed either via a functional interface familiar to Matlab
  users or an object oriented interface familiar to Python users.
  .
- This package contains architecture independent data for python-matplotlib
+ This package contains architecture independent data for python-matplotlib.
 
 Package: python-matplotlib-doc
 Architecture: all
@@ -94,4 +95,17 @@ Description: Python based plotting system (documentation package)
  be accessed either via a functional interface familiar to Matlab
  users or an object oriented interface familiar to Python users.
  .
- This package contains documentation for python-matplotlib
+ This package contains documentation for python-matplotlib.
+
+Package: python-matplotlib-dbg
+Architecture: any
+Priority: extra
+Depends: python-matplotlib (= ${binary:Version}), python-dbg, ${shlibs:Depends}
+Description: Python based plotting system (debug extension)
+ Matplotlib is a pure Python plotting library designed to bring
+ publication quality plotting to Python with a syntax familiar to
+ Matlab users. All of the plotting commands in the pylab interface can
+ be accessed either via a functional interface familiar to Matlab
+ users or an object oriented interface familiar to Python users.
+ .
+ This package contains the debug extension for python-matplotlib.

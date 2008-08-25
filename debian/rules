@@ -12,6 +12,7 @@ PY_PLATFORM=$(shell python -c 'from distutils.util import get_platform; print ge
 pd  := python-matplotlib-doc
 p   := python-matplotlib
 pdata := python-matplotlib-data
+pdbg := python-matplotlib-dbg
 
 include /usr/share/quilt/quilt.make
 
@@ -32,7 +33,10 @@ build-arch:$(PYVERS:%=build-stamp-%)
 
 build-stamp-%:
 	dh_testdir
+
 	python$* ./setup.py build $(PY_BUILD_FLAGS)
+	python$*-dbg ./setup.py build $(PY_BUILD_FLAGS)
+
 	touch $@
 
 
@@ -41,11 +45,16 @@ clean: clean-patched unpatch
 clean-patched: patch
 	dh_testdir
 	dh_testroot
-	for i in $(PYVERS); do python$(i) ./setup.py clean --all; done
+	
+	for i in $(PYVERS); do \
+	    python$(i) ./setup.py clean --all; \
+	    python$(i)-dbg ./setup.py clean --all; \
+	done
+
 	-rm -f *-stamp*
 	-rm -rf build *.pyc *.pyo
 
-	rm -f lib/matplotlib/mpl-data/matplotlib.conf lib/matplotlib/mpl-data/matplotlibrc
+	rm -f lib/matplotlib/mpl-data/matplotlib.conf lib/matplotlib/mpl-data/matplotlibrc doc/mpl_data/matplotlib.conf doc/mpl_data/matplotlibrc
 
 	# clean the doc
 	( cd doc ; ./make.py clean )
@@ -64,10 +73,20 @@ install-arch: build-arch $(PYVERS:%=install-stamp-%)
 install-stamp-%: build-stamp-%
 	dh_testdir
 	dh_testroot
+
 	python$* ./setup.py install_lib \
 		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/ --no-compile
+	python$*-dbg ./setup.py install_lib \
+		-d $(CURDIR)/debian/$(pdbg)/usr/lib/python$*/site-packages/ --no-compile
+
+	find debian/$(pdbg) ! -type d ! -name '*.so' | xargs rm -f
+	find debian/$(pdbg) -depth -empty -exec rmdir {} \;
+
 	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/mpl-data/
 	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/backends/Matplotlib.nib/
+
+	rm -rf $(CURDIR)/debian/$(pdbg)/usr/lib/python$*/site-packages/matplotlib/mpl-data/
+	rm -rf $(CURDIR)/debian/$(pdbg)/usr/lib/python$*/site-packages/matplotlib/backends/Matplotlib.nib/
 
 	touch $@
 
@@ -114,7 +133,7 @@ binary-arch: build-arch install-arch
 	done
 	dh_pycentral -a
 	dh_link -a
-	dh_strip -a
+	dh_strip -a --dbg-package=$(pdbg)
 	dh_compress -a
 	dh_fixperms -a
 	dh_installdeb -a

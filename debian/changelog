@@ -9,12 +9,17 @@ matplotlib (0.98.3-4) UNRELEASED; urgency=low
     - depends reorganization: dvipng moved to recommends (optional tex
       depends), python-configobj and python-enthought-traits to suggests
       (experimental support); Closes: #490992
+    - added python-matplotlib-dbg package and python-all-dbg to build-dep
   * debian/README.debian
     - removed outdated info, added notice for MATPLOTLIBDATA env variable
   * debian/python-matplotlib-data.install
     - added matplotlib.conf installation
+  * debian/patches/matplotlibrc_fix.patch
+    - refreshed to match new upstream code
+  * debian/rules
+    - added build, clean and install for -dbg package
 
- -- Sandro Tosi <matrixhasu@gmail.com>  Fri, 22 Aug 2008 11:29:33 +0200
+ -- Sandro Tosi <matrixhasu@gmail.com>  Fri, 22 Aug 2008 14:33:35 +0200
 
 matplotlib (0.98.3-3) unstable; urgency=medium
 
