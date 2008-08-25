@@ -10,6 +10,7 @@ matplotlib (0.98.3-4) UNRELEASED; urgency=low
       depends), python-configobj and python-enthought-traits to suggests
       (experimental support); Closes: #490992
     - added python-matplotlib-dbg package and python-all-dbg to build-dep
+    - removed python-gd depends since no more needed
   * debian/README.debian
     - removed outdated info, added notice for MATPLOTLIBDATA env variable
   * debian/python-matplotlib-data.install
@@ -19,7 +20,7 @@ matplotlib (0.98.3-4) UNRELEASED; urgency=low
   * debian/rules
     - added build, clean and install for -dbg package
 
- -- Sandro Tosi <matrixhasu@gmail.com>  Fri, 22 Aug 2008 14:33:35 +0200
+ -- Sandro Tosi <matrixhasu@gmail.com>  Mon, 25 Aug 2008 20:17:58 +0200
 
 matplotlib (0.98.3-3) unstable; urgency=medium
 
