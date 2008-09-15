@@ -1,0 +1,85 @@
+Index: matplotlib-0.98.1+lenny1/src/_ttconv.cpp
+===================================================================
+--- matplotlib-0.98.1+lenny1.orig/src/_ttconv.cpp	2008-09-13 20:27:06.000000000 -0500
++++ matplotlib-0.98.1+lenny1/src/_ttconv.cpp	2008-09-13 20:46:57.000000000 -0500
+@@ -25,22 +25,23 @@
+   }
+ 
+   ~PythonFileWriter() {
+-    if (_write_method)
+-      Py_DECREF(_write_method);
++    Py_XDECREF(_write_method);
+   }
+ 
+   void set(PyObject* write_method) {
+-    if (_write_method)
+-      Py_DECREF(_write_method);
++    Py_XDECREF(_write_method);
+     _write_method = write_method;
+-    if (_write_method)
+-      Py_INCREF(_write_method);
++    Py_XINCREF(_write_method);
+   }
+ 
+   virtual void write(const char* a) {
+-    if (_write_method)
+-      if (! PyObject_CallFunction(_write_method, (char *)"s", a))
+-	throw PythonExceptionOccurred();
++    PyObject* result = NULL;
++    if (_write_method) {
++      result = PyObject_CallFunction(_write_method, (char *)"s", a);
++      if (! result)
++        throw PythonExceptionOccurred();
++      Py_DECREF(result);
++    }
+   }
+ };
+ 
+@@ -54,6 +55,7 @@
+   }
+ 
+   file_writer->set(write_method);
++  Py_DECREF(write_method);
+ 
+   return 1;
+ }
+@@ -68,11 +70,14 @@
+   PyObject* item;
+   while ( (item = PyIter_Next(iterator)) ) {
+     long value = PyInt_AsLong(item);
++    Py_DECREF(item);
+     if (value == -1 && PyErr_Occurred())
+       return 0;
+     result->push_back(value);
+   }
+ 
++  Py_DECREF(iterator);
++
+   return 1;
+ }
+ 
+@@ -87,7 +92,7 @@
+     "filename", "output", "fonttype", "glyph_ids", NULL };
+   if (! PyArg_ParseTupleAndKeywords
+       (args, kwds,
+-       "sO&i|O&:convert_ttf_to_ps",
++       "s|O&:get_pdf_charprocs",
+        (char**)kwlist,
+        &filename,
+        fileobject_to_PythonFileWriter,
+@@ -130,9 +135,13 @@
+ 
+   virtual void add_pair(const char* a, const char* b) {
+     PyObject* value = PyString_FromString(b);
+-    if (value)
+-      if (PyDict_SetItemString(_dict, a, value))
++    if (value) {
++      if (PyDict_SetItemString(_dict, a, value)) {
++        Py_DECREF(value);
+ 	throw PythonExceptionOccurred();
++      }
++    }
++    Py_DECREF(value);
+   }
+ };
+ 

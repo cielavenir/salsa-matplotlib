@@ -1,3 +1,15 @@
+matplotlib (0.98.1-1+lenny1) testing-proposed-updates; urgency=low
+
+  [ Kumar Appaiah ]
+  * debian/patches/shared_axes_leak.patch
+    - Fix memory leak related to shared axes.
+  * debian/patches/ttconv_leak_fixes.patch
+    - Plug memory leaks in _ttconv.cpp.
+  * debian/patches/manifest_add_doc.patch
+    - Add the doc directory to MANIFEST.in.
+
+ -- Sandro Tosi <matrixhasu@gmail.com>  Mon, 15 Sep 2008 21:09:15 +0200
+
 matplotlib (0.98.1-1) unstable; urgency=low
 
   * New upstream release; Closes: #486074

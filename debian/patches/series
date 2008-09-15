@@ -1,2 +1,5 @@
 build_fix.patch
 matplotlibrc_fix.patch
+shared_axes_leak.patch
+ttconv_leak_fix.patch
+manifest_add_doc.patch
