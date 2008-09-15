@@ -1,6 +1,7 @@
 matplotlib (0.98.1-1+lenny1) testing-proposed-updates; urgency=low
 
   [ Kumar Appaiah ]
+  * Backporting memory leak fix from new upstream release; Closes: #492735
   * debian/patches/shared_axes_leak.patch
     - Fix memory leak related to shared axes.
   * debian/patches/ttconv_leak_fixes.patch
