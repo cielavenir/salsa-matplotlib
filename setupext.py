@@ -47,8 +47,8 @@ import re
 
 basedir = {
     'win32'  : ['win32_static',],
-    'linux2' : ['/usr'],
-    'linux'  : ['/usr',],
+    'linux2' : ['/usr/local', '/usr'],
+    'linux'  : ['/usr/local', '/usr',],
     'cygwin' : ['/usr/local', '/usr',],
     'darwin' : ['/sw/lib/freetype2', '/sw/lib/freetype219', '/usr/local',
                 '/usr', '/sw', '/usr/X11R6'],
@@ -56,8 +56,8 @@ basedir = {
     'freebsd5' : ['/usr/local', '/usr'],
     'freebsd6' : ['/usr/local', '/usr'],
     'sunos5' : [os.getenv('MPLIB_BASE') or '/usr/local',],
-    'gnukfreebsd5' : ['/usr'],
-    'gnukfreebsd6' : ['/usr'],
+    'gnukfreebsd5' : ['/usr/local', '/usr'],
+    'gnukfreebsd6' : ['/usr/local', '/usr'],
     'aix5' : ['/usr/local'],
 }
 
@@ -976,10 +976,6 @@ def guess_tcl_config(tcl_lib_dir, tk_lib_dir, tk_ver):
         tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
                                                        '../../include'))
 
-    if not os.path.exists(tk_inc):
-        tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
-                                               '../../../include/tcl' + tk_ver))
-
     if not os.path.exists(os.path.join(tk_inc, 'tk.h')):
         tk_inc = tcl_inc
 
@@ -997,10 +993,10 @@ def guess_tcl_config(tcl_lib_dir, tk_lib_dir, tk_ver):
     return tcl_lib, tcl_inc, tk_lib, tk_inc
 
 def hardcoded_tcl_config():
-    tcl_inc = "/usr/include/tcl8.4"
-    tk_inc = "/usr/include/tcl8.4"
-    tcl_lib = "/usr/lib"
-    tk_lib = "/usr/lib"
+    tcl_inc = "/usr/local/include"
+    tk_inc = "/usr/local/include"
+    tcl_lib = "/usr/local/lib"
+    tk_lib = "/usr/local/lib"
     return tcl_lib, tcl_inc, tk_lib, tk_inc
 
 def add_tk_flags(module):
