@@ -26,7 +26,7 @@ build-arch:$(PYVERS:%=build-stamp-%)
 
 build-stamp-%:
 	dh_testdir
-	python$* ./setup.py build $(PY_BUILD_FLAGS)
+	CC=g++ CXX=g++ python$* ./setup.py build $(PY_BUILD_FLAGS)
 	touch $@
 
 
