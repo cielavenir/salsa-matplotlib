@@ -1,3 +1,20 @@
+matplotlib (0.98.1-1+lenny2) testing-proposed-updates; urgency=medium
+
+  [ Kumar Appaiah ]
+  * Revert to the standard build procedure to overcome the "undefined
+    symbol: __gxx_personality_v0" errors which appear when CC=g++ is
+    passed on to setup.py. (Closes: #501578)
+
+ -- Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>  Fri, 03 Oct 2008 17:48:11 -0500
+
+matplotlib (0.98.1-1+lenny1.1) testing-proposed-updates; urgency=low
+
+  * Non-maintainer upload.
+  * debian/rules:
+    - Force use of g++ to compile C++ files, instead of gcc.
+
+ -- Kumar Appaiah <akumar@debian.org>  Thu, 18 Sep 2008 07:53:48 -0500
+
 matplotlib (0.98.1-1+lenny1) testing-proposed-updates; urgency=low
 
   [ Kumar Appaiah ]
