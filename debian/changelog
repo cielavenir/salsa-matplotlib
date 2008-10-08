@@ -1,9 +1,9 @@
 matplotlib (0.98.1-1+lenny1.2) UNRELEASED; urgency=medium
 
   * Non-maintainer upload.
-  * Revert to the standard build procedure
-    to overcome the "undefined symbol: __gxx_personality_v0"
-    errors which appear when CC=g++ is passed on to setup.py.
+  * Revert to the standard build procedure to overcome the "undefined
+    symbol: __gxx_personality_v0" errors which appear when CC=g++ is
+    passed on to setup.py. (Closes: #501578)
 
  -- Kumar Appaiah <akumar@debian.org>  Fri, 03 Oct 2008 17:48:11 -0500
 
