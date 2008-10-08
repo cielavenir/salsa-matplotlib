@@ -1,7 +1,6 @@
-matplotlib (0.98.1-1+lenny2) UNRELEASED; urgency=medium
+matplotlib (0.98.1-1+lenny2) testing-proposed-updates; urgency=medium
 
   [ Kumar Appaiah ]
-  * Non-maintainer upload.
   * Revert to the standard build procedure to overcome the "undefined
     symbol: __gxx_personality_v0" errors which appear when CC=g++ is
     passed on to setup.py. (Closes: #501578)
