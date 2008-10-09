@@ -1,19 +1,23 @@
-Index: matplotlib-0.98.0/setupext.py
+Index: matplotlib-0.98.1/setupext.py
 ===================================================================
---- matplotlib-0.98.0.orig/setupext.py	2008-05-30 00:47:10.000000000 +0200
-+++ matplotlib-0.98.0/setupext.py	2008-06-18 20:14:40.296926877 +0200
-@@ -47,8 +47,8 @@
+--- matplotlib-0.98.1.orig/setupext.py	2008-10-08 23:11:20.000000000 +0000
++++ matplotlib-0.98.1/setupext.py	2008-10-08 23:15:16.000000000 +0000
+@@ -47,8 +47,12 @@
  
  basedir = {
      'win32'  : ['win32_static',],
 -    'linux2' : ['/usr/local', '/usr'],
 -    'linux'  : ['/usr/local', '/usr',],
++    'linux2-alpha' : ['/usr'],
++    'linux2-hppa' : ['/usr'],
++    'linux2-mips' : ['/usr'],
++    'linux2-sparc' : ['/usr'],
 +    'linux2' : ['/usr'],
 +    'linux'  : ['/usr',],
      'cygwin' : ['/usr/local', '/usr',],
      'darwin' : ['/sw/lib/freetype2', '/sw/lib/freetype219', '/usr/local',
                  '/usr', '/sw', '/usr/X11R6'],
-@@ -56,8 +56,8 @@
+@@ -56,8 +60,8 @@
      'freebsd5' : ['/usr/local', '/usr'],
      'freebsd6' : ['/usr/local', '/usr'],
      'sunos5' : [os.getenv('MPLIB_BASE') or '/usr/local',],
@@ -24,7 +28,7 @@ Index: matplotlib-0.98.0/setupext.py
      'aix5' : ['/usr/local'],
  }
  
-@@ -965,6 +965,10 @@
+@@ -976,6 +980,10 @@
          tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
                                                         '../../include'))
  
@@ -35,7 +39,7 @@ Index: matplotlib-0.98.0/setupext.py
      if not os.path.exists(os.path.join(tk_inc, 'tk.h')):
          tk_inc = tcl_inc
  
-@@ -982,10 +986,10 @@
+@@ -993,10 +1001,10 @@
      return tcl_lib, tcl_inc, tk_lib, tk_inc
  
  def hardcoded_tcl_config():
