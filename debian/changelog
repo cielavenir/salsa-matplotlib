@@ -2,6 +2,7 @@ matplotlib (0.98.1-1+lenny3) UNRELEASED; urgency=low
 
   * Patch from Thiemo Seufer: new build_fix.patch to detect new
     sys.platform identifiers on mips, mipsel, hppa, alpha and sparc.
+    (Closes: #501617)
 
  -- Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>  Wed, 08 Oct 2008 19:05:46 -0500
 
