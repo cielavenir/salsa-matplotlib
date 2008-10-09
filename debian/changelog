@@ -1,5 +1,6 @@
-matplotlib (0.98.1-1+lenny3) UNRELEASED; urgency=low
+matplotlib (0.98.1-1+lenny3) testing-proposed-updates; urgency=medium
 
+  [ Kumar Appaiah ]
   * Patch from Thiemo Seufer: new build_fix.patch to detect new
     sys.platform identifiers on mips, mipsel, hppa, alpha and sparc.
     (Closes: #501617)
