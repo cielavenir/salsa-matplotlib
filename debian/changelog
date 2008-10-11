@@ -1,4 +1,4 @@
-matplotlib (0.98.3-4) UNRELEASED; urgency=low
+matplotlib (0.98.3-4) unstable; urgency=low
 
   [ Sandro Tosi ]
   * Release in collaboration with Benjamin Drung, from Ubuntu
