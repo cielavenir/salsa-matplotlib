@@ -1,3 +1,4 @@
 build_fix.patch
 matplotlibrc_fix.patch
+matplotlibrc.template-typo.patch
 doc_graphviz_errors_fix.patch
