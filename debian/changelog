@@ -1,3 +1,22 @@
+matplotlib (0.98.3-5) unstable; urgency=medium
+
+  [ Benjamin Drung ]
+  * debian/patches/matplotlibrc.template-typo.patch
+    - fix typo in matplotlibrc.template
+
+  [ Sandro Tosi ]
+  * debian/control
+    - updated my email address
+    - replaced python-wxgtk2.6 with python-wxgtk2.8
+  * debian/patches/setup.cfg.patch
+    - added to create "setup.cfg" file to guide building (in particular for
+      "backend" configuration); Closes: #502976
+  * debian/patches/bts-498229_axes3d_typo.patch
+    - added to fix a typo when importing "axes3d"; thanks to Tiziano Zito for
+      the report; Closes: #498229
+
+ -- Sandro Tosi <morph@debian.org>  Fri, 31 Oct 2008 13:51:20 +0100
+
 matplotlib (0.98.3-4) unstable; urgency=low
 
   [ Sandro Tosi ]
