@@ -4,8 +4,9 @@ matplotlib (0.98.3-6) UNRELEASED; urgency=low
     - Added python-pkg-resources to build dependency for version detection of
       python-enthought-traits
     - merged python-tk into GUI Python packages alternative dependency list
+    - add myself to uploaders
 
- -- Benjamin Drung <benjamin.drung@gmail.com>  Fri, 31 Oct 2008 23:59:45 +0100
+ -- Benjamin Drung <benjamin.drung@gmail.com>  Sat, 01 Nov 2008 00:01:00 +0100
 
 matplotlib (0.98.3-5) unstable; urgency=medium
 

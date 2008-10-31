@@ -6,7 +6,8 @@ Uploaders: Marco Presi (Zufus) <zufus@debian.org>,
            Alexandre Fayolle <afayolle@debian.org>,
            Vittorio Palmisano <redclay81@gmail.com>,
            Ondrej Certik <ondrej@certik.cz>,
-           Sandro Tosi <morph@debian.org>
+           Sandro Tosi <morph@debian.org>,
+           Benjamin Drung <benjamin.drung@gmail.com>
 Build-Depends: debhelper (>= 5.0.38),
                dvipng,
                graphviz,
