@@ -1,0 +1,7 @@
+Index: matplotlib-0.98.3/lib/matplotlib/axes3d.py
+===================================================================
+--- matplotlib-0.98.3.orig/lib/matplotlib/axes3d.py	2008-10-30 22:40:51.122768151 +0100
++++ matplotlib-0.98.3/lib/matplotlib/axes3d.py	2008-10-30 22:41:41.406765219 +0100
+@@ -1 +1 @@
+-raise NotImplmentedError('axes3d is not supported in matplotlib-0.98.  You may want to try the 0.91.x maintenance branch')
++raise NotImplementedError('axes3d is not supported in matplotlib-0.98.  You may want to try the 0.91.x maintenance branch')
