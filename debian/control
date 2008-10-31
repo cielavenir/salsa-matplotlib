@@ -52,13 +52,12 @@ Depends: ${python:Depends},
          python-cairo,
          python-dateutil,
          python-excelerator,
-         python-gtk2 | python-wxgtk2.8 | python-qt3 | python-qt4,
+         python-gtk2 | python-tk | python-wxgtk2.8 | python-qt3 | python-qt4,
          python-glade2,
          python-gobject,
          python-matplotlib-data (>= ${source:Version}),
          python-numpy (>= 1:1.1.0),
          python-pyparsing,
-         python-tk,
          python-tz
 Provides: ${python:Provides}
 Conflicts: python2.4-matplotlib
