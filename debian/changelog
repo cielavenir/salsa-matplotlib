@@ -1,3 +1,11 @@
+matplotlib (0.98.3-6) UNRELEASED; urgency=low
+
+  * debian/control
+    - Added python-pkg-resources to build dependency for version detection of
+      python-enthought-traits
+
+ -- Benjamin Drung <benjamin.drung@gmail.com>  Fri, 31 Oct 2008 22:55:38 +0100
+
 matplotlib (0.98.3-5) unstable; urgency=medium
 
   [ Benjamin Drung ]
