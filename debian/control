@@ -42,7 +42,7 @@ Standards-Version: 3.8.0
 XS-DM-Upload-Allowed: yes
 Homepage: http://matplotlib.sf.net/
 Vcs-Svn: svn://svn.debian.org/svn/python-modules/packages/matplotlib/trunk/
-Vcs-Browser: http://svn.debian.org/wsvn/python-modules/packages/matplotlib/trunk/?op=log
+Vcs-Browser: http://svn.debian.org/viewsvn/python-modules/packages/matplotlib/trunk/
 
 Package: python-matplotlib
 Architecture: any
