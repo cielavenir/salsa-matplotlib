@@ -6,12 +6,15 @@ matplotlib (0.98.3-6) UNRELEASED; urgency=low
       python-enthought-traits
     - merged python-tk into GUI Python packages alternative dependency list
     - add myself to uploaders
+  * Move content of debian/patches/setup.cfg.patch to
+    debian/Debian-setup.cfg and add debian/Ubuntu-setup.cfg to set the
+    default backend to TkAgg for Ubuntu
 
   [ Sandro Tosi ]
   * debian/control
     - switch Vcs-Browser field to viewsvn
 
- -- Benjamin Drung <benjamin.drung@gmail.com>  Sat, 01 Nov 2008 00:01:00 +0100
+ -- Benjamin Drung <benjamin.drung@gmail.com>  Sat, 08 Nov 2008 00:33:36 +0100
 
 matplotlib (0.98.3-5) unstable; urgency=medium
 
