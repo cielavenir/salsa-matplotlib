@@ -1,0 +1,10 @@
+matplotlib (0.98.3-6) UNRELEASED; urgency=low
+
+  With this release, we are setting the default backend for matplotlib to 'TkAgg',
+  the lower level of backend suggested bu upsteam.
+
+  You can find documentation about changing the backend in the file:
+
+    /usr/share/doc/python-matplotlib/README.Debian
+
+ -- Sandro Tosi <morph@debian.org>  Sat, 08 Nov 2008 19:36:42 +0100
