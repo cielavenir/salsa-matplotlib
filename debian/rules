@@ -9,7 +9,6 @@
 PYVERS := $(shell pyversions -v -r debian/control)
 DEFPY := $(shell pyversions -v -d)
 PY_PLATFORM=$(shell python -c 'from distutils.util import get_platform; print get_platform()')
-builddist = $(shell lsb_release -si)
 pd  := python-matplotlib-doc
 p   := python-matplotlib
 pdata := python-matplotlib-data
@@ -35,7 +34,7 @@ build-arch:$(PYVERS:%=build-stamp-%)
 build-stamp-%:
 	dh_testdir
 
-	cp -f debian/${builddist}-setup.cfg setup.cfg
+	cp -f debian/setup.cfg setup.cfg
 	python$* ./setup.py build $(PY_BUILD_FLAGS)
 	python$*-dbg ./setup.py build $(PY_BUILD_FLAGS)
 

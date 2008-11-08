@@ -7,8 +7,7 @@ matplotlib (0.98.3-6) UNRELEASED; urgency=low
     - merged python-tk into GUI Python packages alternative dependency list
     - add myself to uploaders
   * Move content of debian/patches/setup.cfg.patch to
-    debian/Debian-setup.cfg and add debian/Ubuntu-setup.cfg to set the
-    default backend to TkAgg for Ubuntu
+    debian/setup.cfg to set the default backend to TkAgg
 
   [ Sandro Tosi ]
   * debian/control
