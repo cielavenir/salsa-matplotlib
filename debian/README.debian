@@ -16,7 +16,7 @@ Change the backend
 From matplotlib version 0.98.3-6 the default backend in Debian is 'TkAgg', the
 simplest backend available in most context.
 
-If you want to change it, you have to ways: system wide, changing the file
+If you want to change it, you have two ways: system wide, changing the file
 
   /etc/matplotlibrc
 
@@ -24,7 +24,7 @@ or on a user basis, changing the file
 
   $HOME/.matplotlib/matplotlibrc
 
-to add or modify a line link this:
+to add or modify a line like this:
 
   backend : <backend>
 
