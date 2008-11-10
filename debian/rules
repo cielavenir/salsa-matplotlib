@@ -52,20 +52,16 @@ clean-patched: patch
 	    python$(i)-dbg ./setup.py clean --all; \
 	done
 
-	-rm -f *-stamp*
-	-rm -rf build *.pyc *.pyo
-
-	rm -f lib/matplotlib/mpl-data/matplotlib.conf lib/matplotlib/mpl-data/matplotlibrc doc/mpl_data/matplotlib.conf doc/mpl_data/matplotlibrc
-	rm -f setup.cfg
-
 	# clean the doc
 	( cd doc ; ./make.py clean )
-	rm -f doc/_static/inheritance*
-	rm -f doc/_static/math-*.png
-	rm -f doc/test.png
+
 	find . -name '*.pyc' -exec rm {} \;
 
-	dh_clean
+	dh_clean *-stamp* lib/matplotlib/mpl-data/matplotlib.conf          \
+	         lib/matplotlib/mpl-data/matplotlibrc                      \
+		 doc/mpl_data/matplotlib.conf doc/mpl_data/matplotlibrc    \
+		 setup.cfg doc/_static/inheritance* doc/_static/math-*.png \
+		 doc/test.png build
 
 # install
 install-arch: build-arch $(PYVERS:%=install-stamp-%)
