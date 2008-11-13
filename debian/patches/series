@@ -3,3 +3,4 @@ matplotlibrc_fix.patch
 matplotlibrc.template-typo.patch
 doc_graphviz_errors_fix.patch
 bts-498229_axes3d_typo.patch
+bts-505618_gcc4.4.patch

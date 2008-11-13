@@ -23,6 +23,9 @@ matplotlib (0.98.3-6) UNRELEASED; urgency=low
     - added information about changing backend
   * debian/rules
     - merging all "rm" calls into "dh_clean" call
+  * debian/patches/bts-505618_gcc4.4.patch
+    - added to fix a FTBFS if built with GCC 4.4; thanks to Martin Michlmayr for
+      the report and the patch; Closes: #505618
 
  -- Benjamin Drung <benjamin.drung@gmail.com>  Sat, 08 Nov 2008 00:33:36 +0100
 
