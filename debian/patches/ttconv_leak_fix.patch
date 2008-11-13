@@ -1,7 +1,7 @@
-Index: matplotlib-0.98.1+lenny1/src/_ttconv.cpp
+Index: matplotlib-0.98.1/src/_ttconv.cpp
 ===================================================================
---- matplotlib-0.98.1+lenny1.orig/src/_ttconv.cpp	2008-09-13 20:27:06.000000000 -0500
-+++ matplotlib-0.98.1+lenny1/src/_ttconv.cpp	2008-09-13 20:46:57.000000000 -0500
+--- matplotlib-0.98.1.orig/src/_ttconv.cpp	2008-11-13 12:32:28.000000000 -0600
++++ matplotlib-0.98.1/src/_ttconv.cpp	2008-11-13 12:40:46.000000000 -0600
 @@ -25,22 +25,23 @@
    }
  
@@ -58,15 +58,6 @@ Index: matplotlib-0.98.1+lenny1/src/_ttconv.cpp
    return 1;
  }
  
-@@ -87,7 +92,7 @@
-     "filename", "output", "fonttype", "glyph_ids", NULL };
-   if (! PyArg_ParseTupleAndKeywords
-       (args, kwds,
--       "sO&i|O&:convert_ttf_to_ps",
-+       "s|O&:get_pdf_charprocs",
-        (char**)kwlist,
-        &filename,
-        fileobject_to_PythonFileWriter,
 @@ -130,9 +135,13 @@
  
    virtual void add_pair(const char* a, const char* b) {
@@ -83,3 +74,12 @@ Index: matplotlib-0.98.1+lenny1/src/_ttconv.cpp
    }
  };
  
+@@ -145,7 +154,7 @@
+   static const char *kwlist[] = { "filename", "glyph_ids", NULL };
+   if (! PyArg_ParseTupleAndKeywords
+       (args, kwds,
+-       "s|O&:convert_ttf_to_ps",
++       "s|O&:get_pdf_charprocs",
+        (char **)kwlist,
+        &filename,
+        pyiterable_to_vector_int,
