@@ -1,3 +1,13 @@
+matplotlib (0.98.1-1+lenny4) testing-proposed-updates; urgency=low
+
+  [ Kumar Appaiah ]
+  * debian/patches/ttconv_leak_fix.patch: It appears that the call labels
+    for get_pdf_charprocs and convert_ttf_to_ps have somehow got
+    interchanged. This change fixes that bug, which causes the failure of
+    PS and EPS generation. (Closes: #505527).
+
+ -- Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>  Thu, 13 Nov 2008 12:27:36 -0600
+
 matplotlib (0.98.1-1+lenny3) testing-proposed-updates; urgency=medium
 
   [ Kumar Appaiah ]
