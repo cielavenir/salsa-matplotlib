@@ -1,3 +1,11 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## 10_build_fix.dpatch by Sandro Tosi <morph@debian.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: Fixes path for build on Debian
+
+@DPATCH@
+
 Index: matplotlib-0.98.3/setupext.py
 ===================================================================
 --- matplotlib-0.98.3.orig/setupext.py	2008-10-08 23:30:35.000000000 +0000

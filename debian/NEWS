@@ -1,4 +1,4 @@
-matplotlib (0.98.3-6) UNRELEASED; urgency=low
+matplotlib (0.98.5-1) UNRELEASED; urgency=low
 
   With this release, we are setting the default backend for matplotlib to
   'TkAgg', the lower level of backend suggested by upsteam.
@@ -7,4 +7,14 @@ matplotlib (0.98.3-6) UNRELEASED; urgency=low
 
     /usr/share/doc/python-matplotlib/README.Debian
 
- -- Sandro Tosi <morph@debian.org>  Sat, 08 Nov 2008 19:36:42 +0100
+  Another change introduced is the removal of 'dvipng' from automatical
+  installation. The net result is a reduction on the number (and then size) of
+  packages to download and install to have matplotlib working, since 'dvipng'
+  takes in 'texlive' (the LaTeX distribution); matplotlib has already a way to
+  render mathmatical symbols, but if you want to use the tex render, then run
+
+    apt-get install dvipng
+
+  to reproduce the previous behaviour.
+
+ -- Sandro Tosi <morph@debian.org>  Sat, 13 Dec 2008 09:35:32 +0100

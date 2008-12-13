@@ -14,7 +14,7 @@ p   := python-matplotlib
 pdata := python-matplotlib-data
 pdbg := python-matplotlib-dbg
 
-include /usr/share/quilt/quilt.make
+include /usr/share/dpatch/dpatch.make
 
 # build
 build: patch build-arch build-indep
