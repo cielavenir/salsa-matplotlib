@@ -1,4 +1,4 @@
-matplotlib (0.98.3-6) UNRELEASED; urgency=low
+matplotlib (0.98.5-1) UNRELEASED; urgency=low
 
   [ Benjamin Drung ]
   * debian/control
@@ -10,6 +10,11 @@ matplotlib (0.98.3-6) UNRELEASED; urgency=low
     debian/setup.cfg to set the default backend to TkAgg
 
   [ Sandro Tosi ]
+  * New upstream release
+    - Fixed histogram autoscaling bug when bins or range are given
+      explicitly; Closes: #503148
+    - fix a FTBFS if built with GCC 4.4; thanks to Martin Michlmayr for the
+      report and the patch; Closes: #505618
   * debian/control
     - switch Vcs-Browser field to viewsvn
     - removed python from Depends since introduced by python:Depends
@@ -17,15 +22,14 @@ matplotlib (0.98.3-6) UNRELEASED; urgency=low
       interpreters)
     - moved python-tk to the first position of multiple GUI bindings Depends
       line
+    - moved 'dvipng' from Recommends to Suggests (to avoid texlive to be
+      automatically taken in); Closes: #490992
   * debian/NEWS
     - added to notify users about default backend (TkAgg)
   * debian/README.debian
     - added information about changing backend
   * debian/rules
     - merging all "rm" calls into "dh_clean" call
-  * debian/patches/bts-505618_gcc4.4.patch
-    - added to fix a FTBFS if built with GCC 4.4; thanks to Martin Michlmayr for
-      the report and the patch; Closes: #505618
 
  -- Benjamin Drung <benjamin.drung@gmail.com>  Sat, 08 Nov 2008 00:33:36 +0100
 

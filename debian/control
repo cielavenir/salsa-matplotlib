@@ -63,8 +63,8 @@ Provides: ${python:Provides}
 Conflicts: python2.4-matplotlib
 Replaces: python2.4-matplotlib
 Enhances: ipython
-Recommends: dvipng
-Suggests: ipython (>= 0.6.3),
+Suggests: dvipng,
+          ipython (>= 0.6.3),
           python-configobj,
           python-enthought-traits (>= 2.0),
           python-matplotlib-doc,
