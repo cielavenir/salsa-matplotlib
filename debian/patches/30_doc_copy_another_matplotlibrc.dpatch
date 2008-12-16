@@ -1,0 +1,19 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## 30_doc_copy_another_matplotlibrc.dpatch by Sandro Tosi <morph@debian.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: Copies another matplotlibrc, the one built for mpl itself, for doc build
+
+@DPATCH@
+diff -urNad matplotlib~/doc/make.py matplotlib/doc/make.py
+--- matplotlib~/doc/make.py	2008-12-10 02:52:52.000000000 +0100
++++ matplotlib/doc/make.py	2008-12-15 18:20:41.189080788 +0100
+@@ -41,7 +41,7 @@
+     check_build()
+     if not os.path.exists('examples/index.rst'):
+         examples()
+-    shutil.copy('mpl_data/matplotlibrc', '_static/matplotlibrc')
++    shutil.copy('../lib/matplotlib/mpl-data/matplotlibrc', '_static/matplotlibrc')
+     #figs()
+     if os.system('sphinx-build -b html -d build/doctrees . build/html'):
+         raise SystemExit("Building HTML failed.")

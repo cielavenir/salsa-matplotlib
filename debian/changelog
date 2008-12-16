@@ -24,6 +24,8 @@ matplotlib (0.98.5-1) UNRELEASED; urgency=low
       line
     - moved 'dvipng' from Recommends to Suggests (to avoid texlive to be
       automatically taken in); Closes: #490992
+    - bump build-depends in python-sphinx to at least 0.5 (upstream doc build
+      system requires it)
   * debian/NEWS
     - added to notify users about default backend (TkAgg)
     - added note about 'dvipng' not installed automatically anymore
@@ -31,11 +33,16 @@ matplotlib (0.98.5-1) UNRELEASED; urgency=low
     - added information about changing backend
   * debian/rules
     - merging all "rm" calls into "dh_clean" call
+    - removed 'API_CHANGES' installation, since removed upstream
   * debian/{control,rules,patches/*}
     - moved from quilt to dpatch
   * debian/patches/{matplotlibrc.template-typo.patch,doc_graphviz_errors_fix.patch,
                     bts-498229_axes3d_typo.patch}
     - removed since merged upstream
+  * debian/patches/30_doc_copy_another_matplotlibrc.dpatch
+    - added to use another matplotlibrc file for doc build
+  * debian/docs
+    - removed since not needed since long time (doc files are listed in debian/rules)
 
  -- Benjamin Drung <benjamin.drung@gmail.com>  Sat, 08 Nov 2008 00:33:36 +0100
 
