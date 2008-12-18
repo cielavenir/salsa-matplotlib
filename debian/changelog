@@ -1,4 +1,4 @@
-matplotlib (0.98.5-1) UNRELEASED; urgency=low
+matplotlib (0.98.5.2-1) UNRELEASED; urgency=low
 
   [ Benjamin Drung ]
   * debian/control
@@ -24,7 +24,7 @@ matplotlib (0.98.5-1) UNRELEASED; urgency=low
       line
     - moved 'dvipng' from Recommends to Suggests (to avoid texlive to be
       automatically taken in); Closes: #490992
-    - bump build-depends in python-sphinx to at least 0.5 (upstream doc build
+    - bump build-depends in python-sphinx to at least 0.5.1 (upstream doc build
       system requires it)
   * debian/NEWS
     - added to notify users about default backend (TkAgg)
