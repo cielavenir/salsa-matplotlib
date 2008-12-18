@@ -34,6 +34,8 @@ matplotlib (0.98.5.2-1) UNRELEASED; urgency=low
   * debian/rules
     - merging all "rm" calls into "dh_clean" call
     - removed 'API_CHANGES' installation, since removed upstream
+    - doc building with '--small' option, to reduce doc size (removing hi-res
+      and pdf galery images)
   * debian/{control,rules,patches/*}
     - moved from quilt to dpatch
   * debian/patches/{matplotlibrc.template-typo.patch,doc_graphviz_errors_fix.patch,
