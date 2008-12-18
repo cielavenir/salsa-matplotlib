@@ -1,3 +1,2 @@
 10_build_fix.dpatch
 20_matplotlibrc_path_search_fix.dpatch
-30_doc_copy_another_matplotlibrc

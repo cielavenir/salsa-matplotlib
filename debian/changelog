@@ -39,8 +39,6 @@ matplotlib (0.98.5.2-1) UNRELEASED; urgency=low
   * debian/patches/{matplotlibrc.template-typo.patch,doc_graphviz_errors_fix.patch,
                     bts-498229_axes3d_typo.patch}
     - removed since merged upstream
-  * debian/patches/30_doc_copy_another_matplotlibrc.dpatch
-    - added to use another matplotlibrc file for doc build
   * debian/docs
     - removed since not needed since long time (doc files are listed in debian/rules)
 
