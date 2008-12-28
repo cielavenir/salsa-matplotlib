@@ -1,4 +1,4 @@
-matplotlib (0.98.5-1) UNRELEASED; urgency=low
+matplotlib (0.98.5.2-1) experimental; urgency=low
 
   With this release, we are setting the default backend for matplotlib to
   'TkAgg', the lower level of backend suggested by upsteam.
@@ -17,4 +17,4 @@ matplotlib (0.98.5-1) UNRELEASED; urgency=low
 
   to reproduce the previous behaviour.
 
- -- Sandro Tosi <morph@debian.org>  Sat, 13 Dec 2008 09:35:32 +0100
+ -- Sandro Tosi <morph@debian.org>  Thu, 18 Dec 2008 23:04:31 +0100

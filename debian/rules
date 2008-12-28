@@ -25,7 +25,7 @@ build-indep-stamp: $(DEFPY:%=build-stamp-%)
 
 	# build the doc
 	-( cd doc ; MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
-		    PYTHONPATH=../build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py --small html latex )
+		    PYTHONPATH=../build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py --small all )
 
 	touch build-indep-stamp
 

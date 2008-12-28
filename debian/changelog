@@ -35,16 +35,16 @@ matplotlib (0.98.5.2-1) UNRELEASED; urgency=low
     - merging all "rm" calls into "dh_clean" call
     - removed 'API_CHANGES' installation, since removed upstream
     - doc building with '--small' option, to reduce doc size (removing hi-res
-      and pdf galery images)
-  * debian/{control,rules,patches/*}
+      and pdf gallery images)
+  * debian/{control,rules,patches/*,README.source}
     - moved from quilt to dpatch
-  * debian/patches/{matplotlibrc.template-typo.patch,doc_graphviz_errors_fix.patch,
-                    bts-498229_axes3d_typo.patch}
+  * debian/patches/{matplotlibrc.template-typo.patch,
+             doc_graphviz_errors_fix.patch,bts-498229_axes3d_typo.patch}
     - removed since merged upstream
   * debian/docs
     - removed since not needed since long time (doc files are listed in debian/rules)
 
- -- Benjamin Drung <benjamin.drung@gmail.com>  Sat, 08 Nov 2008 00:33:36 +0100
+ -- Sandro Tosi <morph@debian.org>  Sun, 28 Dec 2008 01:41:11 +0100
 
 matplotlib (0.98.3-5) unstable; urgency=medium
 
