@@ -1,4 +1,4 @@
-matplotlib (0.98.5.2-1) UNRELEASED; urgency=low
+matplotlib (0.98.5.2-1) experimental; urgency=low
 
   [ Benjamin Drung ]
   * debian/control
@@ -42,9 +42,9 @@ matplotlib (0.98.5.2-1) UNRELEASED; urgency=low
              doc_graphviz_errors_fix.patch,bts-498229_axes3d_typo.patch}
     - removed since merged upstream
   * debian/docs
-    - removed since not needed since long time (doc files are listed in debian/rules)
+    - removed since not needed (the same files were listed in debian/rules)
 
- -- Sandro Tosi <morph@debian.org>  Sun, 28 Dec 2008 01:41:11 +0100
+ -- Sandro Tosi <morph@debian.org>  Wed, 14 Jan 2009 22:09:58 +0100
 
 matplotlib (0.98.3-5) unstable; urgency=medium
 
