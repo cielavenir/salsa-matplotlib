@@ -8,9 +8,9 @@ counterparts (e.g. you may not be able to select all line styles) but
 they are meant to be fast for common use cases (e.g. a bunch of solid
 line segemnts)
 """
-import math, warnings
+import copy, math, warnings
 import numpy as np
-import numpy.ma as ma
+from numpy import ma
 import matplotlib as mpl
 import matplotlib.cbook as cbook
 import matplotlib.colors as _colors # avoid conflict with kwarg
@@ -19,6 +19,7 @@ import matplotlib.transforms as transforms
 import matplotlib.artist as artist
 import matplotlib.backend_bases as backend_bases
 import matplotlib.path as mpath
+import matplotlib.mlab as mlab
 
 class Collection(artist.Artist, cm.ScalarMappable):
     """
@@ -71,6 +72,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
                  norm = None,  # optional for ScalarMappable
                  cmap = None,  # ditto
                  pickradius = 5.0,
+                 urls = None,
                  **kwargs
                  ):
         """
@@ -86,6 +88,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         self.set_linewidth(linewidths)
         self.set_linestyle(linestyles)
         self.set_antialiased(antialiaseds)
+        self.set_urls(urls)
 
         self._uniform_offsets = None
         self._offsets = np.array([], np.float_)
@@ -148,6 +151,12 @@ class Collection(artist.Artist, cm.ScalarMappable):
         result = result.inverse_transformed(transData)
         return result
 
+    def get_window_extent(self, renderer):
+        bbox = self.get_datalim(transforms.IdentityTransform())
+        #TODO:check to ensure that this does not fail for
+        #cases other than scatter plot legend
+        return bbox
+
     def _prepare_points(self):
         """Point prep for drawing and hit testing"""
 
@@ -197,7 +206,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
             paths, self.get_transforms(),
             offsets, transOffset,
             self.get_facecolor(), self.get_edgecolor(), self._linewidths,
-            self._linestyles, self._antialiaseds)
+            self._linestyles, self._antialiaseds, self._urls)
         renderer.close_group(self.__class__.__name__)
 
     def contains(self, mouseevent):
@@ -220,6 +229,14 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
     def set_pickradius(self,pickradius): self.pickradius = 5
     def get_pickradius(self): return self.pickradius
+
+    def set_urls(self, urls):
+	if urls is None:
+            self._urls = [None,]
+        else:
+            self._urls = urls
+
+    def get_urls(self): return self._urls
 
     def set_offsets(self, offsets):
         """
@@ -247,7 +264,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         else:
             return self._uniform_offsets
 
-    def set_linewidths(self, lw):
+    def set_linewidth(self, lw):
         """
         Set the linewidth(s) for the collection.  *lw* can be a scalar
         or a sequence; if it is a sequence the patches will cycle
@@ -257,19 +274,28 @@ class Collection(artist.Artist, cm.ScalarMappable):
         """
         if lw is None: lw = mpl.rcParams['patch.linewidth']
         self._linewidths = self._get_value(lw)
-    set_lw = set_linewidth = set_linewidths
 
-    def set_linestyles(self, ls):
+    def set_linewidths(self, lw):
+        """alias for set_linewidth"""
+        return self.set_linewidth(lw)
+
+    def set_lw(self, lw):
+        """alias for set_linewidth"""
+        return self.set_linewidth(lw)
+
+    def set_linestyle(self, ls):
         """
-        Set the linestyles(s) for the collection.
-        ACCEPTS: ['solid' | 'dashed', 'dashdot', 'dotted' | (offset, on-off-dash-seq) ]
+        Set the linestyle(s) for the collection.
+
+        ACCEPTS: ['solid' | 'dashed', 'dashdot', 'dotted' |
+        (offset, on-off-dash-seq) ]
         """
         try:
             dashd = backend_bases.GraphicsContextBase.dashd
             if cbook.is_string_like(ls):
-                if dashd.has_key(ls):
+                if ls in dashd:
                     dashes = [dashd[ls]]
-                elif cbook.ls_mapper.has_key(ls):
+                elif ls in cbook.ls_mapper:
                     dashes = [dashd[cbook.ls_mapper[ls]]]
                 else:
                     raise ValueError()
@@ -278,13 +304,13 @@ class Collection(artist.Artist, cm.ScalarMappable):
                     dashes = []
                     for x in ls:
                         if cbook.is_string_like(x):
-                            if dashd.has_key(x):
+                            if x in dashd:
                                 dashes.append(dashd[x])
-                            elif cbook.ls_mapper.has_key(x):
+                            elif x in cbook.ls_mapper:
                                 dashes.append(dashd[cbook.ls_mapper[x]])
                             else:
                                 raise ValueError()
-                        elif cbook.iterator(x) and len(x) == 2:
+                        elif cbook.iterable(x) and len(x) == 2:
                             dashes.append(x)
                         else:
                             raise ValueError()
@@ -298,7 +324,14 @@ class Collection(artist.Artist, cm.ScalarMappable):
         except ValueError:
             raise ValueError('Do not know how to convert %s to dashes'%ls)
         self._linestyles = dashes
-    set_dashes = set_linestyle = set_linestyles
+
+    def set_linestyles(self, ls):
+        """alias for set_linestyle"""
+        return self.set_linestyle(ls)
+
+    def set_dashes(self, ls):
+        """alias for set_linestyle"""
+        return self.set_linestyle(ls)
 
     def set_antialiased(self, aa):
         """
@@ -309,14 +342,19 @@ class Collection(artist.Artist, cm.ScalarMappable):
         if aa is None:
             aa = mpl.rcParams['patch.antialiased']
         self._antialiaseds = self._get_bool(aa)
-    set_antialiaseds = set_antialiased
+
+    def set_antialiaseds(self, aa):
+        """alias for set_antialiased"""
+        return self.set_antialiased(aa)
 
     def set_color(self, c):
         """
         Set both the edgecolor and the facecolor.
-        See :meth:`set_facecolor` and :meth:`set_edgecolor`.
 
         ACCEPTS: matplotlib color arg or sequence of rgba tuples
+
+        .. seealso::
+            :meth:`set_facecolor`, :meth:`set_edgecolor`
         """
         self.set_facecolor(c)
         self.set_edgecolor(c)
@@ -331,9 +369,12 @@ class Collection(artist.Artist, cm.ScalarMappable):
         ACCEPTS: matplotlib color arg or sequence of rgba tuples
         """
         if c is None: c = mpl.rcParams['patch.facecolor']
+        self._facecolors_original = c
         self._facecolors = _colors.colorConverter.to_rgba_array(c, self._alpha)
 
-    set_facecolors = set_facecolor
+    def set_facecolors(self, c):
+        """alias for set_facecolor"""
+        return self.set_facecolor(c)
 
     def get_facecolor(self):
         return self._facecolors
@@ -360,11 +401,15 @@ class Collection(artist.Artist, cm.ScalarMappable):
         """
         if c == 'face':
             self._edgecolors = 'face'
+            self._edgecolors_original = 'face'
         else:
             if c is None: c = mpl.rcParams['patch.edgecolor']
+            self._edgecolors_original = c
             self._edgecolors = _colors.colorConverter.to_rgba_array(c, self._alpha)
 
-    set_edgecolors = set_edgecolor
+    def set_edgecolors(self, c):
+        """alias for set_edgecolor"""
+        return self.set_edgecolor(c)
 
     def set_alpha(self, alpha):
         """
@@ -378,11 +423,14 @@ class Collection(artist.Artist, cm.ScalarMappable):
         else:
             artist.Artist.set_alpha(self, alpha)
             try:
-                self._facecolors[:, 3] = alpha
+                self._facecolors = _colors.colorConverter.to_rgba_array(
+                    self._facecolors_original, self._alpha)
             except (AttributeError, TypeError, IndexError):
                 pass
             try:
-                self._edgecolors[:, 3] = alpha
+                if self._edgecolors_original != 'face':
+                    self._edgecolors = _colors.colorConverter.to_rgba_array(
+                        self._edgecolors_original, self._alpha)
             except (AttributeError, TypeError, IndexError):
                 pass
 
@@ -407,6 +455,18 @@ class Collection(artist.Artist, cm.ScalarMappable):
         else:
             self._edgecolors = self.to_rgba(self._A, self._alpha)
 
+    def update_from(self, other):
+        'copy properties from other to self'
+
+        artist.Artist.update_from(self, other)
+        self._antialiaseds = other._antialiaseds
+        self._edgecolors_original = other._edgecolors_original
+        self._edgecolors = other._edgecolors
+        self._facecolors_original = other._facecolors_original
+        self._facecolors = other._facecolors
+        self._linewidths = other._linewidths
+        self._linestyles = other._linestyles
+        self._pickradius = other._pickradius
 
 # these are not available for the object inspector until after the
 # class is built so we define an initial set here for the init
@@ -502,12 +562,6 @@ class QuadMesh(Collection):
         else:
             c = coordinates
 
-        # We could let the Path constructor generate the codes for us,
-        # but this is faster, since we know they'll always be the same
-        codes = np.array(
-            [Path.MOVETO, Path.LINETO, Path.LINETO, Path.LINETO, Path.CLOSEPOLY],
-            Path.code_type)
-
         points = np.concatenate((
                     c[0:-1, 0:-1],
                     c[0:-1, 1:  ],
@@ -516,7 +570,7 @@ class QuadMesh(Collection):
                     c[0:-1, 0:-1]
                     ), axis=2)
         points = points.reshape((meshWidth * meshHeight, 5, 2))
-        return [Path(x, codes) for x in points]
+        return [Path(x) for x in points]
     convert_mesh_to_paths = staticmethod(convert_mesh_to_paths)
 
     def get_datalim(self, transData):
@@ -596,9 +650,13 @@ class PolyCollection(Collection):
         if closed:
             self._paths = []
             for xy in verts:
-                xy = np.asarray(xy)
-                if len(xy) and (xy[0] != xy[-1]).any():
-                    xy = np.concatenate([xy, [xy[0]]])
+                if np.ma.isMaskedArray(xy):
+                    if len(xy) and (xy[0] != xy[-1]).any():
+                        xy = np.ma.concatenate([xy, [xy[0]]])
+                else:
+                    xy = np.asarray(xy)
+                    if len(xy) and (xy[0] != xy[-1]).any():
+                        xy = np.concatenate([xy, [xy[0]]])
                 self._paths.append(mpath.Path(xy))
         else:
             self._paths = [mpath.Path(xy) for xy in verts]
@@ -613,6 +671,7 @@ class PolyCollection(Collection):
                     (np.sqrt(x) * self.figure.dpi / 72.0))
                 for x in self._sizes]
         return Collection.draw(self, renderer)
+
 
 class BrokenBarHCollection(PolyCollection):
     """
@@ -634,6 +693,27 @@ class BrokenBarHCollection(PolyCollection):
         verts = [ [(xmin, ymin), (xmin, ymax), (xmin+xwidth, ymax), (xmin+xwidth, ymin), (xmin, ymin)] for xmin, xwidth in xranges]
         PolyCollection.__init__(self, verts, **kwargs)
     __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
+
+
+    @staticmethod
+    def span_where(x, ymin, ymax, where, **kwargs):
+        """
+        Create a BrokenBarHCollection to plot horizontal bars from
+        over the regions in *x* where *where* is True.  The bars range
+        on the y-axis from *ymin* to *ymax*
+
+        A :class:`BrokenBarHCollection` is returned.
+        *kwargs* are passed on to the collection
+        """
+        xranges = []
+        for ind0, ind1 in mlab.contiguous_regions(where):
+            xslice = x[ind0:ind1]
+            if not len(xslice):
+                continue
+            xranges.append((xslice[0], xslice[-1]-xslice[0]))
+
+        collection = BrokenBarHCollection(xranges, [ymin, ymax-ymin], **kwargs)
+        return collection
 
 class RegularPolyCollection(Collection):
     """Draw a collection of regular polygons with *numsides*."""
@@ -676,6 +756,7 @@ class RegularPolyCollection(Collection):
         """
         Collection.__init__(self,**kwargs)
         self._sizes = sizes
+        self._numsides = numsides
         self._paths = [self._path_generator(numsides)]
         self._rotation = rotation
         self.set_transform(transforms.IdentityTransform())
@@ -691,6 +772,15 @@ class RegularPolyCollection(Collection):
 
     def get_paths(self):
         return self._paths
+
+    def get_numsides(self):
+        return self._numsides
+
+    def get_rotation(self):
+        return self._rotation
+
+    def get_sizes(self):
+        return self._sizes
 
 
 class StarPolygonCollection(RegularPolyCollection):
@@ -805,7 +895,7 @@ class LineCollection(Collection):
             pickradius=pickradius,
             **kwargs)
 
-        self._facecolors = np.array([])
+        self.set_facecolors([])
         self.set_segments(segments)
 
     def get_paths(self):
@@ -813,10 +903,14 @@ class LineCollection(Collection):
 
     def set_segments(self, segments):
         if segments is None: return
-        segments = [np.asarray(seg, np.float_) for seg in segments]
+        _segments = []
+        for seg in segments:
+            if not np.ma.isMaskedArray(seg):
+                seg = np.asarray(seg, np.float_)
+            _segments.append(seg)
         if self._uniform_offsets is not None:
-            segments = self._add_offsets(segments)
-        self._paths = [mpath.Path(seg) for seg in segments]
+            _segments = self._add_offsets(_segments)
+        self._paths = [mpath.Path(seg) for seg in _segments]
 
     set_verts = set_segments # for compatibility with PolyCollection
 
@@ -864,7 +958,7 @@ class CircleCollection(Collection):
     """
     A collection of circles, drawn using splines.
     """
-    def __init__(self, sizes):
+    def __init__(self, sizes, **kwargs):
         """
         *sizes*
             Gives the area of the circle in points^2
@@ -886,6 +980,92 @@ class CircleCollection(Collection):
             for x in self._sizes]
         return Collection.draw(self, renderer)
 
+    def get_paths(self):
+        return self._paths
+
+class EllipseCollection(Collection):
+    """
+    A collection of ellipses, drawn using splines.
+    """
+    def __init__(self, widths, heights, angles, units='points', **kwargs):
+        """
+        *widths*: sequence
+            half-lengths of first axes (e.g., semi-major axis lengths)
+
+        *heights*: sequence
+            half-lengths of second axes
+
+        *angles*: sequence
+            angles of first axes, degrees CCW from the X-axis
+
+        *units*: ['points' | 'inches' | 'dots' | 'width' | 'height' | 'x' | 'y']
+            units in which majors and minors are given; 'width' and 'height'
+            refer to the dimensions of the axes, while 'x' and 'y'
+            refer to the *offsets* data units.
+
+        Additional kwargs inherited from the base :class:`Collection`:
+
+        %(Collection)s
+        """
+        Collection.__init__(self,**kwargs)
+        self._widths = np.asarray(widths).ravel()
+        self._heights = np.asarray(heights).ravel()
+        self._angles = np.asarray(angles).ravel() *(np.pi/180.0)
+        self._units = units
+        self.set_transform(transforms.IdentityTransform())
+        self._transforms = []
+        self._paths = [mpath.Path.unit_circle()]
+        self._initialized = False
+
+
+    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
+
+    def _init(self):
+        def on_dpi_change(fig):
+            self._transforms = []
+        self.figure.callbacks.connect('dpi_changed', on_dpi_change)
+        self._initialized = True
+
+    def set_transforms(self):
+        if not self._initialized:
+            self._init()
+        self._transforms = []
+        ax = self.axes
+        fig = self.figure
+        if self._units in ('x', 'y'):
+            if self._units == 'x':
+                dx0 = ax.viewLim.width
+                dx1 = ax.bbox.width
+            else:
+                dx0 = ax.viewLim.height
+                dx1 = ax.bbox.height
+            sc = dx1/dx0
+        else:
+            if self._units == 'inches':
+                sc = fig.dpi
+            elif self._units == 'points':
+                sc = fig.dpi / 72.0
+            elif self._units == 'width':
+                sc = ax.bbox.width
+            elif self._units == 'height':
+                sc = ax.bbox.height
+            elif self._units == 'dots':
+                sc = 1.0
+            else:
+                raise ValueError('unrecognized units: %s' % self._units)
+
+        _affine = transforms.Affine2D
+        for x, y, a in zip(self._widths, self._heights, self._angles):
+            trans = _affine().scale(x * sc, y * sc).rotate(a)
+            self._transforms.append(trans)
+
+    def draw(self, renderer):
+        if True: ###not self._transforms:
+            self.set_transforms()
+        return Collection.draw(self, renderer)
+
+    def get_paths(self):
+        return self._paths
 
 class PatchCollection(Collection):
     """

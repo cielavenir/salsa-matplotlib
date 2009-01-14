@@ -280,10 +280,17 @@ void get_path_extents(PathIterator& path, const agg::trans_affine& trans,
     {
         if ((code & agg::path_cmd_end_poly) == agg::path_cmd_end_poly)
             continue;
+        /* if (MPL_notisfinite64(x) || MPL_notisfinite64(y))
+            continue;
+           We should not need the above, because the path iterator
+           should already be filtering out invalid values.
+        */
         if (x < *x0) *x0 = x;
         if (y < *y0) *y0 = y;
         if (x > *x1) *x1 = x;
         if (y > *y1) *y1 = y;
+        /* xm and ym are the minimum positive values in the data, used
+           by log scaling */
         if (x > 0.0 && x < *xm) *xm = x;
         if (y > 0.0 && y < *ym) *ym = y;
     }
@@ -312,6 +319,8 @@ Py::Object _path_module::get_path_extents(const Py::Tuple& args)
         extents_data[1] = std::numeric_limits<double>::infinity();
         extents_data[2] = -std::numeric_limits<double>::infinity();
         extents_data[3] = -std::numeric_limits<double>::infinity();
+        /* xm and ym are the minimum positive values in the data, used
+           by log scaling */
         xm = std::numeric_limits<double>::infinity();
         ym = std::numeric_limits<double>::infinity();
 
@@ -394,10 +403,25 @@ Py::Object _path_module::update_path_extents(const Py::Tuple& args)
         }
         else
         {
-            extents_data[0] = std::min(x0, x1);
-            extents_data[1] = std::min(y0, y1);
-            extents_data[2] = std::max(x0, x1);
-            extents_data[3] = std::max(y0, y1);
+            if (x0 > x1)
+            {
+                extents_data[0] = std::numeric_limits<double>::infinity();
+                extents_data[2] = -std::numeric_limits<double>::infinity();
+            }
+            else
+            {
+                extents_data[0] = x0;
+                extents_data[2] = x1;
+            }
+            if (y0 > y1) {
+                extents_data[1] = std::numeric_limits<double>::infinity();
+                extents_data[3] = -std::numeric_limits<double>::infinity();
+            }
+            else
+            {
+                extents_data[1] = y0;
+                extents_data[3] = y1;
+            }
             minpos_data[0] = xm;
             minpos_data[1] = ym;
         }
@@ -1076,14 +1100,22 @@ bool path_intersects_path(PathIterator& p1, PathIterator& p2)
 
 Py::Object _path_module::path_intersects_path(const Py::Tuple& args)
 {
-    args.verify_length(2);
+    args.verify_length(2, 3);
 
     PathIterator p1(args[0]);
     PathIterator p2(args[1]);
+    bool filled = false;
+    if (args.size() == 3) {
+      filled = args[2].isTrue();
+    }
 
-    return Py::Int(::path_intersects_path(p1, p2)
-                   || ::path_in_path(p1, agg::trans_affine(), p2, agg::trans_affine())
-                   || ::path_in_path(p2, agg::trans_affine(), p1, agg::trans_affine()));
+    if (!filled) {
+      return Py::Int(::path_intersects_path(p1, p2));
+    } else {
+      return Py::Int(::path_intersects_path(p1, p2)
+        || ::path_in_path(p1, agg::trans_affine(), p2, agg::trans_affine())
+        || ::path_in_path(p2, agg::trans_affine(), p1, agg::trans_affine()));
+    }
 }
 
 void _add_polygon(Py::List& polygons, const std::vector<double>& polygon) {
@@ -1115,7 +1147,7 @@ Py::Object _path_module::convert_path_to_polygons(const Py::Tuple& args)
     double width = Py::Float(args[2]);
     double height = Py::Float(args[3]);
 
-    bool simplify = !path.has_curves() && width != 0.0 && height != 0.0;
+    bool simplify = path.should_simplify() && width != 0.0 && height != 0.0;
 
     transformed_path_t tpath(path, trans);
     simplify_t simplified(tpath, false, simplify, width, height);

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- noplot -*-
 """
 N       Classic     Base renderer    Ext renderer
 20       0.22           0.14            0.14
@@ -18,5 +19,4 @@ for N in (20,100,1000,10000,50000):
     y = 0.9*rand(N)
     s = 20*rand(N)
     scatter(x,y,s)
-    #savefig('scatter_demo')
     print '%d symbols in %1.2f s' % (N, time.time()-tstart)

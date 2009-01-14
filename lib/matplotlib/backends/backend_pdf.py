@@ -17,7 +17,10 @@ import numpy as npy
 from cStringIO import StringIO
 from datetime import datetime
 from math import ceil, cos, floor, pi, sin
-from sets import Set
+try:
+    set
+except NameError:
+    from sets import Set as set
 
 import matplotlib
 from matplotlib import __version__, rcParams, get_data_path
@@ -27,6 +30,7 @@ from matplotlib.backend_bases import RendererBase, GraphicsContextBase,\
 from matplotlib.backends.backend_mixed import MixedModeRenderer
 from matplotlib.cbook import Bunch, is_string_like, reverse_dict, \
     get_realpath_and_stat, is_writable_file_like, maxdict
+from matplotlib.mlab import quad2cubic
 from matplotlib.figure import Figure
 from matplotlib.font_manager import findfont, is_opentype_cff_font
 from matplotlib.afm import AFM
@@ -108,7 +112,7 @@ def fill(strings, linelen=75):
     result.append(' '.join(strings[lasti:]))
     return '\n'.join(result)
 
-
+_string_escape_regex = re.compile(r'([\\()])')
 def pdfRepr(obj):
     """Map Python objects to PDF syntax."""
 
@@ -134,7 +138,7 @@ def pdfRepr(obj):
     # simpler to escape them all. TODO: cut long strings into lines;
     # I believe there is some maximum line length in PDF.
     elif is_string_like(obj):
-        return '(' + re.sub(r'([\\()])', r'\\\1', obj) + ')'
+        return '(' + _string_escape_regex.sub(r'\\\1', obj) + ')'
 
     # Dictionaries. The keys must be PDF names, so if we find strings
     # there, we make Name objects from them. The values may be
@@ -203,12 +207,13 @@ class Reference:
 
 class Name:
     """PDF name object."""
+    _regex = re.compile(r'[^!-~]')
 
     def __init__(self, name):
         if isinstance(name, Name):
             self.name = name.name
         else:
-            self.name = re.sub(r'[^!-~]', Name.hexify, name)
+            self.name = self._regex.sub(Name.hexify, name)
 
     def __repr__(self):
         return "<Name %s>" % self.name
@@ -331,6 +336,10 @@ class PdfFile:
     def __init__(self, width, height, dpi, filename):
         self.width, self.height = width, height
         self.dpi = dpi
+        if rcParams['path.simplify']:
+            self.simplify = (width * dpi, height * dpi)
+        else:
+            self.simplify = None
         self.nextObject = 1     # next free object id
         self.xrefTable = [ [0, 65535, 'the zero object'] ]
         self.passed_in_file_object = False
@@ -438,7 +447,9 @@ class PdfFile:
         self.writeMarkers()
         self.writeXref()
         self.writeTrailer()
-        if not self.passed_in_file_object:
+        if self.passed_in_file_object:
+            self.fh.flush()
+        else:
             self.fh.close()
 
     def write(self, data):
@@ -687,7 +698,7 @@ end"""
             cmap = font.get_charmap()
             glyph_ids = []
             differences = []
-            multi_byte_chars = Set()
+            multi_byte_chars = set()
             for c in characters:
                 ccode = c
                 gind = cmap.get(ccode) or 0
@@ -1092,11 +1103,12 @@ end"""
             self.endStream()
 
     #@staticmethod
-    def pathOperations(path, transform):
+    def pathOperations(path, transform, simplify=None):
         tpath = transform.transform_path(path)
 
         cmds = []
-        for points, code in tpath.iter_segments():
+        last_points = None
+        for points, code in tpath.iter_segments(simplify):
             if code == Path.MOVETO:
                 cmds.extend(points)
                 cmds.append(Op.moveto)
@@ -1104,20 +1116,21 @@ end"""
                 cmds.extend(points)
                 cmds.append(Op.lineto)
             elif code == Path.CURVE3:
-                cmds.extend([points[0], points[1],
-                             points[0], points[1],
-                             points[2], points[3],
-                             Op.curveto])
+                points = quad2cubic(*(list(last_points[-2:]) + list(points)))
+                cmds.extend(points[2:])
+                cmds.append(Op.curveto)
             elif code == Path.CURVE4:
                 cmds.extend(points)
                 cmds.append(Op.curveto)
             elif code == Path.CLOSEPOLY:
                 cmds.append(Op.closepath)
+            last_points = points
         return cmds
     pathOperations = staticmethod(pathOperations)
 
     def writePath(self, path, transform):
-        cmds = self.pathOperations(path, transform)
+        cmds = self.pathOperations(
+            path, transform, self.simplify)
         self.output(*cmds)
 
     def reserveObject(self, name=''):
@@ -1171,13 +1184,14 @@ class RendererPdf(RendererBase):
     truetype_font_cache = maxdict(50)
     afm_font_cache = maxdict(50)
 
-    def __init__(self, file, dpi):
+    def __init__(self, file, dpi, image_dpi):
         RendererBase.__init__(self)
         self.file = file
         self.gc = self.new_gc()
         self.file.used_characters = self.used_characters = {}
         self.mathtext_parser = MathTextParser("Pdf")
         self.dpi = dpi
+        self.image_dpi = image_dpi
         self.tex_font_map = None
 
     def finalize(self):
@@ -1208,18 +1222,19 @@ class RendererPdf(RendererBase):
             fname = font.fname
         realpath, stat_key = get_realpath_and_stat(fname)
         used_characters = self.used_characters.setdefault(
-            stat_key, (realpath, Set()))
+            stat_key, (realpath, set()))
         used_characters[1].update([ord(x) for x in s])
 
     def merge_used_characters(self, other):
-        for stat_key, (realpath, set) in other.items():
+        for stat_key, (realpath, charset) in other.items():
             used_characters = self.used_characters.setdefault(
-                stat_key, (realpath, Set()))
-            used_characters[1].update(set)
+                stat_key, (realpath, set()))
+            used_characters[1].update(charset)
 
+    def get_image_magnification(self):
+        return self.image_dpi/72.0
+            
     def draw_image(self, x, y, im, bbox, clippath=None, clippath_trans=None):
-        #print >>sys.stderr, "draw_image called"
-
         # MGDTODO: Support clippath here
         gc = self.new_gc()
         if bbox is not None:
@@ -1227,6 +1242,7 @@ class RendererPdf(RendererBase):
         self.check_gc(gc)
 
         h, w = im.get_size_out()
+        h, w = 72.0*h/self.image_dpi, 72.0*w/self.image_dpi
         imob = self.file.imageObject(im)
         self.file.output(Op.gsave, w, 0, 0, h, x, y, Op.concat_matrix,
                          imob, Op.use_xobject, Op.grestore)
@@ -1247,21 +1263,24 @@ class RendererPdf(RendererBase):
 
         output(Op.gsave)
         lastx, lasty = 0, 0
-        for x, y in tpath.vertices:
-            dx, dy = x - lastx, y - lasty
-            output(1, 0, 0, 1, dx, dy, Op.concat_matrix,
-                   marker, Op.use_xobject)
-            lastx, lasty = x, y
+        for vertices, code in tpath.iter_segments():
+            if len(vertices):
+                x, y = vertices[-2:]
+                dx, dy = x - lastx, y - lasty
+                output(1, 0, 0, 1, dx, dy, Op.concat_matrix,
+                       marker, Op.use_xobject)
+                lastx, lasty = x, y
         output(Op.grestore)
 
-    def _setup_textpos(self, x, y, angle, oldx=0, oldy=0, oldangle=0):
+    def _setup_textpos(self, x, y, descent, angle, oldx=0, oldy=0, olddescent=0, oldangle=0):
         if angle == oldangle == 0:
-            self.file.output(x - oldx, y - oldy, Op.textpos)
+            self.file.output(x - oldx, (y + descent) - (oldy + olddescent), Op.textpos)
         else:
             angle = angle / 180.0 * pi
             self.file.output( cos(angle), sin(angle),
                              -sin(angle), cos(angle),
                               x,        y,         Op.textmatrix)
+            self.file.output(0, descent, Op.textpos)
 
     def draw_mathtext(self, gc, x, y, s, prop, angle):
         # TODO: fix positioning and encoding
@@ -1291,7 +1310,7 @@ class RendererPdf(RendererBase):
                 fonttype = global_fonttype
 
             if fonttype == 42 or num <= 255:
-                self._setup_textpos(ox, oy, 0, oldx, oldy)
+                self._setup_textpos(ox, oy, 0, 0, oldx, oldy)
                 oldx, oldy = ox, oy
                 if (fontname, fontsize) != prev_font:
                     fontsize *= self.dpi/72.0
@@ -1384,7 +1403,7 @@ class RendererPdf(RendererBase):
                 self.file.output(elt[1], elt[2], Op.selectfont)
             elif elt[0] == 'text':
                 curx, cury = mytrans.transform((elt[1], elt[2]))
-                self._setup_textpos(curx, cury, angle, oldx, oldy)
+                self._setup_textpos(curx, cury, 0, angle, oldx, oldy)
                 oldx, oldy = curx, cury
                 if len(elt[3]) == 1:
                     self.file.output(elt[3][0], Op.show)
@@ -1433,13 +1452,13 @@ class RendererPdf(RendererBase):
         if rcParams['pdf.use14corefonts']:
             font = self._get_font_afm(prop)
             l, b, w, h = font.get_str_bbox(s)
-            y -= b * fontsize / 1000
+            descent = -b * fontsize / 1000
             fonttype = 42
         else:
             font = self._get_font_ttf(prop)
             self.track_characters(font, s)
             font.set_text(s, 0.0, flags=LOAD_NO_HINTING)
-            y += font.get_descent() / 64.0
+            descent = font.get_descent() / 64.0
 
             fonttype = rcParams['pdf.fonttype']
 
@@ -1479,7 +1498,7 @@ class RendererPdf(RendererBase):
                              self.file.fontName(prop),
                              fontsize,
                              Op.selectfont)
-            self._setup_textpos(x, y, angle)
+            self._setup_textpos(x, y, descent, angle)
             self.file.output(self.encode_string(s, fonttype), Op.show, Op.end_text)
 
         def draw_text_woven(chunks):
@@ -1500,6 +1519,7 @@ class RendererPdf(RendererBase):
             # output all the 2-byte characters.
             for mode in (1, 2):
                 newx = oldx = 0
+                olddescent = 0
                 # Output a 1-byte character chunk
                 if mode == 1:
                     self.file.output(Op.begin_text,
@@ -1509,9 +1529,10 @@ class RendererPdf(RendererBase):
 
                 for chunk_type, chunk in chunks:
                     if mode == 1 and chunk_type == 1:
-                        self._setup_textpos(newx, 0, 0, oldx, 0, 0)
+                        self._setup_textpos(newx, 0, descent, 0, oldx, 0, olddescent, 0)
                         self.file.output(self.encode_string(chunk, fonttype), Op.show)
                         oldx = newx
+                        olddescent = descent
 
                     lastgind = None
                     for c in chunk:
@@ -1559,7 +1580,8 @@ class RendererPdf(RendererBase):
             dvi = dviread.Dvi(dvifile, self.dpi)
             page = iter(dvi).next()
             dvi.close()
-            return page.width, page.height, page.descent
+            # A total height (including the descent) needs to be returned.
+            return page.width, page.height+page.descent, page.descent
         if ismath:
             w, h, d, glyphs, rects, used_characters = \
                 self.mathtext_parser.parse(s, self.dpi, prop)
@@ -1854,13 +1876,13 @@ class FigureCanvasPdf(FigureCanvasBase):
         return 'pdf'
 
     def print_pdf(self, filename, **kwargs):
-        dpi = 72 # there are 72 Postscript points to an inch
-        # TODO: use the dpi kwarg for images
-        self.figure.set_dpi(dpi)
+        ppi = 72 # Postscript points in an inch
+        image_dpi = kwargs.get('dpi', 72) # dpi to use for images
+        self.figure.set_dpi(ppi)
         width, height = self.figure.get_size_inches()
-        file = PdfFile(width, height, dpi, filename)
+        file = PdfFile(width, height, ppi, filename)
         renderer = MixedModeRenderer(
-            width, height, dpi, RendererPdf(file, dpi))
+            width, height, ppi, RendererPdf(file, ppi, image_dpi))
         self.figure.draw(renderer)
         renderer.finalize()
         file.close()

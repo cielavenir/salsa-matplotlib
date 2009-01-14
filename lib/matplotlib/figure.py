@@ -280,15 +280,18 @@ class Figure(Artist):
         Add a centered title to the figure.
 
         kwargs are :class:`matplotlib.text.Text` properties.  Using figure
-        coordinates, the defaults are::
+        coordinates, the defaults are:
 
-          *x* = 0.5
+          - *x* = 0.5
               the x location of text in figure coords
-          *y* = 0.98
+
+          - *y* = 0.98
               the y location of the text in figure coords
-          *horizontalalignment* = 'center'
+
+          - *horizontalalignment* = 'center'
               the horizontal alignment of the text
-          *verticalalignment* = 'top'
+
+          - *verticalalignment* = 'top'
               the vertical alignment of the text
 
         A :class:`matplotlib.text.Text` instance is returned.
@@ -386,7 +389,7 @@ class Figure(Artist):
 
         An :class:`matplotlib.image.FigureImage` instance is returned.
 
-        .. plot:: ../mpl_examples/pylab_examples/figimage_demo.py
+        .. plot:: mpl_examples/pylab_examples/figimage_demo.py
 
         """
 
@@ -560,7 +563,7 @@ class Figure(Artist):
         sets the projection type of the axes.  (For backward
         compatibility, ``polar=True`` may also be provided, which is
         equivalent to ``projection='polar'``).  Valid values for
-        *projection* are: %s.  Some of these projections support
+        *projection* are: %(list)s.  Some of these projections support
         additional kwargs, which may be provided to :meth:`add_axes`::
 
             rect = l,b,w,h
@@ -586,12 +589,12 @@ class Figure(Artist):
 
         The following kwargs are supported:
 
-        %s
+        %(Axes)s
         """
 
         key = self._make_key(*args, **kwargs)
 
-        if self._seen.has_key(key):
+        if key in self._seen:
             ax = self._seen[key]
             self.sca(ax)
             return ax
@@ -620,8 +623,9 @@ class Figure(Artist):
         self._seen[key] = a
         return a
 
-    add_axes.__doc__ = add_axes.__doc__ % (", ".join(get_projection_names()), '%(Axes)s')
-    add_axes.__doc__ = dedent(add_axes.__doc__) % artist.kwdocd
+    add_axes.__doc__ = dedent(add_axes.__doc__) % \
+        {'list': (", ".join(get_projection_names())),
+         'Axes': artist.kwdocd['Axes']}
 
     def add_subplot(self, *args, **kwargs):
         """
@@ -633,28 +637,26 @@ class Figure(Artist):
             fig.add_subplot(111, polar=True)  # add a polar subplot
             fig.add_subplot(sub)              # add Subplot instance sub
 
-        *kwargs* are legal :class:`!matplotlib.axes.Axes` kwargs plus *projection*, which chooses
-        a projection type for the axes.  (For backward compatibility,
-        *polar=True* may also be provided, which is equivalent to
-        *projection='polar'*).  Valid values for *projection* are: %s.
-        Some of these projections support additional *kwargs*, which may
-        be provided to :meth:`add_axes`.
+        *kwargs* are legal :class:`!matplotlib.axes.Axes` kwargs plus
+        *projection*, which chooses a projection type for the axes.
+        (For backward compatibility, *polar=True* may also be
+        provided, which is equivalent to *projection='polar'*). Valid
+        values for *projection* are: %(list)s.  Some of these projections
+        support additional *kwargs*, which may be provided to
+        :meth:`add_axes`.
 
         The :class:`~matplotlib.axes.Axes` instance will be returned.
 
-        If the figure already has a subplot with key *args*, *kwargs* then it will
-        simply make that subplot current and return it
+        If the figure already has a subplot with key (*args*,
+        *kwargs*) then it will simply make that subplot current and
+        return it.
 
         The following kwargs are supported:
-        %s
-        """ % (", ".join(get_projection_names()), "%(Axes)s")
 
-        key = self._make_key(*args, **kwargs)
-        if self._seen.has_key(key):
-            ax = self._seen[key]
-            self.sca(ax)
-            return ax
+        %(Axes)s
+        """
 
+        kwargs = kwargs.copy()
 
         if not len(args): return
 
@@ -673,14 +675,26 @@ class Figure(Artist):
                 projection = 'polar'
 
             projection_class = get_projection_class(projection)
-            a = subplot_class_factory(projection_class)(self, *args, **kwargs)
 
+            key = self._make_key(*args, **kwargs)
+            if key in self._seen:
+                ax = self._seen[key]
+                if isinstance(ax, projection_class):
+                    self.sca(ax)
+                    return ax
+                else:
+                    self.axes.remove(ax)
+                    self._axstack.remove(ax)
+
+            a = subplot_class_factory(projection_class)(self, *args, **kwargs)
+            self._seen[key] = a
         self.axes.append(a)
         self._axstack.push(a)
         self.sca(a)
-        self._seen[key] = a
         return a
-    add_subplot.__doc__ = dedent(add_subplot.__doc__) % artist.kwdocd
+    add_subplot.__doc__ = dedent(add_subplot.__doc__) % {
+        'list': ", ".join(get_projection_names()),
+        'Axes': artist.kwdocd['Axes']}
 
     def clf(self):
         """
@@ -708,7 +722,7 @@ class Figure(Artist):
 
     def clear(self):
         """
-        Clear the figure
+        Clear the figure -- synonym for fig.clf
         """
         self.clf()
 
@@ -741,13 +755,12 @@ class Figure(Artist):
             # make a composite image blending alpha
             # list of (_image.Image, ox, oy)
             mag = renderer.get_image_magnification()
-            ims = [(im.make_image(mag), im.ox*mag, im.oy*mag)
+            ims = [(im.make_image(mag), im.ox, im.oy)
                    for im in self.images]
+
             im = _image.from_images(self.bbox.height * mag,
                                     self.bbox.width * mag,
                                     ims)
-            if self.images[0].origin=='upper':
-                im.flipud_out()
 
             im.is_grayscale = False
             l, b, w, h = self.bbox.bounds
@@ -837,7 +850,7 @@ class Figure(Artist):
         *axespad*
             the border between the axes and legend edge
 
-        .. plot:: ../mpl_examples/pylab_examples/figlegend_demo.py
+        .. plot:: mpl_examples/pylab_examples/figlegend_demo.py
         """
         handles = flatten(handles)
         l = Legend(self, handles, labels, *args, **kwargs)
@@ -883,7 +896,20 @@ class Figure(Artist):
         %(Axes)s
         """
         ax = self._axstack()
-        if ax is not None: return ax
+        if ax is not None:
+            ispolar = kwargs.get('polar', False)
+            projection = kwargs.get('projection', None)
+            if ispolar:
+                if projection is not None and projection != 'polar':
+                    raise ValueError(
+                        "polar=True, yet projection='%s'. " +
+                        "Only one of these arguments should be supplied." %
+                        projection)
+                projection = 'polar'
+
+            projection_class = get_projection_class(projection)
+            if isinstance(ax, projection_class):
+                return ax
         return self.add_subplot(111, **kwargs)
     gca.__doc__ = dedent(gca.__doc__) % artist.kwdocd
 
@@ -948,7 +974,7 @@ class Figure(Artist):
         """
 
         for key in ('dpi', 'facecolor', 'edgecolor'):
-            if not kwargs.has_key(key):
+            if key not in kwargs:
                 kwargs[key] = rcParams['savefig.%s'%key]
 
         transparent = kwargs.pop('transparent', False)
@@ -1028,12 +1054,18 @@ class Figure(Artist):
         This will wait for *n* clicks from the user and return a list of the
         coordinates of each click.
 
-        If *timeout* is negative, does not timeout.
+        If *timeout* is zero or negative, does not timeout.
 
-        If *n* is negative, accumulate clicks until a middle click
-        terminates the input.
+        If *n* is zero or negative, accumulate clicks until a middle click
+        (or potentially both mouse buttons at once) terminates the input.
 
         Right clicking cancels last input.
+
+        The keyboard can also be used to select points in case your mouse
+        does not have one or more of the buttons.  The delete and backspace
+        keys act like right clicking (i.e., remove last point), the enter key
+        terminates input and any other key (not already used by the window
+        manager) selects a point.
         """
 
         blocking_mouse_input = BlockingMouseInput(self)

@@ -23,8 +23,8 @@ from matplotlib.colors import is_color_like
 # The capitalized forms are needed for ipython at present; this may
 # change for later versions.
 
-interactive_bk = ['GTK', 'GTKAgg', 'GTKCairo', 'FltkAgg', 'QtAgg', 'Qt4Agg',
-                  'TkAgg', 'WX', 'WXAgg', 'CocoaAgg']
+interactive_bk = ['GTK', 'GTKAgg', 'GTKCairo', 'FltkAgg', 'MacOSX',
+                  'QtAgg', 'Qt4Agg', 'TkAgg', 'WX', 'WXAgg', 'CocoaAgg']
 
 
 non_interactive_bk = ['agg', 'cairo', 'emf', 'gdk',
@@ -100,7 +100,11 @@ def validate_fonttype(s):
             raise ValueError('Supported Postscript/PDF font types are %s' % fonttypes.values())
         return fonttype
 
-validate_backend = ValidateInStrings('backend', all_backends, ignorecase=True)
+#validate_backend = ValidateInStrings('backend', all_backends, ignorecase=True)
+_validate_standard_backends = ValidateInStrings('backend', all_backends, ignorecase=True)
+def validate_backend(s):
+    if s.startswith('module://'): return s
+    else: return _validate_standard_backends(s)
 
 validate_numerix = ValidateInStrings('numerix',[
     'Numeric','numarray','numpy',
@@ -408,15 +412,18 @@ defaultParams = {
                                # use scientific notation if log10
                                # of the axis range is smaller than the
                                # first or larger than the second
+    'axes.unicode_minus'        : [True, validate_bool],
 
     'polaraxes.grid'        : [True, validate_bool],   # display polar grid or not
 
     #legend properties
+    'legend.fancybox'         : [False,validate_bool],
     'legend.loc'         : ['upper right',validate_legend_loc], # at some point, this should be changed to 'best'
     'legend.isaxes'      : [True,validate_bool],  # this option is internally ignored - it never served any useful purpose
     'legend.numpoints'   : [2, validate_int],     # the number of points in the legend line
     'legend.fontsize'    : ['large', validate_fontsize],
-    'legend.pad'         : [0.2, validate_float], # the fractional whitespace inside the legend border
+    'legend.pad'         : [0,   validate_float], # was 0.2, deprecated; the fractional whitespace inside the legend border
+    'legend.borderpad'   : [0.4, validate_float], # units are fontsize
     'legend.markerscale' : [1.0, validate_float], # the relative size of legend markers vs. original
 
     # the following dimensions are in axes coords
@@ -425,6 +432,25 @@ defaultParams = {
     'legend.handletextsep' : [0.02, validate_float], # the space between the legend line and legend text
     'legend.axespad'       : [0.02, validate_float], # the border between the axes and legend edge
     'legend.shadow'        : [False, validate_bool],
+
+
+    'legend.labelspacing'      : [0.5, validate_float], # the vertical space between the legend entries
+    'legend.handlelength'     : [2., validate_float], # the length of the legend lines
+    'legend.handletextpad' : [.8, validate_float], # the space between the legend line and legend text
+    'legend.borderaxespad'       : [0.5, validate_float], # the border between the axes and legend edge
+    'legend.columnspacing'       : [2., validate_float], # the border between the axes and legend edge
+
+
+    'legend.markerscale' : [1.0, validate_float], # the relative size of legend markers vs. original
+
+    # the following dimensions are in axes coords
+    'legend.labelsep'      : [0.010, validate_float], # the vertical space between the legend entries
+    'legend.handlelen'     : [0.05, validate_float], # the length of the legend lines
+    'legend.handletextsep' : [0.02, validate_float], # the space between the legend line and legend text
+    'legend.axespad'       : [0.5, validate_float], # the border between the axes and legend edge
+    'legend.shadow'        : [False, validate_bool],
+
+
 
 
     # tick properties
@@ -485,8 +511,14 @@ defaultParams = {
     'svg.image_inline'  : [True, validate_bool],    # write raster image data directly into the svg file
     'svg.image_noscale' : [False, validate_bool],  # suppress scaling of raster data embedded in SVG
     'svg.embed_char_paths' : [True, validate_bool],  # True to save all characters as paths in the SVG
+
+    'docstring.hardcopy' : [False, validate_bool],  # set this when you want to generate hardcopy docstring
     'plugins.directory' : ['.matplotlib_plugins', str], # where plugin directory is locate
 
+    'path.simplify' : [False, validate_bool],
+    'agg.path.chunksize' : [0, validate_int]       # 0 to disable chunking;
+                                                   # recommend about 20000 to
+                                                   # enable. Experimental.
 }
 
 if __name__ == '__main__':

@@ -18,8 +18,8 @@ You have total control over every text property (font size, font
 weight, text location and color, etc) with sensible defaults set in
 the rc file.  And significantly for those interested in mathematical
 or scientific figures, matplotlib implements a large number of TeX
-math symbols and commands, to support mathematical expressions
-anywhere in your figure.
+math symbols and commands, to support :ref:`mathematical expressions
+<mathtext-tutorial>` anywhere in your figure.
 
 
 Basic text commands
@@ -55,5 +55,5 @@ All of these functions create and return a
 variety of font and other properties.  The example below shows all of
 these commands in action.
 
-.. plot:: text_commands.py
+.. plot:: pyplots/text_commands.py
    :include-source:

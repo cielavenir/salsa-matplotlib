@@ -3,12 +3,16 @@ from __future__ import division
 import os, sys
 def fn_name(): return sys._getframe(1).f_code.co_name
 
-import gobject
-import gtk; gdk = gtk.gdk
-import pango
+try:
+    import gobject
+    import gtk; gdk = gtk.gdk
+    import pango
+except ImportError:
+    raise ImportError("Gtk* backend requires pygtk to be installed.")
+
 pygtk_version_required = (2,2,0)
 if gtk.pygtk_version < pygtk_version_required:
-    raise SystemExit ("PyGTK %d.%d.%d is installed\n"
+    raise ImportError ("PyGTK %d.%d.%d is installed\n"
                       "PyGTK %d.%d.%d or later is required"
                       % (gtk.pygtk_version + pygtk_version_required))
 del pygtk_version_required
@@ -143,6 +147,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
                   gdk.EXPOSURE_MASK       |
                   gdk.KEY_PRESS_MASK      |
                   gdk.KEY_RELEASE_MASK    |
+                  gdk.ENTER_NOTIFY_MASK   |
                   gdk.LEAVE_NOTIFY_MASK   |
                   gdk.POINTER_MOTION_MASK |
                   gdk.POINTER_MOTION_HINT_MASK)
@@ -152,13 +157,13 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         FigureCanvasBase.__init__(self, figure)
         gtk.DrawingArea.__init__(self)
 
-        self._idleID        = 0
+        self._idle_draw_id  = 0
         self._need_redraw   = True
         self._pixmap_width  = -1
         self._pixmap_height = -1
         self._lastCursor    = None
 
-        self.connect('scroll_event',   self.scroll_event)
+        self.connect('scroll_event',         self.scroll_event)
         self.connect('button_press_event',   self.button_press_event)
         self.connect('button_release_event', self.button_release_event)
         self.connect('configure_event',      self.configure_event)
@@ -166,6 +171,8 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         self.connect('key_press_event',      self.key_press_event)
         self.connect('key_release_event',    self.key_release_event)
         self.connect('motion_notify_event',  self.motion_notify_event)
+        self.connect('leave_notify_event',   self.leave_notify_event)
+        self.connect('enter_notify_event',   self.enter_notify_event)
 
         self.set_events(self.__class__.event_mask)
 
@@ -173,7 +180,13 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         self.set_flags(gtk.CAN_FOCUS)
         self._renderer_init()
 
-        gobject.idle_add(self.idle_event)
+        self._idle_event_id = gobject.idle_add(self.idle_event)
+
+    def destroy(self):
+        #gtk.DrawingArea.destroy(self)
+        gobject.source_remove(self._idle_event_id)
+        if self._idle_draw_id != 0:
+            gobject.source_remove(self._idle_draw_id)
 
     def scroll_event(self, widget, event):
         if _debug: print 'FigureCanvasGTK.%s' % fn_name()
@@ -229,8 +242,14 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         FigureCanvasBase.motion_notify_event(self, x, y)
         return False  # finish event propagation?
 
+    def leave_notify_event(self, widget, event):
+        FigureCanvasBase.leave_notify_event(self, event)
+
+    def enter_notify_event(self, widget, event):
+        FigureCanvasBase.enter_notify_event(self, event)
+
     def _get_key(self, event):
-        if self.keyvald.has_key(event.keyval):
+        if event.keyval in self.keyvald:
             key = self.keyvald[event.keyval]
         elif event.keyval <256:
             key = chr(event.keyval)
@@ -272,10 +291,10 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
     def draw_idle(self):
         def idle_draw(*args):
             self.draw()
-            self._idleID = 0
+            self._idle_draw_id = 0
             return False
-        if self._idleID == 0:
-            self._idleID = gobject.idle_add(idle_draw)
+        if self._idle_draw_id == 0:
+            self._idle_draw_id = gobject.idle_add(idle_draw)
 
 
     def _renderer_init(self):
@@ -462,13 +481,16 @@ class FigureManagerGTK(FigureManagerBase):
 
     def destroy(self, *args):
         if _debug: print 'FigureManagerGTK.%s' % fn_name()
+        self.vbox.destroy()
         self.window.destroy()
+        self.canvas.destroy()
+        self.toolbar.destroy()
+        self.__dict__.clear()
 
         if Gcf.get_num_fig_managers()==0 and \
                not matplotlib.is_interactive() and \
                gtk.main_level() >= 1:
             gtk.main_quit()
-
 
     def show(self):
         # show the figure window
@@ -523,14 +545,10 @@ class NavigationToolbar2GTK(NavigationToolbar2, gtk.Toolbar):
         self.win = window
         gtk.Toolbar.__init__(self)
         NavigationToolbar2.__init__(self, canvas)
-        self._idleId = 0
-
-        def destroy(*args):
-            self.fileselect.destroy()
-        self.connect("destroy", destroy)
+        self._idle_draw_id = 0
 
     def set_message(self, s):
-        if self._idleId == 0:
+        if self._idle_draw_id == 0:
             self.message.set_label(s)
 
     def set_cursor(self, cursor):
@@ -572,16 +590,15 @@ class NavigationToolbar2GTK(NavigationToolbar2, gtk.Toolbar):
             axrect = l,b,w,h
             self._imageBack = axrect, drawable.get_image(*axrect)
             drawable.draw_rectangle(gc, False, *rect)
-            self._idleId = 0
+            self._idle_draw_id = 0
         else:
             def idle_draw(*args):
-
                 drawable.draw_image(gc, imageBack, 0, 0, *lastrect)
                 drawable.draw_rectangle(gc, False, *rect)
-                self._idleId = 0
+                self._idle_draw_id = 0
                 return False
-            if self._idleId == 0:
-                self._idleId = gobject.idle_add(idle_draw)
+            if self._idle_draw_id == 0:
+                self._idle_draw_id = gobject.idle_add(idle_draw)
 
 
     def _init_toolbar(self):
@@ -617,11 +634,6 @@ class NavigationToolbar2GTK(NavigationToolbar2, gtk.Toolbar):
         self.append_widget(self.message, None, None)
         self.message.show()
 
-        self.fileselect = FileSelection(title='Save the figure',
-                                        parent=self.win,)
-
-
-
     def _init_toolbar2_4(self):
         basedir = os.path.join(matplotlib.rcParams['datapath'],'images')
         self.tooltips = gtk.Tooltips()
@@ -652,15 +664,19 @@ class NavigationToolbar2GTK(NavigationToolbar2, gtk.Toolbar):
 
         self.show_all()
 
-        self.fileselect = FileChooserDialog(
-            title='Save the figure',
-            parent=self.win,
-            filetypes=self.canvas.get_supported_filetypes(),
-            default_filetype=self.canvas.get_default_filetype())
-
+    def get_filechooser(self):
+        if gtk.pygtk_version >= (2,4,0):
+            return FileChooserDialog(
+                title='Save the figure',
+                parent=self.win,
+                filetypes=self.canvas.get_supported_filetypes(),
+                default_filetype=self.canvas.get_default_filetype())
+        else:
+            return FileSelection(title='Save the figure',
+                                 parent=self.win,)
 
     def save_figure(self, button):
-        fname, format = self.fileselect.get_filename_from_user()
+        fname, format = self.get_filechooser().get_filename_from_user()
         if fname:
             try:
                 self.canvas.print_figure(fname, format=format)
@@ -762,11 +778,6 @@ class NavigationToolbar(gtk.Toolbar):
                                             parent=self.win)
         self.show_all()
         self.update()
-
-        def destroy(*args):
-            self.fileselect.destroy()
-            del self.fileselect
-        self.connect("destroy", destroy)
 
     def _create_toolitems_2_4(self):
         # use the GTK+ 2.4 GtkToolbar API
@@ -952,9 +963,19 @@ class NavigationToolbar(gtk.Toolbar):
         self.canvas.draw()
         return True
 
+    def get_filechooser(self):
+        if gtk.pygtk_version >= (2,4,0):
+            return FileChooserDialog(
+                title='Save the figure',
+                parent=self.win,
+                filetypes=self.canvas.get_supported_filetypes(),
+                default_filetype=self.canvas.get_default_filetype())
+        else:
+            return FileSelection(title='Save the figure',
+                                 parent=self.win)
 
     def save_figure(self, button):
-        fname, format = self.fileselect.get_filename_from_user()
+        fname, format = self.get_filechooser().get_filename_from_user()
         if fname:
             try:
                 self.canvas.print_figure(fname, format=format)

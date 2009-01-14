@@ -1,18 +1,20 @@
 .. _installing-faq:
 
-*************
- Installation
-*************
+*****************
+ Installation FAQ
+*****************
+
 
 .. contents::
+   :backlinks: none
 
 
-How do I report a compilation problem?
+Report a compilation problem
 ======================================
 
 See :ref:`reporting-problems`.
 
-matplotlib compiled fine, but I can't get anything to plot
+matplotlib compiled fine, but nothing shows up with plot
 ==========================================================
 
 The first thing to try is a :ref:`clean install <clean-install>` and see if
@@ -41,7 +43,7 @@ If you are still having trouble, see :ref:`reporting-problems`.
 
 .. _clean-install:
 
-How do I cleanly rebuild and reinstall everything?
+Cleanly rebuild and reinstall everything
 ==================================================
 
 The steps depend on your platform and installation method.
@@ -89,6 +91,28 @@ install directory.  To cleanly rebuild:
 3. Delete any matplotlib directories or eggs from your `installation directory
    <locating-matplotlib-install>`
 
+
+.. _install-svn:
+
+Install from svn
+================
+
+Checking out the main source::
+
+   svn co https://matplotlib.svn.sourceforge.net/svnroot/matplotlib/trunk/matplotlib matplotlib
+
+and build and install as usual with::
+
+  > cd matplotlib
+  > python setup.py install
+
+There is more information on :ref:`using Subversion <using-svn>` in
+the developer docs.
+
+Install from git
+================
+
+See :ref:`using-git`.
 
 Backends
 ========
@@ -219,7 +243,7 @@ FLTKAgg        Agg rendering to a :term:`FLTK` canvas (requires pyFLTK_)
 
 .. _pygtk-2.4:
 
-How do I compile matplotlib with PyGTK-2.4?
+Compile matplotlib with PyGTK-2.4
 -------------------------------------------
 
 There is a `bug in PyGTK-2.4`_. You need to edit
@@ -235,13 +259,28 @@ macros, and rename :cdata:`typename` parameter to :cdata:`typename_`::
 OS-X questions
 ==============
 
+.. _which-python-for-osx:
+
+Which python for OS X?
+----------------------
+
+Apple ships with its own python, many users have had trouble
+with it so there are alternatives.  If it is feasible for you, we
+recommend the enthought python distribution `EPD
+<http://www.enthought.com/products/epd.php>`_ for OS X (which comes
+with matplotlib and much more) or the
+`MacPython <http://wiki.python.org/moin/MacPython/Leopard>`_ or the
+official OS X version from `python.org
+<http://www.python.org/download/>`_.
+
+
 .. _easy-install-osx-egg:
 
-How can I easy_install my egg?
+easy_install from egg?
 ------------------------------
 
-I downloaded the egg for 0.98 from the matplotlib webpages,
-and I am trying to ``easy_install`` it, but I am getting an error::
+Some users have reported problems with the egg for 0.98 from the
+matplotlib download site, with ``easy_install``, getting an error::
 
     > easy_install ./matplotlib-0.98.0-py2.5-macosx-10.3-fat.egg
     Processing matplotlib-0.98.0-py2.5-macosx-10.3-fat.egg
@@ -264,7 +303,7 @@ Windows questions
 
 .. _windows-installers:
 
-Where can I get binary installers for windows?
+Binary installers for windows
 ----------------------------------------------
 
 If you have already installed python, you can use one of the

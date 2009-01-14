@@ -15,7 +15,7 @@ d = c[::-1]
 ax = plt.subplot(111)
 plt.plot(a,c,'k--',a,d,'k:',a,c+d,'k')
 plt.legend(('Model length', 'Data length', 'Total message length'),
-           'upper center', shadow=True)
+           'upper center', shadow=True, fancybox=True)
 plt.ylim([-1,20])
 plt.grid(False)
 plt.xlabel('Model complexity --->')
@@ -39,7 +39,6 @@ frame.set_facecolor('0.80')      # set the frame face color to light gray
 plt.setp(ltext, fontsize='small')    # the legend text fontsize
 plt.setp(llines, linewidth=1.5)      # the legend linewidth
 #leg.draw_frame(False)           # don't draw the legend frame
-#plt.savefig('legend_demo')
 plt.show()
 
 

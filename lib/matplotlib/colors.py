@@ -1,21 +1,36 @@
 """
-A class for converting color arguments to RGB or RGBA
+A module for converting numbers or color arguments to *RGB* or *RGBA*
 
-This class instantiates a single instance colorConverter that is used
-to convert matlab color strings to RGB.  RGB is a tuple of float RGB
-values in the range 0-1.
+*RGB* and *RGBA* are sequences of, respectively, 3 or 4 floats in the
+range 0-1.
+
+This module includes functions and classes for color specification
+conversions, and for mapping numbers to colors in a 1-D array of
+colors called a colormap. Colormapping typically involves two steps:
+a data array is first mapped onto the range 0-1 using an instance
+of :class:`Normalize` or of a subclass; then this number in the 0-1
+range is mapped to a color using an instance of a subclass of
+:class:`Colormap`.  Two are provided here:
+:class:`LinearSegmentedColormap`, which is used to generate all
+the built-in colormap instances, but is also useful for making
+custom colormaps, and :class:`ListedColormap`, which is used for
+generating a custom colormap from a list of color specifications.
+
+The module also provides a single instance, *colorConverter*, of the
+:class:`ColorConverter` class providing methods for converting single
+color specifications or sequences of them to *RGB* or *RGBA*.
 
 Commands which take color arguments can use several formats to specify
 the colors.  For the basic builtin colors, you can use a single letter
 
-      b  : blue
-      g  : green
-      r  : red
-      c  : cyan
-      m  : magenta
-      y  : yellow
-      k  : black
-      w  : white
+    - b  : blue
+    - g  : green
+    - r  : red
+    - c  : cyan
+    - m  : magenta
+    - y  : yellow
+    - k  : black
+    - w  : white
 
 Gray shades can be given as a string encoding a float in the 0-1
 range, e.g.::
@@ -37,6 +52,11 @@ import re
 import numpy as np
 from numpy import ma
 import matplotlib.cbook as cbook
+
+parts = np.__version__.split('.')
+NP_MAJOR, NP_MINOR = map(int, parts[:2])
+# true if clip supports the out kwarg
+NP_CLIP_OUT = NP_MAJOR>=1 and NP_MINOR>=2
 
 cnames = {
     'aliceblue'            : '#F0F8FF',
@@ -188,6 +208,7 @@ for k, v in cnames.items():
         cnames[k] = v
 
 def is_color_like(c):
+    'Return *True* if *c* can be converted to *RGB*'
     try:
         colorConverter.to_rgb(c)
         return True
@@ -213,6 +234,15 @@ def hex2color(s):
     return tuple([int(n, 16)/255.0 for n in (s[1:3], s[3:5], s[5:7])])
 
 class ColorConverter:
+    """
+    Provides methods for converting color specifications to *RGB* or *RGBA*
+
+    Caching is used for more efficient conversion upon repeated calls
+    with the same argument.
+
+    Ordinarily only the single instance instantiated in this module,
+    *colorConverter*, is needed.
+    """
     colors = {
         'b' : (0.0, 0.0, 1.0),
         'g' : (0.0, 0.5, 0.0),
@@ -315,11 +345,9 @@ class ColorConverter:
 
     def to_rgba_array(self, c, alpha=None):
         """
-        Returns an Numpy array of *RGBA* tuples.
+        Returns a numpy array of *RGBA* tuples.
 
         Accepts a single mpl color spec or a sequence of specs.
-        If the sequence is a list or array, the items are changed in place,
-        but an array copy is still returned.
 
         Special case to handle "no color": if *c* is "none" (case-insensitive),
         then an empty array will be returned.  Same for an empty list.
@@ -332,16 +360,15 @@ class ColorConverter:
         if len(c) == 0:
             return np.zeros((0,4), dtype=np.float_)
         try:
-            result = [self.to_rgba(c, alpha)]
+            result = np.array([self.to_rgba(c, alpha)], dtype=np.float_)
         except ValueError:
-            # If c is a list it must be maintained as the same list
-            # with modified items so that items can be appended to
-            # it. This is needed for examples/dynamic_collections.py.
-            if not isinstance(c, (list, np.ndarray)): # specific; don't need duck-typing
-                c = list(c)
+            if isinstance(c, np.ndarray):
+                if c.ndim != 2 and c.dtype.kind not in 'SU':
+                    raise ValueError("Color array must be two-dimensional")
+
+            result = np.zeros((len(c), 4))
             for i, cc in enumerate(c):
-                c[i] = self.to_rgba(cc, alpha)  # change in place
-            result = c
+                result[i] = self.to_rgba(cc, alpha)  # change in place
         return np.asarray(result, np.float_)
 
 colorConverter = ColorConverter()
@@ -453,7 +480,14 @@ class Colormap:
             mask_bad = ma.getmask(xma)
         if xa.dtype.char in np.typecodes['Float']:
             np.putmask(xa, xa==1.0, 0.9999999) #Treat 1.0 as slightly less than 1.
-            xa = (xa * self.N).astype(int)
+            # The following clip is fast, and prevents possible
+            # conversion of large positive values to negative integers.
+
+            if NP_CLIP_OUT:
+                np.clip(xa * self.N, -1, self.N, out=xa)
+            else:
+                xa = np.clip(xa * self.N, -1, self.N)
+            xa = xa.astype(int)
         # Set the over-range indices before the under-range;
         # otherwise the under-range values get converted to over-range.
         np.putmask(xa, xa>self.N-1, self._i_over)
@@ -517,18 +551,50 @@ class Colormap:
 class LinearSegmentedColormap(Colormap):
     """Colormap objects based on lookup tables using linear segments.
 
-    The lookup transfer function is a simple linear function between
-    defined intensities. There is no limit to the number of segments
-    that may be defined. Though as the segment intervals start containing
-    fewer and fewer array locations, there will be inevitable quantization
-    errors
+    The lookup table is generated using linear interpolation for each
+    primary color, with the 0-1 domain divided into any number of
+    segments.
     """
     def __init__(self, name, segmentdata, N=256):
         """Create color map from linear mapping segments
 
         segmentdata argument is a dictionary with a red, green and blue
-        entries. Each entry should be a list of x, y0, y1 tuples.
-        See makeMappingArray for details
+        entries. Each entry should be a list of *x*, *y0*, *y1* tuples,
+        forming rows in a table.
+
+        Example: suppose you want red to increase from 0 to 1 over
+        the bottom half, green to do the same over the middle half,
+        and blue over the top half.  Then you would use::
+
+            cdict = {'red':   [(0.0,  0.0, 0.0),
+                               (0.5,  1.0, 1.0),
+                               (1.0,  1.0, 1.0)],
+
+                     'green': [(0.0,  0.0, 0.0),
+                               (0.25, 0.0, 0.0),
+                               (0.75, 1.0, 1.0),
+                               (1.0,  1.0, 1.0)],
+
+                     'blue':  [(0.0,  0.0, 0.0),
+                               (0.5,  0.0, 0.0),
+                               (1.0,  1.0, 1.0)]}
+
+        Each row in the table for a given color is a sequence of
+        *x*, *y0*, *y1* tuples.  In each sequence, *x* must increase
+        monotonically from 0 to 1.  For any input value *z* falling
+        between *x[i]* and *x[i+1]*, the output value of a given color
+        will be linearly interpolated between *y1[i]* and *y0[i+1]*::
+
+            row i:   x  y0  y1
+                           /
+                          /
+            row i+1: x  y0  y1
+
+        Hence y0 in the first row and y1 in the last row are never used.
+
+
+        .. seealso::
+            :func:`makeMappingArray`
         """
         self.monochrome = False  # True only if all colors in map are identical;
                                  # needed for contouring.

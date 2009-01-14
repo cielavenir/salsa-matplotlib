@@ -25,6 +25,8 @@ X,Y = meshgrid(x, y)
 
 xmin, xmax, ymin, ymax = amin(x), amax(x), amin(y), amax(y)
 extent = xmin, xmax, ymin, ymax
+fig = plt.figure(frameon=False)
+
 Z1 = array(([0,1]*4 + [1,0]*4)*4); Z1.shape = 8,8  # chessboard
 im1 = imshow(Z1, cmap=cm.gray, interpolation='nearest',
              extent=extent)
@@ -35,9 +37,6 @@ Z2 = func3(X, Y)
 im2 = imshow(Z2, cmap=cm.jet, alpha=.9, interpolation='bilinear',
              extent=extent)
 #axis([xmin, xmax, ymin, ymax])
-
-
-#savefig('layer_images')
 
 show()
 

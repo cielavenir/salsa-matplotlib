@@ -1,8 +1,8 @@
 .. _users-guide-index:
 
-#############################
-  The Matplotlib User's Guide
-#############################
+############
+User's Guide
+############
 
 .. htmlonly::
 
@@ -17,10 +17,16 @@
     pyplot_tutorial.rst
     navigation_toolbar.rst
     customizing.rst
+    shell.rst
     index_text.rst
     artists.rst
     event_handling.rst
-
+    plotting.rst
+    toolkits.rst
+    screenshots.rst
+    whats_new.rst
+    license.rst
+    credits.rst
 
 
 

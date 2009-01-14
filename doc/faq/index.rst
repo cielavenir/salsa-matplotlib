@@ -1,8 +1,8 @@
 .. _faq-index:
 
-####################
-  The Matplotlib FAQ
-####################
+##################
+The Matplotlib FAQ
+##################
 
 .. htmlonly::
 
@@ -15,6 +15,6 @@
    :maxdepth: 2
 
    installing_faq.rst
-   troubleshooting_faq.rst
+   usage_faq.rst
    howto_faq.rst
-   environment_variables_faq.rst
+   troubleshooting_faq.rst

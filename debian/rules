@@ -14,7 +14,7 @@ p   := python-matplotlib
 pdata := python-matplotlib-data
 pdbg := python-matplotlib-dbg
 
-include /usr/share/quilt/quilt.make
+include /usr/share/dpatch/dpatch.make
 
 # build
 build: patch build-arch build-indep
@@ -25,7 +25,7 @@ build-indep-stamp: $(DEFPY:%=build-stamp-%)
 
 	# build the doc
 	-( cd doc ; MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
-		    PYTHONPATH=../build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py )
+		    PYTHONPATH=../build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py --small all )
 
 	touch build-indep-stamp
 
@@ -34,6 +34,7 @@ build-arch:$(PYVERS:%=build-stamp-%)
 build-stamp-%:
 	dh_testdir
 
+	cp -f debian/setup.cfg setup.cfg
 	python$* ./setup.py build $(PY_BUILD_FLAGS)
 	python$*-dbg ./setup.py build $(PY_BUILD_FLAGS)
 
@@ -51,19 +52,16 @@ clean-patched: patch
 	    python$(i)-dbg ./setup.py clean --all; \
 	done
 
-	-rm -f *-stamp*
-	-rm -rf build *.pyc *.pyo
-
-	rm -f lib/matplotlib/mpl-data/matplotlib.conf lib/matplotlib/mpl-data/matplotlibrc doc/mpl_data/matplotlib.conf doc/mpl_data/matplotlibrc
-
 	# clean the doc
 	( cd doc ; ./make.py clean )
-	rm -f doc/_static/inheritance*
-	rm -f doc/_static/math-*.png
-	rm -f doc/test.png
+
 	find . -name '*.pyc' -exec rm {} \;
 
-	dh_clean
+	dh_clean *-stamp* lib/matplotlib/mpl-data/matplotlib.conf          \
+	         lib/matplotlib/mpl-data/matplotlibrc                      \
+		 doc/mpl_data/matplotlib.conf doc/mpl_data/matplotlibrc    \
+		 setup.cfg doc/_static/inheritance* doc/_static/math-*.png \
+		 doc/test.png build
 
 # install
 install-arch: build-arch $(PYVERS:%=install-stamp-%)
@@ -123,7 +121,7 @@ binary-arch: build-arch install-arch
 	dh_testdir -a
 	dh_testroot -a
 	dh_installchangelogs -a CHANGELOG
-	dh_installdocs -p$(p) -a README.txt TODO API_CHANGES KNOWN_BUGS INTERACTIVE
+	dh_installdocs -p$(p) -a README.txt TODO KNOWN_BUGS INTERACTIVE
 	# make python scripts starting with '#!' executable
 	for i in `find debian -mindepth 2 -type f ! -perm 755`; do \
 	  if head -1 $$i | grep -q '^#!'; then \

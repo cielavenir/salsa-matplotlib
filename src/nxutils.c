@@ -45,7 +45,7 @@ pnpoly(PyObject *self, PyObject *args)
   if (! PyArg_ParseTuple(args, "ddO", &x, &y, &vertsarg))
     return NULL;
 
-  verts = (PyArrayObject *) PyArray_FromObject(vertsarg,PyArray_DOUBLE, 2, 2);
+  verts = (PyArrayObject *) PyArray_FromObject(vertsarg,NPY_DOUBLE, 2, 2);
 
   if (verts == NULL)
     {
@@ -113,7 +113,7 @@ points_inside_poly(PyObject *self, PyObject *args)
   if (! PyArg_ParseTuple(args, "OO", &xypointsarg, &vertsarg))
     return NULL;
 
-  verts = (PyArrayObject *) PyArray_FromObject(vertsarg,PyArray_DOUBLE, 2, 2);
+  verts = (PyArrayObject *) PyArray_FromObject(vertsarg, NPY_DOUBLE, 2, 2);
 
   if (verts == NULL)
     {
@@ -158,7 +158,7 @@ points_inside_poly(PyObject *self, PyObject *args)
     //printf("adding vert: %1.3f, %1.3f\n", xv[i], yv[i]);
   }
 
-  xypoints = (PyArrayObject *) PyArray_FromObject(xypointsarg,PyArray_DOUBLE, 2, 2);
+  xypoints = (PyArrayObject *) PyArray_FromObject(xypointsarg, NPY_DOUBLE, 2, 2);
 
   if (xypoints == NULL)
     {
@@ -187,7 +187,7 @@ points_inside_poly(PyObject *self, PyObject *args)
   npoints = xypoints->dimensions[0];
   dimensions[0] = npoints;
 
-  mask = (PyArrayObject *)PyArray_SimpleNew(1,dimensions,PyArray_INT);
+  mask = (PyArrayObject *)PyArray_SimpleNew(1,dimensions, NPY_BOOL);
   if (mask==NULL) {
     Py_XDECREF(verts);
     Py_XDECREF(xypoints);
@@ -200,7 +200,7 @@ points_inside_poly(PyObject *self, PyObject *args)
     y = *(double *)(xypoints->data +  i*xypoints->strides[0] + xypoints->strides[1]);
     b = pnpoly_api(npol, xv, yv, x, y);
     //printf("checking %d, %d, %1.3f, %1.3f, %d\n", npol, npoints, x, y, b);
-    *(int *)(mask->data+i*mask->strides[0]) = b;
+    *(char *)(mask->data + i*mask->strides[0]) = b;
 
   }
 
@@ -219,9 +219,19 @@ points_inside_poly(PyObject *self, PyObject *args)
 
 static PyMethodDef module_methods[] = {
   {"pnpoly",  pnpoly, METH_VARARGS,
-        "inside = pnpoly(x, y, xyverts)\nreturn 1 if x,y is inside the polygon defined by the sequence of x,y vertices in xyverts"},
+        "inside = pnpoly(x, y, xyverts)\n\n"
+        "Return 1 if x,y is inside the polygon, 0 otherwise.\n\n"
+        "*xyverts*\n    a sequence of x,y vertices.\n\n"
+        "A point on the boundary may be treated as inside or outside.\n"
+        "See `pnpoly <http://www.ecse.rpi.edu/Homepages/wrf/Research/Short_Notes/pnpoly.html>`_"},
   {"points_inside_poly",  points_inside_poly, METH_VARARGS,
-        "mask = points_inside_poly(xypoints, xyverts)\nreturn a mask of length xypoints indicating whether each x,y point is inside the polygon defined by the sequence of x,y vertices in xyverts"},
+        "mask = points_inside_poly(xypoints, xyverts)\n\n"
+        "Return a boolean ndarray, True for points inside the polygon.\n\n"
+        "*xypoints*\n    a sequence of N x,y pairs.\n"
+        "*xyverts*\n    sequence of x,y vertices of the polygon.\n"
+        "*mask*    an ndarray of length N.\n\n"
+        "A point on the boundary may be treated as inside or outside.\n"
+        "See `pnpoly <http://www.ecse.rpi.edu/Homepages/wrf/Research/Short_Notes/pnpoly.html>`_\n"},
   {NULL}  /* Sentinel */
 };
 
@@ -231,7 +241,7 @@ PyMODINIT_FUNC
   PyObject* m;
 
   m = Py_InitModule3("nxutils", module_methods,
-                     "general purpose utilities (numpy).");
+                     "general purpose numerical utilities, eg for computational geometry, that are not available in `numpy <http://numpy.scipy.org>`_");
 
   if (m == NULL)
     return;

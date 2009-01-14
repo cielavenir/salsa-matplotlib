@@ -52,12 +52,20 @@ matplotlibrc use::
 
 Here is the standard example, `tex_demo.py`:
 
-.. plot:: tex_demo.py
+.. plot:: pyplots/tex_demo.py
    :include-source:
 
 Note that display math mode (``$$ e=mc^2 $$``) is  not supported, but adding the
 command ``\displaystyle``, as in `tex_demo.py`, will produce the same
 results.
+
+.. note::
+   Certain characters require special escaping in TeX, such as::
+
+     # $ % & ~ _ ^ \ { } \( \) \[ \]
+
+   Therefore, these characters will behave differently depending on
+   the rcParam ``text.usetex`` flag.
 
 .. _usetex-unicode:
 
@@ -66,7 +74,7 @@ usetex with unicode
 It is also possible to use unicode strings with the LaTeX text manager, here is
 an example taken from `tex_unicode_demo.py`:
 
-.. plot:: tex_unicode_demo.py
+.. plot:: mpl_examples/pylab_examples/tex_unicode_demo.py
    :include-source:
 
 .. _usetex-postscript:

@@ -21,23 +21,19 @@ TODO:
   * integrate screen dpi w/ ppi and text
 """
 from __future__ import division
-import os, sys, weakref
 
 import numpy as npy
 
-import matplotlib
 from matplotlib import verbose, rcParams
-from matplotlib._image import fromarray
-from matplotlib._pylab_helpers import Gcf
 from matplotlib.backend_bases import RendererBase,\
-     GraphicsContextBase, FigureManagerBase, FigureCanvasBase
-from matplotlib.cbook import is_string_like, exception_to_str, maxdict
+     FigureManagerBase, FigureCanvasBase
+from matplotlib.cbook import is_string_like, maxdict
 from matplotlib.figure import Figure
 from matplotlib.font_manager import findfont
 from matplotlib.ft2font import FT2Font, LOAD_FORCE_AUTOHINT
 from matplotlib.mathtext import MathTextParser
 from matplotlib.path import Path
-from matplotlib.transforms import Affine2D, Bbox
+from matplotlib.transforms import Bbox
 
 from _backend_agg import RendererAgg as _RendererAgg
 from matplotlib import _png
@@ -62,7 +58,7 @@ class RendererAgg(RendererBase):
         self._renderer = _RendererAgg(int(width), int(height), dpi, debug=False)
         if __debug__: verbose.report('RendererAgg.__init__ _RendererAgg done',
                                      'debug-annoying')
-        self.draw_path = self._renderer.draw_path
+        #self.draw_path = self._renderer.draw_path  # see below
         self.draw_markers = self._renderer.draw_markers
         self.draw_path_collection = self._renderer.draw_path_collection
         self.draw_quad_mesh = self._renderer.draw_quad_mesh
@@ -75,6 +71,28 @@ class RendererAgg(RendererBase):
         self.bbox = Bbox.from_bounds(0, 0, self.width, self.height)
         if __debug__: verbose.report('RendererAgg.__init__ done',
                                      'debug-annoying')
+
+    def draw_path(self, gc, path, transform, rgbFace=None):
+        nmax = rcParams['agg.path.chunksize'] # here at least for testing
+        npts = path.vertices.shape[0]
+        if nmax > 100 and npts > nmax and path.should_simplify and rgbFace is None:
+            nch = npy.ceil(npts/float(nmax))
+            chsize = int(npy.ceil(npts/nch))
+            i0 = npy.arange(0, npts, chsize)
+            i1 = npy.zeros_like(i0)
+            i1[:-1] = i0[1:] - 1
+            i1[-1] = npts
+            for ii0, ii1 in zip(i0, i1):
+                v = path.vertices[ii0:ii1,:]
+                c = path.codes
+                if c is not None:
+                    c = c[ii0:ii1]
+                    c[0] = Path.MOVETO # move to end of last chunk
+                p = Path(v, c)
+                self._renderer.draw_path(gc, p, transform, rgbFace)
+        else:
+            self._renderer.draw_path(gc, path, transform, rgbFace)
+
 
     def draw_mathtext(self, gc, x, y, s, prop, angle):
         """
@@ -308,8 +326,6 @@ class FigureCanvasAgg(FigureCanvasBase):
         renderer.dpi = self.figure.dpi
         if is_string_like(filename_or_obj):
             filename_or_obj = file(filename_or_obj, 'wb')
-        renderer = self.get_renderer()
-        x = renderer._renderer.buffer_rgba(0, 0)
         _png.write_png(renderer._renderer.buffer_rgba(0, 0),
                        renderer.width, renderer.height,
                        filename_or_obj, self.figure.dpi)

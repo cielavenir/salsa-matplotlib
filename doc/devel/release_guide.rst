@@ -20,6 +20,8 @@ Testing
 * Run :file:`unit/memleak_hawaii3.py` and make sure there are no
   memory leaks
 
+* Run :file:`unit/nose_tests.py` and make sure all the unit tests are passing
+
 * try some GUI examples, eg :file:`simple_plot.py` with GTKAgg, TkAgg, etc...
 
 * remove font cache and tex cache from :file:`.matplotlib` and test
@@ -43,6 +45,12 @@ Packaging
   OSX, the default backend should be TkAgg.
 
 * on windows, unix2dos the rc file
+
+* make a branch of the svn revision that is released, in case we need
+  to do a bug fix release.  Eg, from the top level of the mpl svn
+  tree, the one which has "branches", "tags" and "trunk", do::
+
+      > svn copy trunk/matplotlib branches/v0_98_4_maint
 
 .. _release-uploading:
 

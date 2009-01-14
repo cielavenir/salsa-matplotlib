@@ -27,8 +27,9 @@ import ipython_console_highlighting
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['mathpng', 'math_symbol_table', 'sphinx.ext.autodoc',
-              'only_directives', 'plot_directive', 'inheritance_diagram']
+extensions = ['mathmpl', 'math_symbol_table', 'sphinx.ext.autodoc',
+              'only_directives', 'plot_directive', 'inheritance_diagram',
+              'gen_gallery', 'gen_rst']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -37,7 +38,7 @@ templates_path = ['_templates']
 source_suffix = '.rst'
 
 # The master toctree document.
-master_doc = 'index'
+master_doc = 'contents'
 
 # General substitutions.
 project = 'Matplotlib'
@@ -47,9 +48,10 @@ copyright = '2008, John Hunter, Darren Dale, Michael Droettboom'
 # other places throughout the built documents.
 #
 # The short X.Y version.
-version = '0.98'
+import matplotlib
+version = matplotlib.__version__
 # The full version, including alpha/beta/rc tags.
-release = '0.98'
+release = version
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
@@ -74,6 +76,10 @@ unused_docs = []
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 
+# Plot directive configuration
+# ----------------------------
+
+plot_formats = ['png', 'hires.png', 'pdf']
 
 # Options for HTML output
 # -----------------------
@@ -81,7 +87,8 @@ pygments_style = 'sphinx'
 # The style sheet to use for HTML and HTML Help pages. A file of that name
 # must exist either in Sphinx' static/ path, or in one of the custom paths
 # given in html_static_path.
-html_style = 'matplotlib.css'
+#html_style = 'matplotlib.css'
+html_style = 'mpl.css'
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
@@ -98,7 +105,7 @@ html_static_path = ['_static']
 
 # If nonempty, this is the file name suffix for generated HTML files.  The
 # default is ``".html"``.
-#html_file_suffix = '.xhtml'
+html_file_suffix = '.html'
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -108,12 +115,20 @@ html_last_updated_fmt = '%b %d, %Y'
 # typographically correct entities.
 #html_use_smartypants = True
 
+# Content template for the index page.
+html_index = 'index.html'
+
 # Custom sidebar templates, maps document names to template names.
 #html_sidebars = {}
 
+# Custom sidebar templates, maps page names to templates.
+html_sidebars = {'index': 'indexsidebar.html',
+                 }
+
+
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
-#html_additional_pages = {}
+html_additional_pages = {'index': 'index.html', 'gallery':'gallery.html'}
 
 # If false, no module index is generated.
 #html_use_modindex = True
@@ -142,7 +157,7 @@ latex_font_size = '11pt'
 # (source start file, target name, title, author, document class [howto/manual]).
 
 latex_documents = [
-  ('index', 'Matplotlib.tex', 'Matplotlib', 'Darren Dale, Michael Droettboom, Eric Firing, John Hunter', 'manual'),
+  ('contents', 'Matplotlib.tex', 'Matplotlib', 'Darren Dale, Michael Droettboom, Eric Firing, John Hunter', 'manual'),
 ]
 
 

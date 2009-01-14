@@ -208,6 +208,7 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
         self._tkphoto = Tk.PhotoImage(
             master=self._tkcanvas, width=width, height=height)
         self._tkcanvas.create_image(width/2,height/2,image=self._tkphoto)
+        self.resize_event()
         self.show()
 
     def draw(self):
@@ -297,7 +298,7 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
 
     def _get_key(self, event):
         val = event.keysym_num
-        if self.keyvald.has_key(val):
+        if val in self.keyvald:
             key = self.keyvald[val]
         elif val<256:
             key = chr(val)
