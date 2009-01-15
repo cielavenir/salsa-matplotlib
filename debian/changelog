@@ -1,3 +1,9 @@
+matplotlib (0.98.5.2-1ubuntu1) jaunty; urgency=low
+
+  * debian/control: Rename python-enthought-traits to python-traits
+
+ -- Benjamin Drung <benjamin.drung@gmail.com>  Thu, 15 Jan 2009 01:14:28 +0100
+
 matplotlib (0.98.5.2-1) experimental; urgency=low
 
   [ Benjamin Drung ]
