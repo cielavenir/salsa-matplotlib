@@ -20,18 +20,18 @@ include /usr/share/dpatch/dpatch.make
 build: patch build-arch build-indep
 
 build-indep: build-indep-stamp
-build-indep-stamp: $(DEFPY:%=build-stamp-%)
+build-indep-stamp: $(DEFPY:%=build-%-stamp)
 	dh_testdir
 
 	# build the doc
 	-( cd doc ; MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
 		PYTHONPATH=../build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py --small all )
 
-	touch build-indep-stamp
+	touch $@
 
-build-arch: $(PYVERS:%=build-stamp-%)
+build-arch: $(PYVERS:%=build-%-stamp)
 
-build-stamp-%:
+build-%-stamp:
 	dh_testdir
 
 	cp -f debian/setup.cfg setup.cfg
@@ -57,7 +57,7 @@ clean-patched: patch
 
 	find . -name '*.pyc' -exec rm {} \;
 
-	dh_clean *-stamp* lib/matplotlib/mpl-data/matplotlib.conf \
+	dh_clean lib/matplotlib/mpl-data/matplotlib.conf \
 		lib/matplotlib/mpl-data/matplotlibrc \
 		doc/mpl_data/matplotlib.conf doc/mpl_data/matplotlibrc \
 		setup.cfg doc/_static/inheritance* doc/_static/math-*.png \
@@ -66,11 +66,11 @@ clean-patched: patch
 
 
 # install
-install-arch: build-arch $(PYVERS:%=install-stamp-%)
+install-arch: build-arch $(PYVERS:%=install-%-stamp)
 	dh_testdir
 	dh_testroot
 
-install-stamp-%: build-stamp-%
+install-%-stamp: build-%-stamp
 	dh_testdir
 	dh_testroot
 
