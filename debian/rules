@@ -93,7 +93,7 @@ install-stamp-%: build-stamp-%
 install-indep: build-indep
 	dh_testdir -i
 	dh_testroot -i
-	dh_clean -k
+	dh_prep
 	dh_install -p $(pdata)
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/Vera*.ttf
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/*.TXT

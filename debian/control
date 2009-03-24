@@ -8,7 +8,7 @@ Uploaders: Marco Presi (Zufus) <zufus@debian.org>,
            Ondrej Certik <ondrej@certik.cz>,
            Sandro Tosi <morph@debian.org>,
            Benjamin Drung <benjamin.drung@gmail.com>
-Build-Depends: debhelper (>= 5.0.38),
+Build-Depends: debhelper (>= 7),
                dpatch,
                dvipng,
                graphviz,
