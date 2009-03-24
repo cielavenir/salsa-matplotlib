@@ -8,7 +8,7 @@
 
 PYVERS := $(shell pyversions -v -r debian/control)
 DEFPY := $(shell pyversions -v -d)
-PY_PLATFORM = $(shell python -c 'from distutils.util import get_platform; print get_platform()')
+PY_PLATFORM := $(shell python -c 'from distutils.util import get_platform; print get_platform()')
 pd := python-matplotlib-doc
 p := python-matplotlib
 pdata := python-matplotlib-data
@@ -29,7 +29,7 @@ build-indep-stamp: $(DEFPY:%=build-stamp-%)
 
 	touch build-indep-stamp
 
-build-arch:$(PYVERS:%=build-stamp-%)
+build-arch: $(PYVERS:%=build-stamp-%)
 
 build-stamp-%:
 	dh_testdir
@@ -63,6 +63,7 @@ clean-patched: patch
 		setup.cfg doc/_static/inheritance* doc/_static/math-*.png \
 		doc/test.png
 	rm -rf build
+
 
 # install
 install-arch: build-arch $(PYVERS:%=install-stamp-%)
