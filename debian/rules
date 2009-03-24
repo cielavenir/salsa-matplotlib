@@ -61,7 +61,8 @@ clean-patched: patch
 	         lib/matplotlib/mpl-data/matplotlibrc                      \
 		 doc/mpl_data/matplotlib.conf doc/mpl_data/matplotlibrc    \
 		 setup.cfg doc/_static/inheritance* doc/_static/math-*.png \
-		 doc/test.png build
+		 doc/test.png
+	rm -rf build
 
 # install
 install-arch: build-arch $(PYVERS:%=install-stamp-%)
