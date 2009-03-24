@@ -1,4 +1,4 @@
-#!/usr/bin/make -f
+﻿#!/usr/bin/make -f
 # -*- makefile -*-
 # Sample debian/rules that uses debhelper.
 # GNU copyright 1997 to 1999 by Joey Hess.
@@ -8,9 +8,9 @@
 
 PYVERS := $(shell pyversions -v -r debian/control)
 DEFPY := $(shell pyversions -v -d)
-PY_PLATFORM=$(shell python -c 'from distutils.util import get_platform; print get_platform()')
-pd  := python-matplotlib-doc
-p   := python-matplotlib
+PY_PLATFORM = $(shell python -c 'from distutils.util import get_platform; print get_platform()')
+pd := python-matplotlib-doc
+p := python-matplotlib
 pdata := python-matplotlib-data
 pdbg := python-matplotlib-dbg
 
@@ -25,7 +25,7 @@ build-indep-stamp: $(DEFPY:%=build-stamp-%)
 
 	# build the doc
 	-( cd doc ; MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
-		    PYTHONPATH=../build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py --small all )
+		PYTHONPATH=../build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py --small all )
 
 	touch build-indep-stamp
 
@@ -48,8 +48,8 @@ clean-patched: patch
 	dh_testroot
 	
 	for i in $(PYVERS); do \
-	    python$(i) ./setup.py clean --all; \
-	    python$(i)-dbg ./setup.py clean --all; \
+		python$(i) ./setup.py clean --all; \
+		python$(i)-dbg ./setup.py clean --all; \
 	done
 
 	# clean the doc
@@ -57,11 +57,11 @@ clean-patched: patch
 
 	find . -name '*.pyc' -exec rm {} \;
 
-	dh_clean *-stamp* lib/matplotlib/mpl-data/matplotlib.conf          \
-	         lib/matplotlib/mpl-data/matplotlibrc                      \
-		 doc/mpl_data/matplotlib.conf doc/mpl_data/matplotlibrc    \
-		 setup.cfg doc/_static/inheritance* doc/_static/math-*.png \
-		 doc/test.png
+	dh_clean *-stamp* lib/matplotlib/mpl-data/matplotlib.conf \
+		lib/matplotlib/mpl-data/matplotlibrc \
+		doc/mpl_data/matplotlib.conf doc/mpl_data/matplotlibrc \
+		setup.cfg doc/_static/inheritance* doc/_static/math-*.png \
+		doc/test.png
 	rm -rf build
 
 # install
@@ -125,10 +125,10 @@ binary-arch: build-arch install-arch
 	dh_installdocs -p$(p) -a README.txt TODO KNOWN_BUGS INTERACTIVE
 	# make python scripts starting with '#!' executable
 	for i in `find debian -mindepth 2 -type f ! -perm 755`; do \
-	  if head -1 $$i | grep -q '^#!'; then \
-	    chmod 755 $$i; \
-	    echo "made executable: $$i"; \
-	  fi; \
+		if head -1 $$i | grep -q '^#!'; then \
+			chmod 755 $$i; \
+			echo "made executable: $$i"; \
+		fi; \
 	done
 	dh_pycentral -a
 	dh_link -a
