@@ -9,8 +9,10 @@ matplotlib (0.98.5.2-2) UNRELEASED; urgency=low
       thanks Andrew Straw for the patch
     - Let all stamp files end with -stamp for automatically cleaning by dh_clean
   * Switch to debhelper 7
+  * Install egg-info files and add python-setuptools to build depends; thanks to
+    Gediminas Paulauskas
 
- -- Benjamin Drung <benjamin.drung@gmail.com>  Wed, 25 Mar 2009 18:15:32 +0100
+ -- Benjamin Drung <benjamin.drung@gmail.com>  Wed, 25 Mar 2009 18:54:34 +0100
 
 matplotlib (0.98.5.2-1) experimental; urgency=low
 
