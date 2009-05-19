@@ -1,4 +1,4 @@
-matplotlib (0.98.5.2-2) UNRELEASED; urgency=low
+matplotlib (0.98.5.3-1) UNRELEASED; urgency=low
 
   [ Benjamin Drung ]
   * debian/control
@@ -14,8 +14,12 @@ matplotlib (0.98.5.2-2) UNRELEASED; urgency=low
     Gediminas Paulauskas
 
   [ Sandro Tosi ]
+  * New upstream release
+    - ensure WX examples use version >= 2.8, thanks to giacomo boffi for the report;
+      Closes: #518150
   * debian/control
     - removed Vittorio Palmisano from uploaders (mia); thanks for your work!
+    - bump Standards-Version to 3.8.1 (no changes needed)
 
  -- Sandro Tosi <morph@debian.org>  Fri, 27 Mar 2009 22:27:31 +0100
 
