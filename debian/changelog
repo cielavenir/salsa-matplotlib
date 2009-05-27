@@ -20,8 +20,10 @@ matplotlib (0.98.5.3-1) UNRELEASED; urgency=low
   * debian/control
     - removed Vittorio Palmisano from uploaders (mia); thanks for your work!
     - bump Standards-Version to 3.8.1 (no changes needed)
+  * debian/copyright
+    - completely rewritten to match new upstream code
 
- -- Sandro Tosi <morph@debian.org>  Fri, 27 Mar 2009 22:27:31 +0100
+ -- Sandro Tosi <morph@debian.org>  Wed, 27 May 2009 15:43:38 +0200
 
 matplotlib (0.98.5.2-1) experimental; urgency=low
 
