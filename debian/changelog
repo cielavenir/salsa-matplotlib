@@ -10,6 +10,8 @@ matplotlib (0.98.5.3-1) UNRELEASED; urgency=low
     - In clean target use rm -rf instead dh_clean for removing build directory;
       thanks Andrew Straw for the patch
     - Let all stamp files end with -stamp for automatically cleaning by dh_clean
+    - Remove generated doc files in clean target; upstreams doc clean target
+      only runs svn-clean, which is useless without a repository
   * Switch to debhelper 7
   * Install egg-info files and add python-setuptools to build depends; thanks to
     Gediminas Paulauskas
@@ -37,7 +39,7 @@ matplotlib (0.98.5.3-1) UNRELEASED; urgency=low
   * debian/{control, rules, python-matplotlib.preinst}
     - switch to python-support (adding preinst for the migration)
 
- -- Benjamin Drung <bdrung@ubuntu.com>  Thu, 28 May 2009 19:47:27 +0200
+ -- Benjamin Drung <bdrung@ubuntu.com>  Thu, 28 May 2009 20:12:56 +0200
 
 matplotlib (0.98.5.2-1) experimental; urgency=low
 

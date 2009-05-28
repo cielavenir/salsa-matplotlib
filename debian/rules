@@ -55,14 +55,19 @@ clean-patched: patch
 	# clean the doc
 	( cd doc ; ./make.py clean )
 
+	# workaround for cleaning the doc ("doc/make.py clean" only runs useless svn-clean)
+	rm -rf doc/build doc/examples
+	rm -f doc/mpl_examples/api/*.png doc/mpl_examples/pylab_examples/*.png
+	rm -f doc/pyplots/tex_demo.png
+	rm -f doc/_static/matplotlibrc
+	rm -f doc/_templates/gallery.html
+
 	find . -name '*.pyc' -exec rm {} \;
 
 	dh_clean lib/matplotlib/mpl-data/matplotlib.conf \
-		lib/matplotlib/mpl-data/matplotlibrc \
-		doc/mpl_data/matplotlib.conf doc/mpl_data/matplotlibrc \
-		setup.cfg doc/_static/inheritance* doc/_static/math-*.png \
-		doc/test.png
+		lib/matplotlib/mpl-data/matplotlibrc setup.cfg
 	rm -rf build
+	rm -rf lib/matplotlib.egg-info
 
 
 # install
