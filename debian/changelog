@@ -5,6 +5,7 @@ matplotlib (0.98.5.3-1) UNRELEASED; urgency=low
     - Rename python-enthought-traits to python-traits
     - Move python-matplotlib-dbg to section debug
     - Build depends on python-qt4
+    - Update my e-mail address.
   * debian/rules
     - In clean target use rm -rf instead dh_clean for removing build directory;
       thanks Andrew Straw for the patch
@@ -36,7 +37,7 @@ matplotlib (0.98.5.3-1) UNRELEASED; urgency=low
   * debian/{control, rules, python-matplotlib.preinst}
     - switch to python-support (adding preinst for the migration)
 
- -- Sandro Tosi <morph@debian.org>  Thu, 28 May 2009 16:10:19 +0200
+ -- Benjamin Drung <bdrung@ubuntu.com>  Thu, 28 May 2009 19:47:27 +0200
 
 matplotlib (0.98.5.2-1) experimental; urgency=low
 

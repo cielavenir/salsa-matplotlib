@@ -6,7 +6,7 @@ Uploaders: Marco Presi (Zufus) <zufus@debian.org>,
            Alexandre Fayolle <afayolle@debian.org>,
            Ondrej Certik <ondrej@certik.cz>,
            Sandro Tosi <morph@debian.org>,
-           Benjamin Drung <benjamin.drung@gmail.com>
+           Benjamin Drung <bdrung@ubuntu.com>
 Build-Depends: debhelper (>= 7),
                dpatch,
                dvipng,
