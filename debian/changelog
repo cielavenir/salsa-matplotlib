@@ -6,6 +6,7 @@ matplotlib (0.98.5.3-1) UNRELEASED; urgency=low
     - Move python-matplotlib-dbg to section debug
     - Build depends on python-qt4
     - Update my e-mail address.
+    - Sort build depends and break depends.
   * debian/rules
     - In clean target use rm -rf instead dh_clean for removing build directory;
       thanks Andrew Straw for the patch
@@ -39,7 +40,7 @@ matplotlib (0.98.5.3-1) UNRELEASED; urgency=low
   * debian/{control, rules, python-matplotlib.preinst}
     - switch to python-support (adding preinst for the migration)
 
- -- Benjamin Drung <bdrung@ubuntu.com>  Thu, 28 May 2009 20:12:56 +0200
+ -- Benjamin Drung <bdrung@ubuntu.com>  Thu, 28 May 2009 21:35:14 +0200
 
 matplotlib (0.98.5.2-1) experimental; urgency=low
 
