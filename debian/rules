@@ -134,7 +134,7 @@ binary-arch: build-arch install-arch
 			echo "made executable: $$i"; \
 		fi; \
 	done
-	dh_pycentral -a
+	dh_pysupport -a
 	dh_link -a
 	dh_lintian -a
 	dh_strip -a --dbg-package=$(pdbg)

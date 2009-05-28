@@ -33,8 +33,10 @@ matplotlib (0.98.5.3-1) UNRELEASED; urgency=low
         . license embedded in the documentation, will break links if removed
       + font-in-non-font-package
         . we ship fonts, so no need to warning for this
+  * debian/{control, rules, python-matplotlib.preinst}
+    - switch to python-support (adding preinst for the migration)
 
- -- Sandro Tosi <morph@debian.org>  Thu, 28 May 2009 08:51:53 +0200
+ -- Sandro Tosi <morph@debian.org>  Thu, 28 May 2009 16:10:19 +0200
 
 matplotlib (0.98.5.2-1) experimental; urgency=low
 
