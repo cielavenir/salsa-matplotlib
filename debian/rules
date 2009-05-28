@@ -115,6 +115,7 @@ binary-indep: build-indep install-indep
 	ln -sf /usr/share/javascript/jquery/jquery.js \
 		$(CURDIR)/debian/$(pd)/usr/share/doc/python-matplotlib-doc/html/_static/jquery.js
 	dh_link -i
+	dh_lintian -i
 	dh_fixperms -i
 	dh_installdeb -i
 	dh_gencontrol -i
@@ -135,6 +136,7 @@ binary-arch: build-arch install-arch
 	done
 	dh_pycentral -a
 	dh_link -a
+	dh_lintian -a
 	dh_strip -a --dbg-package=$(pdbg)
 	dh_compress -a
 	dh_fixperms -a
