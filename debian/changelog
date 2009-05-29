@@ -1,4 +1,4 @@
-matplotlib (0.98.5.3-1) UNRELEASED; urgency=low
+matplotlib (0.98.5.3-1) unstable; urgency=low
 
   [ Benjamin Drung ]
   * debian/control
@@ -18,7 +18,7 @@ matplotlib (0.98.5.3-1) UNRELEASED; urgency=low
     Gediminas Paulauskas
 
   [ Sandro Tosi ]
-  * New upstream release
+  * New upstream release (ready to be uploaded in unstable)
     - ensure WX examples use version >= 2.8, thanks to giacomo boffi for the
       report; Closes: #518150
   * debian/control
@@ -40,7 +40,7 @@ matplotlib (0.98.5.3-1) UNRELEASED; urgency=low
   * debian/{control, rules, python-matplotlib.preinst}
     - switch to python-support (adding preinst for the migration)
 
- -- Benjamin Drung <bdrung@ubuntu.com>  Thu, 28 May 2009 21:35:14 +0200
+ -- Sandro Tosi <morph@debian.org>  Fri, 29 May 2009 08:40:48 +0200
 
 matplotlib (0.98.5.2-1) experimental; urgency=low
 
