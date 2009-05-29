@@ -201,7 +201,7 @@ class MathtextBackendAggRender(MathtextBackend):
 
     def render_glyph(self, ox, oy, info):
         info.font.draw_glyph_to_bitmap(
-            self.image, ox, oy - info.metrics.ymax, info.glyph)
+            self.image, ox, oy - info.metrics.iceberg, info.glyph)
 
     def render_rect_filled(self, x1, y1, x2, y2):
         height = max(int(y2 - y1) - 1, 0)
@@ -652,17 +652,16 @@ class BakomaFonts(TruetypeFonts):
                  'sf'  : 'cmss10',
                  'ex'  : 'cmex10'
                  }
-    fontmap = {}
 
     def __init__(self, *args, **kwargs):
         self._stix_fallback = StixFonts(*args, **kwargs)
 
         TruetypeFonts.__init__(self, *args, **kwargs)
-        if not len(self.fontmap):
-            for key, val in self._fontmap.iteritems():
-                fullpath = findfont(val)
-                self.fontmap[key] = fullpath
-                self.fontmap[val] = fullpath
+        self.fontmap = {}
+        for key, val in self._fontmap.iteritems():
+            fullpath = findfont(val)
+            self.fontmap[key] = fullpath
+            self.fontmap[val] = fullpath
 
 
     _slanted_symbols = set(r"\int \oint".split())
@@ -764,7 +763,6 @@ class UnicodeFonts(TruetypeFonts):
     This class will "fallback" on the Bakoma fonts when a required
     symbol can not be found in the font.
     """
-    fontmap = {}
     use_cmex = True
 
     def __init__(self, *args, **kwargs):
@@ -774,14 +772,14 @@ class UnicodeFonts(TruetypeFonts):
         else:
             self.cm_fallback = None
         TruetypeFonts.__init__(self, *args, **kwargs)
-        if not len(self.fontmap):
-            for texfont in "cal rm tt it bf sf".split():
-                prop = rcParams['mathtext.' + texfont]
-                font = findfont(prop)
-                self.fontmap[texfont] = font
-            prop = FontProperties('cmex10')
+        self.fontmap = {}
+        for texfont in "cal rm tt it bf sf".split():
+            prop = rcParams['mathtext.' + texfont]
             font = findfont(prop)
-            self.fontmap['ex'] = font
+            self.fontmap[texfont] = font
+        prop = FontProperties('cmex10')
+        font = findfont(prop)
+        self.fontmap['ex'] = font
 
     _slanted_symbols = set(r"\int \oint".split())
 
@@ -890,18 +888,17 @@ class StixFonts(UnicodeFonts):
                  4 : 'STIXSize4',
                  5 : 'STIXSize5'
                  }
-    fontmap = {}
     use_cmex = False
     cm_fallback = False
     _sans = False
 
     def __init__(self, *args, **kwargs):
         TruetypeFonts.__init__(self, *args, **kwargs)
-        if not len(self.fontmap):
-            for key, name in self._fontmap.iteritems():
-                fullpath = findfont(name)
-                self.fontmap[key] = fullpath
-                self.fontmap[name] = fullpath
+        self.fontmap = {}
+        for key, name in self._fontmap.iteritems():
+            fullpath = findfont(name)
+            self.fontmap[key] = fullpath
+            self.fontmap[name] = fullpath
 
     def _map_virtual_font(self, fontname, font_class, uniindex):
         # Handle these "fonts" that are actually embedded in
@@ -2035,7 +2032,7 @@ class Parser(object):
       \sqsubset       \sqsupset        \neq             \smile
       \sqsubseteq     \sqsupseteq      \doteq           \frown
       \in             \ni              \propto
-      \vdash          \dashv'''.split())
+      \vdash          \dashv           \dots'''.split())
 
     _arrow_symbols = set(r'''
       \leftarrow              \longleftarrow           \uparrow
@@ -2178,9 +2175,9 @@ class Parser(object):
                      + (group | Error("Expected \sqrt{value}"))
                      ).setParseAction(self.sqrt).setName("sqrt")
 
-        placeable   <<(accent
-                     ^ function
+        placeable   <<(function
                      ^ (c_over_c | symbol)
+                     ^ accent
                      ^ group
                      ^ frac
                      ^ sqrt

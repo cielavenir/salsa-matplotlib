@@ -348,10 +348,16 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
         self._interpolation = s
 
     def set_resample(self, v):
+        """
+        set whether or not image resampling is used
+
+        ACCEPTS: True|False
+        """
         if v is None: v = rcParams['image.resample']
         self._resample = v
 
-    def get_interpolation(self):
+    def get_resample(self):
+        'return the image resample boolean'
         return self._resample
 
     def get_extent(self):
@@ -714,8 +720,6 @@ def imread(fname):
     <http://www.pythonware.com/products/pil/>`_ is installed, it will
     use it to load the image and return an array (if possible) which
     can be used with :func:`~matplotlib.pyplot.imshow`.
-
-    TODO: support RGB and grayscale return values in _image.readpng
     """
 
     def pilread():

@@ -272,11 +272,6 @@ def _spectral_helper(x, y, NFFT=256, Fs=2, detrend=detrend_none,
         pad_to = NFFT
 
     if scale_by_freq is None:
-        warnings.warn("psd, csd, and specgram have changed to scale their "
-            "densities by the sampling frequency for better MatLab "
-            "compatibility. You can pass scale_by_freq=False to disable "
-            "this behavior.  Also, one-sided densities are scaled by a "
-            "factor of 2.")
         scale_by_freq = True
 
     # For real x, ignore the negative frequencies unless told otherwise
@@ -1880,8 +1875,6 @@ def identity(n, rank=2, dtype='l', typecode=None):
     much faster.
     """
     if typecode is not None:
-        warnings.warn("Use dtype kwarg instead of typecode",
-                       DeprecationWarning)
         dtype = typecode
     iden = np.zeros((n,)*rank, dtype)
     for i in range(n):
@@ -2532,8 +2525,14 @@ def csv2rec(fname, comments='#', skiprows=0, checkrows=0, delimiter=',',
     fh.seek(0)
     reader = csv.reader(fh, delimiter=delimiter)
     process_skiprows(reader)
+
     if needheader:
-        skipheader = reader.next()
+        while 1:
+	    # skip past any comments and consume one line of column header
+	    row = reader.next()
+	    if len(row) and row[0].startswith(comments):
+	        continue
+	    break
 
     # iterate over the remaining rows and convert the data to date
     # objects, ints, or floats as approriate

@@ -318,9 +318,17 @@ class ColorConverter:
         Returns an *RGBA* tuple of four floats from 0-1.
 
         For acceptable values of *arg*, see :meth:`to_rgb`.
+        In addition, if *arg* is "none" (case-insensitive),
+        then (0,0,0,0) will be returned.
         If *arg* is an *RGBA* sequence and *alpha* is not *None*,
         *alpha* will replace the original *A*.
         """
+        try:
+            if arg.lower() == 'none':
+                return (0.0, 0.0, 0.0, 0.0)
+        except AttributeError:
+            pass
+
         try:
             if not cbook.is_string_like(arg) and cbook.iterable(arg):
                 if len(arg) == 4:
@@ -331,7 +339,7 @@ class ColorConverter:
                         return tuple(arg)
                     if alpha < 0.0 or alpha > 1.0:
                         raise ValueError("alpha must be in range 0-1")
-                    return arg[0], arg[1], arg[2], arg[3] * alpha
+                    return arg[0], arg[1], arg[2], alpha
                 r,g,b = arg[:3]
                 if [x for x in (r,g,b) if (float(x) < 0) or  (x > 1)]:
                     raise ValueError('number in rbg sequence outside 0-1 range')
@@ -475,7 +483,9 @@ class Colormap:
             xa = np.array([X])
         else:
             vtype = 'array'
-            xma = ma.asarray(X)
+            # force a copy here -- the ma.array and filled functions
+            # do force a cop of the data by default - JDH
+            xma = ma.array(X, copy=True)
             xa = xma.filled(0)
             mask_bad = ma.getmask(xma)
         if xa.dtype.char in np.typecodes['Float']:

@@ -193,7 +193,7 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
     *number* attribute holding this number.
 
     If *num* is an integer, and ``figure(num)`` already exists, make it
-    active and return the handle to it.  If ``figure(num)`` does not exist
+    active and return a reference to it.  If ``figure(num)`` does not exist
     it will be created.  Numbering starts at 1, matlab style::
 
       figure(1)
@@ -264,7 +264,7 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
     return figManager.canvas.figure
 
 def gcf():
-    "Return a handle to the current figure."
+    "Return a reference to the current figure."
 
     figManager = _pylab_helpers.Gcf.get_active()
     if figManager is not None:
@@ -1138,6 +1138,7 @@ def thetagrids(*args, **kwargs):
 def plotting():
     """
     Plotting commands
+
     =============== =========================================================
     Command         Description
     =============== =========================================================
@@ -1165,7 +1166,7 @@ def plotting():
     gca             return the current axes
     gcf             return the current figure
     gci             get the current image, or None
-    getp            get a handle graphics property
+    getp            get a graphics property
     hist            make a histogram
     hold            set the hold state on current axes
     legend          add a legend to the axes
@@ -1181,7 +1182,7 @@ def plotting():
     rc              control the default params
     savefig         save the current figure
     scatter         make a scatter plot
-    setp            set a handle graphics property
+    setp            set a graphics property
     semilogx        log x axis
     semilogy        log y axis
     show            show the figures
@@ -1228,7 +1229,7 @@ def get_plot_commands(): return ( 'axes', 'axis', 'bar', 'boxplot', 'cla', 'clf'
 
 def colors():
     """
-    This is a do nothing function to provide you with help on how
+    This is a do-nothing function to provide you with help on how
     matplotlib handles colors.
 
     Commands which take color arguments can use several formats to
@@ -1406,8 +1407,13 @@ def polar(*args, **kwargs):
 
     Make a polar plot.  Multiple *theta*, *r* arguments are supported,
     with format strings, as in :func:`~matplotlib.pyplot.plot`.
+
+    An optional kwarg *resolution* sets the number of vertices to
+    interpolate between each pair of points.  Set to 1 to disable
+    interpolation.
     """
-    ax = gca(polar=True)
+    resolution = kwargs.pop('resolution', None)
+    ax = gca(polar=True, resolution=resolution)
     ret = ax.plot(*args, **kwargs)
     draw_if_interactive()
     return ret

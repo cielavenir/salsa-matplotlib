@@ -39,7 +39,7 @@ import matplotlib.dviread as dviread
 from matplotlib.ft2font import FT2Font, FIXED_WIDTH, ITALIC, LOAD_NO_SCALE, \
     LOAD_NO_HINTING, KERNING_UNFITTED
 from matplotlib.mathtext import MathTextParser
-from matplotlib.transforms import Affine2D, Bbox, BboxBase
+from matplotlib.transforms import Affine2D, Bbox, BboxBase, TransformedPath
 from matplotlib.path import Path
 from matplotlib import ttconv
 
@@ -112,7 +112,20 @@ def fill(strings, linelen=75):
     result.append(' '.join(strings[lasti:]))
     return '\n'.join(result)
 
-_string_escape_regex = re.compile(r'([\\()])')
+# PDF strings are supposed to be able to include any eight-bit data,
+# except that unbalanced parens and backslashes must be escaped by a
+# backslash. However, sf bug #2708559 shows that the carriage return
+# character may get read as a newline; these characters correspond to
+# \gamma and \Omega in TeX's math font encoding. Escaping them fixes
+# the bug.
+_string_escape_regex = re.compile(r'([\\()\r\n])')
+def _string_escape(match):
+    m = match.group(0)
+    if m in r'\()': return '\\' + m
+    elif m == '\n': return r'\n'
+    elif m == '\r': return r'\r'
+    assert False
+
 def pdfRepr(obj):
     """Map Python objects to PDF syntax."""
 
@@ -138,7 +151,7 @@ def pdfRepr(obj):
     # simpler to escape them all. TODO: cut long strings into lines;
     # I believe there is some maximum line length in PDF.
     elif is_string_like(obj):
-        return '(' + _string_escape_regex.sub(r'\\\1', obj) + ')'
+        return '(' + _string_escape_regex.sub(_string_escape, obj) + ')'
 
     # Dictionaries. The keys must be PDF names, so if we find strings
     # there, we make Name objects from them. The values may be
@@ -942,7 +955,7 @@ end"""
     def hatchPattern(self, lst):
         pattern = self.hatchPatterns.get(lst, None)
         if pattern is not None:
-            return pattern[0]
+            return pattern
 
         name = Name('H%d' % self.nextHatch)
         self.nextHatch += 1
@@ -1233,12 +1246,14 @@ class RendererPdf(RendererBase):
 
     def get_image_magnification(self):
         return self.image_dpi/72.0
-            
+
     def draw_image(self, x, y, im, bbox, clippath=None, clippath_trans=None):
-        # MGDTODO: Support clippath here
         gc = self.new_gc()
         if bbox is not None:
             gc.set_clip_rectangle(bbox)
+        if clippath is not None:
+            clippath = TransformedPath(clippath, clippath_trans)
+            gc.set_clip_path(clippath)
         self.check_gc(gc)
 
         h, w = im.get_size_out()

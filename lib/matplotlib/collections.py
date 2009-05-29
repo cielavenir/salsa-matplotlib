@@ -174,8 +174,8 @@ class Collection(artist.Artist, cm.ScalarMappable):
                 ys = self.convert_yunits(ys)
                 paths.append(mpath.Path(zip(xs, ys), path.codes))
             if len(self._offsets):
-                xs = self.convert_xunits(self._offsets[:0])
-                ys = self.convert_yunits(self._offsets[:1])
+                xs = self.convert_xunits(self._offsets[:,0])
+                ys = self.convert_yunits(self._offsets[:,1])
                 offsets = zip(xs, ys)
 
         offsets = np.asarray(offsets, np.float_)
@@ -1108,7 +1108,7 @@ class PatchCollection(Collection):
 
             facecolors   = [determine_facecolor(p) for p in patches]
             edgecolors   = [p.get_edgecolor() for p in patches]
-            linewidths   = [p.get_linewidths() for p in patches]
+            linewidths   = [p.get_linewidth() for p in patches]
             antialiaseds = [p.get_antialiased() for p in patches]
 
             Collection.__init__(

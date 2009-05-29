@@ -1,3 +1,47 @@
+matplotlib (0.98.5.3-1) unstable; urgency=low
+
+  [ Benjamin Drung ]
+  * debian/control
+    - Rename python-enthought-traits to python-traits
+    - Move python-matplotlib-dbg to section debug
+    - Build depends on python-qt4
+    - Update my e-mail address.
+    - Sort build depends and break depends.
+  * debian/rules
+    - In clean target use rm -rf instead dh_clean for removing build directory;
+      thanks Andrew Straw for the patch
+    - Let all stamp files end with -stamp for automatically cleaning by dh_clean
+    - Remove generated doc files in clean target; upstreams doc clean target
+      only runs svn-clean, which is useless without a repository
+  * Switch to debhelper 7
+  * Install egg-info files and add python-setuptools to build depends; thanks to
+    Gediminas Paulauskas
+
+  [ Sandro Tosi ]
+  * New upstream release (ready to be uploaded in unstable)
+    - ensure WX examples use version >= 2.8, thanks to giacomo boffi for the
+      report; Closes: #518150
+  * debian/control
+    - removed Vittorio Palmisano from uploaders (mia); thanks for your work!
+    - bump Standards-Version to 3.8.1 (no changes needed)
+  * debian/copyright
+    - completely rewritten to match new upstream code
+  * debian/{rules, *.lintian-overrides}
+    - added these lintian overrides:
+      + arch-dep-package-has-big-usr-share
+        . python-matplotlib has large arch-indep with some arch-dep code
+      + copyright-should-refer-to-common-license-file-for-lgpl
+        . false warning, since it greps for LGPL that's in the license text as
+          example
+      + extra-license-file
+        . license embedded in the documentation, will break links if removed
+      + font-in-non-font-package
+        . we ship fonts, so no need to warning for this
+  * debian/{control, rules, python-matplotlib.preinst}
+    - switch to python-support (adding preinst for the migration)
+
+ -- Sandro Tosi <morph@debian.org>  Fri, 29 May 2009 08:40:48 +0200
+
 matplotlib (0.98.5.2-1) experimental; urgency=low
 
   [ Benjamin Drung ]
