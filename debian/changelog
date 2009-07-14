@@ -1,3 +1,11 @@
+matplotlib (0.98.5.3-2) UNRELEASED; urgency=low
+
+  * Build with tcl/tk8.5 as python-tk was build with tcl/tk8.5
+    (Closes: #536985).
+  * Bump Standards-Version to 3.8.2 (no changes).
+
+ -- Benjamin Drung <bdrung@ubuntu.com>  Tue, 14 Jul 2009 17:11:18 +0200
+
 matplotlib (0.98.5.3-1) unstable; urgency=low
 
   [ Benjamin Drung ]
