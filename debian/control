@@ -34,9 +34,9 @@ Build-Depends: debhelper (>= 7),
                python-traits (>= 2.0),
                python-tz,
                python-wxgtk2.8,
-               tcl8.4-dev,
+               tcl8.5-dev,
                texlive-latex-extra,
-               tk8.4-dev,
+               tk8.5-dev,
                zlib1g-dev
 XS-Python-Version: all
 Standards-Version: 3.8.1
