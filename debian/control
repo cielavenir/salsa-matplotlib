@@ -39,7 +39,7 @@ Build-Depends: debhelper (>= 7),
                tk8.5-dev,
                zlib1g-dev
 XS-Python-Version: all
-Standards-Version: 3.8.1
+Standards-Version: 3.8.2
 XS-DM-Upload-Allowed: yes
 Homepage: http://matplotlib.sf.net/
 Vcs-Svn: svn://svn.debian.org/svn/python-modules/packages/matplotlib/trunk/
