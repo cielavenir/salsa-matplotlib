@@ -30,16 +30,16 @@ Build-Depends: debhelper (>= 7),
                python-setuptools,
                python-sphinx (>= 0.5.1),
                python-support (>= 1.0.0),
-               python-tk,
+               python-tk (>= 2.5.2-1.1),
                python-traits (>= 2.0),
                python-tz,
                python-wxgtk2.8,
-               tcl8.4-dev,
+               tcl8.5-dev,
                texlive-latex-extra,
-               tk8.4-dev,
+               tk8.5-dev,
                zlib1g-dev
 XS-Python-Version: all
-Standards-Version: 3.8.1
+Standards-Version: 3.8.2
 XS-DM-Upload-Allowed: yes
 Homepage: http://matplotlib.sf.net/
 Vcs-Svn: svn://svn.debian.org/svn/python-modules/packages/matplotlib/trunk/
@@ -58,7 +58,7 @@ Depends: ${python:Depends},
          python-matplotlib-data (>= ${source:Version}),
          python-numpy (>= 1:1.1.0),
          python-pyparsing,
-         python-tk | python-gtk2 | python-wxgtk2.8 | python-qt3 | python-qt4,
+         python-tk (>= 2.5.2-1.1) | python-gtk2 | python-wxgtk2.8 | python-qt3 | python-qt4,
          python-tz
 Provides: ${python:Provides}
 Conflicts: python2.4-matplotlib
