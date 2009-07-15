@@ -30,7 +30,7 @@ Build-Depends: debhelper (>= 7),
                python-setuptools,
                python-sphinx (>= 0.5.1),
                python-support (>= 1.0.0),
-               python-tk,
+               python-tk (>= 2.5.2-1.1),
                python-traits (>= 2.0),
                python-tz,
                python-wxgtk2.8,
@@ -58,7 +58,7 @@ Depends: ${python:Depends},
          python-matplotlib-data (>= ${source:Version}),
          python-numpy (>= 1:1.1.0),
          python-pyparsing,
-         python-tk | python-gtk2 | python-wxgtk2.8 | python-qt3 | python-qt4,
+         python-tk (>= 2.5.2-1.1) | python-gtk2 | python-wxgtk2.8 | python-qt3 | python-qt4,
          python-tz
 Provides: ${python:Provides}
 Conflicts: python2.4-matplotlib
