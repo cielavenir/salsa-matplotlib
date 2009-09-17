@@ -7,6 +7,7 @@ import matplotlib as mpl
 import numpy as np
 import matplotlib.cbook as cbook
 import matplotlib.artist as artist
+from matplotlib.artist import allow_rasterization
 import matplotlib.colors as colors
 import matplotlib.transforms as transforms
 from matplotlib.path import Path
@@ -79,6 +80,14 @@ class Patch(artist.Artist):
         inside = self.get_path().contains_point(
             (mouseevent.x, mouseevent.y), self.get_transform())
         return inside, {}
+
+    def contains_point(self, point):
+        """
+        Returns *True* if the given point is inside the path
+        (transformed with its transform attribute).
+        """
+        return self.get_path().contains_point(point,
+                                              self.get_transform())
 
     def update_from(self, other):
         """
@@ -190,6 +199,21 @@ class Patch(artist.Artist):
         """alias for set_facecolor"""
         return self.set_facecolor(color)
 
+    def set_color(self, c):
+        """
+        Set both the edgecolor and the facecolor.
+
+        ACCEPTS: matplotlib color arg or sequence of rgba tuples
+
+        .. seealso::
+
+            :meth:`set_facecolor`, :meth:`set_edgecolor`
+               For setting the edge or face color individually.
+        """
+        self.set_facecolor(c)
+        self.set_edgecolor(c)
+
+
     def set_linewidth(self, w):
         """
         Set the patch linewidth in points
@@ -228,43 +252,44 @@ class Patch(artist.Artist):
         'return whether fill is set'
         return self.fill
 
-    def set_hatch(self, h):
+    def set_hatch(self, hatch):
         """
         Set the hatching pattern
 
-        hatch can be one of::
+        *hatch* can be one of::
 
           /   - diagonal hatching
           \   - back diagonal
           |   - vertical
           -   - horizontal
-          #   - crossed
+          +   - crossed
           x   - crossed diagonal
+          o   - small circle
+          O   - large circle
+          .   - dots
+          *   - stars
 
         Letters can be combined, in which case all the specified
         hatchings are done.  If same letter repeats, it increases the
-        density of hatching in that direction.
+        density of hatching of that pattern.
 
-        CURRENT LIMITATIONS:
+        Hatching is supported in the PostScript, PDF, SVG and Agg
+        backends only.
 
-        1. Hatching is supported in the PostScript and the PDF backend only.
-
-        2. Hatching is done with solid black lines of width 0.
-
-
-        ACCEPTS: [ '/' | '\\' | '|' | '-' | '#' | 'x' ] (ps & pdf backend only)
+        ACCEPTS: [ '/' | '\\\\' | '|' | '-' | '+' | 'x' | 'o' | 'O' | '.' | '*' ]
         """
-        self._hatch = h
+        self._hatch = hatch
 
     def get_hatch(self):
         'Return the current hatching pattern'
         return self._hatch
 
-
+    @allow_rasterization
     def draw(self, renderer):
         'Draw the :class:`Patch` to the given *renderer*.'
         if not self.get_visible(): return
-        #renderer.open_group('patch')
+
+        renderer.open_group('patch', self.get_gid())
         gc = renderer.new_gc()
 
         if cbook.is_string_like(self._edgecolor) and self._edgecolor.lower()=='none':
@@ -300,7 +325,8 @@ class Patch(artist.Artist):
 
         renderer.draw_path(gc, tpath, affine, rgbFace)
 
-        #renderer.close_group('patch')
+        gc.restore()
+        renderer.close_group('patch')
 
     def get_path(self):
         """
@@ -647,8 +673,10 @@ class PathPatch(Patch):
         %(Patch)s
 
         .. seealso::
-            :class:`Patch`:
+
+            :class:`Patch`
                 For additional kwargs
+
         """
         Patch.__init__(self, **kwargs)
         self._path = path
@@ -675,8 +703,10 @@ class Polygon(Patch):
         %(Patch)s
 
         .. seealso::
-            :class:`Patch`:
+
+            :class:`Patch`
                 For additional kwargs
+
         """
         Patch.__init__(self, **kwargs)
         xy = np.asarray(xy, np.float_)
@@ -1117,6 +1147,20 @@ class Circle(Ellipse):
         Ellipse.__init__(self, xy, radius*2, radius*2, **kwargs)
     __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
+    def set_radius(self, radius):
+        """
+        Set the radius of the circle
+
+        ACCEPTS: float
+        """
+        self.width = self.height = 2 * radius
+
+    def get_radius(self):
+        'return the radius of the circle'
+        return self.width / 2.
+
+    radius = property(get_radius, set_radius)
+
 class Arc(Ellipse):
     """
     An elliptical arc.  Because it performs various optimizations, it
@@ -1160,10 +1204,9 @@ class Arc(Ellipse):
 
         %(Patch)s
         """
-        fill = kwargs.pop('fill')
+        fill = kwargs.setdefault('fill', False)
         if fill:
             raise ValueError("Arc objects can not be filled")
-        kwargs['fill'] = False
 
         Ellipse.__init__(self, xy, width, height, angle, **kwargs)
 
@@ -1171,6 +1214,7 @@ class Arc(Ellipse):
         self.theta2 = theta2
     __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
+    @allow_rasterization
     def draw(self, renderer):
         """
         Ellipses are normally drawn using an approximation that uses
@@ -1437,8 +1481,8 @@ def _pprint_styles(_styles, leadingspace=2):
         else:
             argstr =  ",".join([("%s=%s" % (an, av)) for an, av in args])
 
-        #adding quotes for now to work around tex bug treating '-' as itemize
-        _table.append([cls.__name__, "'%s'"%name, argstr])
+        #adding ``quotes`` since - and | have special meaning in reST
+        _table.append([cls.__name__, "``%s``"%name, argstr])
 
     return _pprint_table(_table)
 
@@ -1685,8 +1729,8 @@ class BoxStyle(_Style):
         """
 
         def __init__(self, pad=0.3):
-            self.pad = pad
-            super(BoxStyle.RArrow, self).__init__()
+            #self.pad = pad
+            super(BoxStyle.RArrow, self).__init__(pad)
 
         def transmute(self, x0, y0, width, height, mutation_size):
 
@@ -2175,6 +2219,7 @@ from matplotlib.bezier import split_bezier_intersecting_with_closedpath
 from matplotlib.bezier import get_intersection, inside_circle, get_parallels
 from matplotlib.bezier import make_wedged_bezier2
 from matplotlib.bezier import split_path_inout, get_cos_sin
+from matplotlib.bezier import make_path_regular, concatenate_paths
 
 
 class ConnectionStyle(_Style):
@@ -2421,7 +2466,7 @@ class ConnectionStyle(_Style):
             cosA, sinA = math.cos(self.angleA/180.*math.pi),\
                          math.sin(self.angleA/180.*math.pi),
             cosB, sinB = math.cos(self.angleB/180.*math.pi),\
-                         -math.sin(self.angleB/180.*math.pi),
+                         math.sin(self.angleB/180.*math.pi),
 
             cx, cy = get_intersection(x1, y1, cosA, sinA,
                                       x2, y2, cosB, sinB)
@@ -2433,9 +2478,15 @@ class ConnectionStyle(_Style):
                 vertices.append((cx, cy))
                 codes.append(Path.LINETO)
             else:
-                vertices.extend([(cx - self.rad * cosA, cy - self.rad * sinA),
+                dx1, dy1 = x1-cx, y1-cy
+                d1 = (dx1**2 + dy1**2)**.5
+                f1 = self.rad/d1
+                dx2, dy2 = x2-cx, y2-cy
+                d2 = (dx2**2 + dy2**2)**.5
+                f2 = self.rad/d2
+                vertices.extend([(cx + dx1*f1, cy + dy1*f1),
                                  (cx, cy),
-                                 (cx + self.rad * cosB, cy + self.rad * sinB)])
+                                 (cx + dx2*f2, cy + dy2*f2)])
                 codes.extend([Path.LINETO, Path.CURVE3, Path.CURVE3])
 
             vertices.append((x2, y2))
@@ -2539,6 +2590,93 @@ class ConnectionStyle(_Style):
 
     _style_list["arc"] = Arc
 
+
+
+    class Bar(_Base):
+        """
+        A line with *angle* between A and B with *armA* and
+        *armB*. One of the arm is extend so that they are connected in
+        a right angle. The length of armA is determined by (*armA*
+        + *fraction* x AB distance). Same for armB.
+        """
+
+        def __init__(self, armA=0., armB=0., fraction=0.3, angle=None):
+            """
+            *armA* : minimum length of armA
+            *armB* : minimum length of armB
+            *fraction* : a fraction of the distance between two points that will be added to armA and armB.
+            *angle* : anlge of the connecting line (if None, parallel to A and B)
+            """
+            self.armA = armA
+            self.armB = armB
+            self.fraction = fraction
+            self.angle = angle
+
+        def connect(self, posA, posB):
+            x1, y1 = posA
+            x20, y20 = x2, y2 = posB
+
+            x12, y12 = (x1 + x2)/2., (y1 + y2)/2.
+
+            theta1 = math.atan2(y2-y1, x2-x1)
+            dx, dy = x2 - x1, y2 - y1
+            dd = (dx*dx + dy*dy)**.5
+            ddx, ddy = dx/dd, dy/dd
+
+            armA, armB = self.armA, self.armB
+
+            if self.angle is not None:
+                #angle = self.angle % 180.
+                #if angle < 0. or angle > 180.:
+                #    angle
+                #theta0 = (self.angle%180.)/180.*math.pi
+                theta0 = self.angle/180.*math.pi
+                #theta0 = (((self.angle+90)%180.)  - 90.)/180.*math.pi
+                dtheta = theta1 - theta0
+                dl = dd*math.sin(dtheta)
+
+                dL = dd*math.cos(dtheta)
+
+                #x2, y2 = x2 + dl*ddy, y2 - dl*ddx
+                x2, y2 = x1 + dL*math.cos(theta0), y1 + dL*math.sin(theta0)
+
+                armB = armB - dl
+
+                # update
+                dx, dy = x2 - x1, y2 - y1
+                dd2 = (dx*dx + dy*dy)**.5
+                ddx, ddy = dx/dd2, dy/dd2
+
+            else:
+                dl = 0.
+
+            #if armA > armB:
+            #    armB = armA + dl
+            #else:
+            #    armA = armB - dl
+
+
+            arm = max(armA, armB)
+            f = self.fraction*dd + arm
+            #fB = self.fraction*dd + armB
+
+            cx1, cy1 = x1 + f*ddy, y1 - f*ddx
+            cx2, cy2 = x2 + f*ddy, y2 - f*ddx
+
+            vertices = [(x1, y1),
+                        (cx1, cy1),
+                        (cx2, cy2),
+                        (x20, y20)]
+            codes = [Path.MOVETO,
+                     Path.LINETO,
+                     Path.LINETO,
+                     Path.LINETO]
+
+            return Path(vertices, codes)
+
+    _style_list["bar"] = Bar
+
+
     __doc__ = cbook.dedent(__doc__) % \
            {"AvailableConnectorstyles": _pprint_styles(_style_list)}
 
@@ -2626,12 +2764,15 @@ class ArrowStyle(_Style):
         def transmute(self, path, mutation_size, linewidth):
             """
             The transmute method is a very core of the ArrowStyle
-            class and must be overriden in the subclasses. It receives the
-            path object along which the arrow will be drawn, and the
-            mutation_size, with which the amount arrow head and etc. will
-            be scaled. It returns a Path instance. The linewidth may be
-            used to adjust the the path so that it does not pass beyond
-            the given points.
+            class and must be overriden in the subclasses. It receives
+            the path object along which the arrow will be drawn, and
+            the mutation_size, with which the amount arrow head and
+            etc. will be scaled. The linewidth may be used to adjust
+            the the path so that it does not pass beyond the given
+            points. It returns a tuple of a Path instance and a
+            boolean. The boolean value indicate whether the path can
+            be filled or not. The return value can also be a list of paths
+            and list of booleans of a same length.
             """
 
             raise NotImplementedError('Derived must override')
@@ -2645,6 +2786,8 @@ class ArrowStyle(_Style):
             and take care of the aspect ratio.
             """
 
+            path = make_path_regular(path)
+
             if aspect_ratio is not None:
                 # Squeeze the given height by the aspect_ratio
 
@@ -2653,12 +2796,19 @@ class ArrowStyle(_Style):
                 vertices[:,1] = vertices[:,1] / aspect_ratio
                 path_shrinked = Path(vertices, codes)
                 # call transmute method with squeezed height.
-                path_mutated, closed = self.transmute(path_shrinked, linewidth,
-                                                      mutation_size)
-                vertices, codes = path_mutated.vertices, path_mutated.codes
-                # Restore the height
-                vertices[:,1] = vertices[:,1] * aspect_ratio
-                return Path(vertices, codes), closed
+                path_mutated, fillable = self.transmute(path_shrinked,
+                                                        linewidth,
+                                                        mutation_size)
+                if cbook.iterable(fillable):
+                    path_list = []
+                    for p in zip(path_mutated):
+                        v, c = p.vertices, p.codes
+                        # Restore the height
+                        v[:,1] = v[:,1] * aspect_ratio
+                        path_list.append(Path(v, c))
+                    return path_list, fillable
+                else:
+                    return path_mutated, fillable
             else:
                 return self.transmute(path, mutation_size, linewidth)
 
@@ -2668,21 +2818,24 @@ class ArrowStyle(_Style):
         """
         A simple arrow which will work with any path instance. The
         returned path is simply concatenation of the original path + at
-        most two paths representing the arrow at the begin point and the
-        at the end point. The returned path is not closed and only meant
-        to be stroked.
+        most two paths representing the arrow head at the begin point and the
+        at the end point. The arrow heads can be either open or closed.
         """
 
         def __init__(self, beginarrow=None, endarrow=None,
+                     fillbegin=False, fillend=False,
                      head_length=.2, head_width=.1):
             """
             The arrows are drawn if *beginarrow* and/or *endarrow* are
-            true. *head_length* and *head_width* determines the size of
-            the arrow relative to the *mutation scale*.
+            true. *head_length* and *head_width* determines the size
+            of the arrow relative to the *mutation scale*.  The
+            arrowhead at the begin (or end) is closed if fillbegin (or
+            fillend) is True.
             """
             self.beginarrow, self.endarrow = beginarrow, endarrow
             self.head_length, self.head_width = \
                     head_length, head_width
+            self.fillbegin, self.fillend = fillbegin, fillend
             super(ArrowStyle._Curve, self).__init__()
 
 
@@ -2782,16 +2935,33 @@ class ArrowStyle(_Style):
 
             # this simple code will not work if ddx, ddy is greater than
             # separation bettern vertices.
-            vertices = np.concatenate([verticesA + [(x0+ddxA, y0+ddyA)],
-                                       path.vertices[1:-1],
-                                       [(x3+ddxB, y3+ddyB)] + verticesB])
-            codes = np.concatenate([codesA,
-                                    path.codes,
-                                    codesB])
+            _path = [Path(np.concatenate([[(x0+ddxA, y0+ddyA)],
+                                          path.vertices[1:-1],
+                                          [(x3+ddxB, y3+ddyB)]]),
+                          path.codes)]
+            _fillable = [False]
 
-            p = Path(vertices, codes)
+            if self.beginarrow:
+                if self.fillbegin:
+                    p = np.concatenate([verticesA, [verticesA[0], verticesA[0]], ])
+                    c = np.concatenate([codesA, [Path.LINETO, Path.CLOSEPOLY]])
+                    _path.append(Path(p, c))
+                    _fillable.append(True)
+                else:
+                    _path.append(Path(verticesA, codesA))
+                    _fillable.append(False)
 
-            return p, False
+            if self.endarrow:
+                if self.fillend:
+                    _fillable.append(True)
+                    p = np.concatenate([verticesB, [verticesB[0], verticesB[0]], ])
+                    c = np.concatenate([codesB, [Path.LINETO, Path.CLOSEPOLY]])
+                    _path.append(Path(p, c))
+                else:
+                    _fillable.append(False)
+                    _path.append(Path(verticesB, codesB))
+
+            return _path, _fillable
 
 
     class Curve(_Curve):
@@ -2869,6 +3039,73 @@ class ArrowStyle(_Style):
 
     #_style_list["<->"] = CurveAB
     _style_list["<->"] = CurveAB
+
+
+
+    class CurveFilledA(_Curve):
+        """
+        An arrow with filled triangle head at the begin.
+        """
+
+        def __init__(self, head_length=.4, head_width=.2):
+            """
+            *head_length*
+              length of the arrow head
+
+            *head_width*
+              width of the arrow head
+            """
+
+            super(ArrowStyle.CurveFilledA, self).__init__( \
+                beginarrow=True, endarrow=False,
+                fillbegin=True, fillend=False,
+                head_length=head_length, head_width=head_width )
+
+    _style_list["<|-"] = CurveFilledA
+
+
+    class CurveFilledB(_Curve):
+        """
+        An arrow with filled triangle head at the end.
+        """
+
+        def __init__(self, head_length=.4, head_width=.2):
+            """
+            *head_length*
+              length of the arrow head
+
+            *head_width*
+              width of the arrow head
+            """
+
+            super(ArrowStyle.CurveFilledB, self).__init__( \
+                beginarrow=False, endarrow=True,
+                fillbegin=False, fillend=True,
+                head_length=head_length, head_width=head_width )
+
+    _style_list["-|>"] = CurveFilledB
+
+
+    class CurveFilledAB(_Curve):
+        """
+        An arrow with filled triangle heads both at the begin and the end point.
+        """
+
+        def __init__(self, head_length=.4, head_width=.2):
+            """
+            *head_length*
+              length of the arrow head
+
+            *head_width*
+              width of the arrow head
+            """
+
+            super(ArrowStyle.CurveFilledAB, self).__init__( \
+                beginarrow=True, endarrow=True,
+                fillbegin=True, fillend=True,
+                head_length=head_length, head_width=head_width )
+
+    _style_list["<|-|>"] = CurveFilledAB
 
 
     class _Bracket(_Base):
@@ -3200,6 +3437,7 @@ class ArrowStyle(_Style):
 
 
 
+
 class FancyArrowPatch(Patch):
     """
     A fancy arrow patch. It draws an arrow using the :class:ArrowStyle.
@@ -3422,8 +3660,13 @@ class FancyArrowPatch(Patch):
         get_path_in_displaycoord() medthod to retrieve the arrow path
         in the disaply coord.
         """
-        _path = self.get_path_in_displaycoord()
+        _path, fillable = self.get_path_in_displaycoord()
+
+        if cbook.iterable(fillable):
+            _path = concatenate_paths(_path)
+
         return self.get_transform().inverted().transform_path(_path)
+
 
     def get_path_in_displaycoord(self):
         """
@@ -3444,16 +3687,16 @@ class FancyArrowPatch(Patch):
 
 
 
-        _path, closed = self.get_arrowstyle()(_path,
-                                              self.get_mutation_scale(),
-                                              self.get_linewidth(),
-                                              self.get_mutation_aspect()
-                                              )
+        _path, fillable = self.get_arrowstyle()(_path,
+                                                self.get_mutation_scale(),
+                                                self.get_linewidth(),
+                                                self.get_mutation_aspect()
+                                                )
 
-        if not closed:
-            self.fill = False
+        #if not fillable:
+        #    self.fill = False
 
-        return _path
+        return _path, fillable
 
 
 
@@ -3461,11 +3704,6 @@ class FancyArrowPatch(Patch):
         if not self.get_visible(): return
         #renderer.open_group('patch')
         gc = renderer.new_gc()
-
-        fill_orig = self.fill
-
-        path = self.get_path_in_displaycoord()
-        affine = transforms.IdentityTransform()
 
 
         if cbook.is_string_like(self._edgecolor) and self._edgecolor.lower()=='none':
@@ -3493,8 +3731,322 @@ class FancyArrowPatch(Patch):
             gc.set_hatch(self._hatch )
 
 
-        renderer.draw_path(gc, path, affine, rgbFace)
+        path, fillable = self.get_path_in_displaycoord()
 
-        self.fill = fill_orig
+        if not cbook.iterable(fillable):
+            path = [path]
+            fillable = [fillable]
 
-        #renderer.close_group('patch')
+
+        affine = transforms.IdentityTransform()
+
+        renderer.open_group('patch', self.get_gid())
+
+        for p, f in zip(path, fillable):
+            if f:
+                renderer.draw_path(gc, p, affine, rgbFace)
+            else:
+                renderer.draw_path(gc, p, affine, None)
+
+
+        gc.restore()
+        renderer.close_group('patch')
+
+
+class ConnectionPatch(FancyArrowPatch):
+    """
+    A :class:`~matplotlib.patches.ConnectionPatch` class is to make
+    connecting lines between two points (possibly in different axes).
+    """
+    def __str__(self):
+        return "ConnectionPatch((%g,%g),(%g,%g))" % \
+               (self.xy1[0],self.xy1[1],self.xy2[0],self.xy2[1])
+
+    def __init__(self, xyA, xyB, coordsA, coordsB=None,
+                 axesA=None, axesB=None,
+                 arrowstyle="-",
+                 arrow_transmuter=None,
+                 connectionstyle="arc3",
+                 connector=None,
+                 patchA=None,
+                 patchB=None,
+                 shrinkA=0.,
+                 shrinkB=0.,
+                 mutation_scale=10.,
+                 mutation_aspect=None,
+                 clip_on=False,
+                 **kwargs):
+        """
+        Connect point *xyA* in *coordsA* with point *xyB* in *coordsB*
+
+
+        Valid keys are
+
+
+        ===============  ======================================================
+        Key              Description
+        ===============  ======================================================
+        arrowstyle       the arrow style
+        connectionstyle  the connection style
+        relpos           default is (0.5, 0.5)
+        patchA           default is bounding box of the text
+        patchB           default is None
+        shrinkA          default is 2 points
+        shrinkB          default is 2 points
+        mutation_scale   default is text size (in points)
+        mutation_aspect  default is 1.
+        ?                any key for :class:`matplotlib.patches.PathPatch`
+        ===============  ======================================================
+
+
+        *coordsA* and *coordsB* are strings that indicate the
+        coordinates of *xyA* and *xyB*.
+
+        =================   ===================================================
+        Property            Description
+        =================   ===================================================
+        'figure points'     points from the lower left corner of the figure
+        'figure pixels'     pixels from the lower left corner of the figure
+        'figure fraction'   0,0 is lower left of figure and 1,1 is upper, right
+        'axes points'       points from lower left corner of axes
+        'axes pixels'       pixels from lower left corner of axes
+        'axes fraction'     0,1 is lower left of axes and 1,1 is upper right
+        'data'              use the coordinate system of the object being
+                            annotated (default)
+        'offset points'     Specify an offset (in points) from the *xy* value
+
+        'polar'             you can specify *theta*, *r* for the annotation,
+                            even in cartesian plots.  Note that if you
+                            are using a polar axes, you do not need
+                            to specify polar for the coordinate
+                            system since that is the native "data" coordinate
+                            system.
+        =================   ===================================================
+
+        """
+        if coordsB is None:
+            coordsB = coordsA
+        # we'll draw ourself after the artist we annotate by default
+        self.xy1 = xyA
+        self.xy2 = xyB
+        self.coords1 = coordsA
+        self.coords2 = coordsB
+
+        self.axesA = axesA
+        self.axesB = axesB
+
+        FancyArrowPatch.__init__(self,
+                                 posA=(0,0), posB=(1,1),
+                                 arrowstyle=arrowstyle,
+                                 arrow_transmuter=arrow_transmuter,
+                                 connectionstyle=connectionstyle,
+                                 connector=connector,
+                                 patchA=patchA,
+                                 patchB=patchB,
+                                 shrinkA=shrinkA,
+                                 shrinkB=shrinkB,
+                                 mutation_scale=mutation_scale,
+                                 mutation_aspect=mutation_aspect,
+                                 clip_on=clip_on,
+                                 **kwargs)
+
+        # if True, draw annotation only if self.xy is inside the axes
+        self._annotation_clip = None
+
+    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
+
+
+    def _get_xy(self, x, y, s, axes=None):
+        """
+        caculate the pixel position of given point
+        """
+
+        if axes is None:
+            axes = self.axes
+
+        if s=='data':
+            trans = axes.transData
+            x = float(self.convert_xunits(x))
+            y = float(self.convert_yunits(y))
+            return trans.transform_point((x, y))
+        elif s=='offset points':
+            # convert the data point
+            dx, dy = self.xy
+
+            # prevent recursion
+            if self.xycoords == 'offset points':
+                return self._get_xy(dx, dy, 'data')
+
+            dx, dy = self._get_xy(dx, dy, self.xycoords)
+
+            # convert the offset
+            dpi = self.figure.get_dpi()
+            x *= dpi/72.
+            y *= dpi/72.
+
+            # add the offset to the data point
+            x += dx
+            y += dy
+
+            return x, y
+        elif s=='polar':
+            theta, r = x, y
+            x = r*np.cos(theta)
+            y = r*np.sin(theta)
+            trans = axes.transData
+            return trans.transform_point((x,y))
+        elif s=='figure points':
+            #points from the lower left corner of the figure
+            dpi = self.figure.dpi
+            l,b,w,h = self.figure.bbox.bounds
+            r = l+w
+            t = b+h
+
+            x *= dpi/72.
+            y *= dpi/72.
+            if x<0:
+                x = r + x
+            if y<0:
+                y = t + y
+            return x,y
+        elif s=='figure pixels':
+            #pixels from the lower left corner of the figure
+            l,b,w,h = self.figure.bbox.bounds
+            r = l+w
+            t = b+h
+            if x<0:
+                x = r + x
+            if y<0:
+                y = t + y
+            return x, y
+        elif s=='figure fraction':
+            #(0,0) is lower left, (1,1) is upper right of figure
+            trans = self.figure.transFigure
+            return trans.transform_point((x,y))
+        elif s=='axes points':
+            #points from the lower left corner of the axes
+            dpi = self.figure.dpi
+            l,b,w,h = axes.bbox.bounds
+            r = l+w
+            t = b+h
+            if x<0:
+                x = r + x*dpi/72.
+            else:
+                x = l + x*dpi/72.
+            if y<0:
+                y = t + y*dpi/72.
+            else:
+                y = b + y*dpi/72.
+            return x, y
+        elif s=='axes pixels':
+            #pixels from the lower left corner of the axes
+
+            l,b,w,h = axes.bbox.bounds
+            r = l+w
+            t = b+h
+            if x<0:
+                x = r + x
+            else:
+                x = l + x
+            if y<0:
+                y = t + y
+            else:
+                y = b + y
+            return x, y
+        elif s=='axes fraction':
+            #(0,0) is lower left, (1,1) is upper right of axes
+            trans = axes.transAxes
+            return trans.transform_point((x, y))
+
+    def set_annotation_clip(self, b):
+        """
+        set *annotation_clip* attribute.
+
+          * True : the annotation will only be drawn when self.xy is inside the axes.
+          * False : the annotation will always be drawn regardless of its position.
+          * None : the self.xy will be checked only if *xycoords* is "data"
+        """
+        self._annotation_clip = b
+
+    def get_annotation_clip(self):
+        """
+        Return *annotation_clip* attribute.
+        See :meth:`set_annotation_clip` for the meaning of return values.
+        """
+        return self._annotation_clip
+
+
+    def get_path_in_displaycoord(self):
+        """
+        Return the mutated path of the arrow in the display coord
+        """
+
+        x, y = self.xy1
+        posA = self._get_xy(x, y, self.coords1, self.axesA)
+
+        x, y = self.xy2
+        posB = self._get_xy(x, y, self.coords1, self.axesB)
+
+        _path = self.get_connectionstyle()(posA, posB,
+                                           patchA=self.patchA,
+                                           patchB=self.patchB,
+                                           shrinkA=self.shrinkA,
+                                           shrinkB=self.shrinkB
+                                           )
+
+
+
+        _path, fillable = self.get_arrowstyle()(_path,
+                                                self.get_mutation_scale(),
+                                                self.get_linewidth(),
+                                                self.get_mutation_aspect()
+                                                )
+
+        return _path, fillable
+
+
+
+    def _check_xy(self, renderer):
+        """
+        check if the annotation need to
+        be drawn.
+        """
+
+        b = self.get_annotation_clip()
+
+
+        if b or (b is None and self.coords1 == "data"):
+            x, y = self.xy1
+            xy_pixel = self._get_xy(x, y, self.coords1, self.axesA)
+            if not self.axes.contains_point(xy_pixel):
+                return False
+
+        if b or (b is None and self.coords2 == "data"):
+            x, y = self.xy2
+            xy_pixel = self._get_xy(x, y, self.coords2, self.axesB)
+            if self.axesB is None:
+                axes = self.axes
+            else:
+                axes = self.axesB
+            if not axes.contains_point(xy_pixel):
+                return False
+
+        return True
+
+
+    def draw(self, renderer):
+        """
+        Draw.
+        """
+
+        if renderer is not None:
+            self._renderer = renderer
+        if not self.get_visible(): return
+
+        if not self._check_xy(renderer):
+            return
+
+        FancyArrowPatch.draw(self, renderer)
+
+
+

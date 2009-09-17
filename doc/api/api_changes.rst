@@ -1,3 +1,4 @@
+
 ===========
 API Changes
 ===========
@@ -6,25 +7,91 @@ This chapter is a log of changes to matplotlib that affect the
 outward-facing API.  If updating matplotlib breaks your scripts, this
 list may help describe what changes may be necessary in your code.
 
+* You can now print several figures to one pdf file. See the docstrings
+  of the class :class:`matplotlib.backends.backend_pdf.PdfPages` for
+  more information.
+
+* Removed configobj_ and `enthought.traits`_ packages, which are only
+  required by the experimental traited config and are somewhat out of
+  date. If needed, install them independently.
+
+.. _configobj: http://www.voidspace.org.uk/python/configobj.html
+.. _`enthought.traits`: http://code.enthought.com/projects/traits
+
+Changes in 0.99
+======================
+
+* pylab no longer provides a load and save function.  These are
+  available in matplotlib.mlab, or you can use numpy.loadtxt and
+  numpy.savetxt for text files, or np.save and np.load for binary
+  numpy arrays.
+
+* User-generated colormaps can now be added to the set recognized
+  by :func:`matplotlib.cm.get_cmap`.  Colormaps can be made the
+  default and applied to the current image using
+  :func:`matplotlib.pyplot.set_cmap`.
+
+* changed use_mrecords default to False in mlab.csv2rec since this is
+  partially broken
+
+* Axes instances no longer have a "frame" attribute. Instead, use the
+  new "spines" attribute. Spines is a dictionary where the keys are
+  the names of the spines (e.g. 'left','right' and so on) and the
+  values are the artists that draw the spines. For normal
+  (rectilinear) axes, these artists are Line2D instances. For other
+  axes (such as polar axes), these artists may be Patch instances.
+
+* Polar plots no longer accept a resolution kwarg.  Instead, each Path
+  must specify its own number of interpolation steps.  This is
+  unlikely to be a user-visible change -- if interpolation of data is
+  required, that should be done before passing it to matplotlib.
+
 Changes for 0.98.x
 ==================
+* psd(), csd(), and cohere() will now automatically wrap negative
+  frequency components to the beginning of the returned arrays.
+  This is much more sensible behavior and makes them consistent
+  with specgram().  The previous behavior was more of an oversight
+  than a design decision.
+
+* Added new keyword parameters *nonposx*, *nonposy* to
+  :class:`matplotlib.axes.Axes` methods that set log scale
+  parameters.  The default is still to mask out non-positive
+  values, but the kwargs accept 'clip', which causes non-positive
+  values to be replaced with a very small positive value.
+
+* Added new :func:`matplotlib.pyplot.fignum_exists` and
+  :func:`matplotlib.pyplot.get_fignums`; they merely expose
+  information that had been hidden in :mod:`matplotlib._pylab_helpers`.
+
+* Deprecated numerix package.
+
+* Added new :func:`matplotlib.image.imsave` and exposed it to the
+  :mod:`matplotlib.pyplot` interface.
+
+* Remove support for pyExcelerator in exceltools -- use xlwt
+  instead
+
+* Changed the defaults of acorr and xcorr to use usevlines=True,
+  maxlags=10 and normed=True since these are the best defaults
+
 * Following keyword parameters for :class:`matplotlib.label.Label` are now
-  deprecated and new set of parameters are introduced. The new parameters 
-  are given as a fraction of the font-size. Also, *scatteryoffsets*, 
+  deprecated and new set of parameters are introduced. The new parameters
+  are given as a fraction of the font-size. Also, *scatteryoffsets*,
   *fancybox* and *columnspacing* are added as keyword parameters.
 
         ================   ================
         Deprecated         New
         ================   ================
-        pad                borderpad          
-        labelsep           labelspacing       
-        handlelen          handlelength       
-        handlestextsep     handletextpad      
-        axespad	           borderaxespad      
-        ================   ================   
+        pad                borderpad
+        labelsep           labelspacing
+        handlelen          handlelength
+        handlestextsep     handletextpad
+        axespad	           borderaxespad
+        ================   ================
 
 
-* Removed the configobj and experiemtnal traits rc support
+* Removed the configobj and experimental traits rc support
 
 * Modified :func:`matplotlib.mlab.psd`, :func:`matplotlib.mlab.csd`,
   :func:`matplotlib.mlab.cohere`, and :func:`matplotlib.mlab.specgram`

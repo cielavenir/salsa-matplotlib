@@ -361,23 +361,35 @@ class ColorConverter:
         then an empty array will be returned.  Same for an empty list.
         """
         try:
-            if c.lower() == 'none':
-                return np.zeros((0,4), dtype=np.float_)
+            nc = len(c)
+        except TypeError:
+            raise ValueError(
+                "Cannot convert argument type %s to rgba array" % type(c))
+        try:
+            if nc == 0 or c.lower() == 'none':
+                return np.zeros((0,4), dtype=np.float)
         except AttributeError:
             pass
-        if len(c) == 0:
-            return np.zeros((0,4), dtype=np.float_)
         try:
-            result = np.array([self.to_rgba(c, alpha)], dtype=np.float_)
+            # Single value? Put it in an array with a single row.
+            return np.array([self.to_rgba(c, alpha)], dtype=np.float)
         except ValueError:
             if isinstance(c, np.ndarray):
                 if c.ndim != 2 and c.dtype.kind not in 'SU':
                     raise ValueError("Color array must be two-dimensional")
-
-            result = np.zeros((len(c), 4))
+                if (c.ndim == 2 and c.shape[1] == 4 and c.dtype.kind == 'f'):
+                    if (c.ravel() > 1).any() or (c.ravel() < 0).any():
+                        raise ValueError(
+                            "number in rgba sequence is outside 0-1 range")
+                    # looks like rgba already, nothing to be done; do
+                    # we want to apply alpha here if
+                    # (c[:,3]==1).all() ?
+                    return np.asarray(c, np.float)
+            # It must be some other sequence of color specs.
+            result = np.zeros((nc, 4), dtype=np.float)
             for i, cc in enumerate(c):
-                result[i] = self.to_rgba(cc, alpha)  # change in place
-        return np.asarray(result, np.float_)
+                result[i] = self.to_rgba(cc, alpha)
+            return result
 
 colorConverter = ColorConverter()
 
@@ -476,7 +488,7 @@ class Colormap:
         if not self._isinit: self._init()
         alpha = min(alpha, 1.0) # alpha must be between 0 and 1
         alpha = max(alpha, 0.0)
-        self._lut[:-3, -1] = alpha
+        self._lut[:,-1] = alpha
         mask_bad = None
         if not cbook.iterable(X):
             vtype = 'scalar'
@@ -604,7 +616,9 @@ class LinearSegmentedColormap(Colormap):
 
 
         .. seealso::
+
             :func:`makeMappingArray`
+               For information about making a mapping array.
         """
         self.monochrome = False  # True only if all colors in map are identical;
                                  # needed for contouring.
@@ -619,6 +633,26 @@ class LinearSegmentedColormap(Colormap):
         self._isinit = True
         self._set_extremes()
 
+    @staticmethod
+    def from_list(name, colors, N=256):
+        """
+        Make a linear segmented colormap with *name* from a sequence
+        of *colors* which evenly transitions from colors[0] at val=1
+        to colors[-1] at val=1.  N is the number of rgb quantization
+        levels.
+        """
+
+        ncolors = len(colors)
+        vals = np.linspace(0., 1., ncolors)
+
+        cdict = dict(red=[], green=[], blue=[])
+        for val, color in zip(vals, colors):
+            r,g,b = colorConverter.to_rgb(color)
+            cdict['red'].append((val, r, r))
+            cdict['green'].append((val, g, g))
+            cdict['blue'].append((val, b, b))
+
+        return LinearSegmentedColormap(name, cdict, N)
 
 class ListedColormap(Colormap):
     """Colormap object generated from a list of colors.
@@ -888,3 +922,132 @@ class NoNorm(Normalize):
 # compatibility with earlier class names that violated convention:
 normalize = Normalize
 no_norm = NoNorm
+
+def rgb_to_hsv(arr):
+    """
+    convert rgb values in a numpy array to hsv values
+    input and output arrays should have shape (M,N,3)
+    """
+    out = np.empty_like(arr)
+    arr_max = arr.max(-1)
+    delta = arr.ptp(-1)
+    s = delta / arr_max
+    s[delta==0] = 0
+    # red is max
+    idx = (arr[:,:,0] == arr_max)
+    out[idx, 0] = (arr[idx, 1] - arr[idx, 2]) / delta[idx]
+    # green is max
+    idx = (arr[:,:,1] == arr_max)
+    out[idx, 0] = 2. + (arr[idx, 2] - arr[idx, 0] ) / delta[idx]
+    # blue is max
+    idx = (arr[:,:,2] == arr_max)
+    out[idx, 0] = 4. + (arr[idx, 0] - arr[idx, 1] ) / delta[idx]
+    out[:,:,0] = (out[:,:,0]/6.0) % 1.0
+    out[:,:,1] = s
+    out[:,:,2] = arr_max
+    return out
+
+def hsv_to_rgb(hsv):
+    """
+    convert hsv values in a numpy array to rgb values
+    both input and output arrays have shape (M,N,3)
+    """
+    h = hsv[:,:,0]; s = hsv[:,:,1]; v = hsv[:,:,2]
+    r = np.empty_like(h); g = np.empty_like(h); b = np.empty_like(h)
+    i = (h*6.0).astype(np.int)
+    f = (h*6.0) - i
+    p = v*(1.0 - s)
+    q = v*(1.0 - s*f)
+    t = v*(1.0 - s*(1.0-f))
+    idx = i%6 == 0
+    r[idx] = v[idx]; g[idx] = t[idx]; b[idx] = p[idx]
+    idx = i == 1
+    r[idx] = q[idx]; g[idx] = v[idx]; b[idx] = p[idx]
+    idx = i == 2
+    r[idx] = p[idx]; g[idx] = v[idx]; b[idx] = t[idx]
+    idx = i == 3
+    r[idx] = p[idx]; g[idx] = q[idx]; b[idx] = v[idx]
+    idx = i == 4
+    r[idx] = t[idx]; g[idx] = p[idx]; b[idx] = v[idx]
+    idx = i == 5
+    r[idx] = v[idx]; g[idx] = p[idx]; b[idx] = q[idx]
+    idx = s == 0
+    r[idx] = v[idx]; g[idx] = v[idx]; b[idx] = v[idx]
+    rgb = np.empty_like(hsv)
+    rgb[:,:,0]=r; rgb[:,:,1]=g; rgb[:,:,2]=b
+    return rgb
+
+class LightSource(object):
+    """
+    Create a light source coming from the specified azimuth and elevation.
+    Angles are in degrees, with the azimuth measured
+    clockwise from north and elevation up from the zero plane of the surface.
+    The :meth:`shade` is used to produce rgb values for a shaded relief image
+    given a data array.
+    """
+    def __init__(self,azdeg=315,altdeg=45,\
+                 hsv_min_val=0,hsv_max_val=1,hsv_min_sat=1,hsv_max_sat=0):
+       """
+       Specify the azimuth (measured clockwise from south) and altitude
+       (measured up from the plane of the surface) of the light source
+       in degrees.
+
+       The color of the resulting image will be darkened
+       by moving the (s,v) values (in hsv colorspace) toward
+       (hsv_min_sat, hsv_min_val) in the shaded regions, or
+       lightened by sliding (s,v) toward
+       (hsv_max_sat hsv_max_val) in regions that are illuminated.
+       The default extremes are chose so that completely shaded points
+       are nearly black (s = 1, v = 0) and completely illuminated points
+       are nearly white (s = 0, v = 1).
+       """
+       self.azdeg = azdeg
+       self.altdeg = altdeg
+       self.hsv_min_val = hsv_min_val
+       self.hsv_max_val = hsv_max_val
+       self.hsv_min_sat = hsv_min_sat
+       self.hsv_max_sat = hsv_max_sat
+
+    def shade(self,data,cmap):
+        """
+        Take the input data array, convert to HSV values in the
+        given colormap, then adjust those color values
+        to given the impression of a shaded relief map with a
+        specified light source.
+        RGBA values are returned, which can then be used to
+        plot the shaded image with imshow.
+        """
+        # imagine an artificial sun placed at infinity in
+        # some azimuth and elevation position illuminating our surface. The parts of
+        # the surface that slope toward the sun should brighten while those sides
+        # facing away should become darker.
+        # convert alt, az to radians
+        az = self.azdeg*np.pi/180.0
+        alt = self.altdeg*np.pi/180.0
+        # gradient in x and y directions
+        dx, dy = np.gradient(data)
+        slope = 0.5*np.pi - np.arctan(np.hypot(dx, dy))
+        aspect = np.arctan2(dx, dy)
+        intensity = np.sin(alt)*np.sin(slope) + np.cos(alt)*np.cos(slope)*np.cos(-az -\
+                aspect - 0.5*np.pi)
+        # rescale to interval -1,1
+        # +1 means maximum sun exposure and -1 means complete shade.
+        intensity = (intensity - intensity.min())/(intensity.max() - intensity.min())
+        intensity = 2.*intensity - 1.
+        # convert to rgb, then rgb to hsv
+        rgb = cmap((data-data.min())/(data.max()-data.min()))
+        hsv = rgb_to_hsv(rgb[:,:,0:3])
+        # modify hsv values to simulate illumination.
+        hsv[:,:,1] = np.where(np.logical_and(np.abs(hsv[:,:,1])>1.e-10,intensity>0),\
+                (1.-intensity)*hsv[:,:,1]+intensity*self.hsv_max_sat, hsv[:,:,1])
+        hsv[:,:,2] = np.where(intensity > 0, (1.-intensity)*hsv[:,:,2] +\
+                intensity*self.hsv_max_val, hsv[:,:,2])
+        hsv[:,:,1] = np.where(np.logical_and(np.abs(hsv[:,:,1])>1.e-10,intensity<0),\
+                (1.+intensity)*hsv[:,:,1]-intensity*self.hsv_min_sat, hsv[:,:,1])
+        hsv[:,:,2] = np.where(intensity < 0, (1.+intensity)*hsv[:,:,2] -\
+                intensity*self.hsv_min_val, hsv[:,:,2])
+        hsv[:,:,1:] = np.where(hsv[:,:,1:]<0.,0,hsv[:,:,1:])
+        hsv[:,:,1:] = np.where(hsv[:,:,1:]>1.,1,hsv[:,:,1:])
+        # convert modified hsv back to rgb.
+        rgb[:,:,0:3] = hsv_to_rgb(hsv)
+        return rgb

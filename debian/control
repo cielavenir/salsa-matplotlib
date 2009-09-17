@@ -2,8 +2,7 @@ Source: matplotlib
 Section: python
 Priority: optional
 Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
-Uploaders: Marco Presi (Zufus) <zufus@debian.org>,
-           Alexandre Fayolle <afayolle@debian.org>,
+Uploaders: Alexandre Fayolle <afayolle@debian.org>,
            Ondrej Certik <ondrej@certik.cz>,
            Sandro Tosi <morph@debian.org>,
            Benjamin Drung <bdrung@ubuntu.com>
@@ -39,7 +38,7 @@ Build-Depends: debhelper (>= 7),
                tk8.5-dev,
                zlib1g-dev
 XS-Python-Version: all
-Standards-Version: 3.8.2
+Standards-Version: 3.8.3
 XS-DM-Upload-Allowed: yes
 Homepage: http://matplotlib.sf.net/
 Vcs-Svn: svn://svn.debian.org/svn/python-modules/packages/matplotlib/trunk/

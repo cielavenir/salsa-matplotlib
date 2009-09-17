@@ -635,7 +635,7 @@ class BboxBase(TransformNode):
         Return a new :class:`Bbox` that is padded on all four sides by
         the given value.
         """
-        points = self._points
+        points = self.get_points()
         return Bbox(points + [[-p, -p], [p, p]])
 
     def translated(self, tx, ty):
@@ -667,7 +667,7 @@ class BboxBase(TransformNode):
         bbox.update_from_data_xy(corners_rotated, ignore=True)
         return bbox
 
-    #@staticmethod
+    @staticmethod
     def union(bboxes):
         """
         Return a :class:`Bbox` that contains all of the given bboxes.
@@ -692,7 +692,6 @@ class BboxBase(TransformNode):
             y1 = max(y1, np.max(ys))
 
         return Bbox.from_extents(x0, y0, x1, y1)
-    union = staticmethod(union)
 
 
 class Bbox(BboxBase):
@@ -724,16 +723,15 @@ class Bbox(BboxBase):
             TransformNode.invalidate(self)
 
     _unit_values = np.array([[0.0, 0.0], [1.0, 1.0]], np.float_)
-    #@staticmethod
+    @staticmethod
     def unit():
         """
         (staticmethod) Create a new unit :class:`Bbox` from (0, 0) to
         (1, 1).
         """
         return Bbox(Bbox._unit_values.copy())
-    unit = staticmethod(unit)
 
-    #@staticmethod
+    @staticmethod
     def from_bounds(x0, y0, width, height):
         """
         (staticmethod) Create a new :class:`Bbox` from *x0*, *y0*,
@@ -742,9 +740,8 @@ class Bbox(BboxBase):
         *width* and *height* may be negative.
         """
         return Bbox.from_extents(x0, y0, x0 + width, y0 + height)
-    from_bounds = staticmethod(from_bounds)
 
-    #@staticmethod
+    @staticmethod
     def from_extents(*args):
         """
         (staticmethod) Create a new Bbox from *left*, *bottom*,
@@ -754,7 +751,6 @@ class Bbox(BboxBase):
         """
         points = np.array(args, dtype=np.float_).reshape(2, 2)
         return Bbox(points)
-    from_extents = staticmethod(from_extents)
 
     def __repr__(self):
         return 'Bbox(%s)' % repr(self._points)
@@ -1123,7 +1119,8 @@ class Transform(TransformNode):
         In some cases, this transform may insert curves into the path
         that began as line segments.
         """
-        return Path(self.transform(path.vertices), path.codes)
+        return Path(self.transform(path.vertices), path.codes,
+                    path._interpolation_steps)
 
     def transform_path_affine(self, path):
         """
@@ -1147,7 +1144,8 @@ class Transform(TransformNode):
         ``transform_path(path)`` is equivalent to
         ``transform_path_affine(transform_path_non_affine(values))``.
         """
-        return Path(self.transform_non_affine(path.vertices), path.codes)
+        return Path(self.transform_non_affine(path.vertices), path.codes,
+                    path._interpolation_steps)
 
     def transform_angles(self, angles, pts, radians=False, pushoff=1e-5):
         """
@@ -1309,14 +1307,13 @@ class AffineBase(Transform):
     def __array__(self, *args, **kwargs):
         return self.get_matrix()
 
-    #@staticmethod
+    @staticmethod
     def _concat(a, b):
         """
         Concatenates two transformation matrices (represented as numpy
         arrays) together.
         """
         return np.dot(b, a)
-    _concat = staticmethod(_concat)
 
     def get_matrix(self):
         """
@@ -1385,7 +1382,7 @@ class Affine2DBase(AffineBase):
         mtx = self.get_matrix()
         return tuple(mtx[:2].swapaxes(0, 1).flatten())
 
-    #@staticmethod
+    @staticmethod
     def matrix_from_values(a, b, c, d, e, f):
         """
         (staticmethod) Create a new transformation matrix as a 3x3
@@ -1396,7 +1393,6 @@ class Affine2DBase(AffineBase):
           0 0 1
         """
         return np.array([[a, c, e], [b, d, f], [0.0, 0.0, 1.0]], np.float_)
-    matrix_from_values = staticmethod(matrix_from_values)
 
     def transform(self, points):
         mtx = self.get_matrix()
@@ -1471,7 +1467,7 @@ class Affine2D(Affine2DBase):
             return 0
         return -1
 
-    #@staticmethod
+    @staticmethod
     def from_values(a, b, c, d, e, f):
         """
         (staticmethod) Create a new Affine2D instance from the given
@@ -1484,7 +1480,6 @@ class Affine2D(Affine2DBase):
         return Affine2D(
             np.array([a, c, e, b, d, f, 0.0, 0.0, 1.0], np.float_)
             .reshape((3,3)))
-    from_values = staticmethod(from_values)
 
     def get_matrix(self):
         """
@@ -1517,7 +1512,7 @@ class Affine2D(Affine2DBase):
         self._mtx = other.get_matrix()
         self.invalidate()
 
-    #@staticmethod
+    @staticmethod
     def identity():
         """
         (staticmethod) Return a new :class:`Affine2D` object that is
@@ -1527,7 +1522,6 @@ class Affine2D(Affine2DBase):
         the faster :class:`IdentityTransform` class instead.
         """
         return Affine2D(np.identity(3))
-    identity = staticmethod(identity)
 
     def clear(self):
         """
@@ -2189,7 +2183,8 @@ class TransformedPath(TransformNode):
             self._transformed_path = \
                 self._transform.transform_path_non_affine(self._path)
             self._transformed_points = \
-                Path(self._transform.transform_non_affine(self._path.vertices))
+                Path(self._transform.transform_non_affine(self._path.vertices),
+                     None, self._path._interpolation_steps)
         self._invalid = 0
 
     def get_transformed_points_and_affine(self):

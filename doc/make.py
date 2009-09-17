@@ -26,12 +26,6 @@ def sfpdf():
 def figs():
     os.system('cd users/figures/ && python make.py')
 
-def examples():
-    'make the rest examples'
-
-    os.system('cd examples; svn-clean; python gen_rst.py')
-    #pass
-
 def html():
     check_build()
     shutil.copy('../lib/matplotlib/mpl-data/matplotlibrc', '_static/matplotlibrc')
@@ -75,7 +69,6 @@ def clean():
 
 def all():
     #figs()
-    examples()
     html()
     latex()
 
@@ -87,17 +80,16 @@ funcd = {
     'clean'    : clean,
     'sf'       : sf,
     'sfpdf'    : sfpdf,
-    'examples' : examples,
     'all'      : all,
     }
 
+
+small_docs = False
 
 if len(sys.argv)>1:
     if '--small' in sys.argv[1:]:
         small_docs = True
         sys.argv.remove('--small')
-    else:
-        small_docs = False
     for arg in sys.argv[1:]:
         func = funcd.get(arg)
         if func is None:

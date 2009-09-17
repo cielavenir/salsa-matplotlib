@@ -11,7 +11,7 @@
     was written by following the Python "Extending and Embedding"
     tutorial.
 
-  $Id: cntr.c 5781 2008-07-17 19:15:58Z jdh2358 $
+  $Id: cntr.c 7061 2009-04-23 14:22:27Z mdboom $
  */
 
 #include <Python.h>
@@ -1410,7 +1410,7 @@ build_cntr_list_v2(long *np, double *xp, double *yp, int nparts, long ntotal)
 PyObject *
 cntr_trace(Csite *site, double levels[], int nlevels, int points, long nchunk)
 {
-    PyObject *c_list;
+    PyObject *c_list = NULL;
     double *xp0;
     double *yp0;
     long *nseg0;
@@ -1502,6 +1502,7 @@ cntr_trace(Csite *site, double levels[], int nlevels, int points, long nchunk)
     error:
     PyMem_Free(xp0); PyMem_Free(yp0); PyMem_Free(nseg0);
     site->xcp = NULL; site->ycp = NULL;
+    Py_XDECREF(c_list);
     return NULL;
 }
 

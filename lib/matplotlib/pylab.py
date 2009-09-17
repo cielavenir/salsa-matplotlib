@@ -50,6 +50,7 @@ _Plotting commands
   ion      - turn interaction mode on
   isinteractive - return True if interaction mode is on
   imread   - load image file into array
+  imsave   - save array as an image file
   imshow   - plot image data
   ishold   - return the hold state of the current axes
   legend   - make an axes legend
@@ -149,12 +150,12 @@ _Probability
 
 _Statistics
 
+  amax       - the maximum along dimension m
+  amin       - the minimum along dimension m
   corrcoef  - correlation coefficient
   cov       - covariance matrix
-  amax       - the maximum along dimension m
   mean      - the mean along dimension m
   median    - the median along dimension m
-  amin       - the minimum along dimension m
   norm      - the norm of vector x
   prod      - the product along dimension m
   ptp       - the max-min along dimension m
@@ -184,12 +185,14 @@ _Dates
 _Other
 
   angle     - the angle of a complex array
-  griddata - interpolate irregularly distributed data to a regular grid
-  load     - load ASCII data into array
+  griddata  - interpolate irregularly distributed data to a regular grid
+  load      - Deprecated--please use loadtxt.
+  loadtxt   - load ASCII data into array.
   polyfit   - fit x, y to an n-th order polynomial
   polyval   - evaluate an n-th order polynomial
   roots     - the roots of the polynomial coefficients in p
-  save      - save an array to an ASCII file
+  save      - Deprecated--please use savetxt.
+  savetxt   - save an array to an ASCII file.
   trapz     - trapezoidal integration
 
 __end
@@ -197,11 +200,8 @@ __end
 """
 import sys, warnings
 
-from cbook import flatten, is_string_like, exception_to_str, popd, \
+from cbook import flatten, is_string_like, exception_to_str, \
      silent_list, iterable, dedent
-
-import numpy as np
-from numpy import ma
 
 from matplotlib import mpl  # pulls in most modules
 
@@ -213,45 +213,63 @@ from matplotlib.dates import date2num, num2date,\
         DayLocator, HourLocator, MinuteLocator, SecondLocator,\
         rrule, MO, TU, WE, TH, FR, SA, SU, YEARLY, MONTHLY,\
         WEEKLY, DAILY, HOURLY, MINUTELY, SECONDLY, relativedelta
-import matplotlib.dates
+
+import matplotlib.dates  # Do we need this at all?
 
 # bring all the  symbols in so folks can import them from
 # pylab in one fell swoop
 
-from matplotlib.mlab import  window_hanning, window_none,\
-        conv, detrend, detrend_mean, detrend_none, detrend_linear,\
-        polyfit, polyval, entropy, normpdf, griddata,\
-        levypdf, find, trapz, prepca, rem, norm, orth, rank,\
-        sqrtm, prctile, center_matrix, rk4, exp_safe, amap,\
-        sum_flat, mean_flat, rms_flat, l1norm, l2norm, norm, frange,\
-        diagonal_matrix, base_repr, binary_repr, log2, ispower2,\
-        bivariate_normal, load, save
 
-from matplotlib.mlab import stineman_interp, slopes, \
-    stineman_interp, inside_poly, poly_below, poly_between, \
+## We are still importing too many things from mlab; more cleanup is needed.
+
+from matplotlib.mlab import griddata, stineman_interp, slopes, \
+    inside_poly, poly_below, poly_between, \
     is_closed_polygon, path_length, distances_along_curve, vector_lengths
+
+from matplotlib.mlab import window_hanning, window_none,  detrend, demean, \
+     detrend_mean, detrend_none, detrend_linear, entropy, normpdf, levypdf, \
+     find, longest_contiguous_ones, longest_ones, prepca, prctile, prctile_rank, \
+     center_matrix, rk4, bivariate_normal, get_xyz_where, get_sparse_matrix, dist, \
+     dist_point_to_segment, segments_intersect, fftsurr, liaupunov, movavg, \
+     save, load, exp_safe, \
+     amap, rms_flat, l1norm, l2norm, norm_flat, frange,  identity, \
+     base_repr, binary_repr, log2, ispower2, \
+     rec_append_fields, rec_drop_fields, rec_join, csv2rec, rec2csv, isvector
+
+import matplotlib.mlab as mlab
+import matplotlib.cbook as cbook
 
 from numpy import *
 from numpy.fft import *
 from numpy.random import *
 from numpy.linalg import *
 
-from matplotlib.mlab import window_hanning, window_none, conv, detrend, demean, \
-     detrend_mean, detrend_none, detrend_linear, entropy, normpdf, levypdf, \
-     find, longest_contiguous_ones, longest_ones, prepca, prctile, prctile_rank, \
-     center_matrix, rk4, bivariate_normal, get_xyz_where, get_sparse_matrix, dist, \
-     dist_point_to_segment, segments_intersect, fftsurr, liaupunov, movavg, \
-     save, load, exp_safe, \
-     amap, rms_flat, l1norm, l2norm, norm_flat, frange, diagonal_matrix, identity, \
-     base_repr, binary_repr, log2, ispower2, fromfunction_kw, rem, norm, orth, rank, sqrtm,\
-     mfuncC, approx_real, rec_append_field, rec_drop_fields, rec_join, csv2rec, rec2csv, isvector
-
-
-
-
-
 from matplotlib.pyplot import *
 
 # provide the recommended module abbrevs in the pylab namespace
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.ma as ma
+
+def load(*args, **kwargs): 
+    raise  NotImplementedError(load.__doc__)   		
+load.__doc__ = """\
+    pylab no longer provides a load function, though the old pylab
+    function is still available as matplotlib.mlab.load (you can refer
+    to it in pylab as "mlab.load").  However, for plain text files, we
+    recommend numpy.loadtxt, which was inspired by the old pylab.load
+    but now has more features.  For loading numpy arrays, we recommend
+    numpy.load, and its analog numpy.save, which are available in
+    pylab as np.load and np.save.
+    """
+
+
+def save(*args, **kwargs): 
+    raise  NotImplementedError(save.__doc__)   		
+save.__doc__ = """\
+    pylab no longer provides a save function, though the old pylab
+    function is still available as matplotlib.mlab.save (you can still
+    refer to it in pylab as "mlab.save").  However, for plain text
+    files, we recommend numpy.savetxt.  For saving numpy arrays,
+    we recommend numpy.save, and its analog numpy.load, which are
+    available in pylab as np.save and np.load."""

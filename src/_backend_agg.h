@@ -39,6 +39,7 @@
 #include "agg_vcgen_markers_term.h"
 
 #include "agg_py_path_iterator.h"
+#include "path_converters.h"
 
 // These are copied directly from path.py, and must be kept in sync
 #define STOP   0
@@ -59,7 +60,6 @@ typedef agg::rasterizer_scanline_aa<> rasterizer;
 typedef agg::scanline_p8 scanline_p8;
 typedef agg::scanline_bin scanline_bin;
 typedef agg::amask_no_clip_gray8 alpha_mask_type;
-
 
 typedef agg::renderer_base<agg::pixfmt_gray8> renderer_base_alpha_mask_type;
 typedef agg::renderer_scanline_aa_solid<renderer_base_alpha_mask_type> renderer_alpha_mask_type;
@@ -86,6 +86,8 @@ public:
   // set the x and y corners of the rectangle
   Py::Object set_x(const Py::Tuple &args);
   Py::Object set_y(const Py::Tuple &args);
+
+  Py::Object get_extents(const Py::Tuple &args);
 
   Py::Object to_string(const Py::Tuple &args);
   Py::Object to_string_argb(const Py::Tuple &args);
@@ -122,12 +124,9 @@ public:
   typedef std::vector<std::pair<double, double> > dash_t;
   double dashOffset;
   dash_t dashes;
+  e_quantize_mode quantize_mode;
 
-  enum {
-    SNAP_AUTO,
-    SNAP_FALSE,
-    SNAP_TRUE
-  } snap;
+  Py::Object hatchpath;
 
 protected:
   agg::rgba get_color(const Py::Object& gc);
@@ -139,6 +138,7 @@ protected:
   void _set_clip_path( const Py::Object& gc);
   void _set_antialiased( const Py::Object& gc);
   void _set_snap( const Py::Object& gc);
+  void _set_hatch_path( const Py::Object& gc);
 };
 
 
@@ -176,6 +176,7 @@ public:
 
   Py::Object copy_from_bbox(const Py::Tuple & args);
   Py::Object restore_region(const Py::Tuple & args);
+  Py::Object restore_region2(const Py::Tuple & args);
 
   virtual ~RendererAgg();
 
@@ -205,6 +206,10 @@ public:
 
   Py::Object lastclippath;
   agg::trans_affine lastclippath_transform;
+
+  static const size_t HATCH_SIZE = 72;
+  agg::int8u hatchBuffer[HATCH_SIZE * HATCH_SIZE * 4];
+  agg::rendering_buffer hatchRenderingBuffer;
 
   const int debug;
 

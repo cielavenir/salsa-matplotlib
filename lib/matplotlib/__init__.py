@@ -89,9 +89,9 @@ host of others.
 """
 from __future__ import generators
 
-__version__  = '0.98.5.3'
-__revision__ = '$Revision: 6890 $'
-__date__     = '$Date: 2009-02-08 14:29:42 -0600 (Sun, 08 Feb 2009) $'
+__version__  = '0.99.0'
+__revision__ = '$Revision: 7397 $'
+__date__     = '$Date: 2009-08-06 07:02:33 -0500 (Thu, 06 Aug 2009) $'
 
 import os, re, shutil, subprocess, sys, warnings
 import distutils.sysconfig

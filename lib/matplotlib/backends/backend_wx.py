@@ -92,7 +92,7 @@ Examples which work on this release:
  (3) - Clipping seems to be broken.
 """
 
-cvs_id = '$Id: backend_wx.py 6972 2009-03-11 19:36:22Z efiring $'
+cvs_id = '$Id: backend_wx.py 7343 2009-08-04 11:50:09Z jdh2358 $'
 
 
 import sys, os, os.path, math, StringIO, weakref, warnings
@@ -115,16 +115,34 @@ try:
 except ImportError:
     raise ImportError(missingwx)
 
+# Some early versions of wxversion lack AlreadyImportedError.
+# It was added around 2.8.4?
+try:
+    _wx_ensure_failed = wxversion.AlreadyImportedError
+except AttributeError:
+    _wx_ensure_failed = wxversion.VersionError
+
 try:
     wxversion.ensureMinimal('2.8')
-except wxversion.AlreadyImportedError:
+except _wx_ensure_failed:
     pass
+# We don't really want to pass in case of VersionError, but when
+# AlreadyImportedError is not available, we have to.
 
 try:
     import wx
     backend_version = wx.VERSION_STRING
 except ImportError:
     raise ImportError(missingwx)
+
+# Extra version check in case wxversion lacks AlreadyImportedError;
+# then VersionError might have been raised and ignored when
+# there really *is* a problem with the version.
+major, minor = [int(n) for n in backend_version.split('.')[:2]]
+if major < 2 or (major < 3 and minor < 8):
+    print " wxPython version %s was imported." % backend_version
+    raise ImportError(missingwx)
+
 
 #!!! this is the call that is causing the exception swallowing !!!
 #wx.InitAllImageHandlers()
@@ -314,10 +332,10 @@ class RendererWx(RendererBase):
                 gfx_ctx.Clip(new_bounds[0], self.height - new_bounds[1] - new_bounds[3],
                              new_bounds[2], new_bounds[3])
 
-    #@staticmethod
-    def convert_path(gfx_ctx, tpath):
+    @staticmethod
+    def convert_path(gfx_ctx, path, transform):
         wxpath = gfx_ctx.CreatePath()
-        for points, code in tpath.iter_segments():
+        for points, code in path.iter_segments(transform):
             if code == Path.MOVETO:
                 wxpath.MoveToPoint(*points)
             elif code == Path.LINETO:
@@ -329,15 +347,13 @@ class RendererWx(RendererBase):
             elif code == Path.CLOSEPOLY:
                 wxpath.CloseSubpath()
         return wxpath
-    convert_path = staticmethod(convert_path)
 
     def draw_path(self, gc, path, transform, rgbFace=None):
         gc.select()
         self.handle_clip_rectangle(gc)
         gfx_ctx = gc.gfx_ctx
         transform = transform + Affine2D().scale(1.0, -1.0).translate(0.0, self.height)
-        tpath = transform.transform_path(path)
-        wxpath = self.convert_path(gfx_ctx, tpath)
+        wxpath = self.convert_path(gfx_ctx, path, transform)
         if rgbFace is not None:
             gfx_ctx.SetBrush(wx.Brush(gc.get_wxcolour(rgbFace)))
             gfx_ctx.DrawPath(wxpath)
@@ -756,6 +772,11 @@ class FigureCanvasWx(FigureCanvasBase, wx.Panel):
         bind(self, wx.EVT_LEAVE_WINDOW, self._onLeave)
         bind(self, wx.EVT_ENTER_WINDOW, self._onEnter)
         bind(self, wx.EVT_IDLE, self._onIdle)
+        #Add middle button events
+        bind(self, wx.EVT_MIDDLE_DOWN, self._onMiddleButtonDown)
+        bind(self, wx.EVT_MIDDLE_DCLICK, self._onMiddleButtonDown)
+        bind(self, wx.EVT_MIDDLE_UP, self._onMiddleButtonUp)
+	
         self.SetBackgroundStyle(wx.BG_STYLE_CUSTOM)
 
         self.macros = {} # dict from wx id to seq of macros
@@ -1167,6 +1188,7 @@ The current aspect ration will be kept."""
         # so no need to do anything here except to make sure
         # the whole background is repainted.
         self.Refresh(eraseBackground=False)
+        FigureCanvasBase.resize_event(self)
 
     def _get_key(self, evt):
 
@@ -1234,6 +1256,24 @@ The current aspect ration will be kept."""
         evt.Skip()
         if self.HasCapture(): self.ReleaseMouse()
         FigureCanvasBase.button_release_event(self, x, y, 1, guiEvent=evt)
+
+    #Add middle button events	
+    def _onMiddleButtonDown(self, evt):
+        """Start measuring on an axis."""
+        x = evt.GetX()
+        y = self.figure.bbox.height - evt.GetY()
+        evt.Skip()
+        self.CaptureMouse()
+        FigureCanvasBase.button_press_event(self, x, y, 2, guiEvent=evt)
+
+    def _onMiddleButtonUp(self, evt):
+        """End measuring on an axis."""
+        x = evt.GetX()
+        y = self.figure.bbox.height - evt.GetY()
+        #print 'release button', 1
+        evt.Skip()
+        if self.HasCapture(): self.ReleaseMouse()
+        FigureCanvasBase.button_release_event(self, x, y, 2, guiEvent=evt)
 
     def _onMouseWheel(self, evt):
         """Translate mouse wheel events into matplotlib events"""
@@ -1317,7 +1357,7 @@ def draw_if_interactive():
 
         figManager = Gcf.get_active()
         if figManager is not None:
-            figManager.canvas.draw()
+            figManager.canvas.draw_idle()
 
 def show():
     """

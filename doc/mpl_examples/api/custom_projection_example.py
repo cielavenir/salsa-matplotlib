@@ -6,6 +6,8 @@ from matplotlib.ticker import Formatter, Locator, NullLocator, FixedLocator, Nul
 from matplotlib.transforms import Affine2D, Affine2DBase, Bbox, \
     BboxTransformTo, IdentityTransform, Transform, TransformWrapper
 from matplotlib.projections import register_projection
+import matplotlib.spines as mspines
+import matplotlib.axis as maxis
 
 import numpy as np
 
@@ -27,14 +29,18 @@ class HammerAxes(Axes):
     # projection='hammer')``.
     name = 'hammer'
 
-    # The number of interpolation steps when converting from straight
-    # lines to curves.  (See ``transform_path``).
-    RESOLUTION = 75
-
     def __init__(self, *args, **kwargs):
         Axes.__init__(self, *args, **kwargs)
         self.set_aspect(0.5, adjustable='box', anchor='C')
         self.cla()
+
+    def _init_axis(self):
+        self.xaxis = maxis.XAxis(self)
+        self.yaxis = maxis.YAxis(self)
+        # Do not register xaxis or yaxis with spines -- as done in
+        # Axes._init_axis() -- until HammerAxes.xaxis.cla() works.
+        # self.spines['hammer'].register_axis(self.yaxis)
+        self._update_transScale()
 
     def cla(self):
         """
@@ -91,7 +97,7 @@ class HammerAxes(Axes):
 
         # 1) The core transformation from data space into
         # rectilinear space defined in the HammerTransform class.
-        self.transProjection = self.HammerTransform(self.RESOLUTION)
+        self.transProjection = self.HammerTransform()
 
         # 2) The above has an output range that is not in the unit
         # rectangle, so scale and translate it so it fits correctly
@@ -167,11 +173,12 @@ class HammerAxes(Axes):
             yaxis_text_base + \
             Affine2D().translate(8.0, 0.0)
 
-    def get_xaxis_transform(self):
+    def get_xaxis_transform(self,which='grid'):
         """
         Override this method to provide a transformation for the
         x-axis grid and ticks.
         """
+        assert which in ['tick1','tick2','grid']
         return self._xaxis_transform
 
     def get_xaxis_text1_transform(self, pixelPad):
@@ -192,11 +199,12 @@ class HammerAxes(Axes):
         """
         return self._xaxis_text2_transform, 'top', 'center'
 
-    def get_yaxis_transform(self):
+    def get_yaxis_transform(self,which='grid'):
         """
         Override this method to provide a transformation for the
         y-axis grid and ticks.
         """
+        assert which in ['tick1','tick2','grid']
         return self._yaxis_transform
 
     def get_yaxis_text1_transform(self, pixelPad):
@@ -227,6 +235,10 @@ class HammerAxes(Axes):
         clipped to this shape.
         """
         return Circle((0.5, 0.5), 0.5)
+
+    def _gen_axes_spines(self):
+        return {'hammer':mspines.Spine.circular_spine(self,
+                                                      (0.5, 0.5), 0.5)}
 
     # Prevent the user from applying scales to one or both of the
     # axes.  In this particular case, scaling the axes wouldn't make
@@ -373,15 +385,6 @@ class HammerAxes(Axes):
         output_dims = 2
         is_separable = False
 
-        def __init__(self, resolution):
-            """
-            Create a new Hammer transform.  Resolution is the number of steps
-            to interpolate between each input line segment to approximate its
-            path in curved Hammer space.
-            """
-            Transform.__init__(self)
-            self._resolution = resolution
-
         def transform(self, ll):
             """
             Override the transform method to implement the custom transform.
@@ -410,21 +413,17 @@ class HammerAxes(Axes):
         # ``transform_path``.
         def transform_path(self, path):
             vertices = path.vertices
-            ipath = path.interpolated(self._resolution)
+            ipath = path.interpolated(path._interpolation_steps)
             return Path(self.transform(ipath.vertices), ipath.codes)
 
         def inverted(self):
-            return HammerAxes.InvertedHammerTransform(self._resolution)
+            return HammerAxes.InvertedHammerTransform()
         inverted.__doc__ = Transform.inverted.__doc__
 
     class InvertedHammerTransform(Transform):
         input_dims = 2
         output_dims = 2
         is_separable = False
-
-        def __init__(self, resolution):
-            Transform.__init__(self)
-            self._resolution = resolution
 
         def transform(self, xy):
             x = xy[:, 0:1]
@@ -440,7 +439,7 @@ class HammerAxes(Axes):
 
         def inverted(self):
             # The inverse of the inverse is the original transform... ;)
-            return HammerAxes.HammerTransform(self._resolution)
+            return HammerAxes.HammerTransform()
         inverted.__doc__ = Transform.inverted.__doc__
 
 # Now register the projection with matplotlib so the user can select

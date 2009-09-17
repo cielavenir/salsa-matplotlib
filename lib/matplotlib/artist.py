@@ -22,6 +22,38 @@ from path import Path
 # http://groups.google.com/groups?hl=en&lr=&threadm=mailman.5090.1098044946.5135.python-list%40python.org&rnum=1&prev=/groups%3Fq%3D__doc__%2Bauthor%253Ajdhunter%2540ace.bsd.uchicago.edu%26hl%3Den%26btnG%3DGoogle%2BSearch
 
 
+
+
+def allow_rasterization(draw):
+    """
+    Decorator for Artist.draw method. Provides routines
+    that run before and after the draw call. The before and after functions
+    are useful for changing artist-dependant renderer attributes or making
+    other setup function calls, such as starting and flushing a mixed-mode
+    renderer.
+    """
+    def before(artist, renderer):
+        if artist.get_rasterized():
+            renderer.start_rasterizing()
+
+    def after(artist, renderer):
+        if artist.get_rasterized():
+            renderer.stop_rasterizing()
+
+    # the axes class has a second argument inframe for its draw method.
+    def draw_wrapper(artist, renderer, *kl):
+        before(artist, renderer)
+        draw(artist, renderer, *kl)
+        after(artist, renderer)
+
+    # "safe wrapping" to exactly replicate anything we haven't overridden above
+    draw_wrapper.__name__ = draw.__name__
+    draw_wrapper.__dict__ = draw.__dict__
+    draw_wrapper.__doc__  = draw.__doc__
+    draw_wrapper._supports_rasterization = True
+    return draw_wrapper
+
+
 class Artist(object):
     """
     Abstract base class for someone who renders into a
@@ -45,6 +77,7 @@ class Artist(object):
         self._label = ''
         self._picker = None
         self._contains = None
+        self._rasterized = None
 
         self.eventson = False  # fire events only if eventson
         self._oid = 0  # an observer id
@@ -52,6 +85,7 @@ class Artist(object):
         self.axes = None
         self._remove_method = None
         self._url = None
+        self._gid = None
         self.x_isdata = True  # False to avoid updating Axes.dataLim with x
         self.y_isdata = True  #                                      with y
         self._snap = None
@@ -144,7 +178,10 @@ class Artist(object):
         Remove a callback based on its *id*.
 
         .. seealso::
+
             :meth:`add_callback`
+               For adding callbacks
+
         """
         try: del self._propobservers[oid]
         except KeyError: pass
@@ -271,7 +308,10 @@ class Artist(object):
 
         # Pick children
         for a in self.get_children():
-            a.pick(mouseevent)
+            # make sure the event happened in the same axes
+            ax = getattr(a, 'axes', None)
+            if mouseevent.inaxes==ax:
+                a.pick(mouseevent)
 
     def set_picker(self, picker):
         """
@@ -327,8 +367,25 @@ class Artist(object):
     def set_url(self, url):
         """
         Sets the url for the artist
+
+        ACCEPTS: a url string
         """
         self._url = url
+
+
+    def get_gid(self):
+        """
+        Returns the group id
+        """
+        return self._gid
+
+    def set_gid(self, gid):
+        """
+        Sets the (group) id for the artist
+
+        ACCEPTS: an id string
+        """
+        self._gid = gid
 
     def get_snap(self):
         """
@@ -490,6 +547,22 @@ class Artist(object):
             gc.set_clip_rectangle(None)
             gc.set_clip_path(None)
 
+    def get_rasterized(self):
+        return self._rasterized
+
+    def set_rasterized(self, rasterized):
+        """
+        Force rasterized (bitmap) drawing in vector backend output.
+
+        Defaults to None, which implies the backend's default behavior
+
+        ACCEPTS: [True | False | None]
+        """
+        if rasterized and not hasattr(self.draw, "_supports_rasterization"):
+            warnings.warn("Rasterization of '%s' will be ignored" % self)
+
+        self._rasterized = rasterized
+
     def draw(self, renderer, *args, **kwargs):
         'Derived classes drawing method'
         if not self.get_visible(): return
@@ -497,7 +570,7 @@ class Artist(object):
     def set_alpha(self, alpha):
         """
         Set the alpha value used for blending - not supported on
-        all backends
+        all backends.
 
         ACCEPTS: float (0.0 transparent through 1.0 opaque)
         """
@@ -598,6 +671,12 @@ class Artist(object):
         self._label = other._label
         self.pchanged()
 
+
+    def properties(self):
+        """
+        return a dictionary mapping property name -> value for all Artist props
+        """
+        return ArtistInspector(self).properties()
 
     def set(self, **kwargs):
         """
@@ -803,6 +882,7 @@ class ArtistInspector:
         return ':meth:`%s <%s>`%s' % (s, target, aliases)
 
 
+
     def pprint_setters(self, prop=None, leadingspace=2):
         """
         If *prop* is *None*, return a list of strings of all settable properies
@@ -881,24 +961,39 @@ class ArtistInspector:
             lines.append('%s%s: %s' %(pad, name, accepts))
         return lines
 
-    def pprint_getters(self):
-        """
-        Return the getters and actual values as list of strings.
-        """
 
+    def properties(self):
+        """
+        return a dictionary mapping property name -> value
+        """
         o = self.oorig
         getters = [name for name in dir(o)
                    if name.startswith('get_')
                    and callable(getattr(o, name))]
         #print getters
         getters.sort()
-        lines = []
+        d = dict()
         for name in getters:
             func = getattr(o, name)
             if self.is_alias(func): continue
 
             try: val = func()
             except: continue
+            else: d[name[4:]] = val
+
+        return d
+
+    def pprint_getters(self):
+        """
+        Return the getters and actual values as list of strings.
+        """
+
+        d = self.properties()
+        names = d.keys()
+        names.sort()
+        lines = []
+        for name in names:
+            val = d[name]
             if getattr(val, 'shape', ()) != () and len(val)>6:
                 s = str(val[:6]) + '...'
             else:
