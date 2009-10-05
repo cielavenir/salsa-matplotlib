@@ -38,29 +38,3 @@ Index: matplotlib-0.98.3/setupext.py
      'aix5' : ['/usr/local'],
  }
  
-@@ -977,6 +983,10 @@
-         tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
-                                                        '../../include'))
- 
-+    if not os.path.exists(tk_inc):
-+        tk_inc = os.path.normpath(os.path.join(tk_lib_dir,
-+                                               '../../../include/tcl' + tk_ver))
-+
-     if not os.path.exists(os.path.join(tk_inc, 'tk.h')):
-         tk_inc = tcl_inc
- 
-@@ -994,10 +1004,10 @@
-     return tcl_lib, tcl_inc, tk_lib, tk_inc
- 
- def hardcoded_tcl_config():
--    tcl_inc = "/usr/local/include"
--    tk_inc = "/usr/local/include"
--    tcl_lib = "/usr/local/lib"
--    tk_lib = "/usr/local/lib"
-+    tcl_inc = "/usr/include/tcl8.5"
-+    tk_inc = "/usr/include/tcl8.5"
-+    tcl_lib = "/usr/lib"
-+    tk_lib = "/usr/lib"
-     return tcl_lib, tcl_inc, tk_lib, tk_inc
- 
- def add_tk_flags(module):

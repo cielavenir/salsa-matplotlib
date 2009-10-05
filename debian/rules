@@ -57,7 +57,10 @@ clean-patched: patch
 
 	# workaround for cleaning the doc ("doc/make.py clean" only runs useless svn-clean)
 	rm -rf doc/build doc/examples
-	rm -f doc/mpl_examples/api/*.png doc/mpl_examples/pylab_examples/*.png
+	rm -f doc/mpl_examples/api/*.png
+	rm -f doc/mpl_examples/pylab_examples/*.png
+	rm -f doc/mpl_examples/pylab_examples/*.pdf
+	rm -f doc/mpl_examples/units/*.png
 	rm -f doc/pyplots/tex_demo.png
 	rm -f doc/_static/matplotlibrc
 	rm -f doc/_templates/gallery.html

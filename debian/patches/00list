@@ -1,2 +1,3 @@
+05-find-tcl-tk-directory.dpatch
 10_build_fix.dpatch
 20_matplotlibrc_path_search_fix.dpatch
