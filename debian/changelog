@@ -1,3 +1,12 @@
+matplotlib (0.99.1.1-1) UNRELEASED; urgency=low
+
+  * New upstream release
+  * debian/control
+    - added python-wxgtk2.8-dbg to b-d (needed to build -dbg package)
+    - added python-imaging to b-d (needed for -doc package)
+
+ -- Sandro Tosi <morph@debian.org>  Mon, 05 Oct 2009 13:24:33 +0200
+
 matplotlib (0.99.0-1) unstable; urgency=low
 
   * New upstream release
