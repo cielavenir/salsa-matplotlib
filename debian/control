@@ -67,6 +67,7 @@ Replaces: python2.4-matplotlib
 Enhances: ipython
 Suggests: dvipng,
           ipython (>= 0.6.3),
+          librsvg2-common,
           python-configobj,
           python-matplotlib-doc,
           python-scipy,
