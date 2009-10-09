@@ -3,7 +3,6 @@ Section: python
 Priority: optional
 Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
 Uploaders: Alexandre Fayolle <afayolle@debian.org>,
-           Ondrej Certik <ondrej@certik.cz>,
            Sandro Tosi <morph@debian.org>,
            Benjamin Drung <bdrung@ubuntu.com>
 Build-Depends: debhelper (>= 7),
