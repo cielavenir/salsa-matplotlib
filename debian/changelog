@@ -7,6 +7,8 @@ matplotlib (0.99.1.1-1) UNRELEASED; urgency=low
     - added python-imaging to b-d (needed for -doc package)
     - added librsvg2-common to Suggests of python-matplotlib, needed by GTKAgg
       backend; thanks to Jonas for the report and suggestion; Closes: #548874
+    - moved python-excelerator from Depends to Suggests; thanks to W. Martin
+      Borgert for the report; Closes: #547437
   * debian/patches/30_doc_pass_dpi.dpatch
     - pass DPI when building doc images
 
@@ -17,7 +19,7 @@ matplotlib (0.99.1.1-1) UNRELEASED; urgency=low
     - refresh clean target
   * link to fonts in ttf-lyx to make lintian happy
 
- -- Sandro Tosi <morph@debian.org>  Fri, 09 Oct 2009 09:24:06 +0200
+ -- Sandro Tosi <morph@debian.org>  Fri, 09 Oct 2009 15:02:35 +0200
 
 matplotlib (0.99.0-1) unstable; urgency=low
 
