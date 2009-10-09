@@ -2,7 +2,7 @@
 ## 30_doc_pass_dpi.dpatch by Sandro Tosi <morph@debian.org>
 ##
 ## All lines beginning with `## DP:' are a description of the patch.
-## DP: No description.
+## DP: Pass DPI, along with format, in plot format configuration
 
 @DPATCH@
 diff -urNad matplotlib~/doc/make.py matplotlib/doc/make.py
