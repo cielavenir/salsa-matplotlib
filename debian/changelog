@@ -2,6 +2,7 @@ matplotlib (0.99.1.1-1) UNRELEASED; urgency=low
 
   [ Sandro Tosi ]
   * New upstream release
+    - fixes a FTBFS, thanks to Lucas Nussbaum for the report; Closes: #551248
   * debian/control
     - added python-wxgtk2.8-dbg to b-d (needed to build -dbg package)
     - added python-imaging to b-d (needed for -doc package)
@@ -22,7 +23,7 @@ matplotlib (0.99.1.1-1) UNRELEASED; urgency=low
     - refresh clean target
   * link to fonts in ttf-lyx to make lintian happy
 
- -- Sandro Tosi <morph@debian.org>  Tue, 20 Oct 2009 00:07:27 +0200
+ -- Sandro Tosi <morph@debian.org>  Tue, 20 Oct 2009 00:16:00 +0200
 
 matplotlib (0.99.0-1) unstable; urgency=low
 
