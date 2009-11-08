@@ -1,4 +1,4 @@
-matplotlib (0.99.1.1-1) UNRELEASED; urgency=low
+matplotlib (0.99.1.1-1) unstable; urgency=low
 
   [ Sandro Tosi ]
   * New upstream release
@@ -21,8 +21,14 @@ matplotlib (0.99.1.1-1) UNRELEASED; urgency=low
   * debian/rules
     - refresh clean target
   * link to fonts in ttf-lyx to make lintian happy
+  * Add latex-ucs and texlive-fonts-recommended to Build-Depends
+    (Closes: #551248).
+  * Demote GUI toolkits from Depends to Recommends; thanks to Thomas Bechtold
+    for this hint (Closes: #547437).
+  * Install lib/matplotlib/mpl-data/lineprops.glade; thanks to Ambrose Andrews
+    for the report (Closes: #518488).
 
- -- Sandro Tosi <morph@debian.org>  Tue, 20 Oct 2009 00:16:00 +0200
+ -- Benjamin Drung <bdrung@ubuntu.com>  Sun, 08 Nov 2009 21:58:23 +0100
 
 matplotlib (0.99.0-1) unstable; urgency=low
 
