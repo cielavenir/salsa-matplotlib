@@ -53,13 +53,13 @@ Depends: ${python:Depends},
          ${shlibs:Depends},
          python-cairo,
          python-dateutil,
-         python-glade2,
          python-gobject,
          python-matplotlib-data (>= ${source:Version}),
          python-numpy (>= 1:1.1.0),
          python-pyparsing,
-         python-tk (>= 2.5.2-1.1) | python-gtk2 | python-wxgtk2.8 | python-qt3 | python-qt4,
          python-tz
+Recommends: python-glade2,
+            python-tk (>= 2.5.2-1.1) | python-gtk2 | python-wxgtk2.8 | python-qt3 | python-qt4
 Provides: ${python:Provides}
 Conflicts: python2.4-matplotlib
 Replaces: python2.4-matplotlib
