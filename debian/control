@@ -35,6 +35,7 @@ Build-Depends: debhelper (>= 7),
                python-wxgtk2.8,
                python-wxgtk2.8-dbg,
                tcl8.5-dev,
+               texlive-fonts-recommended,
                texlive-latex-extra,
                tk8.5-dev,
                zlib1g-dev
