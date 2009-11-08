@@ -57,7 +57,10 @@ clean-patched: patch
 
 	# workaround for cleaning the doc ("doc/make.py clean" only runs useless svn-clean)
 	rm -rf doc/build doc/examples
-	rm -f doc/mpl_examples/api/*.png doc/mpl_examples/pylab_examples/*.png
+	rm -f doc/mpl_examples/api/*.png
+	rm -f doc/mpl_examples/pylab_examples/*.png
+	rm -f doc/mpl_examples/pylab_examples/*.pdf
+	rm -f doc/mpl_examples/units/*.png
 	rm -f doc/pyplots/tex_demo.png
 	rm -f doc/_static/matplotlibrc
 	rm -f doc/_templates/gallery.html
@@ -107,7 +110,11 @@ install-indep: build-indep
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/local.conf
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/pdfcorefonts/readme.txt
 	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/images/*.svg
-
+	# link to fonts in ttf-lyx
+	ln -sf /usr/share/fonts/truetype/ttf-lyx/cmex10.ttf $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/cmex10.ttf
+	ln -sf /usr/share/fonts/truetype/ttf-lyx/cmmi10.ttf $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/cmmi10.ttf
+	ln -sf /usr/share/fonts/truetype/ttf-lyx/cmr10.ttf $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/cmr10.ttf
+	ln -sf /usr/share/fonts/truetype/ttf-lyx/cmsy10.ttf $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/cmsy10.ttf
 
 # binary
 binary-indep: build-indep install-indep

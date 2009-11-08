@@ -203,10 +203,24 @@ class _process_plot_var_args:
         if self.axes.xaxis is not None and self.axes.yaxis is not None:
             bx = self.axes.xaxis.update_units(x)
             by = self.axes.yaxis.update_units(y)
-            if bx:
-                x = self.axes.convert_xunits(x)
-            if by:
-                y = self.axes.convert_yunits(y)
+
+            if self.command!='plot':
+                # the Line2D class can handle unitized data, with
+                # support for post hoc unit changes etc.  Other mpl
+                # artists, eg Polygon which _process_plot_var_args
+                # also serves on calls to fill, cannot.  So this is a
+                # hack to say: if you are not "plot", which is
+                # creating Line2D, then convert the data now to
+                # floats.  If you are plot, pass the raw data through
+                # to Line2D which will handle the conversion.  So
+                # polygons will not support post hoc conversions of
+                # the unit type since they are not storing the orig
+                # data.  Hopefully we can rationalize this at a later
+                # date - JDH
+                if bx:
+                    x = self.axes.convert_xunits(x)
+                if by:
+                    y = self.axes.convert_yunits(y)
 
         x = np.atleast_1d(x) #like asanyarray, but converts scalar to array
         y = np.atleast_1d(y)
@@ -1324,7 +1338,7 @@ class Axes(martist.Artist):
 
     def add_artist(self, a):
         '''
-        Add any :class:`~matplotlib.artist.Artist` to the axes
+        Add any :class:`~matplotlib.artist.Artist` to the axes.
 
         Returns the artist.
         '''
@@ -1337,8 +1351,8 @@ class Axes(martist.Artist):
 
     def add_collection(self, collection, autolim=True):
         '''
-        add a :class:`~matplotlib.collections.Collection` instance
-        to the axes
+        Add a :class:`~matplotlib.collections.Collection` instance
+        to the axes.
 
         Returns the collection.
         '''
@@ -3601,6 +3615,7 @@ class Axes(martist.Artist):
              }
 
         self.set_xscale('log', **d)
+        self.set_yscale('linear')
         b =  self._hold
         self._hold = True # we've already processed the hold
         l = self.plot(*args, **kwargs)
@@ -3651,6 +3666,7 @@ class Axes(martist.Artist):
              'nonposy': kwargs.pop('nonposy', 'mask'),
              }
         self.set_yscale('log', **d)
+        self.set_xscale('linear')
         b =  self._hold
         self._hold = True # we've already processed the hold
         l = self.plot(*args, **kwargs)
@@ -3694,15 +3710,15 @@ class Axes(martist.Artist):
 
         *maxlags* is a positive integer detailing the number of lags
         to show.  The default value of *None* will return all
-        :math:`2 \mathrm{len}(x) - 1` lags.
+        :math:`2 \times \mathrm{len}(x) - 1` lags.
 
         The return value is a tuple (*lags*, *c*, *linecol*, *b*)
         where
 
-        - *linecol* is the
-          :class:`~matplotlib.collections.LineCollection`
+          - *linecol* is the
+            :class:`~matplotlib.collections.LineCollection`
 
-        - *b* is the *x*-axis.
+          - *b* is the *x*-axis.
 
         .. seealso::
 
@@ -3819,6 +3835,8 @@ class Axes(martist.Artist):
                         if isinstance(c, mcoll.LineCollection)])
         handles.extend([c for c in self.collections
                         if isinstance(c, mcoll.RegularPolyCollection)])
+        handles.extend([c for c in self.collections
+                        if isinstance(c, mcoll.CircleCollection)])
         return handles
 
 
@@ -3826,7 +3844,7 @@ class Axes(martist.Artist):
         """
         return handles and labels for legend
 
-        ax.legend() is equibalent to ::
+        ax.legend() is equivalent to ::
 
           h, l = ax.get_legend_handles_labels()
           ax.legend(h, l)
@@ -4195,13 +4213,6 @@ class Axes(martist.Artist):
         else:
             raise ValueError, 'invalid orientation: %s' % orientation
 
-
-        # do not convert to array here as unit info is lost
-        #left = np.asarray(left)
-        #height = np.asarray(height)
-        #width = np.asarray(width)
-        #bottom = np.asarray(bottom)
-
         if len(linewidth) < nbars:
             linewidth *= nbars
 
@@ -4251,10 +4262,14 @@ class Axes(martist.Artist):
         if self.xaxis is not None:
             left = self.convert_xunits( left )
             width = self.convert_xunits( width )
+            if xerr is not None:
+                xerr = self.convert_xunits( xerr )
 
         if self.yaxis is not None:
             bottom = self.convert_yunits( bottom )
             height = self.convert_yunits( height )
+            if yerr is not None:
+                yerr = self.convert_yunits( yerr )
 
         if align == 'edge':
             pass
@@ -4312,7 +4327,7 @@ class Axes(martist.Artist):
 
         if adjust_xlim:
             xmin, xmax = self.dataLim.intervalx
-            xmin = np.amin(width[width!=0]) # filter out the 0 width rects
+            xmin = np.amin([w for w in width if w > 0])
             if xerr is not None:
                 xmin = xmin - np.amax(xerr)
             xmin = max(xmin*0.9, 1e-100)
@@ -4320,7 +4335,7 @@ class Axes(martist.Artist):
 
         if adjust_ylim:
             ymin, ymax = self.dataLim.intervaly
-            ymin = np.amin(height[height!=0]) # filter out the 0 height rects
+            ymin = np.amin([h for h in height if h > 0])
             if yerr is not None:
                 ymin = ymin - np.amax(yerr)
             ymin = max(ymin*0.9, 1e-100)
@@ -5602,9 +5617,13 @@ class Axes(martist.Artist):
 
             for i in xrange(len(x)):
                 if bdist[i]:
-                    lattice1[ix1[i], iy1[i]]+=1
+                    if ((ix1[i] >= 0) and (ix1[i] < nx1) and
+                        (iy1[i] >= 0) and (iy1[i] < ny1)):
+                        lattice1[ix1[i], iy1[i]]+=1
                 else:
-                    lattice2[ix2[i], iy2[i]]+=1
+                    if ((ix2[i] >= 0) and (ix2[i] < nx2) and
+                        (iy2[i] >= 0) and (iy2[i] < ny2)):
+                        lattice2[ix2[i], iy2[i]]+=1
 
             # threshold
             if mincnt is not None:
@@ -5636,9 +5655,13 @@ class Axes(martist.Artist):
 
             for i in xrange(len(x)):
                 if bdist[i]:
-                    lattice1[ix1[i], iy1[i]].append( C[i] )
+                    if ((ix1[i] >= 0) and (ix1[i] < nx1) and
+                        (iy1[i] >= 0) and (iy1[i] < ny1)):
+                        lattice1[ix1[i], iy1[i]].append( C[i] )
                 else:
-                    lattice2[ix2[i], iy2[i]].append( C[i] )
+                    if ((ix2[i] >= 0) and (ix2[i] < nx2) and
+                        (iy2[i] >= 0) and (iy2[i] < ny2)):
+                        lattice2[ix2[i], iy2[i]].append( C[i] )
 
 
             for i in xrange(nx1):
@@ -7408,8 +7431,8 @@ class Axes(martist.Artist):
                  window = mlab.window_hanning, noverlap=0, pad_to=None,
                  sides='default', scale_by_freq=None, **kwargs)
 
-        cohere the coherence between *x* and *y*.  Coherence is the normalized
-        cross spectral density:
+        :meth:`cohere` the coherence between *x* and *y*.  Coherence
+        is the normalized cross spectral density:
 
         .. math::
 

@@ -282,13 +282,14 @@ class ColorConverter:
 
         try:
             if cbook.is_string_like(arg):
-                color = self.colors.get(arg, None)
+                argl = arg.lower()
+                color = self.colors.get(argl, None)
                 if color is None:
-                    str1 = cnames.get(arg, arg)
+                    str1 = cnames.get(argl, argl)
                     if str1.startswith('#'):
                         color = hex2color(str1)
                     else:
-                        fl = float(arg)
+                        fl = float(argl)
                         if fl < 0 or fl > 1:
                             raise ValueError(
                                    'gray (string) must be in range 0-1')
@@ -488,7 +489,10 @@ class Colormap:
         if not self._isinit: self._init()
         alpha = min(alpha, 1.0) # alpha must be between 0 and 1
         alpha = max(alpha, 0.0)
-        self._lut[:,-1] = alpha
+        self._lut[:-1,-1] = alpha  # Don't assign global alpha to i_bad;
+                                   # it would defeat the purpose of the
+                                   # default behavior, which is to not
+                                   # show anything where data are missing.
         mask_bad = None
         if not cbook.iterable(X):
             vtype = 'scalar'

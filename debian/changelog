@@ -1,3 +1,34 @@
+matplotlib (0.99.1.1-1) unstable; urgency=low
+
+  [ Sandro Tosi ]
+  * New upstream release
+  * debian/control
+    - added python-wxgtk2.8-dbg to b-d (needed to build -dbg package)
+    - added python-imaging to b-d (needed for -doc package)
+    - added librsvg2-common to Suggests of python-matplotlib, needed by GTKAgg
+      backend; thanks to Jonas for the report and suggestion; Closes: #548874
+    - moved python-excelerator from Depends to Suggests; thanks to W. Martin
+      Borgert for the report; Closes: #547437
+    - removed Ondrej from Uploaders: thanks for your work!
+  * debian/patches/30_doc_pass_dpi.dpatch
+    - pass DPI when building doc images
+  * debian/python-matplotlib-doc.doc-base
+    - added doc-base
+
+  [ Benjamin Drung ]
+  * wrote 05-find-tcl-tk-directory.dpatch
+  * strip not working parts from 10_build_fix.dpatch
+  * debian/rules
+    - refresh clean target
+  * link to fonts in ttf-lyx to make lintian happy
+  * Add texlive-fonts-recommended to Build-Depends (Closes: #551248).
+  * Demote GUI toolkits from Depends to Recommends; thanks to Thomas Bechtold
+    for this hint (Closes: #547437).
+  * Install lib/matplotlib/mpl-data/lineprops.glade; thanks to Ambrose Andrews
+    for the report (Closes: #518488).
+
+ -- Benjamin Drung <bdrung@ubuntu.com>  Sun, 08 Nov 2009 21:58:23 +0100
+
 matplotlib (0.99.0-1) unstable; urgency=low
 
   * New upstream release
