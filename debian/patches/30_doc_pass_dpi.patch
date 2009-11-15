@@ -1,10 +1,7 @@
-#! /bin/sh /usr/share/dpatch/dpatch-run
-## 30_doc_pass_dpi.dpatch by Sandro Tosi <morph@debian.org>
-##
-## All lines beginning with `## DP:' are a description of the patch.
-## DP: Pass DPI, along with format, in plot format configuration
+Description: Pass DPI, along with format, in plot format configuration
+Forwarded: yes
+Author: Sandro Tosi <morph@debian.org>
 
-@DPATCH@
 diff -urNad matplotlib~/doc/make.py matplotlib/doc/make.py
 --- matplotlib~/doc/make.py	2009-08-01 21:14:12.000000000 +0200
 +++ matplotlib/doc/make.py	2009-10-09 08:56:04.000000000 +0200
