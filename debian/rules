@@ -1,10 +1,6 @@
 #!/usr/bin/make -f
-# -*- makefile -*-
-# Sample debian/rules that uses debhelper.
-# GNU copyright 1997 to 1999 by Joey Hess.
 
-# Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
+include /usr/share/quilt/quilt.make
 
 PYVERS := $(shell pyversions -v -r debian/control)
 DEFPY := $(shell pyversions -v -d)
@@ -13,8 +9,6 @@ pd := python-matplotlib-doc
 p := python-matplotlib
 pdata := python-matplotlib-data
 pdbg := python-matplotlib-dbg
-
-include /usr/share/dpatch/dpatch.make
 
 # build
 build: patch build-arch build-indep

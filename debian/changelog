@@ -1,3 +1,12 @@
+matplotlib (0.99.1.2-1) unstable; urgency=low
+
+  * New upstream release.
+  * Fix spelling error in doc-base abstract field.
+  * Add missing section field to doc-base file.
+  * Convert patch system back to quilt and use DEP-3 patch tagging guidelines.
+
+ -- Benjamin Drung <bdrung@ubuntu.com>  Sun, 15 Nov 2009 22:17:31 +0100
+
 matplotlib (0.99.1.1-1) unstable; urgency=low
 
   [ Sandro Tosi ]
@@ -21,7 +30,8 @@ matplotlib (0.99.1.1-1) unstable; urgency=low
   * debian/rules
     - refresh clean target
   * link to fonts in ttf-lyx to make lintian happy
-  * Add texlive-fonts-recommended to Build-Depends (Closes: #551248).
+  * Add latex-ucs and texlive-fonts-recommended to Build-Depends
+    (Closes: #551248).
   * Demote GUI toolkits from Depends to Recommends; thanks to Thomas Bechtold
     for this hint (Closes: #547437).
   * Install lib/matplotlib/mpl-data/lineprops.glade; thanks to Ambrose Andrews

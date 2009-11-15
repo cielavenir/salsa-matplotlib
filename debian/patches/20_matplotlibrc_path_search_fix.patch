@@ -1,13 +1,7 @@
-#! /bin/sh /usr/share/dpatch/dpatch-run
-## 20_matplotlibrc_path_search_fix.dpatch by Sandro Tosi <morph@debian.org>
-##
-## All lines beginning with `## DP:' are a description of the patch.
-## DP: Fixes the path to search for matplotlibrc file
+Description: Fixes the path to search for matplotlibrc file
+Forwarded: not-needed
+Author: Sandro Tosi <morph@debian.org>
 
-@DPATCH@
-
-Index: matplotlib-0.98.3/lib/matplotlib/__init__.py
-===================================================================
 --- matplotlib-0.98.3.orig/lib/matplotlib/__init__.py	2008-08-22 11:52:37.253904720 +0200
 +++ matplotlib-0.98.3/lib/matplotlib/__init__.py	2008-08-22 11:52:42.250189441 +0200
 @@ -452,9 +452,11 @@

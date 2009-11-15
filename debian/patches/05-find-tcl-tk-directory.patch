@@ -1,13 +1,10 @@
-#! /bin/sh /usr/share/dpatch/dpatch-run
-## 05-find-tcl-tk-directory.dpatch by Benjamin Drung <bdrung@ubuntu.com>
-##
-## All lines beginning with `## DP:' are a description of the patch.
-## DP: Guess the correct directory in Debian/Ubuntu. Replacing all tcl by tk
-## DP: does not lead to a correct directory:
-## DP: /usr/share/tcltk/tcl8.5 -> /usr/share/tktk/tk8.5
-## DP: The correct path is /usr/share/tcltk/tk8.5
+Description: Find tcl/tk directory
+ Guess the correct directory in Debian/Ubuntu. Replacing all tcl by tk does not
+ lead to a correct directory: /usr/share/tcltk/tcl8.5 -> /usr/share/tktk/tk8.5
+ The correct path is /usr/share/tcltk/tk8.5
+Forwarded: Yes
+Author: Benjamin Drung <bdrung@ubuntu.com>
 
-@DPATCH@
 diff -pruN matplotlib-0.99.1.1/setupext.py matplotlib-0.99.1.1.new/setupext.py
 --- matplotlib-0.99.1.1/setupext.py	2009-08-23 07:27:32.000000000 +0200
 +++ matplotlib-0.99.1.1.new/setupext.py	2009-10-05 22:46:47.465938277 +0200
