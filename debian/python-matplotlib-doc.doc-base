@@ -6,6 +6,7 @@ Abstract: matplotlib is a Python 2D plotting library which produces publication
  across platforms. matplotlib can be used in Python scripts, the Python and
  ipython shell (ala matlab or mathematica), web application servers, and six
  graphical user interface toolkits.
+Section: Python
 
 Format: HTML
 Index: /usr/share/doc/python-matplotlib-doc/html/index.html
