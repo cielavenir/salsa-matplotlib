@@ -10,13 +10,15 @@ import numpy as np
 from numpy import ma
 
 from matplotlib import rcParams
-from matplotlib import artist as martist
-from matplotlib import colors as mcolors
-from matplotlib import cm
+import matplotlib.artist as martist
+from matplotlib.artist import allow_rasterization
+import matplotlib.colors as mcolors
+import matplotlib.cm as cm
+import matplotlib.cbook as cbook
 
 # For clarity, names from _image are given explicitly in this module:
-from matplotlib import _image
-from matplotlib import _png
+import matplotlib._image as _image
+import matplotlib._png as _png
 
 # For user convenience, the names from _image are also imported into
 # the image namespace:
@@ -49,6 +51,9 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
     _interpdr = dict([ (v,k) for k,v in _interpd.items()])
 
     interpnames = _interpd.keys()
+
+    def __str__(self):
+        return "AxesImage(%g,%g;%gx%g)" % tuple(self.axes.bbox.bounds)
 
     def __init__(self, ax,
                  cmap = None,
@@ -85,12 +90,9 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
         self.set_filterrad(filterrad)
         self._filterrad = filterrad
 
-
-
         self.set_interpolation(interpolation)
         self.set_resample(resample)
         self.axes = ax
-
 
         self._imcache = None
 
@@ -193,13 +195,15 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
         else:
             im = self._imcache
 
-        fc = self.axes.get_frame().get_facecolor()
+        fc = self.axes.patch.get_facecolor()
         bg = mcolors.colorConverter.to_rgba(fc, 0)
         im.set_bg( *bg)
 
         # image input dimensions
         im.reset_matrix()
         numrows, numcols = im.get_size()
+        if numrows < 1 or numcols < 1:  # out of range
+            return None
 
         im.set_interpolation(self._interpd[self._interpolation])
 
@@ -224,30 +228,39 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
                   norm=self._filternorm, radius=self._filterrad)
         return im
 
-
+    @allow_rasterization
     def draw(self, renderer, *args, **kwargs):
         if not self.get_visible(): return
         if (self.axes.get_xscale() != 'linear' or
             self.axes.get_yscale() != 'linear'):
             warnings.warn("Images are not supported on non-linear axes.")
         im = self.make_image(renderer.get_image_magnification())
+        if im is None: # out of range
+            return
+        im._url = self.get_url()
         l, b, widthDisplay, heightDisplay = self.axes.bbox.bounds
+        clippath, affine = self.get_transformed_clip_path_and_affine()
         renderer.draw_image(round(l), round(b), im, self.axes.bbox.frozen(),
-                            *self.get_transformed_clip_path_and_affine())
+                            clippath, affine)
 
     def contains(self, mouseevent):
-        """Test whether the mouse event occured within the image.
+        """
+        Test whether the mouse event occured within the image.
         """
         if callable(self._contains): return self._contains(self,mouseevent)
         # TODO: make sure this is consistent with patch and patch
         # collection on nonlinear transformed coordinates.
         # TODO: consider returning image coordinates (shouldn't
         # be too difficult given that the image is rectilinear
+        x, y = mouseevent.xdata, mouseevent.ydata
         xmin, xmax, ymin, ymax = self.get_extent()
-        xdata, ydata = mouseevent.xdata, mouseevent.ydata
-        #print xdata, ydata, xmin, xmax, ymin, ymax
-        if xdata is not None and ydata is not None:
-            inside = xdata>=xmin and xdata<=xmax and ydata>=ymin and ydata<=ymax
+        if xmin > xmax:
+            xmin,xmax = xmax,xmin
+        if ymin > ymax:
+            ymin,ymax = ymax,ymin
+        #print x, y, xmin, xmax, ymin, ymax
+        if x is not None and y is not None:
+            inside = x>=xmin and x<=xmax and y>=ymin and y<=ymax
         else:
             inside = False
 
@@ -256,6 +269,8 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
     def write_png(self, fname, noscale=False):
         """Write the image to png file with fname"""
         im = self.make_image()
+        if im is None:  # out of range
+            return
         if noscale:
             numrows, numcols = im.get_size()
             im.reset_matrix()
@@ -265,17 +280,24 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
         rows, cols, buffer = im.as_rgba_str()
         _png.write_png(buffer, cols, rows, fname)
 
-    def set_data(self, A, shape=None):
+    def set_data(self, A):
         """
         Set the image array
 
-        ACCEPTS: numpy/PIL Image A"""
+        ACCEPTS: numpy/PIL Image A
+        """
         # check if data is PIL Image without importing Image
         if hasattr(A,'getpixel'):
-            X = pil_to_array(A)
+            self._A = pil_to_array(A)
         else:
-            X = ma.asarray(A) # assume array
-        self._A = X
+            self._A = cbook.safe_masked_invalid(A)
+
+        if self._A.dtype != np.uint8 and not np.can_cast(self._A.dtype, np.float):
+            raise TypeError("Image data can not convert to float")
+
+        if (self._A.ndim not in (2, 3) or
+            (self._A.ndim == 3 and self._A.shape[-1] not in (3, 4))):
+            raise TypeError("Invalid dimensions for image data")
 
         self._imcache =None
         self._rgbacache = None
@@ -296,25 +318,26 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
 
 
     def set_extent(self, extent):
-        """extent is data axes (left, right, bottom, top) for making image plots
+        """
+        extent is data axes (left, right, bottom, top) for making image plots
         """
         self._extent = extent
 
         xmin, xmax, ymin, ymax = extent
         corners = (xmin, ymin), (xmax, ymax)
         self.axes.update_datalim(corners)
-        if self.axes._autoscaleon:
+        if self.axes._autoscaleXon:
             self.axes.set_xlim((xmin, xmax))
+        if self.axes._autoscaleYon:
             self.axes.set_ylim((ymin, ymax))
 
     def get_interpolation(self):
         """
         Return the interpolation method the image uses when resizing.
 
-        One of
-
-        'bicubic', 'bilinear', 'blackman100', 'blackman256', 'blackman64',
-        'nearest', 'sinc144', 'sinc256', 'sinc64', 'spline16', 'spline36'
+        One of 'nearest', 'bilinear', 'bicubic', 'spline16', 'spline36', 'hanning',
+        'hamming', 'hermite', 'kaiser', 'quadric', 'catrom', 'gaussian',
+        'bessel', 'mitchell', 'sinc', 'lanczos',
         """
         return self._interpolation
 
@@ -322,19 +345,29 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
         """
         Set the interpolation method the image uses when resizing.
 
-        ACCEPTS: ['bicubic' | 'bilinear' | 'blackman100' | 'blackman256' | 'blackman64', 'nearest' | 'sinc144' | 'sinc256' | 'sinc64' | 'spline16' | 'spline36']
+        ACCEPTS: ['nearest' | 'bilinear' | 'bicubic' | 'spline16' |
+          'spline36' | 'hanning' | 'hamming' | 'hermite' | 'kaiser' |
+          'quadric' | 'catrom' | 'gaussian' | 'bessel' | 'mitchell' |
+          'sinc' | 'lanczos' | ]
+
         """
         if s is None: s = rcParams['image.interpolation']
         s = s.lower()
-        if not self._interpd.has_key(s):
+        if s not in self._interpd:
             raise ValueError('Illegal interpolation string')
         self._interpolation = s
 
     def set_resample(self, v):
+        """
+        set whether or not image resampling is used
+
+        ACCEPTS: True|False
+        """
         if v is None: v = rcParams['image.resample']
         self._resample = v
 
-    def get_interpolation(self):
+    def get_resample(self):
+        'return the image resample boolean'
         return self._resample
 
     def get_extent(self):
@@ -351,7 +384,8 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
                 return (-0.5, numcols-0.5, -0.5, numrows-0.5)
 
     def set_filternorm(self, filternorm):
-        """Set whether the resize filter norms the weights -- see
+        """
+        Set whether the resize filter norms the weights -- see
         help for imshow
 
         ACCEPTS: 0 or 1
@@ -366,7 +400,8 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
         return self._filternorm
 
     def set_filterrad(self, filterrad):
-        """Set the resize filter radius only applicable to some
+        """
+        Set the resize filter radius only applicable to some
         interpolation schemes -- see help for imshow
 
         ACCEPTS: positive float
@@ -381,16 +416,19 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
 
 
 class NonUniformImage(AxesImage):
-    def __init__(self, ax,
-                 **kwargs
-                ):
+    def __init__(self, ax, **kwargs):
+        """
+        kwargs are identical to those for AxesImage, except
+        that 'interpolation' defaults to 'nearest'
+        """
+        interp = kwargs.pop('interpolation', 'nearest')
         AxesImage.__init__(self, ax,
                            **kwargs)
+        AxesImage.set_interpolation(self, interp)
 
     def make_image(self, magnification=1.0):
         if self._A is None:
             raise RuntimeError('You must first set the image array')
-
         x0, y0, v_width, v_height = self.axes.viewLim.bounds
         l, b, r, t = self.axes.bbox.extents
         width = (round(r) + 0.5) - (round(l) - 0.5)
@@ -399,16 +437,29 @@ class NonUniformImage(AxesImage):
         height *= magnification
         im = _image.pcolor(self._Ax, self._Ay, self._A,
                            height, width,
-                           (x0, x0+v_width, y0, y0+v_height))
-        fc = self.axes.get_frame().get_facecolor()
+                           (x0, x0+v_width, y0, y0+v_height),
+                           self._interpd[self._interpolation])
+
+        fc = self.axes.patch.get_facecolor()
         bg = mcolors.colorConverter.to_rgba(fc, 0)
         im.set_bg(*bg)
+        im.is_grayscale = self.is_grayscale
         return im
 
     def set_data(self, x, y, A):
+        """
+        Set the grid for the pixel centers, and the pixel values.
+
+          *x* and *y* are 1-D ndarrays of lengths N and M, respectively,
+             specifying pixel centers
+
+          *A* is an (M,N) ndarray or masked array of values to be
+            colormapped, or a (M,N,3) RGB array, or a (M,N,4) RGBA
+            array.
+        """
         x = np.asarray(x,np.float32)
         y = np.asarray(y,np.float32)
-        A = np.asarray(A)
+        A = cbook.safe_masked_invalid(A)
         if len(x.shape) != 1 or len(y.shape) != 1\
            or A.shape[0:2] != (y.shape[0], x.shape[0]):
             raise TypeError("Axes don't match array shape")
@@ -421,9 +472,11 @@ class NonUniformImage(AxesImage):
         if len(A.shape) == 2:
             if A.dtype != np.uint8:
                 A = (self.cmap(self.norm(A))*255).astype(np.uint8)
+                self.is_grayscale = self.cmap.is_gray()
             else:
                 A = np.repeat(A[:,:,np.newaxis], 4, 2)
                 A[:,:,3] = 255
+                self.is_grayscale = True
         else:
             if A.dtype != np.uint8:
                 A = (255*A).astype(np.uint8)
@@ -432,6 +485,7 @@ class NonUniformImage(AxesImage):
                 B[:,:,0:3] = A
                 B[:,:,3] = 255
                 A = B
+            self.is_grayscale = False
         self._A = A
         self._Ax = x
         self._Ay = y
@@ -441,8 +495,8 @@ class NonUniformImage(AxesImage):
         raise NotImplementedError('Method not supported')
 
     def set_interpolation(self, s):
-        if s != None and s != 'nearest':
-            raise NotImplementedError('Only nearest neighbor supported')
+        if s != None and not s in ('nearest','bilinear'):
+            raise NotImplementedError('Only nearest neighbor and bilinear interpolations are supported')
         AxesImage.set_interpolation(self, s)
 
     def get_extent(self):
@@ -464,7 +518,7 @@ class NonUniformImage(AxesImage):
     def set_cmap(self, cmap):
         if self._A is not None:
             raise RuntimeError('Cannot change colors after loading data')
-        cm.ScalarMappable.set_cmap(self, norm)
+        cm.ScalarMappable.set_cmap(self, cmap)
 
 class PcolorImage(martist.Artist, cm.ScalarMappable):
     '''
@@ -500,7 +554,7 @@ class PcolorImage(martist.Artist, cm.ScalarMappable):
     def make_image(self, magnification=1.0):
         if self._A is None:
             raise RuntimeError('You must first set the image array')
-        fc = self.axes.get_frame().get_facecolor()
+        fc = self.axes.patch.get_facecolor()
         bg = mcolors.colorConverter.to_rgba(fc, 0)
         bg = (np.array(bg)*255).astype(np.uint8)
         l, b, r, t = self.axes.bbox.extents
@@ -524,6 +578,7 @@ class PcolorImage(martist.Artist, cm.ScalarMappable):
         im.is_grayscale = self.is_grayscale
         return im
 
+    @allow_rasterization
     def draw(self, renderer, *args, **kwargs):
         if not self.get_visible(): return
         im = self.make_image(renderer.get_image_magnification())
@@ -535,7 +590,7 @@ class PcolorImage(martist.Artist, cm.ScalarMappable):
 
 
     def set_data(self, x, y, A):
-        A = ma.asarray(A)
+        A = cbook.safe_masked_invalid(A)
         if x is None:
             x = np.arange(0, A.shape[1]+1, dtype=np.float64)
         else:
@@ -604,6 +659,7 @@ class FigureImage(martist.Artist, cm.ScalarMappable):
         self.ox = offsetx
         self.oy = offsety
         self.update(kwargs)
+        self.magnification = 1.0
 
     def contains(self, mouseevent):
         """Test whether the mouse event occured within the image.
@@ -632,33 +688,54 @@ class FigureImage(martist.Artist, cm.ScalarMappable):
         return (-0.5+self.ox, numcols-0.5+self.ox,
                 -0.5+self.oy, numrows-0.5+self.oy)
 
+    def set_data(self, A):
+        """
+        Set the image array
+
+        """
+        cm.ScalarMappable.set_array(self, cbook.safe_masked_invalid(A))
+
+    def set_array(self, A):
+        """
+        Deprecated; use set_data for consistency with other image types.
+        """
+        self.set_data(A)
+
     def make_image(self, magnification=1.0):
-        # had to introduce argument magnification to satisfy the unit test
-        # figimage_demo.py. I have no idea, how magnification should be used
-        # within the function. It should be !=1.0 only for non-default DPI
-        # settings in the PS backend, as introduced by patch #1562394
-        # Probably Nicholas Young should look over this code and see, how
-        # magnification should be handled correctly.
         if self._A is None:
             raise RuntimeError('You must first set the image array')
 
         x = self.to_rgba(self._A, self._alpha)
-
-        im = _image.fromarray(x, 1)
+        self.magnification = magnification
+        # if magnification is not one, we need to resize
+        ismag = magnification!=1
+        #if ismag: raise RuntimeError
+        if ismag:
+            isoutput = 0
+        else:
+            isoutput = 1
+        im = _image.fromarray(x, isoutput)
         fc = self.figure.get_facecolor()
         im.set_bg( *mcolors.colorConverter.to_rgba(fc, 0) )
         im.is_grayscale = (self.cmap.name == "gray" and
                            len(self._A.shape) == 2)
+
+        if ismag:
+            numrows, numcols = self.get_size()
+            numrows *= magnification
+            numcols *= magnification
+            im.set_interpolation(_image.NEAREST)
+            im.resize(numcols, numrows)
         if self.origin=='upper':
             im.flipud_out()
 
         return im
 
+    @allow_rasterization
     def draw(self, renderer, *args, **kwargs):
         if not self.get_visible(): return
         # todo: we should be able to do some cacheing here
-        im = self.make_image()
-
+        im = self.make_image(renderer.get_image_magnification())
         renderer.draw_image(round(self.ox), round(self.oy), im, self.figure.bbox,
                             *self.get_transformed_clip_path_and_affine())
 
@@ -680,8 +757,6 @@ def imread(fname):
     <http://www.pythonware.com/products/pil/>`_ is installed, it will
     use it to load the image and return an array (if possible) which
     can be used with :func:`~matplotlib.pyplot.imshow`.
-
-    TODO: support RGB and grayscale return values in _image.readpng
     """
 
     def pilread():
@@ -706,6 +781,42 @@ def imread(fname):
     handler = handlers[ext]
     return handler(fname)
 
+
+def imsave(fname, arr, vmin=None, vmax=None, cmap=None, format=None, origin=None):
+    """
+    Saves a 2D :class:`numpy.array` as an image with one pixel per element.
+    The output formats available depend on the backend being used.
+
+    Arguments:
+      *fname*:
+        A string containing a path to a filename, or a Python file-like object.
+        If *format* is *None* and *fname* is a string, the output
+        format is deduced from the extension of the filename.
+      *arr*:
+        A 2D array.
+    Keyword arguments:
+      *vmin*/*vmax*: [ None | scalar ]
+        *vmin* and *vmax* set the color scaling for the image by fixing the
+        values that map to the colormap color limits. If either *vmin* or *vmax*
+        is None, that limit is determined from the *arr* min/max value.
+      *cmap*:
+        cmap is a colors.Colormap instance, eg cm.jet.
+        If None, default to the rc image.cmap value.
+      *format*:
+        One of the file extensions supported by the active
+        backend.  Most backends support png, pdf, ps, eps and svg.
+      *origin*
+        [ 'upper' | 'lower' ] Indicates where the [0,0] index of
+        the array is in the upper left or lower left corner of
+        the axes. Defaults to the rc image.origin value.
+    """
+    from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+    from matplotlib.figure import Figure
+
+    fig = Figure(figsize=arr.shape[::-1], dpi=1, frameon=False)
+    canvas = FigureCanvas(fig)
+    fig.figimage(arr, cmap=cmap, vmin=vmin, vmax=vmax, origin=origin)
+    fig.savefig(fname, dpi=1, format=format)
 
 
 def pil_to_array( pilImage ):
@@ -745,3 +856,82 @@ def pil_to_array( pilImage ):
     x = toarray(im)
     x.shape = im.size[1], im.size[0], 4
     return x
+
+def thumbnail(infile, thumbfile, scale=0.1, interpolation='bilinear',
+              preview=False):
+    """
+    make a thumbnail of image in *infile* with output filename
+    *thumbfile*.
+
+      *infile* the image file -- must be PNG or PIL readable if you
+         have `PIL <http://www.pythonware.com/products/pil/>`_ installed
+
+      *thumbfile*
+        the thumbnail filename
+
+      *scale*
+        the scale factor for the thumbnail
+
+      *interpolation*
+        the interpolation scheme used in the resampling
+
+
+      *preview*
+        if True, the default backend (presumably a user interface
+        backend) will be used which will cause a figure to be raised
+        if :func:`~matplotlib.pyplot.show` is called.  If it is False,
+        a pure image backend will be used depending on the extension,
+        'png'->FigureCanvasAgg, 'pdf'->FigureCanvasPDF,
+        'svg'->FigureCanvasSVG
+
+
+    See examples/misc/image_thumbnail.py.
+
+    .. htmlonly::
+
+        :ref:`misc-image_thumbnail`
+
+    Return value is the figure instance containing the thumbnail
+
+    """
+
+    basedir, basename = os.path.split(infile)
+    baseout, extout = os.path.splitext(thumbfile)
+
+    im = imread(infile)
+    rows, cols, depth = im.shape
+
+    # this doesn't really matter, it will cancel in the end, but we
+    # need it for the mpl API
+    dpi = 100
+
+
+    height = float(rows)/dpi*scale
+    width = float(cols)/dpi*scale
+
+    extension = extout.lower()
+
+    if preview:
+        # let the UI backend do everything
+        import matplotlib.pyplot as plt
+        fig = plt.figure(figsize=(width, height), dpi=dpi)
+    else:
+        if extension=='.png':
+            from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+        elif extension=='.pdf':
+            from matplotlib.backends.backend_pdf import FigureCanvasPDF as FigureCanvas
+        elif extension=='.svg':
+            from matplotlib.backends.backend_svg import FigureCanvasSVG as FigureCanvas
+        else:
+            raise ValueError("Can only handle extensions 'png', 'svg' or 'pdf'")
+
+        from matplotlib.figure import Figure
+        fig = Figure(figsize=(width, height), dpi=dpi)
+        canvas = FigureCanvas(fig)
+
+    ax = fig.add_axes([0,0,1,1], aspect='auto', frameon=False, xticks=[], yticks=[])
+
+    basename, ext = os.path.splitext(basename)
+    ax.imshow(im, aspect='auto', resample=True, interpolation='bilinear')
+    fig.savefig(thumbfile, dpi=dpi)
+    return fig

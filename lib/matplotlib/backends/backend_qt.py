@@ -13,7 +13,10 @@ from matplotlib.figure import Figure
 from matplotlib.mathtext import MathTextParser
 from matplotlib.widgets import SubplotTool
 
-import qt
+try:
+    import qt
+except ImportError:
+    raise ImportError("Qt backend requires pyqt to be installed.")
 
 backend_version = "0.9.1"
 def fn_name(): return sys._getframe(1).f_code.co_name
@@ -99,6 +102,12 @@ class FigureCanvasQT( qt.QWidget, FigureCanvasBase ):
         w,h = self.get_width_height()
         self.resize( w, h )
 
+    def enterEvent(self, event):
+        FigureCanvasBase.enter_notify_event(self, event)
+
+    def leaveEvent(self, event):
+        FigureCanvasBase.leave_notify_event(self, event)
+
     def mousePressEvent( self, event ):
         x = event.pos().x()
         # flipy so y=0 is bottom of canvas
@@ -167,7 +176,7 @@ class FigureCanvasQT( qt.QWidget, FigureCanvasBase ):
     def _get_key( self, event ):
         if event.key() < 256:
             key = event.text().latin1()
-        elif self.keyvald.has_key( event.key() ):
+        elif event.key() in self.keyvald.has_key:
             key = self.keyvald[ event.key() ]
         else:
             key = None
@@ -176,6 +185,14 @@ class FigureCanvasQT( qt.QWidget, FigureCanvasBase ):
 
     def flush_events(self):
         qt.qApp.processEvents()
+
+    def start_event_loop(self,timeout):
+        FigureCanvasBase.start_event_loop_default(self,timeout)
+    start_event_loop.__doc__=FigureCanvasBase.start_event_loop_default.__doc__
+
+    def stop_event_loop(self):
+        FigureCanvasBase.stop_event_loop_default(self)
+    stop_event_loop.__doc__=FigureCanvasBase.stop_event_loop_default.__doc__
 
 class FigureManagerQT( FigureManagerBase ):
     """

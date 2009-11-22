@@ -4,13 +4,17 @@ financial data.   User contributions welcome!
 
 """
 #from __future__ import division
-import os, time, warnings, md5
-from urllib import urlopen
+import os, time, warnings
+from urllib2 import urlopen
 
+try:
+    from hashlib import md5
+except ImportError:
+    from md5 import md5 #Deprecated in 2.5
 
 try: import datetime
 except ImportError:
-    raise SystemExit('The finance module requires datetime support (python2.3)')
+    raise ImportError('The finance module requires datetime support (python2.3)')
 
 import numpy as np
 
@@ -111,14 +115,16 @@ def fetch_historical_yahoo(ticker, date1, date2, cachename=None):
 
 
     if cachename is None:
-        cachename = os.path.join(cachedir, md5.md5(url).hexdigest())
+        cachename = os.path.join(cachedir, md5(url).hexdigest())
     if os.path.exists(cachename):
         fh = file(cachename)
         verbose.report('Using cachefile %s for %s'%(cachename, ticker))
     else:
         if not os.path.isdir(cachedir): os.mkdir(cachedir)
+        urlfh = urlopen(url)
+
         fh = file(cachename, 'w')
-        fh.write(urlopen(url).read())
+        fh.write(urlfh.read())
         fh.close()
         verbose.report('Saved %s data to cache file %s'%(ticker, cachename))
         fh = file(cachename, 'r')
@@ -411,7 +417,7 @@ def candlestick2(ax, opens, closes, highs, lows, width=4,
 
     # note this code assumes if any value open, close, low, high is
     # missing they all are missing
-    
+
     delta = width/2.
     barVerts = [ ( (i-delta, open), (i-delta, close), (i+delta, close), (i+delta, open) ) for i, open, close in zip(xrange(len(opens)), opens, closes) if open != -1 and close!=-1 ]
 

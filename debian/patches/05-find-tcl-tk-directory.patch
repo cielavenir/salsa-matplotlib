@@ -1,0 +1,23 @@
+Description: Find tcl/tk directory
+ Guess the correct directory in Debian/Ubuntu. Replacing all tcl by tk does not
+ lead to a correct directory: /usr/share/tcltk/tcl8.5 -> /usr/share/tktk/tk8.5
+ The correct path is /usr/share/tcltk/tk8.5
+Forwarded: Yes
+Author: Benjamin Drung <bdrung@ubuntu.com>
+
+diff -pruN matplotlib-0.99.1.1/setupext.py matplotlib-0.99.1.1.new/setupext.py
+--- matplotlib-0.99.1.1/setupext.py	2009-08-23 07:27:32.000000000 +0200
++++ matplotlib-0.99.1.1.new/setupext.py	2009-10-05 22:46:47.465938277 +0200
+@@ -850,7 +850,11 @@ def query_tcltk():
+         else:
+             tcl_lib_dir = str(tcl.getvar('tcl_library'))
+             # Guess Tk location based on Tcl location
+-            tk_lib_dir = tcl_lib_dir.replace('Tcl', 'Tk').replace('tcl', 'tk')
++            (head, tail) = os.path.split(tcl_lib_dir)
++            tail = tail.replace('Tcl', 'Tk').replace('tcl', 'tk')
++            tk_lib_dir = os.path.join(head, tail)
++            if not os.path.exists(tk_lib_dir):
++                tk_lib_dir = tcl_lib_dir.replace('Tcl', 'Tk').replace('tcl', 'tk')
+     else:
+         # Obtain Tcl and Tk locations from Tk widget
+         tk.withdraw()

@@ -1,11 +1,11 @@
 """
-Some io tools for excel -- requires pypyExcelerator
+Some io tools for excel -- requires xlwt
 
 Example usage:
 
     import matplotlib.mlab as mlab
     import mpl_toolkits.exceltools as exceltools
-    
+
     r = mlab.csv2rec('somefile.csv', checkrows=0)
 
     formatd = dict(
@@ -20,8 +20,10 @@ Example usage:
 
 """
 import copy
-import numpy as npy
-import pyExcelerator as excel
+import numpy as np
+
+import xlwt as excel
+
 import matplotlib.cbook as cbook
 import matplotlib.mlab as mlab
 
@@ -41,8 +43,11 @@ def xlformat_factory(format):
        xlstyle.num_format_str = '0.%s%%;[RED]-0.%s%%'%(zeros, zeros)
        format.scale = 1.
     elif isinstance(format, mlab.FormatFloat):
-        zeros = ''.join(['0']*format.precision)
-        xlstyle.num_format_str = '#,##0.%s;[RED]-#,##0.%s'%(zeros, zeros)
+        if format.precision>0:
+            zeros = ''.join(['0']*format.precision)
+            xlstyle.num_format_str = '#,##0.%s;[RED]-#,##0.%s'%(zeros, zeros)
+        else:
+            xlstyle.num_format_str = '#,##;[RED]-#,##'
     elif isinstance(format, mlab.FormatInt):
         xlstyle.num_format_str = '#,##;[RED]-#,##'
     else:
@@ -52,9 +57,9 @@ def xlformat_factory(format):
 
     return format
 
-def rec2excel(r, ws, formatd=None, rownum=0, colnum=0):
+def rec2excel(r, ws, formatd=None, rownum=0, colnum=0, nanstr='NaN', infstr='Inf'):
     """
-    save record array r to excel pyExcelerator worksheet ws
+    save record array r to excel xlwt worksheet ws
     starting at rownum.  if ws is string like, assume it is a
     filename and save to it
 
@@ -62,6 +67,7 @@ def rec2excel(r, ws, formatd=None, rownum=0, colnum=0):
 
     formatd is a dictionary mapping dtype name -> mlab.Format instances
 
+    nanstr is the string that mpl will put into excel for np.nan value
     The next rownum after writing is returned
     """
 
@@ -96,25 +102,26 @@ def rec2excel(r, ws, formatd=None, rownum=0, colnum=0):
     rownum+=1
 
 
-    ind = npy.arange(len(r.dtype.names))
+    ind = np.arange(len(r.dtype.names))
     for row in r:
+
         for i in ind:
             val = row[i]
             format = formats[i]
             val = format.toval(val)
-            if format.xlstyle is None:
+            if mlab.safe_isnan(val):
+                ws.write(rownum, colnum+i, nanstr)
+            elif mlab.safe_isinf(val):
+                sgn = np.sign(val)
+                if sgn<0: s = infstr
+                else: s = '-%s'%infstr
+                ws.write(rownum, colnum+i, s)
+            elif format.xlstyle is None:
                 ws.write(rownum, colnum+i, val)
             else:
-                if mlab.safe_isnan(val):
-                    ws.write(rownum, colnum+i, 'NaN')
-                else:
-                    ws.write(rownum, colnum+i, val, format.xlstyle)
+                ws.write(rownum, colnum+i, val, format.xlstyle)
         rownum += 1
 
     if autosave:
         wb.save(filename)
     return rownum
-
-
-
-

@@ -1,34 +1,49 @@
 """
-A class for converting color arguments to RGB or RGBA
+A module for converting numbers or color arguments to *RGB* or *RGBA*
 
-This class instantiates a single instance colorConverter that is used
-to convert matlab color strings to RGB.  RGB is a tuple of float RGB
-values in the range 0-1.
+*RGB* and *RGBA* are sequences of, respectively, 3 or 4 floats in the
+range 0-1.
+
+This module includes functions and classes for color specification
+conversions, and for mapping numbers to colors in a 1-D array of
+colors called a colormap. Colormapping typically involves two steps:
+a data array is first mapped onto the range 0-1 using an instance
+of :class:`Normalize` or of a subclass; then this number in the 0-1
+range is mapped to a color using an instance of a subclass of
+:class:`Colormap`.  Two are provided here:
+:class:`LinearSegmentedColormap`, which is used to generate all
+the built-in colormap instances, but is also useful for making
+custom colormaps, and :class:`ListedColormap`, which is used for
+generating a custom colormap from a list of color specifications.
+
+The module also provides a single instance, *colorConverter*, of the
+:class:`ColorConverter` class providing methods for converting single
+color specifications or sequences of them to *RGB* or *RGBA*.
 
 Commands which take color arguments can use several formats to specify
 the colors.  For the basic builtin colors, you can use a single letter
 
-      b  : blue
-      g  : green
-      r  : red
-      c  : cyan
-      m  : magenta
-      y  : yellow
-      k  : black
-      w  : white
+    - b  : blue
+    - g  : green
+    - r  : red
+    - c  : cyan
+    - m  : magenta
+    - y  : yellow
+    - k  : black
+    - w  : white
 
 Gray shades can be given as a string encoding a float in the 0-1
-range, e.g.,
+range, e.g.::
 
     color = '0.75'
 
 For a greater range of colors, you have two options.  You can specify
-the color using an html hex string, as in
+the color using an html hex string, as in::
 
       color = '#eeefff'
 
-or you can pass an R,G,B tuple, where each of R,G,B are in the range
-[0,1].
+or you can pass an *R* , *G* , *B* tuple, where each of *R* , *G* , *B*
+are in the range [0,1].
 
 Finally, legal html names for colors, like 'red', 'burlywood' and
 'chartreuse' are supported.
@@ -37,6 +52,11 @@ import re
 import numpy as np
 from numpy import ma
 import matplotlib.cbook as cbook
+
+parts = np.__version__.split('.')
+NP_MAJOR, NP_MINOR = map(int, parts[:2])
+# true if clip supports the out kwarg
+NP_CLIP_OUT = NP_MAJOR>=1 and NP_MINOR>=2
 
 cnames = {
     'aliceblue'            : '#F0F8FF',
@@ -188,6 +208,7 @@ for k, v in cnames.items():
         cnames[k] = v
 
 def is_color_like(c):
+    'Return *True* if *c* can be converted to *RGB*'
     try:
         colorConverter.to_rgb(c)
         return True
@@ -203,7 +224,7 @@ hexColorPattern = re.compile("\A#[a-fA-F0-9]{6}\Z")
 
 def hex2color(s):
     """
-    Take a hex string 's' and return the corresponding rgb 3-tuple
+    Take a hex string *s* and return the corresponding rgb 3-tuple
     Example: #efefef -> (0.93725, 0.93725, 0.93725)
     """
     if not isinstance(s, basestring):
@@ -213,6 +234,15 @@ def hex2color(s):
     return tuple([int(n, 16)/255.0 for n in (s[1:3], s[3:5], s[5:7])])
 
 class ColorConverter:
+    """
+    Provides methods for converting color specifications to *RGB* or *RGBA*
+
+    Caching is used for more efficient conversion upon repeated calls
+    with the same argument.
+
+    Ordinarily only the single instance instantiated in this module,
+    *colorConverter*, is needed.
+    """
     colors = {
         'b' : (0.0, 0.0, 1.0),
         'g' : (0.0, 0.5, 0.0),
@@ -227,15 +257,17 @@ class ColorConverter:
     cache = {}
     def to_rgb(self, arg):
         """
-        Returns an RGB tuple of three floats from 0-1.
+        Returns an *RGB* tuple of three floats from 0-1.
 
-        arg can be an RGB or RGBA sequence or a string in any of several forms:
+        *arg* can be an *RGB* or *RGBA* sequence or a string in any of
+        several forms:
+
             1) a letter from the set 'rgbcmykw'
             2) a hex color string, like '#00FFFF'
             3) a standard name, like 'aqua'
             4) a float, like '0.4', indicating gray on a 0-1 scale
 
-        if arg is RGBA, the A will simply be discarded.
+        if *arg* is *RGBA*, the *A* will simply be discarded.
         """
         try: return self.cache[arg]
         except KeyError: pass
@@ -250,13 +282,14 @@ class ColorConverter:
 
         try:
             if cbook.is_string_like(arg):
-                color = self.colors.get(arg, None)
+                argl = arg.lower()
+                color = self.colors.get(argl, None)
                 if color is None:
-                    str1 = cnames.get(arg, arg)
+                    str1 = cnames.get(argl, argl)
                     if str1.startswith('#'):
                         color = hex2color(str1)
                     else:
-                        fl = float(arg)
+                        fl = float(argl)
                         if fl < 0 or fl > 1:
                             raise ValueError(
                                    'gray (string) must be in range 0-1')
@@ -283,12 +316,20 @@ class ColorConverter:
 
     def to_rgba(self, arg, alpha=None):
         """
-        Returns an RGBA tuple of four floats from 0-1.
+        Returns an *RGBA* tuple of four floats from 0-1.
 
-        For acceptable values of arg, see to_rgb.
-        If arg is an RGBA sequence and alpha is not None,
-        alpha will replace the original A.
+        For acceptable values of *arg*, see :meth:`to_rgb`.
+        In addition, if *arg* is "none" (case-insensitive),
+        then (0,0,0,0) will be returned.
+        If *arg* is an *RGBA* sequence and *alpha* is not *None*,
+        *alpha* will replace the original *A*.
         """
+        try:
+            if arg.lower() == 'none':
+                return (0.0, 0.0, 0.0, 0.0)
+        except AttributeError:
+            pass
+
         try:
             if not cbook.is_string_like(arg) and cbook.iterable(arg):
                 if len(arg) == 4:
@@ -299,7 +340,7 @@ class ColorConverter:
                         return tuple(arg)
                     if alpha < 0.0 or alpha > 1.0:
                         raise ValueError("alpha must be in range 0-1")
-                    return arg[0], arg[1], arg[2], arg[3] * alpha
+                    return arg[0], arg[1], arg[2], alpha
                 r,g,b = arg[:3]
                 if [x for x in (r,g,b) if (float(x) < 0) or  (x > 1)]:
                     raise ValueError('number in rbg sequence outside 0-1 range')
@@ -313,41 +354,50 @@ class ColorConverter:
 
     def to_rgba_array(self, c, alpha=None):
         """
-        Returns an Numpy array of rgba tuples.
+        Returns a numpy array of *RGBA* tuples.
 
         Accepts a single mpl color spec or a sequence of specs.
-        If the sequence is a list or array, the items are changed in place,
-        but an array copy is still returned.
 
-        Special case to handle "no color": if c is "none" (case-insensitive),
+        Special case to handle "no color": if *c* is "none" (case-insensitive),
         then an empty array will be returned.  Same for an empty list.
         """
         try:
-            if c.lower() == 'none':
-                return np.zeros((0,4), dtype=np.float_)
+            nc = len(c)
+        except TypeError:
+            raise ValueError(
+                "Cannot convert argument type %s to rgba array" % type(c))
+        try:
+            if nc == 0 or c.lower() == 'none':
+                return np.zeros((0,4), dtype=np.float)
         except AttributeError:
             pass
-        if len(c) == 0:
-            return np.zeros((0,4), dtype=np.float_)
         try:
-            result = [self.to_rgba(c, alpha)]
+            # Single value? Put it in an array with a single row.
+            return np.array([self.to_rgba(c, alpha)], dtype=np.float)
         except ValueError:
-            # If c is a list it must be maintained as the same list
-            # with modified items so that items can be appended to
-            # it. This is needed for examples/dynamic_collections.py.
-            if not isinstance(c, (list, np.ndarray)): # specific; don't need duck-typing
-                c = list(c)
+            if isinstance(c, np.ndarray):
+                if c.ndim != 2 and c.dtype.kind not in 'SU':
+                    raise ValueError("Color array must be two-dimensional")
+                if (c.ndim == 2 and c.shape[1] == 4 and c.dtype.kind == 'f'):
+                    if (c.ravel() > 1).any() or (c.ravel() < 0).any():
+                        raise ValueError(
+                            "number in rgba sequence is outside 0-1 range")
+                    # looks like rgba already, nothing to be done; do
+                    # we want to apply alpha here if
+                    # (c[:,3]==1).all() ?
+                    return np.asarray(c, np.float)
+            # It must be some other sequence of color specs.
+            result = np.zeros((nc, 4), dtype=np.float)
             for i, cc in enumerate(c):
-                c[i] = self.to_rgba(cc, alpha)  # change in place
-            result = c
-        return np.asarray(result, np.float_)
+                result[i] = self.to_rgba(cc, alpha)
+            return result
 
 colorConverter = ColorConverter()
 
 def makeMappingArray(N, data):
-    """Create an N-element 1-d lookup table
+    """Create an *N* -element 1-d lookup table
 
-    data represented by a list of x,y0,y1 mapping correspondences.
+    *data* represented by a list of x,y0,y1 mapping correspondences.
     Each element in this list represents how a value between 0 and 1
     (inclusive) represented by x is mapped to a corresponding value
     between 0 and 1 (inclusive). The two values of y are to allow
@@ -358,7 +408,7 @@ def makeMappingArray(N, data):
     all values of x must be in increasing order. Values between
     the given mapping points are determined by simple linear interpolation.
 
-    The function returns an array "result" where result[x*(N-1)]
+    The function returns an array "result" where ``result[x*(N-1)]``
     gives the closest value for values of x between 0 and 1.
     """
     try:
@@ -400,14 +450,16 @@ class Colormap:
     """Base class for all scalar to rgb mappings
 
         Important methods:
-            set_bad()
-            set_under()
-            set_over()
+
+            * :meth:`set_bad`
+            * :meth:`set_under`
+            * :meth:`set_over`
     """
     def __init__(self, name, N=256):
-        """Public class attributes:
-            self.N:       number of rgb quantization levels
-            self.name:    name of colormap
+        """
+        Public class attributes:
+            :attr:`N` : number of rgb quantization levels
+            :attr:`name` : name of colormap
 
         """
         self.name = name
@@ -423,7 +475,7 @@ class Colormap:
 
     def __call__(self, X, alpha=1.0, bytes=False):
         """
-        X is either a scalar or an array (of any dimension).
+        *X* is either a scalar or an array (of any dimension).
         If scalar, a tuple of rgba values is returned, otherwise
         an array with the new shape = oldshape+(4,). If the X-values
         are integers, then they are used as indices into the array.
@@ -437,19 +489,31 @@ class Colormap:
         if not self._isinit: self._init()
         alpha = min(alpha, 1.0) # alpha must be between 0 and 1
         alpha = max(alpha, 0.0)
-        self._lut[:-3, -1] = alpha
+        self._lut[:-1,-1] = alpha  # Don't assign global alpha to i_bad;
+                                   # it would defeat the purpose of the
+                                   # default behavior, which is to not
+                                   # show anything where data are missing.
         mask_bad = None
         if not cbook.iterable(X):
             vtype = 'scalar'
             xa = np.array([X])
         else:
             vtype = 'array'
-            xma = ma.asarray(X)
+            # force a copy here -- the ma.array and filled functions
+            # do force a cop of the data by default - JDH
+            xma = ma.array(X, copy=True)
             xa = xma.filled(0)
             mask_bad = ma.getmask(xma)
         if xa.dtype.char in np.typecodes['Float']:
             np.putmask(xa, xa==1.0, 0.9999999) #Treat 1.0 as slightly less than 1.
-            xa = (xa * self.N).astype(int)
+            # The following clip is fast, and prevents possible
+            # conversion of large positive values to negative integers.
+
+            if NP_CLIP_OUT:
+                np.clip(xa * self.N, -1, self.N, out=xa)
+            else:
+                xa = np.clip(xa * self.N, -1, self.N)
+            xa = xa.astype(int)
         # Set the over-range indices before the under-range;
         # otherwise the under-range values get converted to over-range.
         np.putmask(xa, xa>self.N-1, self._i_over)
@@ -513,18 +577,52 @@ class Colormap:
 class LinearSegmentedColormap(Colormap):
     """Colormap objects based on lookup tables using linear segments.
 
-    The lookup transfer function is a simple linear function between
-    defined intensities. There is no limit to the number of segments
-    that may be defined. Though as the segment intervals start containing
-    fewer and fewer array locations, there will be inevitable quantization
-    errors
+    The lookup table is generated using linear interpolation for each
+    primary color, with the 0-1 domain divided into any number of
+    segments.
     """
     def __init__(self, name, segmentdata, N=256):
         """Create color map from linear mapping segments
 
         segmentdata argument is a dictionary with a red, green and blue
-        entries. Each entry should be a list of x, y0, y1 tuples.
-        See makeMappingArray for details
+        entries. Each entry should be a list of *x*, *y0*, *y1* tuples,
+        forming rows in a table.
+
+        Example: suppose you want red to increase from 0 to 1 over
+        the bottom half, green to do the same over the middle half,
+        and blue over the top half.  Then you would use::
+
+            cdict = {'red':   [(0.0,  0.0, 0.0),
+                               (0.5,  1.0, 1.0),
+                               (1.0,  1.0, 1.0)],
+
+                     'green': [(0.0,  0.0, 0.0),
+                               (0.25, 0.0, 0.0),
+                               (0.75, 1.0, 1.0),
+                               (1.0,  1.0, 1.0)],
+
+                     'blue':  [(0.0,  0.0, 0.0),
+                               (0.5,  0.0, 0.0),
+                               (1.0,  1.0, 1.0)]}
+
+        Each row in the table for a given color is a sequence of
+        *x*, *y0*, *y1* tuples.  In each sequence, *x* must increase
+        monotonically from 0 to 1.  For any input value *z* falling
+        between *x[i]* and *x[i+1]*, the output value of a given color
+        will be linearly interpolated between *y1[i]* and *y0[i+1]*::
+
+            row i:   x  y0  y1
+                           /
+                          /
+            row i+1: x  y0  y1
+
+        Hence y0 in the first row and y1 in the last row are never used.
+
+
+        .. seealso::
+
+            :func:`makeMappingArray`
+               For information about making a mapping array.
         """
         self.monochrome = False  # True only if all colors in map are identical;
                                  # needed for contouring.
@@ -539,6 +637,26 @@ class LinearSegmentedColormap(Colormap):
         self._isinit = True
         self._set_extremes()
 
+    @staticmethod
+    def from_list(name, colors, N=256):
+        """
+        Make a linear segmented colormap with *name* from a sequence
+        of *colors* which evenly transitions from colors[0] at val=1
+        to colors[-1] at val=1.  N is the number of rgb quantization
+        levels.
+        """
+
+        ncolors = len(colors)
+        vals = np.linspace(0., 1., ncolors)
+
+        cdict = dict(red=[], green=[], blue=[])
+        for val, color in zip(vals, colors):
+            r,g,b = colorConverter.to_rgb(color)
+            cdict['red'].append((val, r, r))
+            cdict['green'].append((val, g, g))
+            cdict['blue'].append((val, b, b))
+
+        return LinearSegmentedColormap(name, cdict, N)
 
 class ListedColormap(Colormap):
     """Colormap object generated from a list of colors.
@@ -551,13 +669,22 @@ class ListedColormap(Colormap):
         """
         Make a colormap from a list of colors.
 
-        colors is a list of matplotlib color specifications,
-            or an equivalent Nx3 floating point array (N rgb values)
-        name is a string to identify the colormap
-        N is the number of entries in the map.  The default is None,
+        *colors*
+            a list of matplotlib color specifications,
+            or an equivalent Nx3 floating point array (*N* rgb values)
+        *name*
+            a string to identify the colormap
+        *N*
+            the number of entries in the map.  The default is *None*,
             in which case there is one colormap entry for each
-            element in the list of colors.  If N < len(colors)
-            the list will be truncated at N.  If N > len(colors),
+            element in the list of colors.  If::
+
+                N < len(colors)
+
+            the list will be truncated at *N*.  If::
+
+                N > len(colors)
+
             the list will be extended by repetition.
         """
         self.colors = colors
@@ -600,16 +727,19 @@ class Normalize:
     """
     def __init__(self, vmin=None, vmax=None, clip=False):
         """
-        If vmin or vmax is not given, they are taken from the input's
-        minimum and maximum value respectively.  If clip is True and
+        If *vmin* or *vmax* is not given, they are taken from the input's
+        minimum and maximum value respectively.  If *clip* is *True* and
         the given value falls outside the range, the returned value
-        will be 0 or 1, whichever is closer. Returns 0 if vmin==vmax.
+        will be 0 or 1, whichever is closer. Returns 0 if::
+
+            vmin==vmax
+
         Works with scalars or arrays, including masked arrays.  If
-        clip is True, masked values are set to 1; otherwise they
+        *clip* is *True*, masked values are set to 1; otherwise they
         remain masked.  Clipping silently defeats the purpose of setting
         the over, under, and masked colors in the colormap, so it is
         likely to lead to surprises; therefore the default is
-        clip=False.
+        *clip* = *False*.
         """
         self.vmin = vmin
         self.vmax = vmax
@@ -656,7 +786,7 @@ class Normalize:
 
     def autoscale(self, A):
         '''
-        Set vmin, vmax to min, max of A.
+        Set *vmin*, *vmax* to min, max of *A*.
         '''
         self.vmin = ma.minimum(A)
         self.vmax = ma.maximum(A)
@@ -718,8 +848,9 @@ class BoundaryNorm(Normalize):
     '''
     Generate a colormap index based on discrete intervals.
 
-    Unlike Normalize or LogNorm, BoundaryNorm maps values
-    to integers instead of to the interval 0-1.
+    Unlike :class:`Normalize` or :class:`LogNorm`,
+    :class:`BoundaryNorm` maps values to integers instead of to the
+    interval 0-1.
 
     Mapping to the 0-1 interval could have been done via
     piece-wise linear interpolation, but using integers seems
@@ -728,17 +859,22 @@ class BoundaryNorm(Normalize):
     '''
     def __init__(self, boundaries, ncolors, clip=False):
         '''
-        args:
-            boundaries: a monotonically increasing sequence
-            ncolors: number of colors in the colormap to be used
+        *boundaries*
+            a monotonically increasing sequence
+        *ncolors*
+            number of colors in the colormap to be used
 
-        If b[i] <= v < b[i+1] then v is mapped to color j;
+        If::
+
+            b[i] <= v < b[i+1]
+
+        then v is mapped to color j;
         as i varies from 0 to len(boundaries)-2,
         j goes from 0 to ncolors-1.
 
         Out-of-range values are mapped to -1 if low and ncolors
         if high; these are converted to valid indices by
-        Colormap.__call__.
+        :meth:`Colormap.__call__` .
         '''
         self.clip = clip
         self.vmin = boundaries[0]
@@ -778,7 +914,8 @@ class BoundaryNorm(Normalize):
 class NoNorm(Normalize):
     '''
     Dummy replacement for Normalize, for the case where we
-    want to use indices directly in a ScalarMappable.
+    want to use indices directly in a
+    :class:`~matplotlib.cm.ScalarMappable` .
     '''
     def __call__(self, value, clip=None):
         return value
@@ -789,3 +926,132 @@ class NoNorm(Normalize):
 # compatibility with earlier class names that violated convention:
 normalize = Normalize
 no_norm = NoNorm
+
+def rgb_to_hsv(arr):
+    """
+    convert rgb values in a numpy array to hsv values
+    input and output arrays should have shape (M,N,3)
+    """
+    out = np.empty_like(arr)
+    arr_max = arr.max(-1)
+    delta = arr.ptp(-1)
+    s = delta / arr_max
+    s[delta==0] = 0
+    # red is max
+    idx = (arr[:,:,0] == arr_max)
+    out[idx, 0] = (arr[idx, 1] - arr[idx, 2]) / delta[idx]
+    # green is max
+    idx = (arr[:,:,1] == arr_max)
+    out[idx, 0] = 2. + (arr[idx, 2] - arr[idx, 0] ) / delta[idx]
+    # blue is max
+    idx = (arr[:,:,2] == arr_max)
+    out[idx, 0] = 4. + (arr[idx, 0] - arr[idx, 1] ) / delta[idx]
+    out[:,:,0] = (out[:,:,0]/6.0) % 1.0
+    out[:,:,1] = s
+    out[:,:,2] = arr_max
+    return out
+
+def hsv_to_rgb(hsv):
+    """
+    convert hsv values in a numpy array to rgb values
+    both input and output arrays have shape (M,N,3)
+    """
+    h = hsv[:,:,0]; s = hsv[:,:,1]; v = hsv[:,:,2]
+    r = np.empty_like(h); g = np.empty_like(h); b = np.empty_like(h)
+    i = (h*6.0).astype(np.int)
+    f = (h*6.0) - i
+    p = v*(1.0 - s)
+    q = v*(1.0 - s*f)
+    t = v*(1.0 - s*(1.0-f))
+    idx = i%6 == 0
+    r[idx] = v[idx]; g[idx] = t[idx]; b[idx] = p[idx]
+    idx = i == 1
+    r[idx] = q[idx]; g[idx] = v[idx]; b[idx] = p[idx]
+    idx = i == 2
+    r[idx] = p[idx]; g[idx] = v[idx]; b[idx] = t[idx]
+    idx = i == 3
+    r[idx] = p[idx]; g[idx] = q[idx]; b[idx] = v[idx]
+    idx = i == 4
+    r[idx] = t[idx]; g[idx] = p[idx]; b[idx] = v[idx]
+    idx = i == 5
+    r[idx] = v[idx]; g[idx] = p[idx]; b[idx] = q[idx]
+    idx = s == 0
+    r[idx] = v[idx]; g[idx] = v[idx]; b[idx] = v[idx]
+    rgb = np.empty_like(hsv)
+    rgb[:,:,0]=r; rgb[:,:,1]=g; rgb[:,:,2]=b
+    return rgb
+
+class LightSource(object):
+    """
+    Create a light source coming from the specified azimuth and elevation.
+    Angles are in degrees, with the azimuth measured
+    clockwise from north and elevation up from the zero plane of the surface.
+    The :meth:`shade` is used to produce rgb values for a shaded relief image
+    given a data array.
+    """
+    def __init__(self,azdeg=315,altdeg=45,\
+                 hsv_min_val=0,hsv_max_val=1,hsv_min_sat=1,hsv_max_sat=0):
+       """
+       Specify the azimuth (measured clockwise from south) and altitude
+       (measured up from the plane of the surface) of the light source
+       in degrees.
+
+       The color of the resulting image will be darkened
+       by moving the (s,v) values (in hsv colorspace) toward
+       (hsv_min_sat, hsv_min_val) in the shaded regions, or
+       lightened by sliding (s,v) toward
+       (hsv_max_sat hsv_max_val) in regions that are illuminated.
+       The default extremes are chose so that completely shaded points
+       are nearly black (s = 1, v = 0) and completely illuminated points
+       are nearly white (s = 0, v = 1).
+       """
+       self.azdeg = azdeg
+       self.altdeg = altdeg
+       self.hsv_min_val = hsv_min_val
+       self.hsv_max_val = hsv_max_val
+       self.hsv_min_sat = hsv_min_sat
+       self.hsv_max_sat = hsv_max_sat
+
+    def shade(self,data,cmap):
+        """
+        Take the input data array, convert to HSV values in the
+        given colormap, then adjust those color values
+        to given the impression of a shaded relief map with a
+        specified light source.
+        RGBA values are returned, which can then be used to
+        plot the shaded image with imshow.
+        """
+        # imagine an artificial sun placed at infinity in
+        # some azimuth and elevation position illuminating our surface. The parts of
+        # the surface that slope toward the sun should brighten while those sides
+        # facing away should become darker.
+        # convert alt, az to radians
+        az = self.azdeg*np.pi/180.0
+        alt = self.altdeg*np.pi/180.0
+        # gradient in x and y directions
+        dx, dy = np.gradient(data)
+        slope = 0.5*np.pi - np.arctan(np.hypot(dx, dy))
+        aspect = np.arctan2(dx, dy)
+        intensity = np.sin(alt)*np.sin(slope) + np.cos(alt)*np.cos(slope)*np.cos(-az -\
+                aspect - 0.5*np.pi)
+        # rescale to interval -1,1
+        # +1 means maximum sun exposure and -1 means complete shade.
+        intensity = (intensity - intensity.min())/(intensity.max() - intensity.min())
+        intensity = 2.*intensity - 1.
+        # convert to rgb, then rgb to hsv
+        rgb = cmap((data-data.min())/(data.max()-data.min()))
+        hsv = rgb_to_hsv(rgb[:,:,0:3])
+        # modify hsv values to simulate illumination.
+        hsv[:,:,1] = np.where(np.logical_and(np.abs(hsv[:,:,1])>1.e-10,intensity>0),\
+                (1.-intensity)*hsv[:,:,1]+intensity*self.hsv_max_sat, hsv[:,:,1])
+        hsv[:,:,2] = np.where(intensity > 0, (1.-intensity)*hsv[:,:,2] +\
+                intensity*self.hsv_max_val, hsv[:,:,2])
+        hsv[:,:,1] = np.where(np.logical_and(np.abs(hsv[:,:,1])>1.e-10,intensity<0),\
+                (1.+intensity)*hsv[:,:,1]-intensity*self.hsv_min_sat, hsv[:,:,1])
+        hsv[:,:,2] = np.where(intensity < 0, (1.+intensity)*hsv[:,:,2] -\
+                intensity*self.hsv_min_val, hsv[:,:,2])
+        hsv[:,:,1:] = np.where(hsv[:,:,1:]<0.,0,hsv[:,:,1:])
+        hsv[:,:,1:] = np.where(hsv[:,:,1:]>1.,1,hsv[:,:,1:])
+        # convert modified hsv back to rgb.
+        rgb[:,:,0:3] = hsv_to_rgb(hsv)
+        return rgb

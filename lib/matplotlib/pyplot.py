@@ -1,21 +1,25 @@
 import sys
 
 import matplotlib
-from matplotlib import _pylab_helpers
+from matplotlib import _pylab_helpers, interactive
 from matplotlib.cbook import dedent, silent_list, is_string_like, is_numlike
 from matplotlib.figure import Figure, figaspect
 from matplotlib.backend_bases import FigureCanvasBase
 from matplotlib.image import imread as _imread
+from matplotlib.image import imsave as _imsave
 from matplotlib import rcParams, rcParamsDefault, get_backend
-from matplotlib.artist import getp, get
+from matplotlib.rcsetup import interactive_bk as _interactive_bk
+from matplotlib.artist import getp, get, Artist
 from matplotlib.artist import setp as _setp
 from matplotlib.axes import Axes
 from matplotlib.projections import PolarAxes
-from matplotlib import mlab  # for csv2rec in plotfile
+from matplotlib import mlab  # for csv2rec, detrend_none, window_hanning
 from matplotlib.scale import get_scale_docs, get_scale_names
 
 from matplotlib import cm
-from matplotlib.cm import get_cmap
+from matplotlib.cm import get_cmap, register_cmap
+
+import numpy as np
 
 # We may not need the following imports here:
 from matplotlib.colors import Normalize, normalize # latter for backwards compat.
@@ -32,11 +36,54 @@ from ticker import TickHelper, Formatter, FixedFormatter, NullFormatter,\
            MaxNLocator
 
 
+## Backend detection ##
+def _backend_selection():
+    """ If rcParams['backend_fallback'] is true, check to see if the
+        current backend is compatible with the current running event
+        loop, and if not switches to a compatible one.
+    """
+    backend = rcParams['backend']
+    if not rcParams['backend_fallback'] or \
+                     backend not in _interactive_bk:
+        return
+    is_agg_backend = rcParams['backend'].endswith('Agg')
+    if 'wx' in sys.modules and not backend in ('WX', 'WXAgg'):
+        import wx
+        if wx.App.IsMainLoopRunning():
+            rcParams['backend'] = 'wx' + 'Agg' * is_agg_backend
+    elif 'qt' in sys.modules and not backend == 'QtAgg':
+        import qt
+        if not qt.qApp.startingUp():
+            # The mainloop is running.
+            rcParams['backend'] = 'qtAgg'
+    elif 'PyQt4.QtCore' in sys.modules and not backend == 'Qt4Agg':
+        import PyQt4.QtGui
+        if not PyQt4.QtGui.qApp.startingUp():
+            # The mainloop is running.
+            rcParams['backend'] = 'qt4Agg'
+    elif 'gtk' in sys.modules and not backend in ('GTK', 'GTKAgg',
+                                                            'GTKCairo'):
+        import gobject
+        if gobject.MainLoop().is_running():
+            rcParams['backend'] = 'gtk' + 'Agg' * is_agg_backend
+    elif 'Tkinter' in sys.modules and not backend == 'TkAgg':
+        #import Tkinter
+        pass #what if anything do we need to do for tkinter?
+
+_backend_selection()
 
 ## Global ##
 
 from matplotlib.backends import pylab_setup
 new_figure_manager, draw_if_interactive, show = pylab_setup()
+
+
+
+def findobj(o=None, match=None):
+    if o is None:
+        o = gcf()
+    return o.findobj(match)
+findobj.__doc__ = Artist.findobj.__doc__
 
 def switch_backend(newbackend):
     """
@@ -140,7 +187,7 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
     """
     call signature::
 
-      figure(num = None, figsize=(8, 6), dpi=80, facecolor='w', edgecolor='k')
+      figure(num=None, figsize=(8, 6), dpi=80, facecolor='w', edgecolor='k')
 
 
     Create a new figure and return a :class:`matplotlib.figure.Figure`
@@ -149,7 +196,7 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
     *number* attribute holding this number.
 
     If *num* is an integer, and ``figure(num)`` already exists, make it
-    active and return the handle to it.  If ``figure(num)`` does not exist
+    active and return a reference to it.  If ``figure(num)`` does not exist
     it will be created.  Numbering starts at 1, matlab style::
 
       figure(1)
@@ -190,6 +237,9 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
             num = max(allnums) + 1
         else:
             num = 1
+    else:
+        num = int(num)  # crude validation of num argument
+
 
     figManager = _pylab_helpers.Gcf.get_fig_manager(num)
     if figManager is None:
@@ -202,6 +252,14 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
                                              frameon=frameon,
                                              FigureClass=FigureClass,
                                              **kwargs)
+
+        # make this figure current on button press event
+        def make_active(event):
+            _pylab_helpers.Gcf.set_active(figManager)
+
+        cid = figManager.canvas.mpl_connect('button_press_event', make_active)
+        figManager._cidgcf = cid
+
         _pylab_helpers.Gcf.set_active(figManager)
         figManager.canvas.figure.number = num
 
@@ -209,13 +267,21 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
     return figManager.canvas.figure
 
 def gcf():
-    "Return a handle to the current figure."
+    "Return a reference to the current figure."
 
     figManager = _pylab_helpers.Gcf.get_active()
     if figManager is not None:
         return figManager.canvas.figure
     else:
         return figure()
+
+fignum_exists = _pylab_helpers.Gcf.has_fignum
+
+def get_fignums():
+    "Return a list of existing figure numbers."
+    fignums = _pylab_helpers.Gcf.figs.keys()
+    fignums.sort()
+    return fignums
 
 def get_current_fig_manager():
     figManager = _pylab_helpers.Gcf.get_active()
@@ -252,17 +318,21 @@ def close(*args):
     if len(args)==0:
         figManager = _pylab_helpers.Gcf.get_active()
         if figManager is None: return
-        else: _pylab_helpers.Gcf.destroy(figManager.num)
+        else:
+            figManager.canvas.mpl_disconnect(figManager._cidgcf)
+            _pylab_helpers.Gcf.destroy(figManager.num)
     elif len(args)==1:
         arg = args[0]
         if arg=='all':
             for manager in _pylab_helpers.Gcf.get_all_fig_managers():
+                manager.canvas.mpl_disconnect(manager._cidgcf)
                 _pylab_helpers.Gcf.destroy(manager.num)
         elif isinstance(arg, int):
             _pylab_helpers.Gcf.destroy(arg)
         elif isinstance(arg, Figure):
             for manager in _pylab_helpers.Gcf.get_all_fig_managers():
                 if manager.canvas.figure==arg:
+                    manager.canvas.mpl_disconnect(manager._cidgcf)
                     _pylab_helpers.Gcf.destroy(manager.num)
         else:
             raise TypeError('Unrecognized argument type %s to close'%type(arg))
@@ -299,6 +369,20 @@ def ginput(*args, **kwargs):
     return gcf().ginput(*args, **kwargs)
 if Figure.ginput.__doc__ is not None:
     ginput.__doc__ = dedent(Figure.ginput.__doc__)
+
+def waitforbuttonpress(*args, **kwargs):
+    """
+    Blocking call to interact with the figure.
+
+    This will wait for *n* key or mouse clicks from the user and
+    return a list containing True's for keyboard clicks and False's
+    for mouse clicks.
+
+    If *timeout* is negative, does not timeout.
+    """
+    return gcf().waitforbuttonpress(*args, **kwargs)
+if Figure.waitforbuttonpress.__doc__ is not None:
+    waitforbuttonpress.__doc__ = dedent(Figure.waitforbuttonpress.__doc__)
 
 
 # Putting things in figures
@@ -343,16 +427,18 @@ def figlegend(handles, labels, loc, **kwargs):
       can be a string or an integer specifying the legend
       location
 
+    A :class:`matplotlib.legend.Legend` instance is returned.
+
     Example::
 
       figlegend( (line1, line2, line3),
                  ('label1', 'label2', 'label3'),
                  'upper right' )
 
-    See :func:`~matplotlib.pyplot.legend` for information about the
-    location codes
+    .. seealso::
 
-    A :class:`matplotlib.legend.Legend` instance is returned.
+       :func:`~matplotlib.pyplot.legend`
+
     """
     l = gcf().legend(handles, labels, loc, **kwargs)
     draw_if_interactive()
@@ -514,14 +600,6 @@ def subplot(*args, **kwargs):
 
     ``subplot(111)`` is the default axis.
 
-    The background color of the subplot can be specified via keyword
-    argument *axisbg*, which takes a color string as value, as in::
-
-      subplot(211, axisbg='y')
-
-    See :func:`~matplotlib.pyplot.axes` for additional information on
-    :func:`axes` and :func:`subplot` keyword arguments.
-
     New subplots that overlap old will delete the old axes.  If you do
     not want this behavior, use
     :meth:`matplotlib.figure.Figure.add_subplot` or the
@@ -531,6 +609,36 @@ def subplot(*args, **kwargs):
       plot([1,2,3])  # implicitly creates subplot(111)
       subplot(211)   # overlaps, subplot(111) is killed
       plot(rand(12), rand(12))
+      subplot(212, axisbg='y') # creates 2nd subplot with yellow background
+
+    Keyword arguments:
+
+      *axisbg*:
+        The background color of the subplot, which can be any valid
+        color specifier.  See :mod:`matplotlib.colors` for more
+        information.
+
+      *polar*:
+        A boolean flag indicating whether the subplot plot should be
+        a polar projection.  Defaults to False.
+
+      *projection*:
+        A string giving the name of a custom projection to be used
+        for the subplot. This projection must have been previously
+        registered. See :func:`matplotlib.projections.register_projection`
+
+    .. seealso::
+
+        :func:`~matplotlib.pyplot.axes`
+            For additional information on :func:`axes` and
+            :func:`subplot` keyword arguments.
+
+        :file:`examples/pylab_examples/polar_scatter.py`
+            For an example
+
+    **Example:**
+
+    .. plot:: mpl_examples/pylab_examples/subplot_demo.py
 
     """
 
@@ -555,12 +663,16 @@ def twinx(ax=None):
     *None*) sharing the xaxis.  The ticks for *ax2* will be placed on
     the right, and the *ax2* instance is returned.
 
-    See :file:`examples/pylab_examples/two_scales.py`
+    .. seealso::
+
+       :file:`examples/api_examples/two_scales.py`
+          For an example
     """
     if ax is None:
         ax=gca()
+    ax1 = ax.twinx()
     draw_if_interactive()
-    return ax.twinx()
+    return ax1
 
 
 def twiny(ax=None):
@@ -571,8 +683,9 @@ def twiny(ax=None):
     """
     if ax is None:
         ax=gca()
+    ax1 = ax.twiny()
     draw_if_interactive()
-    return ax.twiny()
+    return ax1
 
 
 
@@ -648,8 +761,10 @@ def title(s, *args, **kwargs):
                   'verticalalignment': 'bottom',
                   'horizontalalignment': 'center'}
 
-    See the :func:`~matplotlib.pyplot.text` docstring for information
-    of how override and the optional args work.
+    .. seealso::
+
+       :func:`~matplotlib.pyplot.text`
+           for information on how override and the optional args work.
     """
     l =  gca().set_title(s, *args, **kwargs)
     draw_if_interactive()
@@ -709,10 +824,14 @@ def axis(*v, **kwargs):
 
     if ``len(*v)==0``, you can pass in *xmin*, *xmax*, *ymin*, *ymax*
     as kwargs selectively to alter just those limits without changing
-    the others.  See :func:`xlim` and :func:`ylim` for more information
+    the others.
 
     The xmin, xmax, ymin, ymax tuple is returned
 
+    .. seealso::
+
+        :func:`xlim`, :func:`ylim`
+           For setting the x- and y-limits individually.
     """
     ax = gca()
     v = ax.axis(*v, **kwargs)
@@ -731,9 +850,10 @@ def xlabel(s, *args, **kwargs):
           'horizontalalignment' : 'center'
           }
 
-    See :func:`~matplotlib.pyplot.text` for information of how
-    override and the optional args work
+    .. seealso::
 
+        :func:`~matplotlib.pyplot.text`
+            For information on how override and the optional args work
     """
     l =  gca().set_xlabel(s, *args, **kwargs)
     draw_if_interactive()
@@ -751,9 +871,11 @@ def ylabel(s, *args, **kwargs):
            'horizontalalignment' : 'right',
            'rotation'='vertical' : }
 
-    See :func:`~matplotlib.pyplot.text` for information on how
-    override and the optional args work.
+    .. seealso::
 
+        :func:`~matplotlib.pyplot.text`
+            For information on how override and the optional args
+            work.
     """
     l = gca().set_ylabel(s, *args, **kwargs)
     draw_if_interactive()
@@ -825,7 +947,7 @@ def xscale(*args, **kwargs):
     draw_if_interactive()
     return ret
 xscale.__doc__ = dedent(xscale.__doc__) % {
-    'scale': ' | '.join([repr(x) for x in get_scale_names()]),
+    'scale': ' | '.join([repr(_x) for _x in get_scale_names()]),
     'scale_docs': get_scale_docs()}
 
 def yscale(*args, **kwargs):
@@ -845,7 +967,7 @@ def yscale(*args, **kwargs):
     draw_if_interactive()
     return ret
 yscale.__doc__ = dedent(yscale.__doc__) % {
-    'scale': ' | '.join([repr(x) for x in get_scale_names()]),
+    'scale': ' | '.join([repr(_x) for _x in get_scale_names()]),
     'scale_docs': get_scale_docs()}
 
 def xticks(*args, **kwargs):
@@ -863,7 +985,9 @@ def xticks(*args, **kwargs):
       xticks( arange(5), ('Tom', 'Dick', 'Harry', 'Sally', 'Sue') )
 
     The keyword args, if any, are :class:`~matplotlib.text.Text`
-    properties.
+    properties. For example, to rotate long labels::
+
+      xticks( arange(12), calendar.month_name[1:13], rotation=17 )
     """
     ax = gca()
 
@@ -899,7 +1023,9 @@ def yticks(*args, **kwargs):
       yticks( arange(5), ('Tom', 'Dick', 'Harry', 'Sally', 'Sue') )
 
     The keyword args, if any, are :class:`~matplotlib.text.Text`
-    properties.
+    properties. For example, to rotate long labels::
+
+      yticks( arange(12), calendar.month_name[1:13], rotation=45 )
     """
     ax = gca()
 
@@ -923,7 +1049,22 @@ def yticks(*args, **kwargs):
              silent_list('Text yticklabel', labels)
              )
 
+def minorticks_on():
+    """
+    Display minor ticks on the current plot.
 
+    Displaying minor ticks reduces performance; turn them off using
+    minorticks_off() if drawing speed is a problem.
+    """
+    gca().minorticks_on()
+    draw_if_interactive()
+
+def minorticks_off():
+    """
+    Remove minor ticks from the current plot.
+    """
+    gca().minorticks_off()
+    draw_if_interactive()
 
 def rgrids(*args, **kwargs):
     """
@@ -961,7 +1102,7 @@ def rgrids(*args, **kwargs):
     if not isinstance(ax, PolarAxes):
         raise RuntimeError('rgrids only defined for polar axes')
     if len(args)==0:
-        lines = ax.yaxis.get_ticklines()
+        lines = ax.yaxis.get_gridlines()
         labels = ax.yaxis.get_ticklabels()
     else:
         lines, labels = ax.set_rgrids(*args, **kwargs)
@@ -1038,61 +1179,64 @@ def plotting():
     """
     Plotting commands
 
-    =========   =================================================
-    Command     Description
-    =========   =================================================
-    axes        Create a new axes
-    axis        Set or return the current axis limits
-    bar         make a bar chart
-    boxplot     make a box and whiskers chart
-    cla         clear current axes
-    clabel      label a contour plot
-    clf         clear a figure window
-    close       close a figure window
-    colorbar    add a colorbar to the current figure
-    cohere      make a plot of coherence
-    contour     make a contour plot
-    contourf    make a filled contour plot
-    csd         make a plot of cross spectral density
-    draw        force a redraw of the current figure
-    errorbar    make an errorbar graph
-    figlegend   add a legend to the figure
-    figimage    add an image to the figure, w/o resampling
-    figtext     add text in figure coords
-    figure      create or change active figure
-    fill        make filled polygons
-    gca         return the current axes
-    gcf         return the current figure
-    gci         get the current image, or None
-    getp        get a handle graphics property
-    hist        make a histogram
-    hold        set the hold state on current axes
-    legend      add a legend to the axes
-    loglog      a log log plot
-    imread      load image file into array
-    imshow      plot image data
-    matshow     display a matrix in a new figure preserving aspect
-    pcolor      make a pseudocolor plot
-    plot        make a line plot
-    plotfile    plot data from a flat file
-    psd         make a plot of power spectral density
-    quiver      make a direction field (arrows) plot
-    rc          control the default params
-    savefig     save the current figure
-    scatter     make a scatter plot
-    setp        set a handle graphics property
-    semilogx    log x axis
-    semilogy    log y axis
-    show        show the figures
-    specgram    a spectrogram plot
-    stem        make a stem plot
-    subplot     make a subplot (numrows, numcols, axesnum)
-    table       add a table to the axes
-    text        add some text at location x,y to the current axes
-    title       add a title to the current axes
-    xlabel      add an xlabel to the current axes
-    ylabel      add a ylabel to the current axes
-    =========   =================================================
+    =============== =========================================================
+    Command         Description
+    =============== =========================================================
+    axes            Create a new axes
+    axis            Set or return the current axis limits
+    bar             make a bar chart
+    boxplot         make a box and whiskers chart
+    cla             clear current axes
+    clabel          label a contour plot
+    clf             clear a figure window
+    close           close a figure window
+    colorbar        add a colorbar to the current figure
+    cohere          make a plot of coherence
+    contour         make a contour plot
+    contourf        make a filled contour plot
+    csd             make a plot of cross spectral density
+    draw            force a redraw of the current figure
+    errorbar        make an errorbar graph
+    figlegend       add a legend to the figure
+    figimage        add an image to the figure, w/o resampling
+    figtext         add text in figure coords
+    figure          create or change active figure
+    fill            make filled polygons
+    fill_between    make filled polygons between two sets of y-values
+    fill_betweenx   make filled polygons between two sets of x-values
+    gca             return the current axes
+    gcf             return the current figure
+    gci             get the current image, or None
+    getp            get a graphics property
+    hist            make a histogram
+    hold            set the hold state on current axes
+    legend          add a legend to the axes
+    loglog          a log log plot
+    imread          load image file into array
+    imsave          save array as an image file
+    imshow          plot image data
+    matshow         display a matrix in a new figure preserving aspect
+    pcolor          make a pseudocolor plot
+    plot            make a line plot
+    plotfile        plot data from a flat file
+    psd             make a plot of power spectral density
+    quiver          make a direction field (arrows) plot
+    rc              control the default params
+    savefig         save the current figure
+    scatter         make a scatter plot
+    setp            set a graphics property
+    semilogx        log x axis
+    semilogy        log y axis
+    show            show the figures
+    specgram        a spectrogram plot
+    stem            make a stem plot
+    subplot         make a subplot (numrows, numcols, axesnum)
+    table           add a table to the axes
+    text            add some text at location x,y to the current axes
+    title           add a title to the current axes
+    xlabel          add an xlabel to the current axes
+    ylabel          add a ylabel to the current axes
+    =============== =========================================================
 
     The following commands will set the default colormap accordingly:
 
@@ -1119,7 +1263,7 @@ def plotting():
 def get_plot_commands(): return ( 'axes', 'axis', 'bar', 'boxplot', 'cla', 'clf',
     'close', 'colorbar', 'cohere', 'csd', 'draw', 'errorbar',
     'figlegend', 'figtext', 'figimage', 'figure', 'fill', 'gca',
-    'gcf', 'gci', 'get', 'gray', 'barh', 'jet', 'hist', 'hold', 'imread',
+    'gcf', 'gci', 'get', 'gray', 'barh', 'jet', 'hist', 'hold', 'imread', 'imsave',
     'imshow', 'legend', 'loglog', 'quiver', 'rc', 'pcolor', 'pcolormesh', 'plot', 'psd',
     'savefig', 'scatter', 'set', 'semilogx', 'semilogy', 'show',
     'specgram', 'stem', 'subplot', 'table', 'text', 'title', 'xlabel',
@@ -1127,7 +1271,7 @@ def get_plot_commands(): return ( 'axes', 'axis', 'bar', 'boxplot', 'cla', 'clf'
 
 def colors():
     """
-    This is a do nothing function to provide you with help on how
+    This is a do-nothing function to provide you with help on how
     matplotlib handles colors.
 
     Commands which take color arguments can use several formats to
@@ -1214,8 +1358,7 @@ def colormaps():
 
 ## Plotting part 1: manually generated functions and wrappers ##
 
-
-from matplotlib.colorbar import colorbar_doc
+import matplotlib.colorbar
 def colorbar(mappable=None, cax=None, ax=None, **kw):
     if mappable is None:
         mappable = gci()
@@ -1225,7 +1368,7 @@ def colorbar(mappable=None, cax=None, ax=None, **kw):
     ret = gcf().colorbar(mappable, cax = cax, ax=ax, **kw)
     draw_if_interactive()
     return ret
-colorbar.__doc__ = colorbar_doc
+colorbar.__doc__ = matplotlib.colorbar.colorbar_doc
 
 def clim(vmin=None, vmax=None):
     """
@@ -1252,12 +1395,35 @@ def clim(vmin=None, vmax=None):
     im.set_clim(vmin, vmax)
     draw_if_interactive()
 
+def set_cmap(cmap):
+    '''
+    set the default colormap to *cmap* and apply to current image if any.
+    See help(colormaps) for more information.
+
+    *cmap* must be a :class:`colors.Colormap` instance, or
+    the name of a registered colormap.
+
+    See :func:`register_cmap` and :func:`get_cmap`.
+    '''
+    cmap = cm.get_cmap(cmap)
+
+    rc('image', cmap=cmap.name)
+    im = gci()
+
+    if im is not None:
+        im.set_cmap(cmap)
+    draw_if_interactive()
 
 
 def imread(*args, **kwargs):
     return _imread(*args, **kwargs)
 if _imread.__doc__ is not None:
     imread.__doc__ = dedent(_imread.__doc__)
+
+def imsave(*args, **kwargs):
+    return _imsave(*args, **kwargs)
+if _imsave.__doc__ is not None:
+    imsave.__doc__ = dedent(_imsave.__doc__)
 
 def matshow(A, fignum=None, **kw):
     """
@@ -1305,14 +1471,20 @@ def polar(*args, **kwargs):
 
     Make a polar plot.  Multiple *theta*, *r* arguments are supported,
     with format strings, as in :func:`~matplotlib.pyplot.plot`.
+
+    An optional kwarg *resolution* sets the number of vertices to
+    interpolate between each pair of points.  The default is 1,
+    which disables interpolation.
     """
-    ax = gca(polar=True)
+    resolution = kwargs.pop('resolution', None)
+    ax = gca(polar=True, resolution=resolution)
     ret = ax.plot(*args, **kwargs)
     draw_if_interactive()
     return ret
 
 def plotfile(fname, cols=(0,), plotfuncs=None,
-             comments='#', skiprows=0, checkrows=5, delimiter=',',
+             comments='#', skiprows=0, checkrows=5, delimiter=',', names=None,
+             subplots=True, newfig=True,
              **kwargs):
     """
     Plot the data in *fname*
@@ -1328,17 +1500,27 @@ def plotfile(fname, cols=(0,), plotfuncs=None,
 
     - If len(*cols*) > 1, the first element will be an identifier for
       data for the *x* axis and the remaining elements will be the
-      column indexes for multiple subplots
+      column indexes for multiple subplots if *subplots* is *True*
+      (the default), or for lines in a single subplot if *subplots*
+      is *False*.
 
     *plotfuncs*, if not *None*, is a dictionary mapping identifier to
     an :class:`~matplotlib.axes.Axes` plotting function as a string.
     Default is 'plot', other choices are 'semilogy', 'fill', 'bar',
     etc.  You must use the same type of identifier in the *cols*
     vector as you use in the *plotfuncs* dictionary, eg., integer
-    column numbers in both or column names in both.
+    column numbers in both or column names in both. If *subplots*
+    is *False*, then including any function such as 'semilogy'
+    that changes the axis scaling will set the scaling for all
+    columns.
 
-    *comments*, *skiprows*, *checkrows*, and *delimiter* are all passed on to
-    :func:`matplotlib.pylab.csv2rec` to load the data into a record array.
+    *comments*, *skiprows*, *checkrows*, *delimiter*, and *names*
+    are all passed on to :func:`matplotlib.pylab.csv2rec` to
+    load the data into a record array.
+
+    If *newfig* is *True*, the plot always will be made in a new figure;
+    if *False*, it will be made in the current figure if one exists,
+    else in a new figure.
 
     kwargs are passed on to plotting functions.
 
@@ -1348,17 +1530,26 @@ def plotfile(fname, cols=(0,), plotfuncs=None,
       plotfile(fname, (0,1,3))
 
       # plot using column names; specify an alternate plot type for volume
-      plotfile(fname, ('date', 'volume', 'adj_close'), plotfuncs={'volume': 'semilogy'})
+      plotfile(fname, ('date', 'volume', 'adj_close'),
+                                    plotfuncs={'volume': 'semilogy'})
+
+    Note: plotfile is intended as a convenience for quickly plotting
+    data from flat files; it is not intended as an alternative
+    interface to general plotting with pyplot or matplotlib.
     """
 
-    fig = figure()
+    if newfig:
+        fig = figure()
+    else:
+        fig = gcf()
+
     if len(cols)<1:
         raise ValueError('must have at least one column of data')
 
     if plotfuncs is None:
         plotfuncs = dict()
-    r = mlab.csv2rec(fname, comments=comments,
-                skiprows=skiprows, checkrows=checkrows, delimiter=delimiter)
+    r = mlab.csv2rec(fname, comments=comments, skiprows=skiprows,
+                     checkrows=checkrows, delimiter=delimiter, names=names)
 
     def getname_val(identifier):
         'return the name and column data for identifier'
@@ -1371,36 +1562,44 @@ def plotfile(fname, cols=(0,), plotfuncs=None,
             raise TypeError('identifier must be a string or integer')
 
     xname, x = getname_val(cols[0])
+    ynamelist = []
 
     if len(cols)==1:
         ax1 = fig.add_subplot(1,1,1)
         funcname = plotfuncs.get(cols[0], 'plot')
         func = getattr(ax1, funcname)
         func(x, **kwargs)
-        ax1.set_xlabel(xname)
+        ax1.set_ylabel(xname)
     else:
         N = len(cols)
         for i in range(1,N):
-            if i==1:
-                ax = ax1 = fig.add_subplot(N-1,1,i)
-                ax.grid(True)
-            else:
-                ax = fig.add_subplot(N-1,1,i, sharex=ax1)
-                ax.grid(True)
+            if subplots:
+                if i==1:
+                    ax = ax1 = fig.add_subplot(N-1,1,i)
+                else:
+                    ax = fig.add_subplot(N-1,1,i, sharex=ax1)
+            elif i==1:
+                ax = fig.add_subplot(1,1,1)
+
+            ax.grid(True)
 
 
             yname, y = getname_val(cols[i])
+            ynamelist.append(yname)
 
             funcname = plotfuncs.get(cols[i], 'plot')
             func = getattr(ax, funcname)
 
             func(x, y, **kwargs)
-            ax.set_ylabel(yname)
+            if subplots:
+                ax.set_ylabel(yname)
             if ax.is_last_row():
                 ax.set_xlabel(xname)
             else:
                 ax.set_xlabel('')
 
+    if not subplots:
+        ax.legend(ynamelist, loc='best')
 
     if xname=='date':
         fig.autofmt_xdate()
@@ -1408,873 +1607,816 @@ def plotfile(fname, cols=(0,), plotfuncs=None,
     draw_if_interactive()
 
 
+# This is added to docstrings of autogenerated plotting functions
+__docstring_addendum = """
+
+Additional kwargs: hold = [True|False] overrides default hold state"""
+
 ## Plotting part 2: autogenerated wrappers for axes methods ##
 
 
-### Do not edit below this point
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def acorr(*args, **kwargs):
+def acorr(x, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().acorr(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.acorr(x, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.acorr.__doc__ is not None:
-    acorr.__doc__ = dedent(Axes.acorr.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    acorr.__doc__ = dedent(Axes.acorr.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def arrow(*args, **kwargs):
+def arrow(x, y, dx, dy, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().arrow(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.arrow(x, y, dx, dy, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.arrow.__doc__ is not None:
-    arrow.__doc__ = dedent(Axes.arrow.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    arrow.__doc__ = dedent(Axes.arrow.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def axhline(*args, **kwargs):
+def axhline(y=0, xmin=0, xmax=1, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().axhline(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.axhline(y, xmin, xmax, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.axhline.__doc__ is not None:
-    axhline.__doc__ = dedent(Axes.axhline.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    axhline.__doc__ = dedent(Axes.axhline.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def axhspan(*args, **kwargs):
+def axhspan(ymin, ymax, xmin=0, xmax=1, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().axhspan(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.axhspan(ymin, ymax, xmin, xmax, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.axhspan.__doc__ is not None:
-    axhspan.__doc__ = dedent(Axes.axhspan.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    axhspan.__doc__ = dedent(Axes.axhspan.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def axvline(*args, **kwargs):
+def axvline(x=0, ymin=0, ymax=1, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().axvline(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.axvline(x, ymin, ymax, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.axvline.__doc__ is not None:
-    axvline.__doc__ = dedent(Axes.axvline.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    axvline.__doc__ = dedent(Axes.axvline.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def axvspan(*args, **kwargs):
+def axvspan(xmin, xmax, ymin=0, ymax=1, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().axvspan(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.axvspan(xmin, xmax, ymin, ymax, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.axvspan.__doc__ is not None:
-    axvspan.__doc__ = dedent(Axes.axvspan.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    axvspan.__doc__ = dedent(Axes.axvspan.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def bar(*args, **kwargs):
+def bar(left, height, width=0.80000000000000004, bottom=None, color=None, edgecolor=None, linewidth=None, yerr=None, xerr=None, ecolor=None, capsize=3, align='edge', orientation='vertical', log=False, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().bar(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.bar(left, height, width, bottom, color, edgecolor, linewidth, yerr, xerr, ecolor, capsize, align, orientation, log, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.bar.__doc__ is not None:
-    bar.__doc__ = dedent(Axes.bar.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    bar.__doc__ = dedent(Axes.bar.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def barh(*args, **kwargs):
+def barh(bottom, width, height=0.80000000000000004, left=None, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().barh(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.barh(bottom, width, height, left, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.barh.__doc__ is not None:
-    barh.__doc__ = dedent(Axes.barh.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    barh.__doc__ = dedent(Axes.barh.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def broken_barh(*args, **kwargs):
+def broken_barh(xranges, yrange, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().broken_barh(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.broken_barh(xranges, yrange, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.broken_barh.__doc__ is not None:
-    broken_barh.__doc__ = dedent(Axes.broken_barh.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    broken_barh.__doc__ = dedent(Axes.broken_barh.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def boxplot(*args, **kwargs):
+def boxplot(x, notch=0, sym='b+', vert=1, whis=1.5, positions=None, widths=None, hold=None):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().boxplot(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.boxplot(x, notch, sym, vert, whis, positions, widths)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.boxplot.__doc__ is not None:
-    boxplot.__doc__ = dedent(Axes.boxplot.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    boxplot.__doc__ = dedent(Axes.boxplot.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def cohere(*args, **kwargs):
+def cohere(x, y, NFFT=256, Fs=2, Fc=0, detrend=mlab.detrend_none, window=mlab.window_hanning, noverlap=0, pad_to=None, sides='default', scale_by_freq=None, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().cohere(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.cohere(x, y, NFFT, Fs, Fc, detrend, window, noverlap, pad_to, sides, scale_by_freq, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.cohere.__doc__ is not None:
-    cohere.__doc__ = dedent(Axes.cohere.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    cohere.__doc__ = dedent(Axes.cohere.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def clabel(*args, **kwargs):
+def clabel(CS, *args, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+    hold = kwargs.pop('hold', None)
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().clabel(*args, **kwargs)
+        ret = ax.clabel(CS, *args, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
 
-    hold(b)
     return ret
 if Axes.clabel.__doc__ is not None:
-    clabel.__doc__ = dedent(Axes.clabel.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    clabel.__doc__ = dedent(Axes.clabel.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 def contour(*args, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+    hold = kwargs.pop('hold', None)
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().contour(*args, **kwargs)
+        ret = ax.contour(*args, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
     if ret._A is not None: gci._current = ret
-    hold(b)
     return ret
 if Axes.contour.__doc__ is not None:
-    contour.__doc__ = dedent(Axes.contour.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    contour.__doc__ = dedent(Axes.contour.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 def contourf(*args, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+    hold = kwargs.pop('hold', None)
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().contourf(*args, **kwargs)
+        ret = ax.contourf(*args, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
     if ret._A is not None: gci._current = ret
-    hold(b)
     return ret
 if Axes.contourf.__doc__ is not None:
-    contourf.__doc__ = dedent(Axes.contourf.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    contourf.__doc__ = dedent(Axes.contourf.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def csd(*args, **kwargs):
+def csd(x, y, NFFT=256, Fs=2, Fc=0, detrend=mlab.detrend_none, window=mlab.window_hanning, noverlap=0, pad_to=None, sides='default', scale_by_freq=None, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().csd(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.csd(x, y, NFFT, Fs, Fc, detrend, window, noverlap, pad_to, sides, scale_by_freq, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.csd.__doc__ is not None:
-    csd.__doc__ = dedent(Axes.csd.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    csd.__doc__ = dedent(Axes.csd.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def errorbar(*args, **kwargs):
+def errorbar(x, y, yerr=None, xerr=None, fmt='-', ecolor=None, elinewidth=None, capsize=3, barsabove=False, lolims=False, uplims=False, xlolims=False, xuplims=False, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().errorbar(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.errorbar(x, y, yerr, xerr, fmt, ecolor, elinewidth, capsize, barsabove, lolims, uplims, xlolims, xuplims, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.errorbar.__doc__ is not None:
-    errorbar.__doc__ = dedent(Axes.errorbar.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    errorbar.__doc__ = dedent(Axes.errorbar.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 def fill(*args, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+    hold = kwargs.pop('hold', None)
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().fill(*args, **kwargs)
+        ret = ax.fill(*args, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
 
-    hold(b)
     return ret
 if Axes.fill.__doc__ is not None:
-    fill.__doc__ = dedent(Axes.fill.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    fill.__doc__ = dedent(Axes.fill.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def hist(*args, **kwargs):
+def fill_between(x, y1, y2=0, where=None, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().hist(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.fill_between(x, y1, y2, where, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
+    return ret
+if Axes.fill_between.__doc__ is not None:
+    fill_between.__doc__ = dedent(Axes.fill_between.__doc__) + __docstring_addendum
+
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
+def fill_betweenx(y, x1, x2=0, where=None, hold=None, **kwargs):
+    ax = gca()
+    # allow callers to override the hold state by passing hold=True|False
+    washold = ax.ishold()
+
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.fill_betweenx(y, x1, x2, where, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
+    return ret
+if Axes.fill_betweenx.__doc__ is not None:
+    fill_betweenx.__doc__ = dedent(Axes.fill_betweenx.__doc__) + __docstring_addendum
+
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
+def hexbin(x, y, C=None, gridsize=100, bins=None, xscale='linear', yscale='linear', extent=None, cmap=None, norm=None, vmin=None, vmax=None, alpha=1.0, linewidths=None, edgecolors='none', reduce_C_function=np.mean, mincnt=None, marginals=False, hold=None, **kwargs):
+    ax = gca()
+    # allow callers to override the hold state by passing hold=True|False
+    washold = ax.ishold()
+
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.hexbin(x, y, C, gridsize, bins, xscale, yscale, extent, cmap, norm, vmin, vmax, alpha, linewidths, edgecolors, reduce_C_function, mincnt, marginals, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+    gci._current = ret
+    return ret
+if Axes.hexbin.__doc__ is not None:
+    hexbin.__doc__ = dedent(Axes.hexbin.__doc__) + __docstring_addendum
+
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
+def hist(x, bins=10, range=None, normed=False, weights=None, cumulative=False, bottom=None, histtype='bar', align='mid', orientation='vertical', rwidth=None, log=False, hold=None, **kwargs):
+    ax = gca()
+    # allow callers to override the hold state by passing hold=True|False
+    washold = ax.ishold()
+
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.hist(x, bins, range, normed, weights, cumulative, bottom, histtype, align, orientation, rwidth, log, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.hist.__doc__ is not None:
-    hist.__doc__ = dedent(Axes.hist.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    hist.__doc__ = dedent(Axes.hist.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def hlines(*args, **kwargs):
+def hlines(y, xmin, xmax, colors='k', linestyles='solid', label='', hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().hlines(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.hlines(y, xmin, xmax, colors, linestyles, label, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.hlines.__doc__ is not None:
-    hlines.__doc__ = dedent(Axes.hlines.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    hlines.__doc__ = dedent(Axes.hlines.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def imshow(*args, **kwargs):
+def imshow(X, cmap=None, norm=None, aspect=None, interpolation=None, alpha=1.0, vmin=None, vmax=None, origin=None, extent=None, shape=None, filternorm=1, filterrad=4.0, imlim=None, resample=None, url=None, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().imshow(*args, **kwargs)
+        ret = ax.imshow(X, cmap, norm, aspect, interpolation, alpha, vmin, vmax, origin, extent, shape, filternorm, filterrad, imlim, resample, url, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
     gci._current = ret
-    hold(b)
     return ret
 if Axes.imshow.__doc__ is not None:
-    imshow.__doc__ = dedent(Axes.imshow.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    imshow.__doc__ = dedent(Axes.imshow.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 def loglog(*args, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+    hold = kwargs.pop('hold', None)
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().loglog(*args, **kwargs)
+        ret = ax.loglog(*args, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
 
-    hold(b)
     return ret
 if Axes.loglog.__doc__ is not None:
-    loglog.__doc__ = dedent(Axes.loglog.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    loglog.__doc__ = dedent(Axes.loglog.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 def pcolor(*args, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+    hold = kwargs.pop('hold', None)
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().pcolor(*args, **kwargs)
+        ret = ax.pcolor(*args, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
     gci._current = ret
-    hold(b)
     return ret
 if Axes.pcolor.__doc__ is not None:
-    pcolor.__doc__ = dedent(Axes.pcolor.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    pcolor.__doc__ = dedent(Axes.pcolor.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 def pcolormesh(*args, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+    hold = kwargs.pop('hold', None)
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().pcolormesh(*args, **kwargs)
+        ret = ax.pcolormesh(*args, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
     gci._current = ret
-    hold(b)
     return ret
 if Axes.pcolormesh.__doc__ is not None:
-    pcolormesh.__doc__ = dedent(Axes.pcolormesh.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    pcolormesh.__doc__ = dedent(Axes.pcolormesh.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def pie(*args, **kwargs):
+def pie(x, explode=None, labels=None, colors=None, autopct=None, pctdistance=0.59999999999999998, shadow=False, labeldistance=1.1000000000000001, hold=None):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().pie(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.pie(x, explode, labels, colors, autopct, pctdistance, shadow, labeldistance)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.pie.__doc__ is not None:
-    pie.__doc__ = dedent(Axes.pie.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    pie.__doc__ = dedent(Axes.pie.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 def plot(*args, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+    hold = kwargs.pop('hold', None)
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().plot(*args, **kwargs)
+        ret = ax.plot(*args, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
 
-    hold(b)
     return ret
 if Axes.plot.__doc__ is not None:
-    plot.__doc__ = dedent(Axes.plot.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    plot.__doc__ = dedent(Axes.plot.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def plot_date(*args, **kwargs):
+def plot_date(x, y, fmt='bo', tz=None, xdate=True, ydate=False, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().plot_date(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.plot_date(x, y, fmt, tz, xdate, ydate, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.plot_date.__doc__ is not None:
-    plot_date.__doc__ = dedent(Axes.plot_date.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    plot_date.__doc__ = dedent(Axes.plot_date.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def psd(*args, **kwargs):
+def psd(x, NFFT=256, Fs=2, Fc=0, detrend=mlab.detrend_none, window=mlab.window_hanning, noverlap=0, pad_to=None, sides='default', scale_by_freq=None, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().psd(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.psd(x, NFFT, Fs, Fc, detrend, window, noverlap, pad_to, sides, scale_by_freq, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.psd.__doc__ is not None:
-    psd.__doc__ = dedent(Axes.psd.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    psd.__doc__ = dedent(Axes.psd.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def quiver(*args, **kwargs):
+def quiver(*args, **kw):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+    hold = kw.pop('hold', None)
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().quiver(*args, **kwargs)
+        ret = ax.quiver(*args, **kw)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
     gci._current = ret
-    hold(b)
     return ret
 if Axes.quiver.__doc__ is not None:
-    quiver.__doc__ = dedent(Axes.quiver.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    quiver.__doc__ = dedent(Axes.quiver.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def quiverkey(*args, **kwargs):
+def quiverkey(*args, **kw):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+    hold = kw.pop('hold', None)
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().quiverkey(*args, **kwargs)
+        ret = ax.quiverkey(*args, **kw)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
 
-    hold(b)
     return ret
 if Axes.quiverkey.__doc__ is not None:
-    quiverkey.__doc__ = dedent(Axes.quiverkey.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    quiverkey.__doc__ = dedent(Axes.quiverkey.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def scatter(*args, **kwargs):
+def scatter(x, y, s=20, c='b', marker='o', cmap=None, norm=None, vmin=None, vmax=None, alpha=1.0, linewidths=None, faceted=True, verts=None, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().scatter(*args, **kwargs)
+        ret = ax.scatter(x, y, s, c, marker, cmap, norm, vmin, vmax, alpha, linewidths, faceted, verts, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
     gci._current = ret
-    hold(b)
     return ret
 if Axes.scatter.__doc__ is not None:
-    scatter.__doc__ = dedent(Axes.scatter.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
-
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
-def hexbin(*args, **kwargs):
-    # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().hexbin(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
-    gci._current = ret
-    hold(b)
-    return ret
-if Axes.hexbin.__doc__ is not None:
-    hexbin.__doc__ = dedent(Axes.hexbin.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    scatter.__doc__ = dedent(Axes.scatter.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 def semilogx(*args, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+    hold = kwargs.pop('hold', None)
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().semilogx(*args, **kwargs)
+        ret = ax.semilogx(*args, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
 
-    hold(b)
     return ret
 if Axes.semilogx.__doc__ is not None:
-    semilogx.__doc__ = dedent(Axes.semilogx.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    semilogx.__doc__ = dedent(Axes.semilogx.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 def semilogy(*args, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+    hold = kwargs.pop('hold', None)
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().semilogy(*args, **kwargs)
+        ret = ax.semilogy(*args, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
 
-    hold(b)
     return ret
 if Axes.semilogy.__doc__ is not None:
-    semilogy.__doc__ = dedent(Axes.semilogy.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    semilogy.__doc__ = dedent(Axes.semilogy.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def specgram(*args, **kwargs):
+def specgram(x, NFFT=256, Fs=2, Fc=0, detrend=mlab.detrend_none, window=mlab.window_hanning, noverlap=128, cmap=None, xextent=None, pad_to=None, sides='default', scale_by_freq=None, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().specgram(*args, **kwargs)
+        ret = ax.specgram(x, NFFT, Fs, Fc, detrend, window, noverlap, cmap, xextent, pad_to, sides, scale_by_freq, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
     gci._current = ret[-1]
-    hold(b)
     return ret
 if Axes.specgram.__doc__ is not None:
-    specgram.__doc__ = dedent(Axes.specgram.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    specgram.__doc__ = dedent(Axes.specgram.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def spy(*args, **kwargs):
+def spy(Z, precision=0, marker=None, markersize=None, aspect='equal', hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().spy(*args, **kwargs)
+        ret = ax.spy(Z, precision, marker, markersize, aspect, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
     gci._current = ret
-    hold(b)
     return ret
 if Axes.spy.__doc__ is not None:
-    spy.__doc__ = dedent(Axes.spy.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    spy.__doc__ = dedent(Axes.spy.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def stem(*args, **kwargs):
+def stem(x, y, linefmt='b-', markerfmt='bo', basefmt='r-', hold=None):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().stem(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.stem(x, y, linefmt, markerfmt, basefmt)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.stem.__doc__ is not None:
-    stem.__doc__ = dedent(Axes.stem.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    stem.__doc__ = dedent(Axes.stem.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def step(*args, **kwargs):
+def step(x, y, *args, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
+    washold = ax.ishold()
+    hold = kwargs.pop('hold', None)
+    if hold is not None:
+        ax.hold(hold)
     try:
-        ret =  gca().step(*args, **kwargs)
+        ret = ax.step(x, y, *args, **kwargs)
         draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    finally:
+        ax.hold(washold)
 
-    hold(b)
     return ret
 if Axes.step.__doc__ is not None:
-    step.__doc__ = dedent(Axes.step.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    step.__doc__ = dedent(Axes.step.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def vlines(*args, **kwargs):
+def vlines(x, ymin, ymax, colors='k', linestyles='solid', label='', hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().vlines(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.vlines(x, ymin, ymax, colors, linestyles, label, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.vlines.__doc__ is not None:
-    vlines.__doc__ = dedent(Axes.vlines.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    vlines.__doc__ = dedent(Axes.vlines.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def xcorr(*args, **kwargs):
+def xcorr(x, y, normed=True, detrend=mlab.detrend_none, usevlines=True, maxlags=10, hold=None, **kwargs):
+    ax = gca()
     # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().xcorr(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
+    washold = ax.ishold()
 
-    hold(b)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.xcorr(x, y, normed, detrend, usevlines, maxlags, **kwargs)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
+
     return ret
 if Axes.xcorr.__doc__ is not None:
-    xcorr.__doc__ = dedent(Axes.xcorr.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
+    xcorr.__doc__ = dedent(Axes.xcorr.__doc__) + __docstring_addendum
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def cla(*args, **kwargs):
+def barbs(*args, **kw):
+    ax = gca()
+    # allow callers to override the hold state by passing hold=True|False
+    washold = ax.ishold()
+    hold = kw.pop('hold', None)
+    if hold is not None:
+        ax.hold(hold)
+    try:
+        ret = ax.barbs(*args, **kw)
+        draw_if_interactive()
+    finally:
+        ax.hold(washold)
 
-    ret =  gca().cla(*args, **kwargs)
+    return ret
+if Axes.barbs.__doc__ is not None:
+    barbs.__doc__ = dedent(Axes.barbs.__doc__) + __docstring_addendum
+
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
+def cla():
+    ret =  gca().cla()
     draw_if_interactive()
     return ret
 if Axes.cla.__doc__ is not None:
@@ -2282,9 +2424,8 @@ if Axes.cla.__doc__ is not None:
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def grid(*args, **kwargs):
-
-    ret =  gca().grid(*args, **kwargs)
+def grid(b=None, **kwargs):
+    ret =  gca().grid(b, **kwargs)
     draw_if_interactive()
     return ret
 if Axes.grid.__doc__ is not None:
@@ -2293,7 +2434,6 @@ if Axes.grid.__doc__ is not None:
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 def legend(*args, **kwargs):
-
     ret =  gca().legend(*args, **kwargs)
     draw_if_interactive()
     return ret
@@ -2302,9 +2442,8 @@ if Axes.legend.__doc__ is not None:
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def table(*args, **kwargs):
-
-    ret =  gca().table(*args, **kwargs)
+def table(**kwargs):
+    ret =  gca().table(**kwargs)
     draw_if_interactive()
     return ret
 if Axes.table.__doc__ is not None:
@@ -2312,9 +2451,8 @@ if Axes.table.__doc__ is not None:
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def text(*args, **kwargs):
-
-    ret =  gca().text(*args, **kwargs)
+def text(x, y, s, fontdict=None, withdash=False, **kwargs):
+    ret =  gca().text(x, y, s, fontdict, withdash, **kwargs)
     draw_if_interactive()
     return ret
 if Axes.text.__doc__ is not None:
@@ -2323,7 +2461,6 @@ if Axes.text.__doc__ is not None:
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 def annotate(*args, **kwargs):
-
     ret =  gca().annotate(*args, **kwargs)
     draw_if_interactive()
     return ret
@@ -2334,8 +2471,8 @@ if Axes.annotate.__doc__ is not None:
 # changes will be lost
 def autumn():
     '''
-    Set the default colormap to *autumn* and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to autumn and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='autumn')
     im = gci()
@@ -2349,8 +2486,8 @@ def autumn():
 # changes will be lost
 def bone():
     '''
-    Set the default colormap to bone and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to bone and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='bone')
     im = gci()
@@ -2364,8 +2501,8 @@ def bone():
 # changes will be lost
 def cool():
     '''
-    Set the default colormap to cool and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to cool and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='cool')
     im = gci()
@@ -2379,8 +2516,8 @@ def cool():
 # changes will be lost
 def copper():
     '''
-    Set the default colormap to copper and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to copper and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='copper')
     im = gci()
@@ -2394,8 +2531,8 @@ def copper():
 # changes will be lost
 def flag():
     '''
-    Set the default colormap to flag and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to flag and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='flag')
     im = gci()
@@ -2409,8 +2546,8 @@ def flag():
 # changes will be lost
 def gray():
     '''
-    Set the default colormap to gray and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to gray and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='gray')
     im = gci()
@@ -2424,8 +2561,8 @@ def gray():
 # changes will be lost
 def hot():
     '''
-    Set the default colormap to hot and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to hot and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='hot')
     im = gci()
@@ -2439,8 +2576,8 @@ def hot():
 # changes will be lost
 def hsv():
     '''
-    Set the default colormap to hsv and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to hsv and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='hsv')
     im = gci()
@@ -2454,8 +2591,8 @@ def hsv():
 # changes will be lost
 def jet():
     '''
-    Set the default colormap to jet and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to jet and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='jet')
     im = gci()
@@ -2469,8 +2606,8 @@ def jet():
 # changes will be lost
 def pink():
     '''
-    Set the default colormap to pink and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to pink and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='pink')
     im = gci()
@@ -2484,8 +2621,8 @@ def pink():
 # changes will be lost
 def prism():
     '''
-    Set the default colormap to prism and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to prism and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='prism')
     im = gci()
@@ -2499,8 +2636,8 @@ def prism():
 # changes will be lost
 def spring():
     '''
-    Set the default colormap to spring and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to spring and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='spring')
     im = gci()
@@ -2514,8 +2651,8 @@ def spring():
 # changes will be lost
 def summer():
     '''
-    Set the default colormap to summer and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to summer and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='summer')
     im = gci()
@@ -2529,8 +2666,8 @@ def summer():
 # changes will be lost
 def winter():
     '''
-    Set the default colormap to winter and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to winter and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='winter')
     im = gci()
@@ -2544,8 +2681,8 @@ def winter():
 # changes will be lost
 def spectral():
     '''
-    Set the default colormap to spectral and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to spectral and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='spectral')
     im = gci()

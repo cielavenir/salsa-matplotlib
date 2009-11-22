@@ -10,9 +10,8 @@
 #include <fstream>
 
 #include "agg_basics.h"
-#include "_backend_agg.h"
-#define PY_ARRAY_TYPES_PREFIX NumPy
 #include "numpy/arrayobject.h"
+#include "_backend_agg.h"
 #include "agg_py_transforms.h"
 
 // the extension module
@@ -98,7 +97,7 @@ private:
       //destrb.clear(agg::rgba(1, 1, 1, 0));
 
       agg::rect_base<int> region(destx, desty, (int)r, srcheight-(int)b);
-      destrb.copy_from(*aggRenderer->renderingBuffer, &region,
+      destrb.copy_from(aggRenderer->renderingBuffer, &region,
 		       -destx, -desty);
     }
 

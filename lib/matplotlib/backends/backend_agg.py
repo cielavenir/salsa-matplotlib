@@ -21,23 +21,19 @@ TODO:
   * integrate screen dpi w/ ppi and text
 """
 from __future__ import division
-import os, sys, weakref
 
 import numpy as npy
 
-import matplotlib
 from matplotlib import verbose, rcParams
-from matplotlib._image import fromarray
-from matplotlib._pylab_helpers import Gcf
 from matplotlib.backend_bases import RendererBase,\
-     GraphicsContextBase, FigureManagerBase, FigureCanvasBase
-from matplotlib.cbook import is_string_like, exception_to_str, maxdict
+     FigureManagerBase, FigureCanvasBase
+from matplotlib.cbook import is_string_like, maxdict
 from matplotlib.figure import Figure
 from matplotlib.font_manager import findfont
 from matplotlib.ft2font import FT2Font, LOAD_FORCE_AUTOHINT
 from matplotlib.mathtext import MathTextParser
 from matplotlib.path import Path
-from matplotlib.transforms import Affine2D, Bbox
+from matplotlib.transforms import Bbox, BboxBase
 
 from _backend_agg import RendererAgg as _RendererAgg
 from matplotlib import _png
@@ -50,11 +46,12 @@ class RendererAgg(RendererBase):
     context instance that controls the colors/styles
     """
     debug=1
-    texd = maxdict(50)  # a cache of tex image rasters
-    _fontd = maxdict(50)
     def __init__(self, width, height, dpi):
         if __debug__: verbose.report('RendererAgg.__init__', 'debug-annoying')
         RendererBase.__init__(self)
+        self.texd = maxdict(50)  # a cache of tex image rasters
+        self._fontd = maxdict(50)
+
         self.dpi = dpi
         self.width = width
         self.height = height
@@ -62,19 +59,43 @@ class RendererAgg(RendererBase):
         self._renderer = _RendererAgg(int(width), int(height), dpi, debug=False)
         if __debug__: verbose.report('RendererAgg.__init__ _RendererAgg done',
                                      'debug-annoying')
-        self.draw_path = self._renderer.draw_path
+        #self.draw_path = self._renderer.draw_path  # see below
         self.draw_markers = self._renderer.draw_markers
         self.draw_path_collection = self._renderer.draw_path_collection
         self.draw_quad_mesh = self._renderer.draw_quad_mesh
         self.draw_image = self._renderer.draw_image
         self.copy_from_bbox = self._renderer.copy_from_bbox
-        self.restore_region = self._renderer.restore_region
         self.tostring_rgba_minimized = self._renderer.tostring_rgba_minimized
         self.mathtext_parser = MathTextParser('Agg')
 
         self.bbox = Bbox.from_bounds(0, 0, self.width, self.height)
         if __debug__: verbose.report('RendererAgg.__init__ done',
                                      'debug-annoying')
+
+    def draw_path(self, gc, path, transform, rgbFace=None):
+        """
+        Draw the path
+        """
+        nmax = rcParams['agg.path.chunksize'] # here at least for testing
+        npts = path.vertices.shape[0]
+        if (nmax > 100 and npts > nmax and path.should_simplify and
+            rgbFace is None and gc.get_hatch() is None):
+            nch = npy.ceil(npts/float(nmax))
+            chsize = int(npy.ceil(npts/nch))
+            i0 = npy.arange(0, npts, chsize)
+            i1 = npy.zeros_like(i0)
+            i1[:-1] = i0[1:] - 1
+            i1[-1] = npts
+            for ii0, ii1 in zip(i0, i1):
+                v = path.vertices[ii0:ii1,:]
+                c = path.codes
+                if c is not None:
+                    c = c[ii0:ii1]
+                    c[0] = Path.MOVETO # move to end of last chunk
+                p = Path(v, c)
+                self._renderer.draw_path(gc, p, transform, rgbFace)
+        else:
+            self._renderer.draw_path(gc, path, transform, rgbFace)
 
     def draw_mathtext(self, gc, x, y, s, prop, angle):
         """
@@ -125,10 +146,10 @@ class RendererAgg(RendererBase):
             # todo: handle props
             size = prop.get_size_in_points()
             texmanager = self.get_texmanager()
-            Z = texmanager.get_grey(s, size, self.dpi)
-            m,n = Z.shape
-            # TODO: descent of TeX text (I am imitating backend_ps here -JKS)
-            return n, m, 0
+            fontsize = prop.get_size_in_points()
+            w, h, d = texmanager.get_text_width_height_descent(s, fontsize,
+                                                               renderer=self)
+            return w, h, d
 
         if ismath:
             ox, oy, width, height, descent, fonts, used_characters = \
@@ -211,6 +232,43 @@ class RendererAgg(RendererBase):
     def clear(self):
         self._renderer.clear()
 
+    def option_image_nocomposite(self):
+        # It is generally faster to composite each image directly to
+        # the Figure, and there's no file size benefit to compositing
+        # with the Agg backend
+        return True
+
+    def restore_region(self, region, bbox=None, xy=None):
+        """
+        restore the saved region. if bbox (instance of BboxBase, or
+        its extents) is given, only the region specified by the bbox
+        will be restored. *xy* (a tuple of two floasts) optionally
+        specify the new position (of the LLC of the originally region,
+        not the LLC of the bbox) that the region will be restored.
+
+        >>> region = renderer.copy_from_bbox()
+        >>> x1, y1, x2, y2 = region.get_extents()
+        >>> renderer.restore_region(region, bbox=(x1+dx, y1, x2, y2),
+                                    xy=(x1-dx, y1))
+        
+        """
+        if bbox is not None or xy is not None:
+            if bbox is None:
+                x1, y1, x2, y2 = region.get_extents()
+            elif isinstance(bbox, BboxBase):
+                x1, y1, x2, y2 = bbox.extents
+            else:
+                x1, y1, x2, y2 = bbox
+
+            if xy is None:
+                ox, oy = x1, y1
+            else:
+                ox, oy = xy
+
+            self._renderer.restore_region2(region, x1, y1, x2, y2, ox, oy)
+
+        else:
+            self._renderer.restore_region(region)
 
 
 def new_figure_manager(num, *args, **kwargs):
@@ -242,9 +300,9 @@ class FigureCanvasAgg(FigureCanvasBase):
         renderer = self.get_renderer()
         return renderer.copy_from_bbox(bbox)
 
-    def restore_region(self, region):
+    def restore_region(self, region, bbox=None, xy=None):
         renderer = self.get_renderer()
-        return renderer.restore_region(region)
+        return renderer.restore_region(region, bbox, xy)
 
     def draw(self):
         """
@@ -303,9 +361,8 @@ class FigureCanvasAgg(FigureCanvasBase):
         renderer.dpi = self.figure.dpi
         if is_string_like(filename_or_obj):
             filename_or_obj = file(filename_or_obj, 'wb')
-        renderer = self.get_renderer()
-        x = renderer._renderer.buffer_rgba(0, 0)
         _png.write_png(renderer._renderer.buffer_rgba(0, 0),
                        renderer.width, renderer.height,
                        filename_or_obj, self.figure.dpi)
         renderer.dpi = original_dpi
+

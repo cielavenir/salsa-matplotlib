@@ -1,16 +1,24 @@
 """
-You will need to have freetype, libpng and zlib installed to compile
+You will need to have freetype, libpng and zlib installed to comile
 matplotlib, inlcuding the *-devel versions of these libraries if you
 are using a package manager like RPM or debian.
 
 The matplotlib build options can be modified with a setup.cfg file. See
 setup.cfg.template for more information.
 """
+# distutils is breaking our sdists for files in symlinked dirs.
+# distutils will copy if os.link is not available, so this is a hack
+# to force copying
+import os
+try:
+    del os.link
+except AttributeError:
+    pass
 
 # This dict will be updated as we try to select the best option during
 # the build process. However, values in setup.cfg will be used, if
 # defined.
-rc = {'backend':'Agg', 'numerix':'numpy'}
+rc = {'backend':'Agg'}
 
 # BEFORE importing disutils, remove MANIFEST. distutils doesn't properly
 # update it when the contents of directories change.
@@ -26,15 +34,15 @@ if major==2 and minor1<4 or major<2:
 import glob
 from distutils.core import setup
 from setupext import build_agg, build_gtkagg, build_tkagg, build_wxagg,\
-     build_ft2font, build_image, build_windowing, build_path, \
-     build_contour, build_nxutils, build_traits, build_gdk, \
+     build_macosx, build_ft2font, build_image, build_windowing, build_path, \
+     build_contour, build_delaunay, build_nxutils, build_gdk, \
      build_ttconv, print_line, print_status, print_message, \
      print_raw, check_for_freetype, check_for_libpng, check_for_gtk, \
-     check_for_tk, check_for_wx, check_for_numpy, check_for_qt, check_for_qt4, \
-     check_for_cairo, check_provide_traits, check_provide_pytz, \
-     check_provide_dateutil, check_provide_configobj, check_for_dvipng, \
-     check_for_ghostscript, check_for_latex, check_for_pdftops, \
-     check_for_datetime, options, build_png
+     check_for_tk, check_for_wx, check_for_macosx, check_for_numpy, \
+     check_for_qt, check_for_qt4, check_for_cairo, \
+     check_provide_pytz, check_provide_dateutil,\
+     check_for_dvipng, check_for_ghostscript, check_for_latex, \
+     check_for_pdftops, check_for_datetime, options, build_png
 #import distutils.sysconfig
 
 # jdh
@@ -44,13 +52,17 @@ packages = [
     'matplotlib.projections',
 #   'matplotlib.toolkits',
     'mpl_toolkits',
+    'mpl_toolkits.mplot3d',
+    'mpl_toolkits.axes_grid',
+    'matplotlib.sphinxext',
+    # The following are deprecated and will be removed.
     'matplotlib.numerix',
     'matplotlib.numerix.mlab',
     'matplotlib.numerix.ma',
-    'matplotlib.numerix.npyma',
     'matplotlib.numerix.linear_algebra',
     'matplotlib.numerix.random_array',
-    'matplotlib.numerix.fft'
+    'matplotlib.numerix.fft',
+
     ]
 
 py_modules = ['pylab']
@@ -80,6 +92,7 @@ package_data = {'matplotlib':['mpl-data/fonts/afm/*.afm',
                               'mpl-data/images/*.svg',
                               'mpl-data/images/*.png',
                               'mpl-data/images/*.ppm',
+                              'mpl-data/example/*.npy',
                               'mpl-data/matplotlibrc',
                               'mpl-data/matplotlib.conf',
                               'mpl-data/*.glade',
@@ -95,6 +108,7 @@ if not check_for_freetype():
 build_ft2font(ext_modules, packages)
 build_ttconv(ext_modules, packages)
 build_contour(ext_modules, packages)
+build_delaunay(ext_modules, packages)
 build_nxutils(ext_modules, packages)
 build_path(ext_modules, packages)
 
@@ -147,6 +161,11 @@ if options['build_gtkagg']:
         build_gtkagg(ext_modules, packages)
         rc['backend'] = 'GTKAgg'
 
+if options['build_macosx']:
+    if check_for_macosx() or (options['build_macosx'] is True):
+        build_macosx(ext_modules, packages)
+        rc['backend'] = 'MacOSX'
+
 # These are informational only.  We don't build any extensions for them.
 check_for_qt()
 check_for_qt4()
@@ -164,18 +183,20 @@ if hasdatetime: # dates require python23 datetime
 
     def add_pytz():
         packages.append('pytz')
+
         resources = ['zone.tab', 'locales/pytz.pot']
-        # install pytz subdirs
-        for dirpath, dirname, filenames in os.walk(os.path.join('lib', 'pytz',
-                                                                'zoneinfo')):
-            if '.svn' not in dirpath:
-                # remove the 'lib/pytz' part of the path
-                basepath = dirpath.split(os.path.sep, 2)[2]
-                resources.extend([os.path.join(basepath, filename)
-                                  for filename in filenames])
+        for dirpath, dirnames, filenames in os.walk(os.path.join('lib', 'pytz', 'zoneinfo')):
+
+            if '.svn' in dirpath: continue
+            # remove the 'pytz' part of the path
+            basepath = os.path.join(*dirpath.split(os.path.sep)[2:])
+            #print dirpath, basepath
+            resources.extend([os.path.join(basepath, filename)
+                              for filename in filenames])
         package_data['pytz'] = resources
-        assert len(resources) > 10, 'pytz zoneinfo files not found!'
-#                packages.append('/'.join(dirpath.split(os.sep)[1:]))
+        #print resources
+        assert len(resources) > 10, 'zoneinfo files not found!'
+
 
     def add_dateutil():
         packages.append('dateutil')
@@ -188,7 +209,9 @@ if hasdatetime: # dates require python23 datetime
         add_dateutil()
     else:
         # only add them if we need them
-        if provide_pytz: add_pytz()
+        if provide_pytz:
+            add_pytz()
+            print 'adding pytz'
         if provide_dateutil: add_dateutil()
 
 print_raw("")
@@ -198,27 +221,18 @@ check_for_ghostscript()
 check_for_latex()
 check_for_pdftops()
 
-# TODO: comment out for mpl release:
-print_raw("")
-print_raw("EXPERIMENTAL CONFIG PACKAGE DEPENDENCIES")
-packages.append('matplotlib.config')
-if check_provide_configobj(): py_modules.append('configobj')
-if check_provide_traits(): build_traits(ext_modules, packages)
-
 print_raw("")
 print_raw("[Edit setup.cfg to suppress the above messages]")
 print_line()
 
 # Write the default matplotlibrc file
 if options['backend']: rc['backend'] = options['backend']
-if options['numerix']: rc['numerix'] = options['numerix']
 template = file('matplotlibrc.template').read()
 file('lib/matplotlib/mpl-data/matplotlibrc', 'w').write(template%rc)
 
 # Write the default matplotlib.conf file
 template = file('lib/matplotlib/mpl-data/matplotlib.conf.template').read()
 template = template.replace("datapath = ", "#datapath = ")
-template = template.replace("numerix = 'numpy'", "numerix = '%s'"%rc['numerix'])
 template = template.replace("    use = 'Agg'", "    use = '%s'"%rc['backend'])
 file('lib/matplotlib/mpl-data/matplotlib.conf', 'w').write(template)
 
@@ -229,6 +243,8 @@ for mod in ext_modules:
     if options['verbose']:
         mod.extra_compile_args.append('-DVERBOSE')
 
+print 'pymods', py_modules
+print 'packages', packages
 distrib = setup(name="matplotlib",
       version= __version__,
       description = "Python plotting package",

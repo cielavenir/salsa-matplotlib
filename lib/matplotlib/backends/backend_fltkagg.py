@@ -115,6 +115,7 @@ def new_figure_manager(num, *args, **kwargs):
     window = Fltk.Fl_Double_Window(10,10,30,30)
     canvas = FigureCanvasFltkAgg(figure)
     window.end()
+    #Fltk.Fl.visual(Fltk.FL_DOUBLE)
     window.show()
     window.make_current()
     figManager = FigureManagerFltkAgg(canvas, num, window)
@@ -157,7 +158,7 @@ class FltkCanvas(Fltk.Fl_Widget):
     def handle(self, event):
         x=Fltk.Fl.event_x()
         y=Fltk.Fl.event_y()
-        yf=self._source.figure.bbox.height() - y
+        yf=self._source.figure.bbox.height - y
         if event == Fltk.FL_FOCUS or event == Fltk.FL_UNFOCUS:
             return 1
         elif event == Fltk.FL_KEYDOWN:
@@ -230,7 +231,7 @@ class FigureCanvasFltkAgg(FigureCanvasAgg):
     def resize(self,size):
         w, h = size
         # compute desired figure size in inches
-        dpival = self.figure.dpi.get()
+        dpival = self.figure.dpi
         winch = w/dpival
         hinch = h/dpival
         self.figure.set_size_inches(winch,hinch)
@@ -246,6 +247,14 @@ class FigureCanvasFltkAgg(FigureCanvasAgg):
 
     def widget(self):
         return self.canvas
+
+    def start_event_loop(self,timeout):
+        FigureCanvasBase.start_event_loop_default(self,timeout)
+    start_event_loop.__doc__=FigureCanvasBase.start_event_loop_default.__doc__
+
+    def stop_event_loop(self):
+        FigureCanvasBase.stop_event_loop_default(self)
+    stop_event_loop.__doc__=FigureCanvasBase.stop_event_loop_default.__doc__
 
 def destroy_figure(ptr,figman):
     figman.window.hide()
@@ -397,7 +406,7 @@ class NavigationToolbar:
     """
 
     def __init__(self, canvas, figman):
-        #xmin, xmax = canvas.figure.bbox.intervalx().get_bounds()
+        #xmin, xmax = canvas.figure.bbox.intervalx
         #height, width = 50, xmax-xmin
         self.canvas = canvas
         self.figman = figman
@@ -491,7 +500,7 @@ def save_figure(ptr,base):
     default_filetype = base.canvas.get_default_filetype()
     sorted_filetypes = filetypes.items()
     sorted_filetypes.sort()
-    
+
     selected_filter = 0
     filters = []
     for i, (ext, name) in enumerate(sorted_filetypes):
@@ -518,7 +527,7 @@ def save_figure(ptr,base):
     lastDir = os.path.dirname(fname)
     file_chooser.directory(lastDir)
     format = sorted_filetypes[file_chooser.filter_value()][0]
-    
+
     try:
         base.canvas.print_figure(fname, format=format)
     except IOError, msg:

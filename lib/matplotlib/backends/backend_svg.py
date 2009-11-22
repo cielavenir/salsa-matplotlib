@@ -1,6 +1,11 @@
 from __future__ import division
 
-import os, codecs, base64, tempfile, urllib, gzip, md5, cStringIO
+import os, codecs, base64, tempfile, urllib, gzip, cStringIO
+
+try:
+    from hashlib import md5
+except ImportError:
+    from md5 import md5 #Deprecated in 2.5
 
 from matplotlib import verbose, __version__, rcParams
 from matplotlib.backend_bases import RendererBase, GraphicsContextBase,\
@@ -22,7 +27,7 @@ backend_version = __version__
 
 def new_figure_manager(num, *args, **kwargs):
     FigureClass = kwargs.pop('FigureClass', Figure)
-    thisFig = FigureClass(*args)
+    thisFig = FigureClass(*args, **kwargs)
     canvas  = FigureCanvasSVG(thisFig)
     manager = FigureManagerSVG(canvas, num)
     return manager
@@ -48,6 +53,7 @@ class RendererSVG(RendererBase):
         self._markers = {}
         self._path_collection_id = 0
         self._imaged = {}
+        self._hatchd = {}
         self.mathtext_parser = MathTextParser('SVG')
         svgwriter.write(svgProlog%(width,height,width,height))
 
@@ -58,9 +64,13 @@ class RendererSVG(RendererBase):
         else:
             clippath = 'clip-path="url(#%s)"' % clipid
 
+        if gc.get_url() is not None:
+            self._svgwriter.write('<a xlink:href="%s">' % gc.get_url())
         style = self._get_style(gc, rgbFace)
         self._svgwriter.write ('<%s style="%s" %s %s/>\n' % (
                 element, style, clippath, details))
+        if gc.get_url() is not None:
+            self._svgwriter.write('</a>')
 
     def _get_font(self, prop):
         key = hash(prop)
@@ -77,27 +87,59 @@ class RendererSVG(RendererBase):
         font.set_size(size, 72.0)
         return font
 
+    def _get_hatch(self, gc, rgbFace):
+        """
+        Create a new hatch pattern
+        """
+        HATCH_SIZE = 72
+        dictkey = (gc.get_hatch(), rgbFace, gc.get_rgb())
+        id = self._hatchd.get(dictkey)
+        if id is None:
+            id = 'h%s' % md5(str(dictkey)).hexdigest()
+            self._svgwriter.write('<defs>\n  <pattern id="%s" ' % id)
+            self._svgwriter.write('patternUnits="userSpaceOnUse" x="0" y="0" ')
+            self._svgwriter.write(' width="%d" height="%d" >\n' % (HATCH_SIZE, HATCH_SIZE))
+            path_data = self._convert_path(
+                gc.get_hatch_path(),
+                Affine2D().scale(HATCH_SIZE).scale(1.0, -1.0).translate(0, HATCH_SIZE))
+            if rgbFace is None:
+                fill = 'none'
+            else:
+                fill = rgb2hex(rgbFace)
+            self._svgwriter.write(
+                '<rect x="0" y="0" width="%d" height="%d" fill="%s"/>' %
+                (HATCH_SIZE+1, HATCH_SIZE+1, fill))
+            path = '<path d="%s" fill="%s" stroke="%s" stroke-width="1.0"/>' % (
+                path_data, rgb2hex(gc.get_rgb()[:3]), rgb2hex(gc.get_rgb()[:3]))
+            self._svgwriter.write(path)
+            self._svgwriter.write('\n  </pattern>\n</defs>')
+            self._hatchd[dictkey] = id
+        return id
+
     def _get_style(self, gc, rgbFace):
         """
         return the style string.
         style is generated from the GraphicsContext, rgbFace and clippath
         """
-        if rgbFace is None:
-            fill = 'none'
+        if gc.get_hatch() is not None:
+            fill = "url(#%s)" % self._get_hatch(gc, rgbFace)
         else:
-            fill = rgb2hex(rgbFace[:3])
+            if rgbFace is None:
+                fill = 'none'
+            else:
+                fill = rgb2hex(rgbFace[:3])
 
         offset, seq = gc.get_dashes()
         if seq is None:
             dashes = ''
         else:
-            dashes = 'stroke-dasharray: %s; stroke-dashoffset: %s;' % (
-                ','.join(['%s'%val for val in seq]), offset)
+            dashes = 'stroke-dasharray: %s; stroke-dashoffset: %f;' % (
+                ','.join(['%f'%val for val in seq]), offset)
 
         linewidth = gc.get_linewidth()
         if linewidth:
-            return 'fill: %s; stroke: %s; stroke-width: %s; ' \
-                'stroke-linejoin: %s; stroke-linecap: %s; %s opacity: %s' % (
+            return 'fill: %s; stroke: %s; stroke-width: %f; ' \
+                'stroke-linejoin: %s; stroke-linecap: %s; %s opacity: %f' % (
                          fill,
                          rgb2hex(gc.get_rgb()[:3]),
                          linewidth,
@@ -107,7 +149,7 @@ class RendererSVG(RendererBase):
                          gc.get_alpha(),
                 )
         else:
-            return 'fill: %s; opacity: %s' % (\
+            return 'fill: %s; opacity: %f' % (\
                          fill,
                          gc.get_alpha(),
                 )
@@ -116,27 +158,35 @@ class RendererSVG(RendererBase):
         cliprect = gc.get_clip_rectangle()
         clippath, clippath_trans = gc.get_clip_path()
         if clippath is not None:
+            clippath_trans = self._make_flip_transform(clippath_trans)
             path_data = self._convert_path(clippath, clippath_trans)
             path = '<path d="%s"/>' % path_data
         elif cliprect is not None:
             x, y, w, h = cliprect.bounds
             y = self.height-(y+h)
-            path = '<rect x="%(x)s" y="%(y)s" width="%(w)s" height="%(h)s"/>' % locals()
+            path = '<rect x="%(x)f" y="%(y)f" width="%(w)f" height="%(h)f"/>' % locals()
         else:
             return None
 
         id = self._clipd.get(path)
         if id is None:
-            id = 'p%s' % md5.new(path).hexdigest()
+            id = 'p%s' % md5(path).hexdigest()
             self._svgwriter.write('<defs>\n  <clipPath id="%s">\n' % id)
             self._svgwriter.write(path)
             self._svgwriter.write('\n  </clipPath>\n</defs>')
             self._clipd[path] = id
         return id
 
-    def open_group(self, s):
-        self._groupd[s] = self._groupd.get(s,0) + 1
-        self._svgwriter.write('<g id="%s%d">\n' % (s, self._groupd[s]))
+    def open_group(self, s, gid=None):
+        """
+        Open a grouping element with label *s*. If *gid* is given, use
+        *gid* as the id of the group.
+        """
+        if gid:
+            self._svgwriter.write('<g id="%s">\n' % (gid))
+        else:
+            self._groupd[s] = self._groupd.get(s,0) + 1
+            self._svgwriter.write('<g id="%s%d">\n' % (s, self._groupd[s]))
 
     def close_group(self, s):
         self._svgwriter.write('</g>\n')
@@ -148,10 +198,10 @@ class RendererSVG(RendererBase):
         return rcParams['svg.image_noscale']
 
     _path_commands = {
-        Path.MOVETO: 'M%s %s',
-        Path.LINETO: 'L%s %s',
-        Path.CURVE3: 'Q%s %s %s %s',
-        Path.CURVE4: 'C%s %s %s %s %s %s'
+        Path.MOVETO: 'M%f %f',
+        Path.LINETO: 'L%f %f',
+        Path.CURVE3: 'Q%f %f %f %f',
+        Path.CURVE4: 'C%f %f %f %f %f %f'
         }
 
     def _make_flip_transform(self, transform):
@@ -160,14 +210,16 @@ class RendererSVG(RendererBase):
                 .scale(1.0, -1.0)
                 .translate(0.0, self.height))
 
-    def _convert_path(self, path, transform):
-        tpath = transform.transform_path(path)
-
+    def _convert_path(self, path, transform, clip=False):
         path_data = []
         appender = path_data.append
         path_commands = self._path_commands
         currpos = 0
-        for points, code in tpath.iter_segments():
+        if clip:
+            clip = (0.0, 0.0, self.width, self.height)
+        else:
+            clip = None
+        for points, code in path.iter_segments(transform, clip=clip):
             if code == Path.CLOSEPOLY:
                 segment = 'z'
             else:
@@ -182,7 +234,7 @@ class RendererSVG(RendererBase):
 
     def draw_path(self, gc, path, transform, rgbFace=None):
         trans_and_flip = self._make_flip_transform(transform)
-        path_data = self._convert_path(path, trans_and_flip)
+        path_data = self._convert_path(path, trans_and_flip, clip=(rgbFace is None))
         self._draw_svg_element('path', 'd="%s"' % path_data, gc, rgbFace)
 
     def draw_markers(self, gc, marker_path, marker_trans, path, trans, rgbFace=None):
@@ -191,7 +243,7 @@ class RendererSVG(RendererBase):
         key = self._convert_path(marker_path, marker_trans + Affine2D().scale(1.0, -1.0))
         name = self._markers.get(key)
         if name is None:
-            name = 'm%s' % md5.new(key).hexdigest()
+            name = 'm%s' % md5(key).hexdigest()
             write('<defs><path id="%s" d="%s"/></defs>\n' % (name, key))
             self._markers[key] = name
 
@@ -203,17 +255,18 @@ class RendererSVG(RendererBase):
 
         write('<g %s>' % clippath)
         trans_and_flip = self._make_flip_transform(trans)
-        tpath = trans_and_flip.transform_path(path)
-        for x, y in tpath.vertices:
-            details = 'xlink:href="#%s" x="%f" y="%f"' % (name, x, y)
-            style = self._get_style(gc, rgbFace)
-            self._svgwriter.write ('<use style="%s" %s/>\n' % (style, details))
+        for vertices, code in path.iter_segments(trans_and_flip, simplify=False):
+            if len(vertices):
+                x, y = vertices[-2:]
+                details = 'xlink:href="#%s" x="%f" y="%f"' % (name, x, y)
+                style = self._get_style(gc, rgbFace)
+                self._svgwriter.write ('<use style="%s" %s/>\n' % (style, details))
         write('</g>')
 
     def draw_path_collection(self, master_transform, cliprect, clippath,
                              clippath_trans, paths, all_transforms, offsets,
                              offsetTrans, facecolors, edgecolors, linewidths,
-                             linestyles, antialiaseds):
+                             linestyles, antialiaseds, urls):
         write = self._svgwriter.write
 
         path_codes = []
@@ -223,7 +276,7 @@ class RendererSVG(RendererBase):
             transform = Affine2D(transform.get_matrix()).scale(1.0, -1.0)
             d = self._convert_path(path, transform)
             name = 'coll%x_%x_%s' % (self._path_collection_id, i,
-                                     md5.new(d).hexdigest())
+                                     md5(d).hexdigest())
             write('<path id="%s" d="%s"/>\n' % (name, d))
             path_codes.append(name)
         write('</defs>\n')
@@ -231,8 +284,11 @@ class RendererSVG(RendererBase):
         for xo, yo, path_id, gc, rgbFace in self._iter_collection(
             path_codes, cliprect, clippath, clippath_trans,
             offsets, offsetTrans, facecolors, edgecolors,
-            linewidths, linestyles, antialiaseds):
+            linewidths, linestyles, antialiaseds, urls):
             clipid = self._get_gc_clip_svg(gc)
+            url = gc.get_url()
+            if url is not None:
+                self._svgwriter.write('<a xlink:href="%s">' % url)
             if clipid is not None:
                 write('<g clip-path="url(#%s)">' % clipid)
             details = 'xlink:href="#%s" x="%f" y="%f"' % (path_id, xo, self.height - yo)
@@ -240,6 +296,8 @@ class RendererSVG(RendererBase):
             self._svgwriter.write ('<use style="%s" %s/>\n' % (style, details))
             if clipid is not None:
                 write('</g>')
+            if url is not None:
+                self._svgwriter.write('</a>')
 
         self._path_collection_id += 1
 
@@ -249,11 +307,8 @@ class RendererSVG(RendererBase):
         transstr = ''
         if rcParams['svg.image_noscale']:
             trans = list(im.get_matrix())
-            if im.get_interpolation() != 0:
-                trans[4] += trans[0]
-                trans[5] += trans[3]
             trans[5] = -trans[5]
-            transstr = 'transform="matrix(%s %s %s %s %s %s)" '%tuple(trans)
+            transstr = 'transform="matrix(%f %f %f %f %f %f)" '%tuple(trans)
             assert trans[1] == 0
             assert trans[2] == 0
             numrows,numcols = im.get_size()
@@ -263,8 +318,11 @@ class RendererSVG(RendererBase):
 
         h,w = im.get_size_out()
 
+        url = getattr(im, '_url', None)
+        if url is not None:
+            self._svgwriter.write('<a xlink:href="%s">' % url)
         self._svgwriter.write (
-            '<image x="%s" y="%s" width="%s" height="%s" '
+            '<image x="%f" y="%f" width="%f" height="%f" '
             '%s xlink:href="'%(x/trans[0], (self.height-y)/trans[3]-h, w, h, transstr)
             )
 
@@ -287,6 +345,8 @@ class RendererSVG(RendererBase):
             self._svgwriter.write(filename)
 
         self._svgwriter.write('"/>\n')
+        if url is not None:
+            self._svgwriter.write('</a>')
 
     def draw_text(self, gc, x, y, s, prop, angle, ismath):
         if ismath:
@@ -318,12 +378,12 @@ class RendererSVG(RendererBase):
             if clipid is not None:
                 svg.append('<g clip-path="url(#%s)">\n' % clipid)
 
-            svg.append('<g style="fill: %s; opacity: %s" transform="' % (color, gc.get_alpha()))
+            svg.append('<g style="fill: %s; opacity: %f" transform="' % (color, gc.get_alpha()))
             if angle != 0:
-                svg.append('translate(%s,%s)rotate(%1.1f)' % (x,y,-angle))
+                svg.append('translate(%f,%f)rotate(%1.1f)' % (x,y,-angle))
             elif x != 0 or y != 0:
-                svg.append('translate(%s,%s)' % (x, y))
-            svg.append('scale(%s)">\n' % (fontsize / self.FONT_SCALE))
+                svg.append('translate(%f,%f)' % (x, y))
+            svg.append('scale(%f)">\n' % (fontsize / self.FONT_SCALE))
 
             cmap = font.get_charmap()
             lastgind = None
@@ -345,7 +405,7 @@ class RendererSVG(RendererBase):
 
                 svg.append('<use xlink:href="#%s"' % charnum)
                 if currx != 0:
-                    svg.append(' x="%s"' %
+                    svg.append(' x="%f"' %
                                (currx * (self.FONT_SCALE / fontsize)))
                 svg.append('/>\n')
 
@@ -360,16 +420,16 @@ class RendererSVG(RendererBase):
             fontfamily = font.family_name
             fontstyle = prop.get_style()
 
-            style = ('font-size: %f; font-family: %s; font-style: %s; fill: %s; opacity: %s' %
+            style = ('font-size: %f; font-family: %s; font-style: %s; fill: %s; opacity: %f' %
                      (fontsize, fontfamily,fontstyle, color, gc.get_alpha()))
             if angle!=0:
-                transform = 'transform="translate(%s,%s) rotate(%1.1f) translate(%s,%s)"' % (x,y,-angle,-x,-y)
+                transform = 'transform="translate(%f,%f) rotate(%1.1f) translate(%f,%f)"' % (x,y,-angle,-x,-y)
                 # Inkscape doesn't support rotate(angle x y)
             else:
                 transform = ''
 
             svg = """\
-<text style="%(style)s" x="%(x)s" y="%(y)s" %(transform)s>%(thetext)s</text>
+<text style="%(style)s" x="%(x)f" y="%(y)f" %(transform)s>%(thetext)s</text>
 """ % locals()
         write(svg)
 
@@ -391,17 +451,17 @@ class RendererSVG(RendererBase):
         currx, curry = 0.0, 0.0
         for step in glyph.path:
             if step[0] == 0:   # MOVE_TO
-                path_data.append("M%s %s" %
+                path_data.append("M%f %f" %
                                  (step[1], -step[2]))
             elif step[0] == 1: # LINE_TO
-                path_data.append("l%s %s" %
+                path_data.append("l%f %f" %
                                  (step[1] - currx, -step[2] - curry))
             elif step[0] == 2: # CURVE3
-                path_data.append("q%s %s %s %s" %
+                path_data.append("q%f %f %f %f" %
                                  (step[1] - currx, -step[2] - curry,
                                   step[3] - currx, -step[4] - curry))
             elif step[0] == 3: # CURVE4
-                path_data.append("c%s %s %s %s %s %s" %
+                path_data.append("c%f %f %f %f %f %f" %
                                  (step[1] - currx, -step[2] - curry,
                                   step[3] - currx, -step[4] - curry,
                                   step[5] - currx, -step[6] - curry))
@@ -412,7 +472,7 @@ class RendererSVG(RendererBase):
             if step[0] != 4:
                 currx, curry = step[-2], -step[-1]
         path_data = ''.join(path_data)
-        char_num = 'c_%s' % md5.new(path_data).hexdigest()
+        char_num = 'c_%s' % md5(path_data).hexdigest()
         path_element = '<path id="%s" d="%s"/>\n' % (char_num, ''.join(path_data))
         self._char_defs[char_id] = char_num
         return path_element
@@ -455,16 +515,16 @@ class RendererSVG(RendererBase):
 
             svg = ['<g style="%s" transform="' % style]
             if angle != 0:
-                svg.append('translate(%s,%s)rotate(%1.1f)'
+                svg.append('translate(%f,%f)rotate(%1.1f)'
                            % (x,y,-angle) )
             else:
-                svg.append('translate(%s,%s)' % (x, y))
+                svg.append('translate(%f,%f)' % (x, y))
             svg.append('">\n')
 
             for font, fontsize, thetext, new_x, new_y_mtc, metrics in svg_glyphs:
                 charid = self._get_char_def_id(font, thetext)
 
-                svg.append('<use xlink:href="#%s" transform="translate(%s,%s)scale(%s)"/>\n' %
+                svg.append('<use xlink:href="#%s" transform="translate(%f,%f)scale(%f)"/>\n' %
                            (charid, new_x, -new_y_mtc, fontsize / self.FONT_SCALE))
             svg.append('</g>\n')
         else: # not rcParams['svg.embed_char_paths']
@@ -483,15 +543,15 @@ class RendererSVG(RendererBase):
 
                 svg.append('<tspan style="%s"' % style)
                 xadvance = metrics.advance
-                svg.append(' textLength="%s"' % xadvance)
+                svg.append(' textLength="%f"' % xadvance)
 
                 dx = new_x - curr_x
                 if dx != 0.0:
-                    svg.append(' dx="%s"' % dx)
+                    svg.append(' dx="%f"' % dx)
 
                 dy = new_y - curr_y
                 if dy != 0.0:
-                    svg.append(' dy="%s"' % dy)
+                    svg.append(' dy="%f"' % dy)
 
                 thetext = escape_xml_text(thetext)
 
@@ -506,14 +566,14 @@ class RendererSVG(RendererBase):
             style = "fill: %s; stroke: none" % color
             svg.append('<g style="%s" transform="' % style)
             if angle != 0:
-                svg.append('translate(%s,%s) rotate(%1.1f)'
+                svg.append('translate(%f,%f) rotate(%1.1f)'
                            % (x,y,-angle) )
             else:
-                svg.append('translate(%s,%s)' % (x, y))
+                svg.append('translate(%f,%f)' % (x, y))
             svg.append('">\n')
 
             for x, y, width, height in svg_rects:
-                svg.append('<rect x="%s" y="%s" width="%s" height="%s" fill="black" stroke="none" />' % (x, -y + height, width, height))
+                svg.append('<rect x="%f" y="%f" width="%f" height="%f" fill="black" stroke="none" />' % (x, -y + height, width, height))
             svg.append("</g>")
 
         self.open_group("mathtext")
@@ -557,7 +617,7 @@ class FigureCanvasSVG(FigureCanvasBase):
             fh_to_close = None
         else:
             raise ValueError("filename must be a path or a file-like object")
-        return self._print_svg(filename, svgwriter, fh_to_close)
+        return self._print_svg(filename, svgwriter, fh_to_close, **kwargs)
 
     def print_svgz(self, filename, *args, **kwargs):
         if is_string_like(filename):
@@ -570,13 +630,28 @@ class FigureCanvasSVG(FigureCanvasBase):
             raise ValueError("filename must be a path or a file-like object")
         return self._print_svg(filename, svgwriter, fh_to_close)
 
-    def _print_svg(self, filename, svgwriter, fh_to_close=None):
+    def _print_svg(self, filename, svgwriter, fh_to_close=None, **kwargs):
         self.figure.set_dpi(72.0)
         width, height = self.figure.get_size_inches()
         w, h = width*72, height*72
 
-        renderer = MixedModeRenderer(
-            width, height, 72.0, RendererSVG(w, h, svgwriter, filename))
+        if rcParams['svg.image_noscale']:
+            renderer = RendererSVG(w, h, svgwriter, filename)
+        else:
+            # setting mixed renderer dpi other than 72 results in
+            # incorrect size of the rasterized image. It seems that the
+            # svg internally uses fixed dpi of 72 and seems to cause
+            # the problem. I hope someone who knows the svg backends
+            # take a look at this problem. Meanwhile, the dpi
+            # parameter is ignored and image_dpi is fixed at 72. - JJL
+
+            #image_dpi = kwargs.pop("dpi", 72)
+            image_dpi = 72
+            _bbox_inches_restore = kwargs.pop("bbox_inches_restore", None)
+            renderer = MixedModeRenderer(self.figure,
+                width, height, image_dpi, RendererSVG(w, h, svgwriter, filename),
+                bbox_inches_restore=_bbox_inches_restore)
+
         self.figure.draw(renderer)
         renderer.finalize()
         if fh_to_close is not None:

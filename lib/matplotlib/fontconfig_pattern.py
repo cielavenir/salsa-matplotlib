@@ -1,22 +1,24 @@
 """
-A module for parsing a fontconfig pattern.
+A module for parsing and generating fontconfig patterns.
 
-This class is defined here because it must be available in:
-  - The old-style config framework (rcsetup.py)
-  - The traits-based config framework (mpltraits.py)
-  - The font manager (font_manager.py)
-
-It probably logically belongs in font_manager.py, but
-placing it in any of these places would have created cyclical
-dependency problems, or an undesired dependency on traits even
-when the traits-based config framework is not used.
-
-See here for a rough specification of these patterns:
-http://www.fontconfig.org/fontconfig-user.html
-
-Author : Michael Droettboom <mdroe@stsci.edu>
-License   : matplotlib license (PSF compatible)
+See the `fontconfig pattern specification
+<http://www.fontconfig.org/fontconfig-user.html>`_ for more
+information.
 """
+
+# Author : Michael Droettboom <mdroe@stsci.edu>
+# License : matplotlib license (PSF compatible)
+
+# This class is defined here because it must be available in:
+#   - The old-style config framework (:file:`rcsetup.py`)
+#   - The traits-based config framework (:file:`mpltraits.py`)
+#   - The font manager (:file:`font_manager.py`)
+
+# It probably logically belongs in :file:`font_manager.py`, but
+# placing it in any of these places would have created cyclical
+# dependency problems, or an undesired dependency on traits even
+# when the traits-based config framework is not used.
+
 import re
 from matplotlib.pyparsing import Literal, ZeroOrMore, \
     Optional, Regex, StringEnd, ParseException, Suppress
@@ -32,10 +34,10 @@ value_escape = re.compile(r'([%s])' % value_punc).sub
 class FontconfigPatternParser:
     """A simple pyparsing-based parser for fontconfig-style patterns.
 
-    See here for a rough specification of these patterns:
-    http://www.fontconfig.org/fontconfig-user.html
+    See the `fontconfig pattern specification
+    <http://www.fontconfig.org/fontconfig-user.html>`_ for more
+    information.
     """
-
 
     _constants = {
         'thin'           : ('weight', 'light'),
@@ -113,6 +115,11 @@ class FontconfigPatternParser:
         self.ParseException = ParseException
 
     def parse(self, pattern):
+        """
+        Parse the given fontconfig *pattern* and return a dictionary
+        of key/value pairs useful for initializing a
+        :class:`font_manager.FontProperties` object.
+        """
         props = self._properties = {}
         try:
             self._parser.parseString(pattern)
@@ -123,23 +130,23 @@ class FontconfigPatternParser:
         return props
 
     def _family(self, s, loc, tokens):
-        return [family_unescape(r'\1', tokens[0])]
+        return [family_unescape(r'\1', str(tokens[0]))]
 
     def _size(self, s, loc, tokens):
         return [float(tokens[0])]
 
     def _name(self, s, loc, tokens):
-        return [tokens[0]]
+        return [str(tokens[0])]
 
     def _value(self, s, loc, tokens):
-        return [value_unescape(r'\1', tokens[0])]
+        return [value_unescape(r'\1', str(tokens[0]))]
 
     def _families(self, s, loc, tokens):
-        self._properties['family'] = tokens
+        self._properties['family'] = [str(x) for x in tokens]
         return []
 
     def _point_sizes(self, s, loc, tokens):
-        self._properties['size'] = tokens
+        self._properties['size'] = [str(x) for x in tokens]
         return []
 
     def _property(self, s, loc, tokens):
@@ -156,15 +163,19 @@ class FontconfigPatternParser:
 parse_fontconfig_pattern = FontconfigPatternParser().parse
 
 def generate_fontconfig_pattern(d):
-    """Given a dictionary of key/value pairs, generates a fontconfig pattern
-    string."""
+    """
+    Given a dictionary of key/value pairs, generates a fontconfig
+    pattern string.
+    """
     props = []
     families = ''
     size = ''
-    for key, val in d.items():
+    for key in 'family style variant weight stretch file size'.split():
+        val = getattr(d, 'get_' + key)()
         if val is not None and val != []:
-            val = [value_escape(r'\\\1', str(x)) for x in val if x is not None]
-            if val != []:
-                val = ','.join(val)
-                props.append(":%s=%s" % (key, val))
+            if type(val) == list:
+                val = [value_escape(r'\\\1', str(x)) for x in val if x is not None]
+                if val != []:
+                    val = ','.join(val)
+            props.append(":%s=%s" % (key, val))
     return ''.join(props)

@@ -58,12 +58,11 @@ class MPLConfig(TConfig):
     toolbar = T.Trait('toolbar2', 'toolbar2', None)
     timezone = T.Trait('UTC', pytz.all_timezones)
     datapath = T.Trait(cutils.get_data_path())
-    numerix = T.Trait('numpy', 'numpy', 'numeric', 'numarray')
-    maskedarray = T.false
     units = T.false
 
     class backend(TConfig):
         use = T.Trait('Agg', mplT.BackendHandler())
+        fallback = T.Trait(True, mplT.BoolHandler())
 
         class cairo(TConfig):
             format = T.Trait('png', 'png', 'ps', 'pdf', 'svg')
@@ -105,9 +104,9 @@ class MPLConfig(TConfig):
         linewidth = T.Float(1.0)
         linestyle = T.Trait('-','--','-.', ':', 'steps', '', ' ', None)
         color = T.Trait('blue',mplT.ColorHandler())
-        solid_joinstyle = T.Trait('miter', 'miter', 'round', 'bevel')
+        solid_joinstyle = T.Trait('round', 'miter', 'round', 'bevel')
         solid_capstyle = T.Trait('butt', 'butt', 'round', 'projecting')
-        dash_joinstyle = T.Trait('miter', 'miter', 'round', 'bevel')
+        dash_joinstyle = T.Trait('round', 'miter', 'round', 'bevel')
         dash_capstyle = T.Trait('butt', 'butt', 'round', 'projecting')
         marker = T.Trait('None', 'None', 'o', '.', ',', '^', 'v', '<', '>', 's',
                          '+', 'x', 'D','d', '1', '2', '3', '4', 'h', 'H', 'p',
@@ -115,6 +114,10 @@ class MPLConfig(TConfig):
         markeredgewidth = T.Float(0.5)
         markersize = T.Float(6)
         antialiased = T.true
+
+    class path(TConfig):
+        simplify = T.false
+        simplify_threshold = T.float(1.0 / 9.0)
 
     class patch(TConfig):
         linewidth = T.Float(1.0)
@@ -165,6 +168,7 @@ class MPLConfig(TConfig):
         bf  = T.Trait('serif:bold'    , mplT.FontconfigPatternHandler())
         sf  = T.Trait('sans'          , mplT.FontconfigPatternHandler())
         fontset = T.Trait('cm', 'cm', 'stix', 'stixsans', 'custom')
+        default = T.Trait(*("rm cal it tt sf bf default bb frak circled scr regular".split()))
         fallback_to_cm = T.true
 
     class axes(TConfig):
@@ -284,8 +288,7 @@ class RcParamsWrapper(dict):
 
         self.tconfig_map = {
         'backend' : (self.tconfig.backend, 'use'),
-        'numerix' : (self.tconfig, 'numerix'),
-        'maskedarray' : (self.tconfig, 'maskedarray'),
+        'backend_fallback' : (self.tconfig.backend, 'fallback'),
         'toolbar' : (self.tconfig, 'toolbar'),
         'datapath' : (self.tconfig, 'datapath'),
         'units' : (self.tconfig, 'units'),
@@ -437,6 +440,9 @@ class RcParamsWrapper(dict):
         'svg.image_noscale' : (self.tconfig.backend.svg, 'image_noscale'),
         'svg.embed_char_paths' : (self.tconfig.backend.svg, 'embed_char_paths'),
 
+        # Path properties
+        'path.simplify' : (self.tconfig.path, 'simplify'),
+        'path.simplify_threshold' : (self.tconfig.path, 'simplify_threshold')
         }
 
     def __setitem__(self, key, val):
@@ -454,8 +460,8 @@ See rcParams.keys() for a list of valid parameters.'%key)
     def keys(self):
         return self.tconfig_map.keys()
 
-    def has_key(self, val):
-        return self.tconfig_map.has_key(val)
+    def __contains__(self, val):
+        return val in self.tconfig_map
 
     def update(self, arg, **kwargs):
         try:

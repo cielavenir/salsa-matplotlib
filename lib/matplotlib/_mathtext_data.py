@@ -1805,7 +1805,7 @@ tex2uni = {
 'Game': 0x2141,
 'hbar': 0x0127,
 'hslash': 0x210f,
-'ldots': 0x22ef,
+'ldots': 0x2026,
 'vdots': 0x22ee,
 'doteqdot': 0x2251,
 'doteq': 8784,
@@ -2100,7 +2100,7 @@ tex2uni = {
 'propto': 8733,
 'pi': 960,
 'pm': 177,
-'dots': 8230,
+'dots': 0x2026,
 'nrightarrow': 8603,
 'textasciiacute': 180,
 'Doteq': 8785,
@@ -2347,7 +2347,7 @@ stix_virtual_fonts = {
         'it':
             [
             (0x0030, 0x0039, 'rm', 0x1d7d8), # 0-9
-            (0x0041, 0x0041, 'it', 0xe154),  # A-B
+            (0x0041, 0x0042, 'it', 0xe154),  # A-B
             (0x0043, 0x0043, 'it', 0x2102),  # C (missing in beta STIX fonts)
             (0x0044, 0x0044, 'it', 0x2145),  # D
             (0x0045, 0x0047, 'it', 0xe156),  # E-G

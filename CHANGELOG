@@ -1,3 +1,816 @@
+===============================================
+2009-09-21 Tagged for release 0.99.1
+
+2009-09-20 Fix usetex spacing errors in pdf backend. - JKS
+
+2009-09-20 Fix off-by-one error in dviread.Tfm, and additionally protect
+           against exceptions in case a dvi font is missing some metrics. - JKS
+
+2009-09-15 Don't fail on AFM files containing floating-point bounding boxes - JKS
+
+2009-08-06 Tagging the 0.99.0 release at svn r7397 - JDH
+
+	   * fixed an alpha colormapping bug posted on sf 2832575
+
+	   * fix typo in axes_divider.py. use nanmin, nanmax in angle_helper.py
+             (patch by Christoph Gohlke)
+
+	   * remove dup gui event in enter/leave events in gtk
+
+	   * lots of fixes for os x binaries (Thanks Russell Owen)
+
+	   * attach gtk events to mpl events -- fixes sf bug 2816580
+
+	   * applied sf patch 2815064 (middle button events for wx) and
+             patch  2818092 (resize events for wx)
+
+	   * fixed boilerplate.py so it doesn't break the ReST docs.
+
+	   * removed a couple of cases of mlab.load
+
+	   * fixed rec2csv win32 file handle bug from sf patch 2831018
+
+	   * added two examples from Josh Hemann: examples/pylab_examples/barchart_demo2.py
+             and examples/pylab_examples/boxplot_demo2.py
+
+	   * handled sf bugs 2831556 and 2830525; better bar error messages and
+             backend driver configs
+
+	   * added miktex win32 patch from sf patch 2820194
+
+	   * apply sf patches 2830233 and 2823885 for osx setup and 64 bit;  thanks Michiel
+
+2009-08-03 Fixed boilerplate.py so it doesn't break the ReST docs. - JKS
+
+2009-08-03 pylab no longer provides a load and save function.  These
+           are available in matplotlib.mlab, or you can use
+           numpy.loadtxt and numpy.savetxt for text files, or np.save
+           and np.load for binary numpy arrays. - JDH
+
+2009-07-31 Tagging 0.99.0.rc1 at 7314 - MGD
+
+2009-07-30 Add set_cmap and register_cmap, and improve get_cmap,
+           to provide convenient handling of user-generated
+           colormaps. Reorganized _cm and cm modules. - EF
+
+2009-07-28 Quiver speed improved, thanks to tip by Ray Speth. -EF
+
+2009-07-27 Simplify argument handling code for plot method. -EF
+
+2009-07-25 Allow "plot(1, 2, 'r*')" to work. - EF
+
+2009-07-22 Added an 'interp' keyword to griddata so the faster linear
+           interpolation method can be chosen.  Default is 'nn', so
+           default behavior (using natural neighbor method) is unchanged (JSW)
+
+2009-07-22 Improved boilerplate.py so that it generates the correct
+           signatures for pyplot functions. - JKS
+
+2009-07-19 Fixed the docstring of Axes.step to reflect the correct
+           meaning of the kwargs "pre" and "post" - See SF bug
+           https://sourceforge.net/tracker/index.php?func=detail&aid=2823304&group_id=80706&atid=560720
+           - JDH
+
+2009-07-18 Fix support for hatches without color fills to pdf and svg
+           backends. Add an example of that to hatch_demo.py. - JKS
+
+2009-07-17 Removed fossils from swig version of agg backend. - EF
+
+2009-07-14 initial submission of the annotation guide. -JJL
+
+2009-07-14 axes_grid : minor improvements in anchored_artists and
+           inset_locator. -JJL
+
+2009-07-14 Fix a few bugs in ConnectionStyle algorithms. Add
+           ConnectionPatch class. -JJL
+
+2009-07-11 Added a fillstyle Line2D property for half filled markers
+           -- see examples/pylab_examples/fillstyle_demo.py JDH
+
+2009-07-08 Attempt to improve performance of qt4 backend, do not call
+           qApp.processEvents while processing an event. Thanks Ole
+           Streicher for tracking this down - DSD
+
+2009-06-24 Add withheader option to mlab.rec2csv and changed
+  use_mrecords default to False in mlab.csv2rec since this is
+  partially broken - JDH
+
+2009-06-24 backend_agg.draw_marker quantizes the main path (as in the
+           draw_path). - JJL
+
+2009-06-24 axes_grid: floating axis support added. - JJL
+
+2009-06-14 Add new command line options to backend_driver.py to support
+           running only some directories of tests - JKS
+
+2009-06-13 partial cleanup of mlab and its importation in pylab - EF
+
+2009-06-13 Introduce a rotation_mode property for the Text artist. See
+           examples/pylab_examples/demo_text_rotation_mode.py -JJL
+
+2009-06-07 add support for bz2 files per sf support request 2794556 -
+           JDH
+
+2009-06-06 added a properties method to the artist and inspector to
+           return a dict mapping property name -> value; see sf
+           feature request 2792183 - JDH
+
+2009-06-06 added Neil's auto minor tick patch; sf patch #2789713 - JDH
+
+2009-06-06 do not apply alpha to rgba color conversion if input is
+           already rgba - JDH
+
+2009-06-03 axes_grid : Initial check-in of curvelinear grid support. See
+           examples/axes_grid/demo_curvelinear_grid.py - JJL
+
+2009-06-01 Add set_color method to Patch - EF
+
+2009-06-01 Spine is now derived from Patch - ADS
+
+2009-06-01 use cbook.is_string_like() instead of isinstance() for spines - ADS
+
+2009-06-01 cla() support for spines - ADS
+
+2009-06-01 Removed support for gtk < 2.4. - EF
+
+2009-05-29 Improved the animation_blit_qt4 example, which was a mix
+           of the object-oriented and pylab interfaces. It is now
+           strictly object-oriented - DSD
+
+2009-05-28 Fix axes_grid toolkit to work with spine patch by ADS. - JJL
+
+2009-05-28 Applied fbianco's patch to handle scroll wheel events in
+           the qt4 backend - DSD
+
+2009-05-26 Add support for "axis spines" to have arbitrary location. -ADS
+
+2009-05-20 Add an empty matplotlibrc to the tests/ directory so that running
+           tests will use the default set of rcparams rather than the user's
+           config. - RMM
+
+2009-05-19 Axis.grid(): allow use of which='major,minor' to have grid
+           on major and minor ticks. -ADS
+
+2009-05-18 Make psd(), csd(), and cohere() wrap properly for complex/two-sided
+           versions, like specgram() (SF #2791686) - RMM
+
+2009-05-18 Fix the linespacing bug of multiline text (#1239682). See
+           examples/pylab_examples/multiline.py -JJL
+
+2009-05-18 Add *annotation_clip* attr. for text.Annotation class.
+           If True, annotation is only drawn when the annotated point is
+           inside the axes area. -JJL
+
+2009-05-17 Fix bug(#2749174) that some properties of minor ticks are
+           not conserved -JJL
+
+2009-05-17 applied Michiel's sf patch 2790638 to turn off gtk event
+           loop in setupext for pygtk>=2.15.10 - JDH
+
+2009-05-17 applied Michiel's sf patch 2792742 to speed up Cairo and
+           macosx collections; speedups can be 20x.  Also fixes some
+           bugs in which gc got into inconsistent state
+
+======================================================================
+
+2008-05-17 Release 0.98.5.3 at r7107 from the branch - JDH
+
+2009-05-13 An optional offset and bbox support in restore_bbox.
+           Add animation_blit_gtk2.py. -JJL
+
+2009-05-13 psfrag in backend_ps now uses baseline-alignment
+           when preview.sty is used ((default is
+           bottom-alignment). Also, a small api imporvement
+           in OffsetBox-JJL
+
+2009-05-13 When the x-coordinate of a line is monotonically
+           increasing, it is now automatically clipped at
+           the stage of generating the transformed path in
+           the draw method; this greatly speeds up zooming and
+           panning when one is looking at a short segment of
+           a long time series, for example. - EF
+
+2009-05-11 aspect=1 in log-log plot gives square decades. -JJL
+
+2009-05-08 clabel takes new kwarg, rightside_up; if False, labels
+           will not be flipped to keep them rightside-up.  This
+           allows the use of clabel to make streamfunction arrows,
+           as requested by Evan Mason. - EF
+
+2009-05-07 'labelpad' can now be passed when setting x/y labels. This
+           allows controlling the spacing between the label and its
+           axis. - RMM
+
+2009-05-06 print_ps now uses mixed-mode renderer. Axes.draw rasterize
+           artists whose zorder smaller than rasterization_zorder.
+           -JJL
+
+2009-05-06 Per-artist Rasterization, originally by Eric Bruning. -JJ
+
+2009-05-05 Add an example that shows how to make a plot that updates
+           using data from another process.  Thanks to Robert
+           Cimrman - RMM
+
+2009-05-05 Add Axes.get_legend_handles_labels method. - JJL
+
+2009-05-04 Fix bug that Text.Annotation is still drawn while set to
+           not visible. - JJL
+
+2009-05-04 Added TJ's fill_betweenx patch - JDH
+
+2009-05-02 Added options to plotfile based on question from
+           Joseph Smidt and patch by Matthias Michler. - EF
+
+
+2009-05-01 Changed add_artist and similar Axes methods to
+           return their argument. - EF
+
+2009-04-30 Incorrect eps bbox for landscape mode fixed - JJL
+
+2009-04-28 Fixed incorrect bbox of eps output when usetex=True. - JJL
+
+2009-04-24 Changed use of os.open* to instead use subprocess.Popen.
+           os.popen* are deprecated in 2.6 and are removed in 3.0. - RMM
+
+2009-04-20 Worked on axes_grid documentation. Added
+           axes_grid.inset_locator. - JJL
+
+2009-04-17 Initial check-in of the axes_grid toolkit. - JJL
+
+2009-04-17 Added a support for bbox_to_anchor in
+           offsetbox.AnchoredOffsetbox. Improved a documentation.
+           - JJL
+
+2009-04-16 Fixed a offsetbox bug that multiline texts are not
+           correctly aligned.  - JJL
+
+2009-04-16 Fixed a bug in mixed mode renderer that images produced by
+           an rasterizing backend are placed with incorrect size.
+           - JJL
+
+2009-04-14 Added Jonathan Taylor's Reinier Heeres' port of John
+           Porters' mplot3d to svn trunk.  Package in
+           mpl_toolkits.mplot3d and demo is examples/mplot3d/demo.py.
+           Thanks Reiner
+
+2009-04-06 The pdf backend now escapes newlines and linefeeds in strings.
+           Fixes sf bug #2708559; thanks to Tiago Pereira for the report.
+
+2009-04-06 texmanager.make_dvi now raises an error if LaTeX failed to
+           create an output file. Thanks to Joao Luis Silva for reporting
+           this. - JKS
+
+2009-04-05 _png.read_png() reads 12 bit PNGs (patch from
+           Tobias Wood) - ADS
+
+2009-04-04 Allow log axis scale to clip non-positive values to
+           small positive value; this is useful for errorbars. - EF
+
+2009-03-28 Make images handle nan in their array argument.
+           A helper, cbook.safe_masked_invalid() was added. - EF
+
+2009-03-25 Make contour and contourf handle nan in their Z argument. - EF
+
+2009-03-20 Add AuxTransformBox in offsetbox.py to support some transformation.
+           anchored_text.py example is enhanced and renamed
+           (anchored_artists.py). - JJL
+
+2009-03-20 Add "bar" connection style for annotation - JJL
+
+2009-03-17 Fix bugs in edge color handling by contourf, found
+           by Jae-Joon Lee. - EF
+
+2009-03-14 Added 'LightSource' class to colors module for
+           creating shaded relief maps.  shading_example.py
+           added to illustrate usage. - JSW
+
+2009-03-11 Ensure wx version >= 2.8; thanks to Sandro Tosi and
+           Chris Barker. - EF
+
+2009-03-10 Fix join style bug in pdf. - JKS
+
+2009-03-07 Add pyplot access to figure number list - EF
+
+2009-02-28 hashing of FontProperties accounts current rcParams - JJL
+
+2009-02-28 Prevent double-rendering of shared axis in twinx, twiny - EF
+
+2009-02-26 Add optional bbox_to_anchor argument for legend class - JJL
+
+2009-02-26 Support image clipping in pdf backend. - JKS
+
+2009-02-25 Improve tick location subset choice in FixedLocator. - EF
+
+2009-02-24 Deprecate numerix, and strip out all but the numpy
+           part of the code. - EF
+
+2009-02-21 Improve scatter argument handling; add an early error
+           message, allow inputs to have more than one dimension. - EF
+
+2009-02-16 Move plot_directive.py to the installed source tree.  Add
+           support for inline code content - MGD
+
+2009-02-16 Move mathmpl.py to the installed source tree so it is
+           available to other projects. - MGD
+
+2009-02-14 Added the legend title support - JJL
+
+2009-02-10 Fixed a bug in backend_pdf so it doesn't break when the setting
+           pdf.use14corefonts=True is used. Added test case in
+           unit/test_pdf_use14corefonts.py. - NGR
+
+2009-02-08 Added a new imsave function to image.py and exposed it in
+           the pyplot interface - GR
+
+2009-02-04 Some reorgnization of the legend code. anchored_text.py
+           added as an example. - JJL
+
+2009-02-04 Add extent keyword arg to hexbin - ADS
+
+2009-02-04 Fix bug in mathtext related to \dots and \ldots - MGD
+
+2009-02-03 Change default joinstyle to round - MGD
+
+2009-02-02 Reduce number of marker XObjects in pdf output - JKS
+
+2009-02-02 Change default resolution on polar plot to 1 - MGD
+
+2009-02-02 Avoid malloc errors in ttconv for fonts that don't have
+           e.g. PostName (a version of Tahoma triggered this) - JKS
+
+2009-01-30 Remove support for pyExcelerator in exceltools -- use xlwt
+           instead - JDH
+
+2009-01-29 Document 'resolution' kwarg for polar plots.  Support it
+           when using pyplot.polar, not just Figure.add_axes. - MGD
+
+2009-01-29 Rework the nan-handling/clipping/quantizing/simplification
+           framework so each is an independent part of a pipeline.
+           Expose the C++-implementation of all of this so it can be
+           used from all Python backends.  Add rcParam
+           "path.simplify_threshold" to control the threshold of
+           similarity below which vertices will be removed.
+
+2009-01-26 Improved tight bbox option of the savefig. - JJL
+
+2009-01-26 Make curves and NaNs play nice together - MGD
+
+2009-01-21 Changed the defaults of acorr and xcorr to use
+           usevlines=True, maxlags=10 and normed=True since these are
+           the best defaults
+
+2009-01-19 Fix bug in quiver argument handling. - EF
+
+2009-01-19 Fix bug in backend_gtk: don't delete nonexistent toolbar. - EF
+
+2009-01-16 Implement bbox_inches option for savefig. If bbox_inches is
+           "tight", try to determine the tight bounding box. - JJL
+
+2009-01-16 Fix bug in is_string_like so it doesn't raise an
+           unnecessary exception. - EF
+
+2009-01-16 Fix an infinite recursion in the unit registry when searching
+           for a converter for a sequence of strings. Add a corresponding
+           test. - RM
+
+2009-01-16 Bugfix of C typedef of MPL_Int64 that was failing on
+           Windows XP 64 bit, as reported by George Goussard on numpy
+           mailing list. - ADS
+
+2009-01-16 Added helper function LinearSegmentedColormap.from_list to
+           facilitate building simple custom colomaps.  See
+           examples/pylab_examples/custom_cmap_fromlist.py - JDH
+
+2009-01-16 Applied Michiel's patch for macosx backend to fix rounding
+           bug. Closed sf bug 2508440 - JSW
+
+2009-01-10 Applied Michiel's hatch patch for macosx backend and
+           draw_idle patch for qt.  Closes sf patched 2497785 and
+           2468809 - JDH
+
+2009-01-10 Fix bug in pan/zoom with log coordinates. - EF
+
+2009-01-06 Fix bug in setting of dashed negative contours. - EF
+
+2009-01-06 Be fault tolerant when len(linestyles)>NLev in contour. - MM
+
+2009-01-06 Added marginals kwarg to hexbin to plot marginal densities
+           JDH
+
+2009-01-06 Change user-visible multipage pdf object to PdfPages to
+           avoid accidents with the file-like PdfFile. - JKS
+
+2009-01-05 Fix a bug in pdf usetex: allow using non-embedded fonts. - JKS
+
+2009-01-05 optional use of preview.sty in usetex mode. - JJL
+
+2009-01-02 Allow multipage pdf files. - JKS
+
+2008-12-31 Improve pdf usetex by adding support for font effects
+           (slanting and extending). - JKS
+
+2008-12-29 Fix a bug in pdf usetex support, which occurred if the same
+           Type-1 font was used with different encodings, e.g. with
+           Minion Pro and MnSymbol. - JKS
+
+2008-12-20 fix the dpi-dependent offset of Shadow. - JJL
+
+2008-12-20 fix the hatch bug in the pdf backend. minor update
+           in docs and  example - JJL
+
+2008-12-19 Add axes_locator attribute in Axes. Two examples are added.
+           - JJL
+
+2008-12-19 Update Axes.legend documnetation. /api/api_changes.rst is also
+           updated to describe chages in keyword parameters.
+           Issue a warning if old keyword parameters are used. - JJL
+
+2008-12-18 add new arrow style, a line + filled triangles. -JJL
+
+==================================================================
+2008-12-18 Re-Released 0.98.5.2 from v0_98_5_maint at r6679
+           Released 0.98.5.2 from v0_98_5_maint at r6667
+
+2008-12-18 Removed configobj, experimental traits and doc/mpl_data link - JDH
+
+2008-12-18 Fix bug where a line with NULL data limits prevents
+           subsequent data limits from calculating correctly - MGD
+
+2008-12-17 Major documentation generator changes - MGD
+
+2008-12-17 Applied macosx backend patch with support for path
+           collections, quadmesh, etc... - JDH
+
+2008-12-17 fix dpi-dependent behavior of text bbox and arrow in annotate
+            -JJL
+
+2008-12-17 Add group id support in artist. Two examples which
+           demostrate svg filter are added. -JJL
+
+2008-12-16 Another attempt to fix dpi-dependent behavior of Legend. -JJL
+
+2008-12-16 Fixed dpi-dependent behavior of Legend and fancybox in Text.
+
+2008-12-16 Added markevery property to Line2D to support subsampling
+           of markers - JDH
+2008-12-15 Removed mpl_data symlink in docs.  On platforms that do not
+           support symlinks, these become copies, and the font files
+           are large, so the distro becomes unneccessarily bloaded.
+           Keeping the mpl_examples dir because relative links are
+           harder for the plot directive and the *.py files are not so
+           large. - JDH
+
+2008-12-15 Fix \$ in non-math text with usetex off.  Document
+           differences between usetex on/off - MGD
+
+2008-12-15 Fix anti-aliasing when auto-snapping - MGD
+
+2008-12-15 Fix grid lines not moving correctly during pan and zoom - MGD
+
+2008-12-12 Preparations to eliminate maskedarray rcParams key: its
+           use will now generate a warning.  Similarly, importing
+           the obsolote numerix.npyma will generate a warning. - EF
+
+2008-12-12 Added support for the numpy.histogram() weights parameter
+           to the axes hist() method. Docs taken from numpy - MM
+
+2008-12-12 Fixed warning in hist() with numpy 1.2 - MM
+
+2008-12-12 Removed external packages: configobj and enthought.traits
+           which are only required by the experimental traited config
+           and are somewhat out of date. If needed, install them
+           independently, see:
+
+           http://code.enthought.com/projects/traits
+
+           and:
+
+           http://www.voidspace.org.uk/python/configobj.html
+
+2008-12-12 Added support to asign labels to histograms of multiple
+           data. - MM
+
+=================================================================
+2008-12-11 Released 0.98.5 at svn r6573
+
+2008-12-11 Use subprocess.Popen instead of os.popen in dviread
+           (Windows problem reported by Jorgen Stenarson) - JKS
+
+2008-12-10 Added Michael's font_manager fix and Jae-Joon's
+           figure/subplot fix.  Bumped version number to 0.98.5 - JDH
+
+=================================================================
+2008-12-09 Released 0.98.4 at svn r6536
+
+2008-12-08 Added mdehoon's native macosx backend from sf patch 2179017 - JDH
+
+2008-12-08 Removed the prints in the set_*style commands.  Return the
+           list of pprinted strings instead - JDH
+
+2008-12-08 Some of the changes Michael made to improve the output of
+           the property tables in the rest docs broke of made
+           difficult to use some of the interactive doc helpers, eg
+           setp and getp.  Having all the rest markup in the ipython
+           shell also confused the docstrings.  I added a new rc param
+           docstring.harcopy, to format the docstrings differently for
+           hardcopy and other use.  Ther ArtistInspector could use a
+           little refactoring now since there is duplication of effort
+           between the rest out put and the non-rest output - JDH
+
+2008-12-08 Updated spectral methods (psd, csd, etc.) to scale one-sided
+           densities by a factor of 2 and, optionally, scale all densities
+           by the sampling frequency.  This gives better MatLab
+           compatibility. -RM
+
+2008-12-08 Fixed alignment of ticks in colorbars. -MGD
+
+2008-12-07 drop the deprecated "new" keyword of np.histogram() for
+           numpy 1.2 or later.  -JJL
+
+2008-12-06 Fixed a bug in svg backend that new_figure_manager()
+           ignores keywords arguments such as figsize, etc. -JJL
+
+2008-12-05 Fixed a bug that the handlelength of the new legend class
+           set too short when numpoints=1 -JJL
+
+2008-12-04 Added support for data with units (e.g. dates) to
+           Axes.fill_between. -RM
+
+2008-12-04 Added fancybox keyword to legend. Also applied some changes
+           for better look, including baseline adjustment of the
+           multiline texts so that it is center aligned. -JJL
+
+2008-12-02 The transmuter classes in the patches.py are reorganized as
+           subclasses of the Style classes. A few more box and arrow
+           styles are added. -JJL
+
+2008-12-02 Fixed a bug in the new legend class that didn't allowed
+           a tuple of coordinate vlaues as loc. -JJL
+
+2008-12-02 Improve checks for external dependencies, using subprocess
+           (instead of deprecated popen*) and distutils (for version
+           checking) - DSD
+
+2008-11-30 Reimplementaion of the legend which supports baseline alignement,
+           multi-column, and expand mode. - JJL
+
+2008-12-01 Fixed histogram autoscaling bug when bins or range are given
+           explicitly (fixes Debian bug 503148) - MM
+
+2008-11-25 Added rcParam axes.unicode_minus which allows plain hypen
+           for minus when False - JDH
+
+2008-11-25 Added scatterpoints support in Legend. patch by Erik
+           Tollerud - JJL
+
+2008-11-24 Fix crash in log ticking. - MGD
+
+2008-11-20 Added static helper method BrokenHBarCollection.span_where
+           and Axes/pyplot method fill_between.  See
+           examples/pylab/fill_between.py - JDH
+
+2008-11-12 Add x_isdata and y_isdata attributes to Artist instances,
+           and use them to determine whether either or both
+           coordinates are used when updating dataLim.  This is
+           used to fix autoscaling problems that had been triggered
+           by axhline, axhspan, axvline, axvspan. - EF
+
+2008-11-11 Update the psd(), csd(), cohere(), and specgram() methods
+           of Axes and the csd() cohere(), and specgram() functions
+           in mlab to be in sync with the changes to psd().
+           In fact, under the hood, these all call the same core
+           to do computations. - RM
+
+2008-11-11 Add 'pad_to' and 'sides' parameters to mlab.psd() to
+           allow controlling of zero padding and returning of
+           negative frequency components, respecitively.  These are
+           added in a way that does not change the API. - RM
+
+2008-11-10 Fix handling of c kwarg by scatter; generalize
+           is_string_like to accept numpy and numpy.ma string
+           array scalars. - RM and EF
+
+2008-11-09 Fix a possible EINTR problem in dviread, which might help
+           when saving pdf files from the qt backend. - JKS
+
+2008-11-05 Fix bug with zoom to rectangle and twin axes - MGD
+
+2008-10-24 Added Jae Joon's fancy arrow, box and annotation
+           enhancements -- see
+           examples/pylab_examples/annotation_demo2.py
+
+2008-10-23 Autoscaling is now supported with shared axes - EF
+
+2008-10-23 Fixed exception in dviread that happened with Minion - JKS
+
+2008-10-21 set_xlim, ylim now return a copy of the viewlim array to
+           avoid modify inplace surprises
+
+2008-10-20 Added image thumbnail generating function
+           matplotlib.image.thumbnail.  See
+           examples/misc/image_thumbnail.py - JDH
+
+2008-10-20 Applied scatleg patch based on ideas and work by Erik
+           Tollerud and Jae-Joon Lee. - MM
+
+2008-10-11 Fixed bug in pdf backend: if you pass a file object for
+           output instead of a filename, e.g. in a wep app, we now
+           flush the object at the end. - JKS
+
+2008-10-08 Add path simplification support to paths with gaps. - EF
+
+2008-10-05 Fix problem with AFM files that don't specify the font's
+           full name or family name. - JKS
+
+2008-10-04 Added 'scilimits' kwarg to Axes.ticklabel_format() method,
+           for easy access to the set_powerlimits method of the
+           major ScalarFormatter. - EF
+
+2008-10-04 Experimental new kwarg borderpad to replace pad in legend,
+           based on suggestion by Jae-Joon Lee.  - EF
+
+2008-09-27 Allow spy to ignore zero values in sparse arrays, based
+           on patch by Tony Yu.  Also fixed plot to handle empty
+           data arrays, and fixed handling of markers in figlegend. - EF
+
+2008-09-24 Introduce drawstyles for lines. Transparently split linestyles
+           like 'steps--' into drawstyle 'steps' and linestyle '--'.
+           Legends always use drawstyle 'default'. - MM
+
+2008-09-18 Fixed quiver and quiverkey bugs (failure to scale properly
+           when resizing) and added additional methods for determining
+           the arrow angles - EF
+
+2008-09-18 Fix polar interpolation to handle negative values of theta - MGD
+
+2008-09-14 Reorganized cbook and mlab methods related to numerical
+           calculations that have little to do with the goals of those two
+           modules into a separate module numerical_methods.py
+           Also, added ability to select points and stop point selection
+           with keyboard in ginput and manual contour labeling code.
+           Finally, fixed contour labeling bug. - DMK
+
+2008-09-11 Fix backtick in Postscript output. - MGD
+
+2008-09-10 [ 2089958 ] Path simplification for vector output backends
+           Leverage the simplification code exposed through
+           path_to_polygons to simplify certain well-behaved paths in
+           the vector backends (PDF, PS and SVG).  "path.simplify"
+           must be set to True in matplotlibrc for this to work.  -
+           MGD
+
+2008-09-10 Add "filled" kwarg to Path.intersects_path and
+           Path.intersects_bbox. - MGD
+
+2008-09-07 Changed full arrows slightly to avoid an xpdf rendering
+           problem reported by Friedrich Hagedorn. - JKS
+
+2008-09-07 Fix conversion of quadratic to cubic Bezier curves in PDF
+           and PS backends. Patch by Jae-Joon Lee. - JKS
+
+2008-09-06 Added 5-point star marker to plot command - EF
+
+2008-09-05 Fix hatching in PS backend - MGD
+
+2008-09-03 Fix log with base 2 - MGD
+
+2008-09-01 Added support for bilinear interpolation in
+           NonUniformImage; patch by Gregory Lielens. - EF
+
+2008-08-28 Added support for multiple histograms with data of
+           different length - MM
+
+2008-08-28 Fix step plots with log scale - MGD
+
+2008-08-28 Fix masked arrays with markers in non-Agg backends - MGD
+
+2008-08-28 Fix clip_on kwarg so it actually works correctly - MGD
+
+2008-08-25 Fix locale problems in SVG backend - MGD
+
+2008-08-22 fix quiver so masked values are not plotted - JSW
+
+2008-08-18 improve interactive pan/zoom in qt4 backend on windows - DSD
+
+2008-08-11 Fix more bugs in NaN/inf handling.  In particular, path simplification
+           (which does not handle NaNs or infs) will be turned off automatically
+           when infs or NaNs are present.  Also masked arrays are now converted
+           to arrays with NaNs for consistent handling of masks and NaNs
+            - MGD and EF
+
+=================================================================
+2008-08-03 Released 0.98.3 at svn r5947
+
+2008-08-01 Backported memory leak fixes in _ttconv.cpp - MGD
+
+2008-07-31 Added masked array support to griddata. - JSW
+
+2008-07-26 Added optional C and reduce_C_function arguments to
+           axes.hexbin().  This allows hexbin to accumulate the values
+           of C based on the x,y coordinates and display in hexagonal
+           bins. - ADS
+
+2008-07-24 Deprecated (raise NotImplementedError) all the mlab2
+           functions from matplotlib.mlab out of concern that some of
+           them were not clean room implementations. JDH
+
+2008-07-24 Rewrite of a significant portion of the clabel code (class
+           ContourLabeler) to improve inlining. - DMK
+
+2008-07-22 Added Barbs polygon collection (similar to Quiver) for plotting
+           wind barbs.  Added corresponding helpers to Axes and pyplot as
+           well. (examples/pylab_examples/barb_demo.py shows it off.) - RMM
+
+2008-07-21 Added scikits.delaunay as matplotlib.delaunay.  Added griddata
+           function in matplotlib.mlab, with example (griddata_demo.py) in
+           pylab_examples. griddata function will use mpl_toolkits._natgrid
+           if installed.  - JSW
+
+2008-07-21 Re-introduced offset_copy that works in the context of the
+           new transforms. - MGD
+
+2008-07-21 Committed patch by Ryan May to add get_offsets and
+           set_offsets to Collections base class - EF
+
+2008-07-21 Changed the "asarray" strategy in image.py so that
+           colormapping of masked input should work for all
+           image types (thanks Klaus Zimmerman) - EF
+
+2008-07-20 Rewrote cbook.delete_masked_points and corresponding
+           unit test to support rgb color array inputs, datetime
+           inputs, etc. - EF
+
+2008-07-20 Renamed unit/axes_unit.py to cbook_unit.py and modified
+           in accord with Ryan's move of delete_masked_points from
+           axes to cbook. - EF
+
+2008-07-18 Check for nan and inf in axes.delete_masked_points().
+           This should help hexbin and scatter deal with nans. - ADS
+
+2008-07-17 Added ability to manually select contour label locations.
+           Also added a waitforbuttonpress function. - DMK
+
+2008-07-17 Fix bug with NaNs at end of path (thanks, Andrew Straw for
+           the report) - MGD
+
+2008-07-16 Improve error handling in texmanager, thanks to Ian Henry
+           for reporting - DSD
+
+2008-07-12 Added support for external backends with the
+           "module://my_backend" syntax - JDH
+
+2008-07-11 Fix memory leak related to shared axes.  Grouper should
+           store weak references. - MGD
+
+2008-07-10 Bugfix: crash displaying fontconfig pattern - MGD
+
+2008-07-10 Bugfix: [ 2013963 ] update_datalim_bounds in Axes not works - MGD
+
+2008-07-10 Bugfix: [ 2014183 ] multiple imshow() causes gray edges - MGD
+
+2008-07-09 Fix rectangular axes patch on polar plots bug - MGD
+
+2008-07-09 Improve mathtext radical rendering - MGD
+
+2008-07-08 Improve mathtext superscript placement - MGD
+
+2008-07-07 Fix custom scales in pcolormesh (thanks Matthew Turk) - MGD
+
+2008-07-03 Implemented findobj method for artist and pyplot - see
+           examples/pylab_examples/findobj_demo.py - JDH
+
+2008-06-30 Another attempt to fix TextWithDash - DSD
+
+2008-06-30 Removed Qt4 NavigationToolbar2.destroy -- it appears to
+           have been unnecessary and caused a bug reported by P.
+           Raybaut - DSD
+
+2008-06-27 Fixed tick positioning bug - MM
+
+2008-06-27 Fix dashed text bug where text was at the wrong end of the
+           dash - MGD
+
+2008-06-26 Fix mathtext bug for expressions like $x_{\leftarrow}$ - MGD
+
+2008-06-26 Fix direction of horizontal/vertical hatches - MGD
+
+2008-06-25 Figure.figurePatch renamed Figure.patch, Axes.axesPatch
+           renamed Axes.patch, Axes.axesFrame renamed Axes.frame,
+           Axes.get_frame, which returns Axes.patch, is deprecated.
+           Examples and users guide updated - JDH
+
+2008-06-25 Fix rendering quality of pcolor - MGD
+
+=================================================================
+2008-06-24 Released 0.98.2 at svn r5667 - (source only for debian) JDH
+
+2008-06-24 Added "transparent" kwarg to savefig. - MGD
+
+2008-06-24 Applied Stefan's patch to draw a single centered marker over
+           a line with numpoints==1 - JDH
+
+2008-06-23 Use splines to render circles in scatter plots - MGD
+
 ===============================================================
 2008-06-22 Released 0.98.1 at revision 5637
 
@@ -80,7 +893,7 @@
 2008-06-05 Fix image drawing so there is no extra space to the right
            or bottom - MGD
 
-2006-06-04 Added a figure title command subtitle as a Figure method
+2006-06-04 Added a figure title command suptitle as a Figure method
            and pyplot command -- see examples/figure_title.py - JDH
 
 2008-06-02 Added support for log to hist with histtype='step' and fixed
@@ -390,8 +1203,8 @@
 2007-11-27 Released 0.91.0 at revision 4478
 
 2007-11-13 All backends now support writing to a file-like object, not
-	   just a regular file.  savefig() can be passed a file-like
-	   object in place of a file path. - MGD
+           just a regular file.  savefig() can be passed a file-like
+           object in place of a file path. - MGD
 
 2007-11-13 Improved the default backend selection at build time:
            SVG -> Agg -> TkAgg -> WXAgg -> GTK -> GTKAgg. The last usable
@@ -409,24 +1222,24 @@
            updated on subsequent installs - DSD
 
 2007-11-12 Added support for STIX fonts.  A new rcParam,
-	   mathtext.fontset, can be used to choose between:
+           mathtext.fontset, can be used to choose between:
 
-	   'cm':
-	     The TeX/LaTeX Computer Modern fonts
+           'cm':
+             The TeX/LaTeX Computer Modern fonts
 
-	   'stix':
-	     The STIX fonts (see stixfonts.org)
+           'stix':
+             The STIX fonts (see stixfonts.org)
 
-	   'stixsans':
-	     The STIX fonts, using sans-serif glyphs by default
+           'stixsans':
+             The STIX fonts, using sans-serif glyphs by default
 
-	   'custom':
-	     A generic Unicode font, in which case the mathtext font
-	     must be specified using mathtext.bf, mathtext.it,
-	     mathtext.sf etc.
+           'custom':
+             A generic Unicode font, in which case the mathtext font
+             must be specified using mathtext.bf, mathtext.it,
+             mathtext.sf etc.
 
-	   Added a new example, stix_fonts_demo.py to show how to access
-	   different fonts and unusual symbols.
+           Added a new example, stix_fonts_demo.py to show how to access
+           different fonts and unusual symbols.
 
            - MGD
 
@@ -477,72 +1290,72 @@
 
 2007-10-29 TRANSFORMS REFACTORING
 
-	   The primary goal of this refactoring was to make it easier
-	   to extend matplotlib to support new kinds of projections.
-	   This is primarily an internal improvement, and the possible
-	   user-visible changes it allows are yet to come.
+           The primary goal of this refactoring was to make it easier
+           to extend matplotlib to support new kinds of projections.
+           This is primarily an internal improvement, and the possible
+           user-visible changes it allows are yet to come.
 
-	   The transformation framework was completely rewritten in
-	   Python (with Numpy).  This will make it easier to add news
-	   kinds of transformations without writing C/C++ code.
+           The transformation framework was completely rewritten in
+           Python (with Numpy).  This will make it easier to add news
+           kinds of transformations without writing C/C++ code.
 
-	   Transforms are composed into a 'transform tree', made of
-	   transforms whose value depends on other transforms (their
-	   children).  When the contents of children change, their
-	   parents are automatically updated to reflect those changes.
-	   To do this an "invalidation" method is used: when children
-	   change, all of their ancestors are marked as "invalid".
-	   When the value of a transform is accessed at a later time,
-	   its value is recomputed only if it is invalid, otherwise a
-	   cached value may be used.  This prevents unnecessary
-	   recomputations of transforms, and contributes to better
-	   interactive performance.
+           Transforms are composed into a 'transform tree', made of
+           transforms whose value depends on other transforms (their
+           children).  When the contents of children change, their
+           parents are automatically updated to reflect those changes.
+           To do this an "invalidation" method is used: when children
+           change, all of their ancestors are marked as "invalid".
+           When the value of a transform is accessed at a later time,
+           its value is recomputed only if it is invalid, otherwise a
+           cached value may be used.  This prevents unnecessary
+           recomputations of transforms, and contributes to better
+           interactive performance.
 
-	   The framework can be used for both affine and non-affine
-	   transformations.  However, for speed, we want use the
-	   backend renderers to perform affine transformations
-	   whenever possible.  Therefore, it is possible to perform
-	   just the affine or non-affine part of a transformation on a
-	   set of data.  The affine is always assumed to occur after
-	   the non-affine.  For any transform:
+           The framework can be used for both affine and non-affine
+           transformations.  However, for speed, we want use the
+           backend renderers to perform affine transformations
+           whenever possible.  Therefore, it is possible to perform
+           just the affine or non-affine part of a transformation on a
+           set of data.  The affine is always assumed to occur after
+           the non-affine.  For any transform:
 
-	        full transform == non-affine + affine
+                full transform == non-affine + affine
 
-	   Much of the drawing has been refactored in terms of
-	   compound paths.  Therefore, many methods have been removed
-	   from the backend interface and replaced with a a handful to
-	   draw compound paths.  This will make updating the backends
-	   easier, since there is less to update.  It also should make
-	   the backends more consistent in terms of functionality.
+           Much of the drawing has been refactored in terms of
+           compound paths.  Therefore, many methods have been removed
+           from the backend interface and replaced with a a handful to
+           draw compound paths.  This will make updating the backends
+           easier, since there is less to update.  It also should make
+           the backends more consistent in terms of functionality.
 
-	   User visible changes:
+           User visible changes:
 
-	   - POLAR PLOTS: Polar plots are now interactively zoomable,
+           - POLAR PLOTS: Polar plots are now interactively zoomable,
              and the r-axis labels can be interactively rotated.
              Straight line segments are now interpolated to follow the
              curve of the r-axis.
 
-	   - Non-rectangular clipping works in more backends and with
+           - Non-rectangular clipping works in more backends and with
              more types of objects.
 
-	   - Sharing an axis across figures is now done in exactly
-	     the same way as sharing an axis between two axes in the
-	     same figure:
+           - Sharing an axis across figures is now done in exactly
+             the same way as sharing an axis between two axes in the
+             same figure:
 
-	   	   fig1 = figure()
-		   fig2 = figure()
+                      fig1 = figure()
+                   fig2 = figure()
 
-		   ax1 = fig1.add_subplot(111)
-		   ax2 = fig2.add_subplot(111, sharex=ax1, sharey=ax1)
+                   ax1 = fig1.add_subplot(111)
+                   ax2 = fig2.add_subplot(111, sharex=ax1, sharey=ax1)
 
            - linestyles now include steps-pre, steps-post and
              steps-mid.  The old step still works and is equivalent to
              step-pre.
 
-	   - Multiple line styles may be provided to a collection.
+           - Multiple line styles may be provided to a collection.
 
-	   See API_CHANGES for more low-level information about this
-	   refactoring.
+           See API_CHANGES for more low-level information about this
+           refactoring.
 
 2007-10-24 Added ax kwarg to Figure.colorbar and pyplot.colorbar - EF
 
@@ -3659,4 +4472,3 @@ This is the Old, stale, never used changelog
 2003-11-21 - make a dash-dot dict for the GC
 
 2003-12-15 - fix install path bug
-t

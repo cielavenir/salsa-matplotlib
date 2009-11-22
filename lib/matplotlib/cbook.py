@@ -3,19 +3,30 @@ A collection of utility functions and classes.  Many (but not all)
 from the Python Cookbook -- hence the name cbook
 """
 from __future__ import generators
-import re, os, errno, sys, StringIO, traceback, locale
+import re, os, errno, sys, StringIO, traceback, locale, threading, types
 import time, datetime
+import warnings
 import numpy as np
+import numpy.ma as ma
+from weakref import ref
 
 major, minor1, minor2, s, tmp = sys.version_info
 
 
-# on some systems, locale.getpreferredencoding returns None, which can break unicode
-preferredencoding = locale.getpreferredencoding()
+# On some systems, locale.getpreferredencoding returns None,
+# which can break unicode; and the sage project reports that
+# some systems have incorrect locale specifications, e.g.,
+# an encoding instead of a valid locale name.
+
+try:
+    preferredencoding = locale.getpreferredencoding()
+except (ValueError, ImportError):
+    preferredencoding = None
 
 def unicode_safe(s):
     if preferredencoding is None: return unicode(s)
     else: return unicode(s, preferredencoding)
+
 
 class converter:
     """
@@ -152,6 +163,64 @@ class CallbackRegistry:
             func(*args, **kwargs)
 
 
+class Scheduler(threading.Thread):
+    """
+    Base class for timeout and idle scheduling
+    """
+    idlelock = threading.Lock()
+    id = 0
+
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self.id = Scheduler.id
+        self._stopped = False
+        Scheduler.id += 1
+        self._stopevent = threading.Event()
+
+    def stop(self):
+        if self._stopped: return
+        self._stopevent.set()
+        self.join()
+        self._stopped = True
+
+class Timeout(Scheduler):
+    """
+    Schedule recurring events with a wait time in seconds
+    """
+    def __init__(self, wait, func):
+        Scheduler.__init__(self)
+        self.wait = wait
+        self.func = func
+
+    def run(self):
+
+        while not self._stopevent.isSet():
+            self._stopevent.wait(self.wait)
+            Scheduler.idlelock.acquire()
+            b = self.func(self)
+            Scheduler.idlelock.release()
+            if not b: break
+
+class Idle(Scheduler):
+    """
+    Schedule callbacks when scheduler is idle
+    """
+    # the prototype impl is a bit of a poor man's idle handler.  It
+    # just implements a short wait time.  But it will provide a
+    # placeholder for a proper impl ater
+    waittime = 0.05
+    def __init__(self, func):
+        Scheduler.__init__(self)
+        self.func = func
+
+    def run(self):
+
+        while not self._stopevent.isSet():
+            self._stopevent.wait(Idle.waittime)
+            Scheduler.idlelock.acquire()
+            b = self.func(self)
+            Scheduler.idlelock.release()
+            if not b: break
 
 class silent_list(list):
     """
@@ -193,6 +262,10 @@ class Bunch:
         self.__dict__.update(kwds)
 
 
+    def __repr__(self):
+        keys = self.__dict__.keys()
+        return 'Bunch(%s)'%', '.join(['%s=%s'%(k,self.__dict__[k]) for k in keys])
+
 def unique(x):
     'Return a list of unique elements of *x*'
     return dict([ (val, 1) for val in x]).keys()
@@ -200,16 +273,32 @@ def unique(x):
 def iterable(obj):
     'return true if *obj* is iterable'
     try: len(obj)
-    except: return 0
-    return 1
+    except: return False
+    return True
 
 
 def is_string_like(obj):
-    'return true if *obj* looks like a string'
-    if hasattr(obj, 'shape'): return 0
+    'Return True if *obj* looks like a string'
+    if isinstance(obj, (str, unicode)): return True
+    # numpy strings are subclass of str, ma strings are not
+    if ma.isMaskedArray(obj):
+        if obj.ndim == 0 and obj.dtype.kind in 'SU':
+            return True
+        else:
+            return False
     try: obj + ''
-    except (TypeError, ValueError): return 0
-    return 1
+    except: return False
+    return True
+
+def is_sequence_of_strings(obj):
+    """
+    Returns true if *obj* is iterable and contains strings
+    """
+    if not iterable(obj): return False
+    if is_string_like(obj): return False
+    for o in obj:
+        if not is_string_like(o): return False
+    return True
 
 def is_writable_file_like(obj):
     'return true if *obj* looks like a file object with a *write* method'
@@ -217,7 +306,7 @@ def is_writable_file_like(obj):
 
 def is_scalar(obj):
     'return true if *obj* is not string like and is not iterable'
-    return is_string_like(obj) or not iterable(obj)
+    return not is_string_like(obj) and not iterable(obj)
 
 def is_numlike(obj):
     'return true if *obj* looks like a number'
@@ -225,7 +314,7 @@ def is_numlike(obj):
     except TypeError: return False
     else: return True
 
-def to_filehandle(fname, flag='r', return_opened=False):
+def to_filehandle(fname, flag='rU', return_opened=False):
     """
     *fname* can be a filename or a file handle.  Support for gzipped
     files is automatic, if the filename ends in .gz.  *flag* is a
@@ -234,7 +323,14 @@ def to_filehandle(fname, flag='r', return_opened=False):
     if is_string_like(fname):
         if fname.endswith('.gz'):
             import gzip
+            # get rid of 'U' in flag for gzipped files.
+            flag = flag.replace('U','')
             fh = gzip.open(fname, flag)
+        elif fname.endswith('.bz2'):
+            # get rid of 'U' in flag for bz2 files
+            flag = flag.replace('U','')
+            import bz2
+            fh = bz2.BZ2File(fname, flag)
         else:
             fh = file(fname, flag)
         opened = True
@@ -247,7 +343,10 @@ def to_filehandle(fname, flag='r', return_opened=False):
         return fh, opened
     return fh
 
-def flatten(seq, scalarp=is_scalar):
+def is_scalar_or_string(val):
+    return is_string_like(val) or not iterable(val)
+
+def flatten(seq, scalarp=is_scalar_or_string):
     """
     this generator flattens nested containers such as
 
@@ -399,7 +498,20 @@ class Null:
 
 
 def mkdirs(newdir, mode=0777):
-    try: os.makedirs(newdir, mode)
+    """
+    make directory *newdir* recursively, and set *mode*.  Equivalent to ::
+
+        > mkdir -p NEWDIR
+        > chmod MODE NEWDIR
+    """
+    try:
+        if not os.path.exists(newdir):
+            parts = os.path.split(newdir)
+            for i in range(1, len(parts)+1):
+                thispart = os.path.join(*parts[:i])
+                if not os.path.exists(thispart):
+                    os.makedirs(thispart, mode)
+
     except OSError, err:
         # Reraise the error unless it's about an already existing directory
         if err.errno != errno.EEXIST or not os.path.isdir(newdir):
@@ -657,34 +769,6 @@ def allpairs(x):
 
 
 
-
-# python 2.2 dicts don't have pop--but we don't support 2.2 any more
-def popd(d, *args):
-    """
-    Should behave like python2.3 :meth:`dict.pop` method; *d* is a
-    :class:`dict`::
-
-      # returns value for key and deletes item; raises a KeyError if key
-      # is not in dict
-      val = popd(d, key)
-
-      # returns value for key if key exists, else default.  Delete key,
-      # val item if it exists.  Will not raise a KeyError
-      val = popd(d, key, default)
-
-    """
-    if len(args)==1:
-        key = args[0]
-        val = d[key]
-        del d[key]
-    elif len(args)==2:
-        key, default = args
-        val = d.get(key, default)
-        try: del d[key]
-        except KeyError: pass
-    return val
-
-
 class maxdict(dict):
     """
     A dictionary with a maximum size; this doesn't override all the
@@ -696,11 +780,12 @@ class maxdict(dict):
         self.maxsize = maxsize
         self._killkeys = []
     def __setitem__(self, k, v):
-        if len(self)>=self.maxsize:
-            del self[self._killkeys[0]]
-            del self._killkeys[0]
+        if k not in self:
+            if len(self)>=self.maxsize:
+                del self[self._killkeys[0]]
+                del self._killkeys[0]
+            self._killkeys.append(k)
         dict.__setitem__(self, k, v)
-        self._killkeys.append(k)
 
 
 
@@ -806,15 +891,19 @@ def reverse_dict(d):
 
 def report_memory(i=0):  # argument may go away
     'return the memory consumed by process'
+    from subprocess import Popen, PIPE
     pid = os.getpid()
     if sys.platform=='sunos5':
-        a2 = os.popen('ps -p %d -o osz' % pid).readlines()
+        a2 = Popen('ps -p %d -o osz' % pid, shell=True,
+            stdout=PIPE).stdout.readlines()
         mem = int(a2[-1].strip())
     elif sys.platform.startswith('linux'):
-        a2 = os.popen('ps -p %d -o rss,sz' % pid).readlines()
+        a2 = Popen('ps -p %d -o rss,sz' % pid, shell=True,
+            stdout=PIPE).stdout.readlines()
         mem = int(a2[1].split()[1])
     elif sys.platform.startswith('darwin'):
-        a2 = os.popen('ps -p %d -o rss,vsz' % pid).readlines()
+        a2 = Popen('ps -p %d -o rss,vsz' % pid, shell=True,
+            stdout=PIPE).stdout.readlines()
         mem = int(a2[1].split()[0])
 
     return mem
@@ -828,6 +917,22 @@ def safezip(*args):
             raise ValueError(_safezip_msg % (Nx, i+1, len(arg)))
     return zip(*args)
 
+def issubclass_safe(x, klass):
+    'return issubclass(x, klass) and return False on a TypeError'
+
+    try:
+        return issubclass(x, klass)
+    except TypeError:
+        return False
+
+def safe_masked_invalid(x):
+    x = np.asanyarray(x)
+    try:
+        xm = np.ma.masked_invalid(x, copy=False)
+        xm.shrink_mask()
+    except TypeError:
+        return x
+    return xm
 
 class MemoryMonitor:
     def __init__(self, nmax=20000):
@@ -965,7 +1070,7 @@ class Grouper(object):
     >>> g.join('a', 'b')
     >>> g.join('b', 'c')
     >>> g.join('d', 'e')
-    >>> list(g.get())
+    >>> list(g)
     [['a', 'b', 'c'], ['d', 'e']]
     >>> g.joined('a', 'b')
     True
@@ -977,10 +1082,20 @@ class Grouper(object):
     def __init__(self, init=[]):
         mapping = self._mapping = {}
         for x in init:
-            mapping[x] = [x]
+            mapping[ref(x)] = [ref(x)]
 
     def __contains__(self, item):
-        return item in self._mapping
+        return ref(item) in self._mapping
+
+    def clean(self):
+        """
+        Clean dead weak references from the dictionary
+        """
+        mapping = self._mapping
+        for key, val in mapping.items():
+            if key() is None:
+                del mapping[key]
+                val.remove(key)
 
     def join(self, a, *args):
         """
@@ -988,13 +1103,13 @@ class Grouper(object):
         arguments.
         """
         mapping = self._mapping
-        set_a = mapping.setdefault(a, [a])
+        set_a = mapping.setdefault(ref(a), [ref(a)])
 
         for arg in args:
-            set_b = mapping.get(arg)
+            set_b = mapping.get(ref(arg))
             if set_b is None:
-                set_a.append(arg)
-                mapping[arg] = set_a
+                set_a.append(ref(arg))
+                mapping[ref(arg)] = set_a
             elif set_b is not set_a:
                 if len(set_b) > len(set_a):
                     set_a, set_b = set_b, set_a
@@ -1002,34 +1117,57 @@ class Grouper(object):
                 for elem in set_b:
                     mapping[elem] = set_a
 
+        self.clean()
+
     def joined(self, a, b):
         """
         Returns True if *a* and *b* are members of the same set.
         """
+        self.clean()
+
         mapping = self._mapping
         try:
-            return mapping[a] is mapping[b]
+            return mapping[ref(a)] is mapping[ref(b)]
         except KeyError:
             return False
 
     def __iter__(self):
         """
-        Returns an iterator yielding each of the disjoint sets as a list.
+        Iterate over each of the disjoint sets as a list.
+
+        The iterator is invalid if interleaved with calls to join().
         """
-        seen = set()
-        for elem, group in self._mapping.iteritems():
-            if elem not in seen:
-                yield group
-                seen.update(group)
+        self.clean()
+
+        class Token: pass
+        token = Token()
+
+        # Mark each group as we come across if by appending a token,
+        # and don't yield it twice
+        for group in self._mapping.itervalues():
+            if not group[-1] is token:
+                yield [x() for x in group]
+                group.append(token)
+
+        # Cleanup the tokens
+        for group in self._mapping.itervalues():
+            if group[-1] is token:
+                del group[-1]
 
     def get_siblings(self, a):
         """
         Returns all of the items joined with *a*, including itself.
         """
-        return self._mapping.get(a, [a])
+        self.clean()
+
+        siblings = self._mapping.get(ref(a), [ref(a)])
+        return [x() for x in siblings]
 
 
 def simple_linear_interpolation(a, steps):
+    if steps == 1:
+        return a
+
     steps = np.floor(steps)
     new_length = ((len(a) - 1) * steps) + 1
     new_shape = list(a.shape)
@@ -1059,7 +1197,131 @@ def recursive_remove(path):
     else:
         os.remove(path)
 
+def delete_masked_points(*args):
+    """
+    Find all masked and/or non-finite points in a set of arguments,
+    and return the arguments with only the unmasked points remaining.
 
+    Arguments can be in any of 5 categories:
+
+    1) 1-D masked arrays
+    2) 1-D ndarrays
+    3) ndarrays with more than one dimension
+    4) other non-string iterables
+    5) anything else
+
+    The first argument must be in one of the first four categories;
+    any argument with a length differing from that of the first
+    argument (and hence anything in category 5) then will be
+    passed through unchanged.
+
+    Masks are obtained from all arguments of the correct length
+    in categories 1, 2, and 4; a point is bad if masked in a masked
+    array or if it is a nan or inf.  No attempt is made to
+    extract a mask from categories 2, 3, and 4 if :meth:`np.isfinite`
+    does not yield a Boolean array.
+
+    All input arguments that are not passed unchanged are returned
+    as ndarrays after removing the points or rows corresponding to
+    masks in any of the arguments.
+
+    A vastly simpler version of this function was originally
+    written as a helper for Axes.scatter().
+
+    """
+    if not len(args):
+        return ()
+    if (is_string_like(args[0]) or not iterable(args[0])):
+        raise ValueError("First argument must be a sequence")
+    nrecs = len(args[0])
+    margs = []
+    seqlist = [False] * len(args)
+    for i, x in enumerate(args):
+        if (not is_string_like(x)) and iterable(x) and len(x) == nrecs:
+            seqlist[i] = True
+            if ma.isMA(x):
+                if x.ndim > 1:
+                    raise ValueError("Masked arrays must be 1-D")
+            else:
+                x = np.asarray(x)
+        margs.append(x)
+    masks = []    # list of masks that are True where good
+    for i, x in enumerate(margs):
+        if seqlist[i]:
+            if x.ndim > 1:
+                continue  # Don't try to get nan locations unless 1-D.
+            if ma.isMA(x):
+                masks.append(~ma.getmaskarray(x))  # invert the mask
+                xd = x.data
+            else:
+                xd = x
+            try:
+                mask = np.isfinite(xd)
+                if isinstance(mask, np.ndarray):
+                    masks.append(mask)
+            except: #Fixme: put in tuple of possible exceptions?
+                pass
+    if len(masks):
+        mask = reduce(np.logical_and, masks)
+        igood = mask.nonzero()[0]
+        if len(igood) < nrecs:
+            for i, x in enumerate(margs):
+                if seqlist[i]:
+                    margs[i] = x.take(igood, axis=0)
+    for i, x in enumerate(margs):
+        if seqlist[i] and ma.isMA(x):
+            margs[i] = x.filled()
+    return margs
+
+def unmasked_index_ranges(mask, compressed = True):
+    '''
+    Find index ranges where *mask* is *False*.
+
+    *mask* will be flattened if it is not already 1-D.
+
+    Returns Nx2 :class:`numpy.ndarray` with each row the start and stop
+    indices for slices of the compressed :class:`numpy.ndarray`
+    corresponding to each of *N* uninterrupted runs of unmasked
+    values.  If optional argument *compressed* is *False*, it returns
+    the start and stop indices into the original :class:`numpy.ndarray`,
+    not the compressed :class:`numpy.ndarray`.  Returns *None* if there
+    are no unmasked values.
+
+    Example::
+
+      y = ma.array(np.arange(5), mask = [0,0,1,0,0])
+      ii = unmasked_index_ranges(ma.getmaskarray(y))
+      # returns array [[0,2,] [2,4,]]
+
+      y.compressed()[ii[1,0]:ii[1,1]]
+      # returns array [3,4,]
+
+      ii = unmasked_index_ranges(ma.getmaskarray(y), compressed=False)
+      # returns array [[0, 2], [3, 5]]
+
+      y.filled()[ii[1,0]:ii[1,1]]
+      # returns array [3,4,]
+
+    Prior to the transforms refactoring, this was used to support
+    masked arrays in Line2D.
+
+    '''
+    mask = mask.reshape(mask.size)
+    m = np.concatenate(((1,), mask, (1,)))
+    indices = np.arange(len(mask) + 1)
+    mdif = m[1:] - m[:-1]
+    i0 = np.compress(mdif == -1, indices)
+    i1 = np.compress(mdif == 1, indices)
+    assert len(i0) == len(i1)
+    if len(i1) == 0:
+        return None  # Maybe this should be np.zeros((0,2), dtype=int)
+    if not compressed:
+        return np.concatenate((i0[:, np.newaxis], i1[:, np.newaxis]), axis=1)
+    seglengths = i1 - i0
+    breakpoints = np.cumsum(seglengths)
+    ic0 = np.concatenate(((0,), breakpoints[:-1]))
+    ic1 = breakpoints
+    return np.concatenate((ic0[:, np.newaxis], ic1[:, np.newaxis]), axis=1)
 
 # a dict to cross-map linestyle arguments
 _linestyles = [('-', 'solid'),
@@ -1069,6 +1331,77 @@ _linestyles = [('-', 'solid'),
 
 ls_mapper = dict(_linestyles)
 ls_mapper.update([(ls[1], ls[0]) for ls in _linestyles])
+
+def less_simple_linear_interpolation( x, y, xi, extrap=False ):
+    """
+    This function has been moved to matplotlib.mlab -- please import
+    it from there
+    """
+    # deprecated from cbook in 0.98.4
+    warnings.warn('less_simple_linear_interpolation has been moved to matplotlib.mlab -- please import it from there', DeprecationWarning)
+    import matplotlib.mlab as mlab
+    return mlab.less_simple_linear_interpolation( x, y, xi, extrap=extrap )
+
+def isvector(X):
+    """
+    This function has been moved to matplotlib.mlab -- please import
+    it from there
+    """
+    # deprecated from cbook in 0.98.4
+    warnings.warn('isvector has been moved to matplotlib.mlab -- please import it from there', DeprecationWarning)
+    import matplotlib.mlab as mlab
+    return mlab.isvector( x, y, xi, extrap=extrap )
+
+def vector_lengths( X, P=2., axis=None ):
+    """
+    This function has been moved to matplotlib.mlab -- please import
+    it from there
+    """
+    # deprecated from cbook in 0.98.4
+    warnings.warn('vector_lengths has been moved to matplotlib.mlab -- please import it from there', DeprecationWarning)
+    import matplotlib.mlab as mlab
+    return mlab.vector_lengths( X, P=2., axis=axis )
+
+def distances_along_curve( X ):
+    """
+    This function has been moved to matplotlib.mlab -- please import
+    it from there
+    """
+    # deprecated from cbook in 0.98.4
+    warnings.warn('distances_along_curve has been moved to matplotlib.mlab -- please import it from there', DeprecationWarning)
+    import matplotlib.mlab as mlab
+    return mlab.distances_along_curve( X )
+
+def path_length(X):
+    """
+    This function has been moved to matplotlib.mlab -- please import
+    it from there
+    """
+    # deprecated from cbook in 0.98.4
+    warnings.warn('path_length has been moved to matplotlib.mlab -- please import it from there', DeprecationWarning)
+    import matplotlib.mlab as mlab
+    return mlab.path_length(X)
+
+def is_closed_polygon(X):
+    """
+    This function has been moved to matplotlib.mlab -- please import
+    it from there
+    """
+    # deprecated from cbook in 0.98.4
+    warnings.warn('is_closed_polygon has been moved to matplotlib.mlab -- please import it from there', DeprecationWarning)
+    import matplotlib.mlab as mlab
+    return mlab.is_closed_polygon(X)
+
+def quad2cubic(q0x, q0y, q1x, q1y, q2x, q2y):
+    """
+    This function has been moved to matplotlib.mlab -- please import
+    it from there
+    """
+    # deprecated from cbook in 0.98.4
+    warnings.warn('quad2cubic has been moved to matplotlib.mlab -- please import it from there', DeprecationWarning)
+    import matplotlib.mlab as mlab
+    return mlab.quad2cubic(q0x, q0y, q1x, q1y, q2x, q2y)
+
 
 if __name__=='__main__':
     assert( allequal([1,1,1]) )

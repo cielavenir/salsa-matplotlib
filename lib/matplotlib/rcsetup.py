@@ -14,6 +14,7 @@ parameter set listed here should also be visited to the
 """
 
 import os
+import warnings
 from matplotlib.fontconfig_pattern import parse_fontconfig_pattern
 from matplotlib.colors import is_color_like
 
@@ -22,8 +23,8 @@ from matplotlib.colors import is_color_like
 # The capitalized forms are needed for ipython at present; this may
 # change for later versions.
 
-interactive_bk = ['GTK', 'GTKAgg', 'GTKCairo', 'FltkAgg', 'QtAgg', 'Qt4Agg',
-                  'TkAgg', 'WX', 'WXAgg', 'CocoaAgg']
+interactive_bk = ['GTK', 'GTKAgg', 'GTKCairo', 'FltkAgg', 'MacOSX',
+                  'QtAgg', 'Qt4Agg', 'TkAgg', 'WX', 'WXAgg', 'CocoaAgg']
 
 
 non_interactive_bk = ['agg', 'cairo', 'emf', 'gdk',
@@ -99,15 +100,41 @@ def validate_fonttype(s):
             raise ValueError('Supported Postscript/PDF font types are %s' % fonttypes.values())
         return fonttype
 
-validate_backend = ValidateInStrings('backend', all_backends, ignorecase=True)
+#validate_backend = ValidateInStrings('backend', all_backends, ignorecase=True)
+_validate_standard_backends = ValidateInStrings('backend', all_backends, ignorecase=True)
+def validate_backend(s):
+    if s.startswith('module://'): return s
+    else: return _validate_standard_backends(s)
 
-validate_numerix = ValidateInStrings('numerix',[
-    'Numeric','numarray','numpy',
-    ], ignorecase=True)
+
+def validate_numerix(v):
+    # 2009/02/24: start warning; later, remove all traces
+    try:
+        if v == 'obsolete':
+            return v
+    except ValueError:
+        pass
+    warnings.warn('rcParams key "numerix" is obsolete and has no effect;\n'
+                  ' please delete it from your matplotlibrc file')
+
 
 validate_toolbar = ValidateInStrings('toolbar',[
     'None','classic','toolbar2',
     ], ignorecase=True)
+
+def validate_autolayout(v):
+    if v:
+        warnings.warn("figure.autolayout is not currently supported")
+
+def validate_maskedarray(v):
+    # 2008/12/12: start warning; later, remove all traces of maskedarray
+    try:
+        if v == 'obsolete':
+            return v
+    except ValueError:
+        pass
+    warnings.warn('rcParams key "maskedarray" is obsolete and has no effect;\n'
+                  ' please delete it from your matplotlibrc file')
 
 class validate_nseq_float:
     def __init__(self, n):
@@ -150,8 +177,11 @@ class validate_nseq_int:
 
 def validate_color(s):
     'return a valid color arg'
-    if s.lower() == 'none':
-        return 'None'
+    try:
+        if s.lower() == 'none':
+            return 'None'
+    except AttributeError:
+        pass
     if is_color_like(s):
         return s
     stmp = '#' + s
@@ -213,6 +243,9 @@ def validate_font_properties(s):
     return s
 
 validate_fontset = ValidateInStrings('fontset', ['cm', 'stix', 'stixsans', 'custom'])
+
+validate_mathtext_default = ValidateInStrings(
+    'default', "rm cal it tt sf bf default bb frak circled scr regular".split())
 
 validate_verbose = ValidateInStrings('verbose',[
     'silent', 'helpful', 'debug', 'debug-annoying',
@@ -300,8 +333,9 @@ class ValidateInterval:
 # a map from key -> value, converter
 defaultParams = {
     'backend'           : ['Agg', validate_backend], # agg is certainly present
-    'numerix'           : ['numpy', validate_numerix],
-    'maskedarray'       : [False, validate_bool],
+    'backend_fallback'  : [True, validate_bool], # agg is certainly present
+    'numerix'           : ['obsolete', validate_numerix],
+    'maskedarray'       : ['obsolete', validate_maskedarray], #to be removed
     'toolbar'           : ['toolbar2', validate_toolbar],
     'datapath'          : [None, validate_path_exists],   # handled by _get_data_path_cached
     'units'             : [False, validate_bool],
@@ -320,8 +354,8 @@ defaultParams = {
     'lines.markeredgewidth' : [0.5, validate_float],
     'lines.markersize'      : [6, validate_float],       # markersize, in points
     'lines.antialiased'     : [True, validate_bool],     # antialised (no jaggies)
-    'lines.dash_joinstyle'  : ['miter', validate_joinstyle],
-    'lines.solid_joinstyle' : ['miter', validate_joinstyle],
+    'lines.dash_joinstyle'  : ['round', validate_joinstyle],
+    'lines.solid_joinstyle' : ['round', validate_joinstyle],
     'lines.dash_capstyle'   : ['butt', validate_capstyle],
     'lines.solid_capstyle'  : ['projecting', validate_capstyle],
 
@@ -363,6 +397,7 @@ defaultParams = {
     'text.usetex'         : [False, validate_bool],
     'text.latex.unicode'  : [False, validate_bool],
     'text.latex.preamble' : [[''], validate_stringlist],
+    'text.latex.preview' : [False, validate_bool],
     'text.dvipnghack'     : [None, validate_bool_maybe_none],
     'text.fontstyle'      : ['normal', str],
     'text.fontangle'      : ['normal', str],
@@ -377,6 +412,7 @@ defaultParams = {
     'mathtext.bf'         : ['serif:bold', validate_font_properties],
     'mathtext.sf'         : ['sans\-serif', validate_font_properties],
     'mathtext.fontset'    : ['cm', validate_fontset],
+    'mathtext.default'    : ['it', validate_mathtext_default],
     'mathtext.fallback_to_cm' : [True, validate_bool],
 
     'image.aspect'        : ['equal', validate_aspect],  # equal, auto, a number
@@ -402,23 +438,35 @@ defaultParams = {
                                # use scientific notation if log10
                                # of the axis range is smaller than the
                                # first or larger than the second
+    'axes.unicode_minus'        : [True, validate_bool],
 
     'polaraxes.grid'        : [True, validate_bool],   # display polar grid or not
+    'axes3d.grid'           : [True, validate_bool],   # display 3d grid
 
     #legend properties
+    'legend.fancybox'         : [False,validate_bool],
     'legend.loc'         : ['upper right',validate_legend_loc], # at some point, this should be changed to 'best'
     'legend.isaxes'      : [True,validate_bool],  # this option is internally ignored - it never served any useful purpose
     'legend.numpoints'   : [2, validate_int],     # the number of points in the legend line
     'legend.fontsize'    : ['large', validate_fontsize],
-    'legend.pad'         : [0.2, validate_float], # the fractional whitespace inside the legend border
+    'legend.markerscale' : [1.0, validate_float], # the relative size of legend markers vs. original
+    'legend.shadow'        : [False, validate_bool],
+
+
+    # the following dimensions are in fraction of the font size
+    'legend.borderpad'   : [0.4, validate_float], # units are fontsize
+    'legend.labelspacing'      : [0.5, validate_float], # the vertical space between the legend entries
+    'legend.handlelength'     : [2., validate_float], # the length of the legend lines
+    'legend.handletextpad' : [.8, validate_float], # the space between the legend line and legend text
+    'legend.borderaxespad'       : [0.5, validate_float], # the border between the axes and legend edge
+    'legend.columnspacing'       : [2., validate_float], # the border between the axes and legend edge
+
+
     'legend.markerscale' : [1.0, validate_float], # the relative size of legend markers vs. original
 
-    # the following dimensions are in axes coords
-    'legend.labelsep'      : [0.010, validate_float], # the vertical space between the legend entries
-    'legend.handlelen'     : [0.05, validate_float], # the length of the legend lines
-    'legend.handletextsep' : [0.02, validate_float], # the space between the legend line and legend text
-    'legend.axespad'       : [0.02, validate_float], # the border between the axes and legend edge
     'legend.shadow'        : [False, validate_bool],
+
+
 
 
     # tick properties
@@ -449,6 +497,7 @@ defaultParams = {
     'figure.dpi'        : [ 80, validate_float],   # DPI
     'figure.facecolor'  : [ '0.75', validate_color], # facecolor; scalar gray
     'figure.edgecolor'  : [ 'w', validate_color],  # edgecolor; white
+    'figure.autolayout' : [ False, validate_autolayout],
 
     'figure.subplot.left'   : [0.125, ValidateInterval(0, 1, closedmin=True, closedmax=True)],
     'figure.subplot.right'  : [0.9, ValidateInterval(0, 1, closedmin=True, closedmax=True)],
@@ -478,8 +527,15 @@ defaultParams = {
     'svg.image_inline'  : [True, validate_bool],    # write raster image data directly into the svg file
     'svg.image_noscale' : [False, validate_bool],  # suppress scaling of raster data embedded in SVG
     'svg.embed_char_paths' : [True, validate_bool],  # True to save all characters as paths in the SVG
+
+    'docstring.hardcopy' : [False, validate_bool],  # set this when you want to generate hardcopy docstring
     'plugins.directory' : ['.matplotlib_plugins', str], # where plugin directory is locate
 
+    'path.simplify' : [True, validate_bool],
+    'path.simplify_threshold' : [1.0 / 9.0, ValidateInterval(0.0, 1.0)],
+    'agg.path.chunksize' : [0, validate_int]       # 0 to disable chunking;
+                                                   # recommend about 20000 to
+                                                   # enable. Experimental.
 }
 
 if __name__ == '__main__':

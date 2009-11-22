@@ -1,51 +1,255 @@
-matplotlib (0.98.1-1+lenny4) testing-proposed-updates; urgency=low
+matplotlib (0.99.1.2-1~bpo50+1) lenny-backports; urgency=low
 
-  [ Kumar Appaiah ]
-  * debian/patches/ttconv_leak_fix.patch: It appears that the call labels
-    for get_pdf_charprocs and convert_ttf_to_ps have somehow got
-    interchanged. This change fixes that bug, which causes the failure of
-    PS and EPS generation. (Closes: #505527).
+  * Rebuild for lenny-backports.
+  * No -dbg package, as this wasn't available in lenny anyway.
+    (Anybody feel free to add this, however.)
 
- -- Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>  Thu, 13 Nov 2008 12:27:36 -0600
+ -- W. Martin Borgert <debacle@debian.org>  Sun, 22 Nov 2009 23:10:47 +0000
 
-matplotlib (0.98.1-1+lenny3) testing-proposed-updates; urgency=medium
+matplotlib (0.99.1.2-1) unstable; urgency=low
 
-  [ Kumar Appaiah ]
-  * Patch from Thiemo Seufer: new build_fix.patch to detect new
-    sys.platform identifiers on mips, mipsel, hppa, alpha and sparc.
-    (Closes: #501617)
+  * New upstream release.
+  * Fix spelling error in doc-base abstract field.
+  * Add missing section field to doc-base file.
+  * Convert patch system back to quilt and use DEP-3 patch tagging guidelines.
 
- -- Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>  Wed, 08 Oct 2008 19:05:46 -0500
+ -- Benjamin Drung <bdrung@ubuntu.com>  Sun, 15 Nov 2009 22:17:31 +0100
 
-matplotlib (0.98.1-1+lenny2) testing-proposed-updates; urgency=medium
+matplotlib (0.99.1.1-1) unstable; urgency=low
 
-  [ Kumar Appaiah ]
-  * Revert to the standard build procedure to overcome the "undefined
-    symbol: __gxx_personality_v0" errors which appear when CC=g++ is
-    passed on to setup.py. (Closes: #501578)
+  [ Sandro Tosi ]
+  * New upstream release
+  * debian/control
+    - added python-wxgtk2.8-dbg to b-d (needed to build -dbg package)
+    - added python-imaging to b-d (needed for -doc package)
+    - added librsvg2-common to Suggests of python-matplotlib, needed by GTKAgg
+      backend; thanks to Jonas for the report and suggestion; Closes: #548874
+    - moved python-excelerator from Depends to Suggests; thanks to W. Martin
+      Borgert for the report; Closes: #547437
+    - removed Ondrej from Uploaders: thanks for your work!
+  * debian/patches/30_doc_pass_dpi.dpatch
+    - pass DPI when building doc images
+  * debian/python-matplotlib-doc.doc-base
+    - added doc-base
 
- -- Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>  Fri, 03 Oct 2008 17:48:11 -0500
+  [ Benjamin Drung ]
+  * wrote 05-find-tcl-tk-directory.dpatch
+  * strip not working parts from 10_build_fix.dpatch
+  * debian/rules
+    - refresh clean target
+  * link to fonts in ttf-lyx to make lintian happy
+  * Add latex-ucs and texlive-fonts-recommended to Build-Depends
+    (Closes: #551248).
+  * Demote GUI toolkits from Depends to Recommends; thanks to Thomas Bechtold
+    for this hint (Closes: #547437).
+  * Install lib/matplotlib/mpl-data/lineprops.glade; thanks to Ambrose Andrews
+    for the report (Closes: #518488).
 
-matplotlib (0.98.1-1+lenny1.1) testing-proposed-updates; urgency=low
+ -- Benjamin Drung <bdrung@ubuntu.com>  Sun, 08 Nov 2009 21:58:23 +0100
 
-  * Non-maintainer upload.
-  * debian/rules:
-    - Force use of g++ to compile C++ files, instead of gcc.
+matplotlib (0.99.0-1) unstable; urgency=low
 
- -- Kumar Appaiah <akumar@debian.org>  Thu, 18 Sep 2008 07:53:48 -0500
+  * New upstream release
+    - thanks to Michael S. Gilbert for the report; Closes: #541146
+  * debian/control
+    - removed Marco Presi from uploaders: thanks for your work!
+    - bump Standards-Version to 3.8.3 (no changes needed)
 
-matplotlib (0.98.1-1+lenny1) testing-proposed-updates; urgency=low
+ -- Sandro Tosi <morph@debian.org>  Thu, 17 Sep 2009 12:46:17 +0200
 
-  [ Kumar Appaiah ]
-  * Backporting memory leak fix from new upstream release; Closes: #492735
-  * debian/patches/shared_axes_leak.patch
-    - Fix memory leak related to shared axes.
-  * debian/patches/ttconv_leak_fixes.patch
-    - Plug memory leaks in _ttconv.cpp.
-  * debian/patches/manifest_add_doc.patch
-    - Add the doc directory to MANIFEST.in.
+matplotlib (0.98.5.3-2) unstable; urgency=medium
 
- -- Sandro Tosi <matrixhasu@gmail.com>  Mon, 15 Sep 2008 21:09:15 +0200
+  [ Benjamin Drung ]
+  * Build with tcl/tk8.5 as python-tk was build with tcl/tk8.5; thanks to Lucas
+    Nussbaum for the report; Closes: #536985 (RC bug, hence urgency=medium)
+  * Bump Standards-Version to 3.8.2 (no changes).
+
+ -- Sandro Tosi <morph@debian.org>  Wed, 15 Jul 2009 10:16:45 +0200
+
+matplotlib (0.98.5.3-1) unstable; urgency=low
+
+  [ Benjamin Drung ]
+  * debian/control
+    - Rename python-enthought-traits to python-traits
+    - Move python-matplotlib-dbg to section debug
+    - Build depends on python-qt4
+    - Update my e-mail address.
+    - Sort build depends and break depends.
+  * debian/rules
+    - In clean target use rm -rf instead dh_clean for removing build directory;
+      thanks Andrew Straw for the patch
+    - Let all stamp files end with -stamp for automatically cleaning by dh_clean
+    - Remove generated doc files in clean target; upstreams doc clean target
+      only runs svn-clean, which is useless without a repository
+  * Switch to debhelper 7
+  * Install egg-info files and add python-setuptools to build depends; thanks to
+    Gediminas Paulauskas
+
+  [ Sandro Tosi ]
+  * New upstream release (ready to be uploaded in unstable)
+    - ensure WX examples use version >= 2.8, thanks to giacomo boffi for the
+      report; Closes: #518150
+  * debian/control
+    - removed Vittorio Palmisano from uploaders (mia); thanks for your work!
+    - bump Standards-Version to 3.8.1 (no changes needed)
+  * debian/copyright
+    - completely rewritten to match new upstream code
+  * debian/{rules, *.lintian-overrides}
+    - added these lintian overrides:
+      + arch-dep-package-has-big-usr-share
+        . python-matplotlib has large arch-indep with some arch-dep code
+      + copyright-should-refer-to-common-license-file-for-lgpl
+        . false warning, since it greps for LGPL that's in the license text as
+          example
+      + extra-license-file
+        . license embedded in the documentation, will break links if removed
+      + font-in-non-font-package
+        . we ship fonts, so no need to warning for this
+  * debian/{control, rules, python-matplotlib.preinst}
+    - switch to python-support (adding preinst for the migration)
+
+ -- Sandro Tosi <morph@debian.org>  Fri, 29 May 2009 08:40:48 +0200
+
+matplotlib (0.98.5.2-1) experimental; urgency=low
+
+  [ Benjamin Drung ]
+  * debian/control
+    - Added python-pkg-resources to build dependency for version detection of
+      python-enthought-traits
+    - merged python-tk into GUI Python packages alternative dependency list
+    - add myself to uploaders
+  * Move content of debian/patches/setup.cfg.patch to
+    debian/setup.cfg to set the default backend to TkAgg
+
+  [ Sandro Tosi ]
+  * New upstream release
+    - Fixed histogram autoscaling bug when bins or range are given
+      explicitly; Closes: #503148
+    - fix a FTBFS if built with GCC 4.4; thanks to Martin Michlmayr for the
+      report and the patch; Closes: #505618
+  * debian/control
+    - switch Vcs-Browser field to viewsvn
+    - removed python from Depends since introduced by python:Depends
+    - depending on python-all-dbg for -dbg package (to install all dbg
+      interpreters)
+    - moved python-tk to the first position of multiple GUI bindings Depends
+      line
+    - moved 'dvipng' from Recommends to Suggests (to avoid texlive to be
+      automatically taken in); Closes: #490992
+    - bump build-depends in python-sphinx to at least 0.5.1 (upstream doc build
+      system requires it)
+  * debian/NEWS
+    - added to notify users about default backend (TkAgg)
+    - added note about 'dvipng' not installed automatically anymore
+  * debian/README.debian
+    - added information about changing backend
+  * debian/rules
+    - merging all "rm" calls into "dh_clean" call
+    - removed 'API_CHANGES' installation, since removed upstream
+    - doc building with '--small' option, to reduce doc size (removing hi-res
+      and pdf gallery images)
+  * debian/{control,rules,patches/*,README.source}
+    - moved from quilt to dpatch
+  * debian/patches/{matplotlibrc.template-typo.patch,
+             doc_graphviz_errors_fix.patch,bts-498229_axes3d_typo.patch}
+    - removed since merged upstream
+  * debian/docs
+    - removed since not needed (the same files were listed in debian/rules)
+
+ -- Sandro Tosi <morph@debian.org>  Wed, 14 Jan 2009 22:09:58 +0100
+
+matplotlib (0.98.3-5) unstable; urgency=medium
+
+  [ Benjamin Drung ]
+  * debian/patches/matplotlibrc.template-typo.patch
+    - fix typo in matplotlibrc.template
+
+  [ Sandro Tosi ]
+  * debian/control
+    - updated my email address
+    - replaced python-wxgtk2.6 with python-wxgtk2.8
+  * debian/patches/setup.cfg.patch
+    - added to create "setup.cfg" file to guide building (in particular for
+      "backend" configuration); Closes: #502976
+  * debian/patches/bts-498229_axes3d_typo.patch
+    - added to fix a typo when importing "axes3d"; thanks to Tiziano Zito for
+      the report; Closes: #498229
+
+ -- Sandro Tosi <morph@debian.org>  Fri, 31 Oct 2008 13:51:20 +0100
+
+matplotlib (0.98.3-4) unstable; urgency=low
+
+  [ Sandro Tosi ]
+  * Release in collaboration with Benjamin Drung, from Ubuntu
+  * debian/control
+    - applied Benjamin Drung patch to split dep fields a package per line;
+      thanks to him; Closes: #495287
+    - replaced dep on python-dev with python; thanks to Benjamin Drung for the
+      notice
+    - depends reorganization: dvipng moved to recommends (optional tex
+      depends), python-configobj and python-enthought-traits to suggests
+      (experimental support); Closes: #490992
+    - added python-matplotlib-dbg package and python-all-dbg, python-numpy-dbg
+      to build-dep
+    - removed python-gd depends since no more needed
+  * debian/README.debian
+    - removed outdated info, added notice for MATPLOTLIBDATA env variable
+  * debian/python-matplotlib-data.install
+    - added matplotlib.conf installation
+  * debian/patches/matplotlibrc_fix.patch
+    - refreshed to match new upstream code
+  * debian/rules
+    - added build, clean and install for -dbg package
+
+  [ Ondrej Certik ]
+  * debian/patches/build_fix.patch updated thanks to Thiemo Seufer.
+      Closes: #501618
+
+ -- Sandro Tosi <matrixhasu@gmail.com>  Mon, 25 Aug 2008 23:28:30 +0200
+
+matplotlib (0.98.3-3) unstable; urgency=medium
+
+  * debian/control
+    - moved depends on libjs-jquery from binary to -doc package; thanks to
+      Nicolas Évrard for the report; part of #490992 resolution
+  * debian/rules
+    - used distutils to retrieve the build directory for matplotlib, needed
+      for doc generation; thanks to Lucas Nussbaum for the report and to
+      Piotr for the fix; Closes: #494236
+
+ -- Sandro Tosi <matrixhasu@gmail.com>  Mon, 11 Aug 2008 20:51:52 +0200
+
+matplotlib (0.98.3-2) unstable; urgency=low
+
+  * debian/patches/build_fix.patch
+    - added kfreebsd7/8 based systems; thanks to Petr Salinger for the patch;
+      Closes: #493858
+
+ -- Sandro Tosi <matrixhasu@gmail.com>  Tue, 05 Aug 2008 19:39:18 +0200
+
+matplotlib (0.98.3-1) unstable; urgency=medium
+
+  * New upstream release
+    - fixed memory leaks; Closes: #492735 (RC bug, hence urgency=medium)
+  * debian/control
+    - added python-sphinx (versioned to easy Lenny entrance), graphviz,
+      ipython, texlive-latex-extra build-deps in order to build documentation
+    - added Suggests on python-scipy; thanks to Chris Walker for the report;
+      Closes: #488138
+    - added Vcs-{Browser,Svn} fields
+    - added depend on libjs-jquery to replace embedded one
+  * debian/rules
+    - build and install documentation; Closes: #401629
+    - symlinked jquery.js from libjs-jquery instead of the embedded one
+    - added dh_link -i call for indep packages
+  * debian/watch
+    - removed comment lines since not needed
+  * debian/patches/doc_graphviz_errors_fix.patch
+    - added to fix graphviz errors during doc build (from upstream svn r5962)
+  * debian/copyright
+    - shortened some long line (to make lintian happy)
+
+ -- Sandro Tosi <matrixhasu@gmail.com>  Mon, 04 Aug 2008 21:42:05 +0200
 
 matplotlib (0.98.1-1) unstable; urgency=low
 

@@ -21,6 +21,8 @@ from matplotlib._pylab_helpers import Gcf
 import matplotlib.windowing as windowing
 from matplotlib.widgets import SubplotTool
 
+import matplotlib.cbook as cbook
+
 rcParams = matplotlib.rcParams
 verbose = matplotlib.verbose
 
@@ -37,6 +39,7 @@ cursord = {
     cursors.POINTER: "arrow",
     cursors.SELECT_REGION: "tcross",
     }
+
 
 def round(x):
     return int(math.floor(x+0.5))
@@ -161,13 +164,33 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
         self._tkcanvas.bind("<KeyRelease>", self.key_release)
         for name in "<Button-1>", "<Button-2>", "<Button-3>":
             self._tkcanvas.bind(name, self.button_press_event)
-
         for name in "<ButtonRelease-1>", "<ButtonRelease-2>", "<ButtonRelease-3>":
             self._tkcanvas.bind(name, self.button_release_event)
+
+        # Mouse wheel on Linux generates button 4/5 events
+        for name in "<Button-4>", "<Button-5>":
+            self._tkcanvas.bind(name, self.scroll_event)
+        # Mouse wheel for windows goes to the window with the focus.
+        # Since the canvas won't usually have the focus, bind the
+        # event to the window containing the canvas instead.
+        # See http://wiki.tcl.tk/3893 (mousewheel) for details
+        root = self._tkcanvas.winfo_toplevel()
+        root.bind("<MouseWheel>", self.scroll_event_windows)
 
         self._master = master
         self._tkcanvas.focus_set()
 
+        # a dict from func-> cbook.Scheduler threads
+        self.sourced = dict()
+
+        # call the idle handler
+        def on_idle(*ignore):
+            self.idle_event()
+            return True
+
+        # disable until you figure out how to handle threads and interrupts
+        #t = cbook.Idle(on_idle)
+        #self._tkcanvas.after_idle(lambda *ignore: t.start())
 
     def resize(self, event):
         width, height = event.width, event.height
@@ -185,6 +208,7 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
         self._tkphoto = Tk.PhotoImage(
             master=self._tkcanvas, width=width, height=height)
         self._tkcanvas.create_image(width/2,height/2,image=self._tkphoto)
+        self.resize_event()
         self.show()
 
     def draw(self):
@@ -221,6 +245,7 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
         y = self.figure.bbox.height - event.y
         FigureCanvasBase.motion_notify_event(self, x, y, guiEvent=event)
 
+
     def button_press_event(self, event):
         x = event.x
         # flipy so y=0 is bottom of canvas
@@ -250,9 +275,30 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
 
         FigureCanvasBase.button_release_event(self, x, y, num, guiEvent=event)
 
+    def scroll_event(self, event):
+        x = event.x
+        y = self.figure.bbox.height - event.y
+        num = getattr(event, 'num', None)
+        if   num==4: step = -1
+        elif num==5: step = +1
+        else:        step =  0
+
+        FigureCanvasBase.scroll_event(self, x, y, step, guiEvent=event)
+
+    def scroll_event_windows(self, event):
+        """MouseWheel event processor"""
+        # need to find the window that contains the mouse
+        w = event.widget.winfo_containing(event.x_root, event.y_root)
+        if w == self._tkcanvas:
+            x = event.x_root - w.winfo_rootx()
+            y = event.y_root - w.winfo_rooty()
+            y = self.figure.bbox.height - y
+            step = event.delta/120.
+            FigureCanvasBase.scroll_event(self, x, y, step, guiEvent=event)
+
     def _get_key(self, event):
         val = event.keysym_num
-        if self.keyvald.has_key(val):
+        if val in self.keyvald:
             key = self.keyvald[val]
         elif val<256:
             key = chr(val)
@@ -271,6 +317,14 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
 
     def flush_events(self):
         self._master.update()
+
+    def start_event_loop(self,timeout):
+        FigureCanvasBase.start_event_loop_default(self,timeout)
+    start_event_loop.__doc__=FigureCanvasBase.start_event_loop_default.__doc__
+
+    def stop_event_loop(self):
+        FigureCanvasBase.stop_event_loop_default(self)
+    stop_event_loop.__doc__=FigureCanvasBase.stop_event_loop_default.__doc__
 
 class FigureManagerTkAgg(FigureManagerBase):
     """
@@ -335,7 +389,7 @@ class FigureManagerTkAgg(FigureManagerBase):
             # anim.py requires this
             if sys.platform=='win32' : self.window.update()
         else:
-            self.canvas.draw()
+            self.canvas.draw_idle()
         self._shown = True
 
 
@@ -654,11 +708,17 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
         tk_filetypes = [
             (name, '*.%s' % ext) for (ext, name) in sorted_filetypes]
 
+        # adding a default extension seems to break the
+        # asksaveasfilename dialog when you choose various save types
+        # from the dropdown.  Passing in the empty string seems to
+        # work - JDH
+        #defaultextension = self.canvas.get_default_filetype()
+        defaultextension = ''
         fname = asksaveasfilename(
             master=self.window,
             title='Save the figure',
             filetypes = tk_filetypes,
-            defaultextension = self.canvas.get_default_filetype()
+            defaultextension = defaultextension
             )
 
         if fname == "" or fname == ():
