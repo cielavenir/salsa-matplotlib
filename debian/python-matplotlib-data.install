@@ -1,0 +1,6 @@
+lib/matplotlib/mpl-data/fonts/ /usr/share/matplotlib/mpl-data/
+lib/matplotlib/mpl-data/images/ /usr/share/matplotlib/mpl-data/
+lib/matplotlib/mpl-data/lineprops.glade /usr/share/matplotlib/mpl-data/
+lib/matplotlib/mpl-data/matplotlib.conf /usr/share/matplotlib
+lib/matplotlib/mpl-data/matplotlibrc /etc/
+lib/matplotlib/backends/Matplotlib.nib /usr/share/matplotlib/

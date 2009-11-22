@@ -1,0 +1,146 @@
+#!/usr/bin/make -f
+
+include /usr/share/quilt/quilt.make
+
+PYVERS := $(shell pyversions -v -r debian/control)
+DEFPY := $(shell pyversions -v -d)
+PY_PLATFORM := $(shell python -c 'from distutils.util import get_platform; print get_platform()')
+pd := python-matplotlib-doc
+p := python-matplotlib
+pdata := python-matplotlib-data
+
+# build
+build: patch build-arch build-indep
+
+build-indep: build-indep-stamp
+build-indep-stamp: $(DEFPY:%=build-%-stamp)
+	dh_testdir
+
+	# build the doc
+	-( cd doc ; MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
+		PYTHONPATH=../build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py --small all )
+
+	touch $@
+
+build-arch: $(PYVERS:%=build-%-stamp)
+
+build-%-stamp:
+	dh_testdir
+
+	cp -f debian/setup.cfg setup.cfg
+	python$* ./setup.py build $(PY_BUILD_FLAGS)
+
+	touch $@
+
+
+# clean
+clean: clean-patched unpatch
+clean-patched: patch
+	dh_testdir
+	dh_testroot
+	
+	for i in $(PYVERS); do \
+		python$(i) ./setup.py clean --all; \
+	done
+
+	# clean the doc
+	( cd doc ; ./make.py clean )
+
+	# workaround for cleaning the doc ("doc/make.py clean" only runs useless svn-clean)
+	rm -rf doc/build doc/examples
+	rm -f doc/mpl_examples/api/*.png
+	rm -f doc/mpl_examples/pylab_examples/*.png
+	rm -f doc/mpl_examples/pylab_examples/*.pdf
+	rm -f doc/mpl_examples/units/*.png
+	rm -f doc/pyplots/tex_demo.png
+	rm -f doc/_static/matplotlibrc
+	rm -f doc/_templates/gallery.html
+
+	find . -name '*.pyc' -exec rm {} \;
+
+	dh_clean lib/matplotlib/mpl-data/matplotlib.conf \
+		lib/matplotlib/mpl-data/matplotlibrc setup.cfg
+	rm -rf build
+	rm -rf lib/matplotlib.egg-info
+
+
+# install
+install-arch: build-arch $(PYVERS:%=install-%-stamp)
+	dh_testdir
+	dh_testroot
+
+install-%-stamp: build-%-stamp
+	dh_testdir
+	dh_testroot
+
+	python$* ./setup.py install_lib \
+		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/ --no-compile
+	python$* ./setupegg.py install_egg_info \
+		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/
+
+	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/mpl-data/
+	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/backends/Matplotlib.nib/
+
+	touch $@
+
+install-indep: build-indep
+	dh_testdir -i
+	dh_testroot -i
+	dh_prep
+	dh_install -p $(pdata)
+	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/Vera*.ttf
+	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/*.TXT
+	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/local.conf
+	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/pdfcorefonts/readme.txt
+	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/images/*.svg
+	# link to fonts in ttf-lyx
+	ln -sf /usr/share/fonts/truetype/ttf-lyx/cmex10.ttf $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/cmex10.ttf
+	ln -sf /usr/share/fonts/truetype/ttf-lyx/cmmi10.ttf $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/cmmi10.ttf
+	ln -sf /usr/share/fonts/truetype/ttf-lyx/cmr10.ttf $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/cmr10.ttf
+	ln -sf /usr/share/fonts/truetype/ttf-lyx/cmsy10.ttf $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/cmsy10.ttf
+
+# binary
+binary-indep: build-indep install-indep
+	dh_testdir -i
+	dh_testroot -i
+	dh_installchangelogs -i CHANGELOG
+	dh_installdocs -p$(pd) -i doc/build/html/
+	dh_installexamples -p$(pd) -i examples/*
+	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js
+	-mkdir -p $(CURDIR)/debian/$(pd)/usr/share/doc/python-matplotlib-doc/html/_static
+	-ln -sf /usr/share/javascript/jquery/jquery.js \
+		$(CURDIR)/debian/$(pd)/usr/share/doc/python-matplotlib-doc/html/_static/jquery.js
+	dh_link -i
+	dh_lintian -i
+	dh_fixperms -i
+	dh_installdeb -i
+	dh_gencontrol -i
+	dh_md5sums -i
+	dh_builddeb -i
+
+binary-arch: build-arch install-arch
+	dh_testdir -a
+	dh_testroot -a
+	dh_installchangelogs -a CHANGELOG
+	dh_installdocs -p$(p) -a README.txt TODO KNOWN_BUGS INTERACTIVE
+	# make python scripts starting with '#!' executable
+	for i in `find debian -mindepth 2 -type f ! -perm 755`; do \
+		if head -1 $$i | grep -q '^#!'; then \
+			chmod 755 $$i; \
+			echo "made executable: $$i"; \
+		fi; \
+	done
+	dh_pysupport -a
+	dh_link -a
+	dh_lintian -a
+	dh_strip -a
+	dh_compress -a
+	dh_fixperms -a
+	dh_installdeb -a
+	dh_shlibdeps -a
+	dh_gencontrol -a
+	dh_md5sums -a
+	dh_builddeb -a
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install

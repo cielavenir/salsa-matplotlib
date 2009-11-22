@@ -1,0 +1,107 @@
+Source: matplotlib
+Section: python
+Priority: optional
+Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
+Uploaders: Alexandre Fayolle <afayolle@debian.org>,
+           Sandro Tosi <morph@debian.org>,
+           Benjamin Drung <bdrung@ubuntu.com>
+Build-Depends: debhelper (>= 7),
+               dvipng,
+               graphviz,
+               ipython,
+               latex-ucs,
+               libfreetype6-dev,
+               libgtk2.0-dev,
+               libpng-dev,
+               python-all-dev (>= 2.3.5-7),
+               python-configobj,
+               python-dateutil,
+               python-epydoc,
+               python-gtk2-dev,
+               python-imaging,
+               python-numpy (>= 1:1.1.0),
+               python-numpy-dbg (>= 1:1.1.0),
+               python-pkg-resources,
+               python-qt4,
+               python-qt4-dev,
+               python-qt-dev,
+               python-setuptools,
+               python-sphinx,
+               python-support,
+               python-tk,
+               python-tz,
+               python-wxgtk2.8,
+               python-wxgtk2.8-dbg,
+               quilt,
+               tcl8.5-dev,
+               texlive-fonts-recommended,
+               texlive-latex-extra,
+               tk8.5-dev,
+               zlib1g-dev
+XS-Python-Version: all
+Standards-Version: 3.8.3
+XS-DM-Upload-Allowed: yes
+Homepage: http://matplotlib.sf.net/
+Vcs-Svn: svn://svn.debian.org/svn/python-modules/packages/matplotlib/trunk/
+Vcs-Browser: http://svn.debian.org/viewsvn/python-modules/packages/matplotlib/trunk/
+
+Package: python-matplotlib
+Architecture: any
+XB-Python-Version: ${python:Versions}
+Depends: ${python:Depends},
+         ${shlibs:Depends},
+         python-cairo,
+         python-dateutil,
+         python-gobject,
+         python-matplotlib-data (>= ${source:Version}),
+         python-numpy (>= 1:1.1.0),
+         python-pyparsing,
+         python-tz
+Recommends: python-glade2,
+            python-tk (>= 2.5.2-1.1) | python-gtk2 | python-wxgtk2.8 | python-qt3 | python-qt4
+Provides: ${python:Provides}
+Conflicts: python2.4-matplotlib
+Replaces: python2.4-matplotlib
+Enhances: ipython
+Suggests: dvipng,
+          ipython (>= 0.6.3),
+          librsvg2-common,
+          python-configobj,
+          python-excelerator,
+          python-matplotlib-doc,
+          python-scipy,
+          python-traits (>= 2.0),
+          texlive-extra-utils,
+          texlive-latex-extra
+Description: Python based plotting system in a style similar to Matlab
+ Matplotlib is a pure Python plotting library designed to bring
+ publication quality plotting to Python with a syntax familiar to
+ Matlab users. All of the plotting commands in the pylab interface can
+ be accessed either via a functional interface familiar to Matlab
+ users or an object oriented interface familiar to Python users.
+
+Package: python-matplotlib-data
+Architecture: all
+Depends: ttf-lyx
+Description: Python based plotting system (data package)
+ Matplotlib is a pure Python plotting library designed to bring
+ publication quality plotting to Python with a syntax familiar to
+ Matlab users. All of the plotting commands in the pylab interface can
+ be accessed either via a functional interface familiar to Matlab
+ users or an object oriented interface familiar to Python users.
+ .
+ This package contains architecture independent data for python-matplotlib.
+
+Package: python-matplotlib-doc
+Architecture: all
+Section: doc
+Depends: libjs-jquery
+Description: Python based plotting system (documentation package)
+ Matplotlib is a pure Python plotting library designed to bring
+ publication quality plotting to Python with a syntax familiar to
+ Matlab users. All of the plotting commands in the pylab interface can
+ be accessed either via a functional interface familiar to Matlab
+ users or an object oriented interface familiar to Python users.
+ .
+ This package contains documentation for python-matplotlib.
+
