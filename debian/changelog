@@ -4,7 +4,7 @@ matplotlib (0.99.1.2-1~bpo50+1) lenny-backports; urgency=low
   * No -dbg package, as this wasn't available in lenny anyway.
     (Anybody feel free to add this, however.)
 
- -- W. Martin Borgert <debacle@debian.org>  Tue, 22 Sep 2009 23:13:53 +0000
+ -- W. Martin Borgert <debacle@debian.org>  Sun, 22 Nov 2009 23:10:47 +0000
 
 matplotlib (0.99.1.2-1) unstable; urgency=low
 
