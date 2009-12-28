@@ -1,7 +1,5 @@
 #!/usr/bin/make -f
 
-include /usr/share/quilt/quilt.make
-
 PYVERS := $(shell pyversions -v -r debian/control)
 DEFPY := $(shell pyversions -v -d)
 PY_PLATFORM := $(shell python -c 'from distutils.util import get_platform; print get_platform()')
@@ -11,7 +9,7 @@ pdata := python-matplotlib-data
 pdbg := python-matplotlib-dbg
 
 # build
-build: patch build-arch build-indep
+build: build-arch build-indep
 
 build-indep: build-indep-stamp
 build-indep-stamp: $(DEFPY:%=build-%-stamp)
@@ -36,8 +34,7 @@ build-%-stamp:
 
 
 # clean
-clean: clean-patched unpatch
-clean-patched: patch
+clean:
 	dh_testdir
 	dh_testroot
 	
