@@ -4,9 +4,9 @@ matplotlib (0.99.1.2-3) UNRELEASED; urgency=low
     - Recommends python-tk directly and Suggests all other other Python
       bindings (changes from Ubuntu); this way the default backend ('TkAgg')
       will work out-of-the-box and the others will need manual bindings
-      intallation; Closes: #563137
+      installation; Closes: #563137
 
- -- Sandro Tosi <morph@debian.org>  Wed, 27 Jan 2010 23:40:35 +0100
+ -- Sandro Tosi <morph@debian.org>  Wed, 27 Jan 2010 23:47:49 +0100
 
 matplotlib (0.99.1.2-2) unstable; urgency=low
 
