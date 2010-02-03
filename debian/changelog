@@ -1,12 +1,18 @@
 matplotlib (0.99.1.2-3) UNRELEASED; urgency=low
 
+  [ Sandro Tosi ]
   * debian/control
     - Recommends python-tk directly and Suggests all other other Python
       bindings (changes from Ubuntu); this way the default backend ('TkAgg')
       will work out-of-the-box and the others will need manual bindings
       installation; Closes: #563137
 
- -- Sandro Tosi <morph@debian.org>  Wed, 27 Jan 2010 23:47:49 +0100
+  [ Benjamin Drung ]
+  * Bump Standards-Version to 3.8.4 (no changes required).
+  * Add trailing blank line to debian/NEWS.
+  * Remove unused lintian override.
+
+ -- Benjamin Drung <bdrung@ubuntu.com>  Wed, 03 Feb 2010 13:58:48 +0100
 
 matplotlib (0.99.1.2-2) unstable; urgency=low
 
