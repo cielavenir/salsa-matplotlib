@@ -10,9 +10,8 @@ matplotlib (0.99.1.2-3) UNRELEASED; urgency=low
   [ Benjamin Drung ]
   * Bump Standards-Version to 3.8.4 (no changes required).
   * Add trailing blank line to debian/NEWS.
-  * Remove unused lintian override.
 
- -- Benjamin Drung <bdrung@ubuntu.com>  Wed, 03 Feb 2010 13:58:48 +0100
+ -- Benjamin Drung <bdrung@ubuntu.com>  Wed, 03 Feb 2010 23:53:08 +0100
 
 matplotlib (0.99.1.2-2) unstable; urgency=low
 
