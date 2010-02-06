@@ -18,3 +18,4 @@ matplotlib (0.98.5.2-1) experimental; urgency=low
   to reproduce the previous behaviour.
 
  -- Sandro Tosi <morph@debian.org>  Wed, 14 Jan 2009 22:10:26 +0100
+

@@ -40,7 +40,7 @@ Build-Depends: debhelper (>= 7),
                tk8.5-dev,
                zlib1g-dev
 XS-Python-Version: all
-Standards-Version: 3.8.3
+Standards-Version: 3.8.4
 XS-DM-Upload-Allowed: yes
 Homepage: http://matplotlib.sf.net/
 Vcs-Svn: svn://svn.debian.org/svn/python-modules/packages/matplotlib/trunk/
@@ -60,7 +60,7 @@ Depends: python-cairo,
          ${python:Depends},
          ${shlibs:Depends}
 Recommends: python-glade2,
-            python-tk (>= 2.5.2-1.1) | python-gtk2 | python-wxgtk2.8 | python-qt3 | python-qt4
+            python-tk (>= 2.5.2-1.1)
 Provides: ${python:Provides}
 Conflicts: python2.4-matplotlib
 Replaces: python2.4-matplotlib
@@ -74,7 +74,11 @@ Suggests: dvipng,
           python-scipy,
           python-traits (>= 2.0),
           texlive-extra-utils,
-          texlive-latex-extra
+          texlive-latex-extra,
+          python-gtk2,
+          python-wxgtk2.8,
+          python-qt3,
+          python-qt4
 Description: Python based plotting system in a style similar to Matlab
  Matplotlib is a pure Python plotting library designed to bring
  publication quality plotting to Python with a syntax familiar to
