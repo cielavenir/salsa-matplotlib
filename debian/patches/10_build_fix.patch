@@ -1,11 +1,11 @@
 Description: Fixes path for build on Debian
 Forwarded: no
 Author: Sandro Tosi <morph@debian.org>
+Last-Update: 2010-02-06
 
-diff -pruN matplotlib-0.98.3.orig/setupext.py matplotlib-0.98.3/setupext.py
---- matplotlib-0.98.3.orig/setupext.py	2008-10-08 23:30:35.000000000 +0000
-+++ matplotlib-0.98.3/setupext.py	2008-10-08 23:31:19.000000000 +0000
-@@ -47,8 +47,12 @@
+--- matplotlib-0.99.1.2.orig/setupext.py
++++ matplotlib-0.99.1.2/setupext.py
+@@ -47,8 +47,12 @@ import subprocess
  
  basedir = {
      'win32'  : ['win32_static',],
@@ -20,7 +20,7 @@ diff -pruN matplotlib-0.98.3.orig/setupext.py matplotlib-0.98.3/setupext.py
      'cygwin' : ['/usr/local', '/usr',],
      '_darwin' : ['/sw/lib/freetype2', '/sw/lib/freetype219', '/usr/local',
                  '/usr', '/sw'],
-@@ -63,8 +67,10 @@
+@@ -63,9 +67,12 @@ basedir = {
      'freebsd5' : ['/usr/local', '/usr'],
      'freebsd6' : ['/usr/local', '/usr'],
      'sunos5' : [os.getenv('MPLIB_BASE') or '/usr/local',],
@@ -31,5 +31,7 @@ diff -pruN matplotlib-0.98.3.orig/setupext.py matplotlib-0.98.3/setupext.py
 +    'gnukfreebsd7' : ['/usr'],
 +    'gnukfreebsd8' : ['/usr'],
      'aix5' : ['/usr/local'],
++    'gnu0' : ['/usr'],
  }
  
+ import sys, os, stat
