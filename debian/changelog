@@ -1,3 +1,11 @@
+matplotlib (0.99.3-1) UNRELEASED; urgency=low
+
+  * New upstream release
+  * debian/patches/05-find-tcl-tk-directory.patch
+    - removed, now merged upstream
+
+ -- Sandro Tosi <morph@debian.org>  Sat, 12 Jun 2010 09:53:25 +0200
+
 matplotlib (0.99.1.2-3) unstable; urgency=low
 
   [ Sandro Tosi ]
