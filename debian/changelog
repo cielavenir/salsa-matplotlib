@@ -5,8 +5,10 @@ matplotlib (0.99.3-1) UNRELEASED; urgency=low
     - removed, now merged upstream
   * debian/patches/10_build_fix.patch
     - adapted to new upstream code
+  * debian/pycompat
+    - removed, not needed
 
- -- Sandro Tosi <morph@debian.org>  Sat, 12 Jun 2010 10:02:11 +0200
+ -- Sandro Tosi <morph@debian.org>  Tue, 22 Jun 2010 00:27:11 +0200
 
 matplotlib (0.99.1.2-3) unstable; urgency=low
 
