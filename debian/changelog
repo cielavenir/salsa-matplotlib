@@ -7,8 +7,10 @@ matplotlib (0.99.3-1) UNRELEASED; urgency=low
     - adapted to new upstream code
   * debian/pycompat
     - removed, not needed
+  * debian/mkcopyright.sh
+    - removed, not needed anymore
 
- -- Sandro Tosi <morph@debian.org>  Tue, 22 Jun 2010 00:27:11 +0200
+ -- Sandro Tosi <morph@debian.org>  Tue, 22 Jun 2010 00:31:16 +0200
 
 matplotlib (0.99.1.2-3) unstable; urgency=low
 
