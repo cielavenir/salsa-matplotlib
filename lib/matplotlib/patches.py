@@ -203,7 +203,7 @@ class Patch(artist.Artist):
         """
         Set both the edgecolor and the facecolor.
 
-        ACCEPTS: matplotlib color arg or sequence of rgba tuples
+        ACCEPTS: matplotlib color spec
 
         .. seealso::
 
@@ -415,6 +415,7 @@ class Shadow(Patch):
 
             self.set_facecolor((r,g,b,0.5))
             self.set_edgecolor((r,g,b,0.5))
+            self.set_alpha(0.5)
 
     def _update_transform(self, renderer):
         ox = renderer.points_to_pixels(self._ox)
@@ -630,19 +631,22 @@ class RegularPolygon(Patch):
     def _get_xy(self):
         return self._xy
     def _set_xy(self, xy):
+        self._xy = xy
         self._update_transform()
     xy = property(_get_xy, _set_xy)
 
     def _get_orientation(self):
         return self._orientation
-    def _set_orientation(self, xy):
-        self._orientation = xy
+    def _set_orientation(self, orientation):
+        self._orientation = orientation
+        self._update_transform()
     orientation = property(_get_orientation, _set_orientation)
 
     def _get_radius(self):
         return self._radius
-    def _set_radius(self, xy):
-        self._radius = xy
+    def _set_radius(self, radius):
+        self._radius = radius
+        self._update_transform()
     radius = property(_get_radius, _set_radius)
 
     def _get_numvertices(self):
@@ -1379,12 +1383,12 @@ def bbox_artist(artist, renderer, props=None, fill=True):
     pad = props.pop('pad', 4)
     pad = renderer.points_to_pixels(pad)
     bbox = artist.get_window_extent(renderer)
-    l,b,w,h = bbox.bounds
-    l-=pad/2.
-    b-=pad/2.
-    w+=pad
-    h+=pad
-    r = Rectangle(xy=(l,b),
+    l, b, w, h = bbox.bounds
+    l -= pad/2.
+    b -= pad/2.
+    w += pad
+    h += pad
+    r = Rectangle(xy=(l, b),
                   width=w,
                   height=h,
                   fill=fill,
@@ -1403,8 +1407,8 @@ def draw_bbox(bbox, renderer, color='k', trans=None):
     to test whether the artist is returning the correct bbox.
     """
 
-    l,b,w,h = bbox.get_bounds()
-    r = Rectangle(xy=(l,b),
+    l, b, w, h = bbox.bounds
+    r = Rectangle(xy=(l, b),
                   width=w,
                   height=h,
                   edgecolor=color,
@@ -3170,7 +3174,7 @@ class ArrowStyle(_Style):
                 cos_t, sin_t = get_cos_sin(x1, y1, x0, y0)
                 verticesA, codesA = self._get_bracket(x0, y0, cos_t, sin_t,
                                                       self.widthA*scaleA,
-                                                      self.legnthA*scaleA)
+                                                      self.lengthA*scaleA)
                 vertices_list.append(verticesA)
                 codes_list.append(codesA)
 

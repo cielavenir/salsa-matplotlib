@@ -1,3 +1,17 @@
+matplotlib (0.99.3-1) unstable; urgency=low
+
+  * New upstream release
+  * debian/patches/05-find-tcl-tk-directory.patch
+    - removed, now merged upstream
+  * debian/patches/10_build_fix.patch
+    - adapted to new upstream code
+  * debian/pycompat
+    - removed, not needed
+  * debian/mkcopyright.sh
+    - removed, not needed anymore
+
+ -- Sandro Tosi <morph@debian.org>  Tue, 22 Jun 2010 00:32:30 +0200
+
 matplotlib (0.99.1.2-3) unstable; urgency=low
 
   [ Sandro Tosi ]

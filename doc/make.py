@@ -65,7 +65,19 @@ def latex():
         print 'latex build has not been tested on windows'
 
 def clean():
-    os.system('svn-clean')
+    for dirpath in ['build', 'examples']:
+        if os.path.exists(dirpath):
+            shutil.rmtree(dirpath)
+    for pattern in ['mpl_examples/api/*.png',
+                    'mpl_examples/pylab_examples/*.png',
+                    'mpl_examples/pylab_examples/*.pdf',
+                    'mpl_examples/units/*.png',
+                    'pyplots/tex_demo.png',
+                    '_static/matplotlibrc',
+                    '_templates/gallery.html']:
+        for filename in glob.glob(pattern):
+            if os.path.exists(filename):
+                os.remove(filename)
 
 def all():
     #figs()
@@ -86,6 +98,10 @@ funcd = {
 
 small_docs = False
 
+# Change directory to the one containing this file
+current_dir = os.getcwd()
+os.chdir(os.path.dirname(os.path.join(current_dir, __file__)))
+
 if len(sys.argv)>1:
     if '--small' in sys.argv[1:]:
         small_docs = True
@@ -99,3 +115,4 @@ if len(sys.argv)>1:
 else:
     small_docs = False
     all()
+os.chdir(current_dir)

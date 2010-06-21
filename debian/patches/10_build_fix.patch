@@ -3,12 +3,18 @@ Forwarded: no
 Author: Sandro Tosi <morph@debian.org>
 Last-Update: 2010-02-06
 
---- matplotlib-0.99.1.2.orig/setupext.py
-+++ matplotlib-0.99.1.2/setupext.py
-@@ -47,8 +47,12 @@ import subprocess
+Index: matplotlib-0.99.3/setupext.py
+===================================================================
+--- matplotlib-0.99.3.orig/setupext.py	2010-03-09 15:20:20.000000000 +0100
++++ matplotlib-0.99.3/setupext.py	2010-06-12 10:01:18.165019669 +0200
+@@ -47,12 +47,12 @@
  
  basedir = {
      'win32'  : ['win32_static',],
+-    'linux2-alpha' : ['/usr/local', '/usr'],
+-    'linux2-hppa' : ['/usr/local', '/usr'],
+-    'linux2-mips' : ['/usr/local', '/usr'],
+-    'linux2-sparc' : ['/usr/local', '/usr'],
 -    'linux2' : ['/usr/local', '/usr'],
 -    'linux'  : ['/usr/local', '/usr',],
 +    'linux2-alpha' : ['/usr'],
@@ -20,12 +26,14 @@ Last-Update: 2010-02-06
      'cygwin' : ['/usr/local', '/usr',],
      '_darwin' : ['/sw/lib/freetype2', '/sw/lib/freetype219', '/usr/local',
                  '/usr', '/sw'],
-@@ -63,9 +67,12 @@ basedir = {
+@@ -67,11 +67,12 @@
      'freebsd5' : ['/usr/local', '/usr'],
      'freebsd6' : ['/usr/local', '/usr'],
      'sunos5' : [os.getenv('MPLIB_BASE') or '/usr/local',],
 -    'gnukfreebsd5' : ['/usr/local', '/usr'],
 -    'gnukfreebsd6' : ['/usr/local', '/usr'],
+-    'gnukfreebsd7' : ['/usr/local', '/usr'],
+-    'gnukfreebsd8' : ['/usr/local', '/usr'],
 +    'gnukfreebsd5' : ['/usr'],
 +    'gnukfreebsd6' : ['/usr'],
 +    'gnukfreebsd7' : ['/usr'],
