@@ -1,8 +1,10 @@
 matplotlib (1.0~rc1-1) UNRELEASED; urgency=low
 
   * New upstream release (first RC of upcoming 1.0 release)
+  * debian/patches/10_build_fix.patch
+    - updated to new upstream code
 
- -- Sandro Tosi <morph@debian.org>  Wed, 30 Jun 2010 19:44:12 +0200
+ -- Sandro Tosi <morph@debian.org>  Wed, 30 Jun 2010 20:06:34 +0200
 
 matplotlib (0.99.3-1) unstable; urgency=low
 
