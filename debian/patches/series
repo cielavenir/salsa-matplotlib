@@ -1,2 +1,3 @@
 10_build_fix.patch
 20_matplotlibrc_path_search_fix.patch
+40_doc_clean_dont_fail
