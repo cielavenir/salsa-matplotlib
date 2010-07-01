@@ -44,7 +44,7 @@ clean:
 	done
 
 	# clean the doc
-	( cd doc ; ./make.py clean )
+	-( cd doc ; ./make.py clean )
 
 	# workaround for cleaning the doc ("doc/make.py clean" only runs useless svn-clean)
 	rm -rf doc/build doc/examples
