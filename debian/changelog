@@ -5,10 +5,8 @@ matplotlib (1.0.0-1) UNRELEASED; urgency=low
     - updated to new upstream code
   * debian/patches/30_doc_pass_dpi.patch
     - removed, merged upstream
-  * debian/patches/40_doc_clean_dont_fail
-    - don't fail on doc clean if directories are missing
 
- -- Sandro Tosi <morph@debian.org>  Thu, 15 Jul 2010 17:27:20 +0200
+ -- Sandro Tosi <morph@debian.org>  Thu, 15 Jul 2010 17:58:36 +0200
 
 matplotlib (0.99.3-1) unstable; urgency=low
 
