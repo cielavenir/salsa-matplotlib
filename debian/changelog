@@ -1,6 +1,6 @@
-matplotlib (1.0~rc1-1) UNRELEASED; urgency=low
+matplotlib (1.0-1) UNRELEASED; urgency=low
 
-  * New upstream release (first RC of upcoming 1.0 release)
+  * New upstream release
   * debian/patches/{10_build_fix.patch, 20_matplotlibrc_path_search_fix.patch}
     - updated to new upstream code
   * debian/patches/30_doc_pass_dpi.patch
@@ -8,7 +8,7 @@ matplotlib (1.0~rc1-1) UNRELEASED; urgency=low
   * debian/patches/40_doc_clean_dont_fail
     - don't fail on doc clean if directories are missing
 
- -- Sandro Tosi <morph@debian.org>  Thu, 01 Jul 2010 19:11:23 +0200
+ -- Sandro Tosi <morph@debian.org>  Thu, 15 Jul 2010 17:27:20 +0200
 
 matplotlib (0.99.3-1) unstable; urgency=low
 
