@@ -3,8 +3,7 @@ Section: python
 Priority: optional
 Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
 Uploaders: Alexandre Fayolle <afayolle@debian.org>,
-           Sandro Tosi <morph@debian.org>,
-           Benjamin Drung <bdrung@ubuntu.com>
+           Sandro Tosi <morph@debian.org>
 Build-Depends: debhelper (>= 7),
                dvipng,
                graphviz,
