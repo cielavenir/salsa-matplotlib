@@ -399,7 +399,7 @@ ttconv/*
     ** There are many things in this file you may want to change.  This file
     ** should be the first include file.  It is the header file for the whole
     ** project.
-    **  
+    **
     ** This file was last modified 22 December 1995.
     */
 
