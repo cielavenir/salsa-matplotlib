@@ -5,8 +5,11 @@ matplotlib (1.0.1~rc1-1) UNRELEASED; urgency=low
     - updated to new upstream code
   * debian/patches/30_doc_pass_dpi.patch
     - removed, merged upstream
+  * debian/rules
+    - don't compress objects.inv; thanks to Michael Fladischer for the report;
+      Closes: #608760
 
- -- Sandro Tosi <morph@debian.org>  Sun, 02 Jan 2011 20:46:14 +0100
+ -- Sandro Tosi <morph@debian.org>  Mon, 03 Jan 2011 13:25:00 +0100
 
 matplotlib (0.99.3-1) unstable; urgency=low
 

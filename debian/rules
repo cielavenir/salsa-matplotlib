@@ -114,7 +114,7 @@ binary-indep: build-indep install-indep
 	dh_installchangelogs -i CHANGELOG
 	dh_installdocs -p$(pd) -i doc/build/html/ doc/build/latex/Matplotlib.pdf
 	dh_installexamples -p$(pd) -i examples/*
-	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js
+	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js -Xobjects.inv
 	ln -sf /usr/share/javascript/jquery/jquery.js \
 		$(CURDIR)/debian/$(pd)/usr/share/doc/python-matplotlib-doc/html/_static/jquery.js
 	dh_link -i
