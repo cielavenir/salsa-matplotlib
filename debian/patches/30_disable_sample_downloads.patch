@@ -1,0 +1,15 @@
+Description: disable download of sample data (used to run examples)
+Author: Benjamin Gamari <bgamari.foss@gmail.com>
+
+Index: matplotlib-1.0.1/matplotlibrc.template
+===================================================================
+--- matplotlib-1.0.1.orig/matplotlibrc.template	2011-01-01 21:49:44.000000000 -0500
++++ matplotlib-1.0.1/matplotlibrc.template	2011-01-01 22:13:35.720384573 -0500
+@@ -377,5 +377,5 @@
+ # where you have a checkout of
+ # https://matplotlib.svn.sourceforge.net/svnroot/matplotlib/trunk/sample_data
+ 
+-#examples.download : True  # False to bypass downloading mechanism
+-#examples.directory : ''   # directory to look in if download is false
++examples.download : False  # False to bypass downloading mechanism
++examples.directory : '/usr/share/matplotlib/sample_data'   # absolute directory to look in if download is false
