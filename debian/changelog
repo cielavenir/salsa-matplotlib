@@ -12,8 +12,10 @@ matplotlib (1.0.1-1) UNRELEASED; urgency=low
     - bypass examples data download from internet, but use local copy instead
   * debian/python-matplotlib-data.install
     - install examples sample data
+  * debian/control
+    - bump Standards-Version: to 3.9.1 (no changes needed)
 
- -- Sandro Tosi <morph@debian.org>  Tue, 11 Jan 2011 00:34:46 +0100
+ -- Sandro Tosi <morph@debian.org>  Tue, 11 Jan 2011 00:38:44 +0100
 
 matplotlib (0.99.3-1) unstable; urgency=low
 
