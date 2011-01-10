@@ -14,8 +14,9 @@ matplotlib (1.0.1-1) UNRELEASED; urgency=low
     - install examples sample data
   * debian/control
     - bump Standards-Version: to 3.9.1 (no changes needed)
+    - removed DM-U-A flag, no more needed
 
- -- Sandro Tosi <morph@debian.org>  Tue, 11 Jan 2011 00:38:44 +0100
+ -- Sandro Tosi <morph@debian.org>  Tue, 11 Jan 2011 00:39:27 +0100
 
 matplotlib (0.99.3-1) unstable; urgency=low
 
