@@ -9,9 +9,11 @@ matplotlib (1.0.1-1) UNRELEASED; urgency=low
     - don't compress objects.inv; thanks to Michael Fladischer for the report;
       Closes: #608760
   * debian/rules, debian/patches/30_disable_sample_downloads.patch
-    - bypass examples download from internet, but use local copy instead
+    - bypass examples data download from internet, but use local copy instead
+  * debian/python-matplotlib-data.install
+    - install examples sample data
 
- -- Sandro Tosi <morph@debian.org>  Tue, 11 Jan 2011 00:28:26 +0100
+ -- Sandro Tosi <morph@debian.org>  Tue, 11 Jan 2011 00:34:46 +0100
 
 matplotlib (0.99.3-1) unstable; urgency=low
 

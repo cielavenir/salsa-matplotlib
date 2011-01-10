@@ -12,4 +12,4 @@ Index: matplotlib-1.0.1/matplotlibrc.template
 -#examples.download : True  # False to bypass downloading mechanism
 -#examples.directory : ''   # directory to look in if download is false
 +examples.download : False  # False to bypass downloading mechanism
-+examples.directory : '/usr/share/matplotlib/sample_data'   # absolute directory to look in if download is false
++examples.directory : '/usr/share/matplotlib/sampledata'   # absolute directory to look in if download is false
