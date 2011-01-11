@@ -4,4 +4,4 @@ lib/matplotlib/mpl-data/images/ /usr/share/matplotlib/mpl-data/
 lib/matplotlib/mpl-data/lineprops.glade /usr/share/matplotlib/mpl-data/
 lib/matplotlib/mpl-data/matplotlib.conf /usr/share/matplotlib
 lib/matplotlib/mpl-data/matplotlibrc /etc/
-sampledata/ /usr/share/matplotlib/sampledata/
+sampledata/ /usr/share/matplotlib/
