@@ -24,8 +24,11 @@ matplotlib (1.0.1-1) UNRELEASED; urgency=low
     - don't separate param and its argument with a space, new sphinx consider
       the first argument as the type; thanks to Jakub Wilk for the report;
       Closes: #608942
+  * debian/patches/60_doc_output_format.patch
+    - obtain the documentation output format even if the value is a unicode (as
+      returned by recent sphinx)
 
- -- Sandro Tosi <morph@debian.org>  Thu, 13 Jan 2011 21:51:43 +0100
+ -- Sandro Tosi <morph@debian.org>  Thu, 13 Jan 2011 23:43:23 +0100
 
 matplotlib (0.99.3-1) unstable; urgency=low
 
