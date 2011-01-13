@@ -20,8 +20,12 @@ matplotlib (1.0.1-1) UNRELEASED; urgency=low
   * debian/patches/40_bts608939_draw_markers_description.patch
     - fix a glitch (missing reference to documentation page) in draw_markers()
       description; thanks to Jakub Wilk for report and patch; Closes: #608939
+  * debian/patches/50_bts608942_spaces_in_param_args.patch
+    - don't separate param and its argument with a space, new sphinx consider
+      the second argument as the type; thanks to Jakub Wilk for the report;
+      Closes: #608942
 
- -- Sandro Tosi <morph@debian.org>  Wed, 12 Jan 2011 23:55:51 +0100
+ -- Sandro Tosi <morph@debian.org>  Thu, 13 Jan 2011 21:47:36 +0100
 
 matplotlib (0.99.3-1) unstable; urgency=low
 
