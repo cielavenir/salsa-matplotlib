@@ -26,9 +26,9 @@ matplotlib (1.0.1-1) UNRELEASED; urgency=low
       Closes: #608942
   * debian/patches/60_doc_output_format.patch
     - obtain the documentation output format even if the value is a unicode (as
-      returned by recent sphinx)
+      returned by recent sphinx); thanks to Jakub Wilk for the tip on IRC
 
- -- Sandro Tosi <morph@debian.org>  Thu, 13 Jan 2011 23:43:23 +0100
+ -- Sandro Tosi <morph@debian.org>  Thu, 13 Jan 2011 23:58:12 +0100
 
 matplotlib (0.99.3-1) unstable; urgency=low
 
