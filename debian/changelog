@@ -1,6 +1,6 @@
 matplotlib (1.0.1-1) UNRELEASED; urgency=low
 
-  * New upstream release
+  * New upstream release; Closes: #606116
   * debian/patches/{10_build_fix.patch, 20_matplotlibrc_path_search_fix.patch}
     - updated to new upstream code
   * debian/patches/30_doc_pass_dpi.patch
@@ -29,7 +29,7 @@ matplotlib (1.0.1-1) UNRELEASED; urgency=low
     - obtain the documentation output format even if the value is a unicode (as
       returned by recent sphinx); thanks to Jakub Wilk for the tip on IRC
 
- -- Sandro Tosi <morph@debian.org>  Mon, 17 Jan 2011 19:58:26 +0100
+ -- Sandro Tosi <morph@debian.org>  Mon, 17 Jan 2011 20:16:12 +0100
 
 matplotlib (0.99.3-1) unstable; urgency=low
 
