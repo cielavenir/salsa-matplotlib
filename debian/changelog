@@ -15,6 +15,7 @@ matplotlib (1.0.1-1) UNRELEASED; urgency=low
   * debian/control
     - bump Standards-Version: to 3.9.1 (no changes needed)
     - removed DM-U-A flag, no more needed
+    - added python-xlwt to b-d, needed to build doc examples
   * debian/copyright
     - udpated debian packaging copyright
   * debian/patches/40_bts608939_draw_markers_description.patch
@@ -28,7 +29,7 @@ matplotlib (1.0.1-1) UNRELEASED; urgency=low
     - obtain the documentation output format even if the value is a unicode (as
       returned by recent sphinx); thanks to Jakub Wilk for the tip on IRC
 
- -- Sandro Tosi <morph@debian.org>  Thu, 13 Jan 2011 23:58:12 +0100
+ -- Sandro Tosi <morph@debian.org>  Mon, 17 Jan 2011 19:58:26 +0100
 
 matplotlib (0.99.3-1) unstable; urgency=low
 
