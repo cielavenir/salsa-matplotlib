@@ -1,3 +1,10 @@
+matplotlib (1.0.1-2) UNRELEASED; urgency=low
+
+  * debian/rules
+    - remove verbose logging for debhelper
+
+ -- Sandro Tosi <morph@debian.org>  Tue, 25 Jan 2011 19:30:47 +0100
+
 matplotlib (1.0.1-1) experimental; urgency=low
 
   * New upstream release; Closes: #606116
