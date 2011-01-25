@@ -5,7 +5,6 @@ import numpy.ma as ma
 
 import matplotlib
 rcParams = matplotlib.rcParams
-from matplotlib.artist import kwdocd
 from matplotlib.axes import Axes
 from matplotlib import cbook
 from matplotlib.patches import Circle
@@ -56,6 +55,9 @@ class GeoAxes(Axes):
         self.yaxis.set_minor_locator(NullLocator())
         self.xaxis.set_ticks_position('none')
         self.yaxis.set_ticks_position('none')
+        self.yaxis.set_tick_params(label1On=True)
+        # Why do we need to turn on yaxis tick labels, but
+        # xaxis tick labels are already on?
 
         self.grid(rcParams['axes.grid'])
 
@@ -344,7 +346,7 @@ class HammerAxes(GeoAxes):
             cos_latitude = np.cos(latitude)
             sqrt2 = np.sqrt(2.0)
 
-            alpha = 1.0 + cos_latitude * np.cos(half_long)
+            alpha = np.sqrt(1.0 + cos_latitude * np.cos(half_long))
             x = (2.0 * sqrt2) * (cos_latitude * np.sin(half_long)) / alpha
             y = (sqrt2 * np.sin(latitude)) / alpha
             return np.concatenate((x, y), 1)

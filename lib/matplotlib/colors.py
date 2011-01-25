@@ -217,8 +217,8 @@ def is_color_like(c):
 
 
 def rgb2hex(rgb):
-    'Given a len 3 rgb tuple of 0-1 floats, return the hex string'
-    return '#%02x%02x%02x' % tuple([round(val*255) for val in rgb])
+    'Given an rgb or rgba sequence of 0-1 floats, return the hex string'
+    return '#%02x%02x%02x' % tuple([round(val*255) for val in rgb[:3]])
 
 hexColorPattern = re.compile("\A#[a-fA-F0-9]{6}\Z")
 
@@ -382,10 +382,17 @@ class ColorConverter:
                     if (c.ravel() > 1).any() or (c.ravel() < 0).any():
                         raise ValueError(
                             "number in rgba sequence is outside 0-1 range")
-                    # looks like rgba already, nothing to be done; do
-                    # we want to apply alpha here if
-                    # (c[:,3]==1).all() ?
-                    return np.asarray(c, np.float)
+                    result = np.asarray(c, np.float)
+                    if alpha is not None:
+                        if alpha > 1 or alpha < 0:
+                            raise ValueError("alpha must be in 0-1 range")
+                        result[:,3] = alpha
+                    return result
+                    # This alpha operation above is new, and depends
+                    # on higher levels to refrain from setting alpha
+                    # to values other than None unless there is
+                    # intent to override any existing alpha values.
+
             # It must be some other sequence of color specs.
             result = np.zeros((nc, 4), dtype=np.float)
             for i, cc in enumerate(c):
@@ -394,7 +401,7 @@ class ColorConverter:
 
 colorConverter = ColorConverter()
 
-def makeMappingArray(N, data):
+def makeMappingArray(N, data, gamma=1.0):
     """Create an *N* -element 1-d lookup table
 
     *data* represented by a list of x,y0,y1 mapping correspondences.
@@ -408,9 +415,18 @@ def makeMappingArray(N, data):
     all values of x must be in increasing order. Values between
     the given mapping points are determined by simple linear interpolation.
 
+    Alternatively, data can be a function mapping values between 0 - 1
+    to 0 - 1.
+
     The function returns an array "result" where ``result[x*(N-1)]``
     gives the closest value for values of x between 0 and 1.
     """
+
+    if callable(data):
+        xind = np.linspace(0, 1, N)**gamma
+        lut = np.clip(np.array(data(xind), dtype=np.float), 0, 1)
+        return lut
+
     try:
         adata = np.array(data)
     except:
@@ -432,7 +448,7 @@ def makeMappingArray(N, data):
     # begin generation of lookup table
     x = x * (N-1)
     lut = np.zeros((N,), np.float)
-    xind = np.arange(float(N))
+    xind = (N - 1) * np.linspace(0, 1, N)**gamma
     ind = np.searchsorted(x, xind)[1:-1]
 
     lut[1:-1] = ( ((xind[1:-1] - x[ind-1]) / (x[ind] - x[ind-1]))
@@ -473,7 +489,7 @@ class Colormap:
         self._isinit = False
 
 
-    def __call__(self, X, alpha=1.0, bytes=False):
+    def __call__(self, X, alpha=None, bytes=False):
         """
         *X* is either a scalar or an array (of any dimension).
         If scalar, a tuple of rgba values is returned, otherwise
@@ -481,18 +497,12 @@ class Colormap:
         are integers, then they are used as indices into the array.
         If they are floating point, then they must be in the
         interval (0.0, 1.0).
-        Alpha must be a scalar.
+        Alpha must be a scalar between 0 and 1, or None.
         If bytes is False, the rgba values will be floats on a
         0-1 scale; if True, they will be uint8, 0-255.
         """
 
         if not self._isinit: self._init()
-        alpha = min(alpha, 1.0) # alpha must be between 0 and 1
-        alpha = max(alpha, 0.0)
-        self._lut[:-1,-1] = alpha  # Don't assign global alpha to i_bad;
-                                   # it would defeat the purpose of the
-                                   # default behavior, which is to not
-                                   # show anything where data are missing.
         mask_bad = None
         if not cbook.iterable(X):
             vtype = 'scalar'
@@ -523,7 +533,21 @@ class Colormap:
         if bytes:
             lut = (self._lut * 255).astype(np.uint8)
         else:
-            lut = self._lut
+            lut = self._lut.copy() # Don't let alpha modify original _lut.
+
+        if alpha is not None:
+            alpha = min(alpha, 1.0) # alpha must be between 0 and 1
+            alpha = max(alpha, 0.0)
+            if (lut[-1] == 0).all():
+                lut[:-1, -1] = alpha
+                # All zeros is taken as a flag for the default bad
+                # color, which is no color--fully transparent.  We
+                # don't want to override this.
+            else:
+                lut[:,-1] = alpha
+                # If the bad value is set to have a color, then we
+                # override its alpha just as for any other value.
+
         rgba = np.empty(shape=xa.shape+(4,), dtype=lut.dtype)
         lut.take(xa, axis=0, mode='clip', out=rgba)
                     #  twice as fast as lut[xa];
@@ -533,20 +557,20 @@ class Colormap:
             rgba = tuple(rgba[0,:])
         return rgba
 
-    def set_bad(self, color = 'k', alpha = 1.0):
+    def set_bad(self, color = 'k', alpha = None):
         '''Set color to be used for masked values.
         '''
         self._rgba_bad = colorConverter.to_rgba(color, alpha)
         if self._isinit: self._set_extremes()
 
-    def set_under(self, color = 'k', alpha = 1.0):
+    def set_under(self, color = 'k', alpha = None):
         '''Set color to be used for low out-of-range values.
            Requires norm.clip = False
         '''
         self._rgba_under = colorConverter.to_rgba(color, alpha)
         if self._isinit: self._set_extremes()
 
-    def set_over(self, color = 'k', alpha = 1.0):
+    def set_over(self, color = 'k', alpha = None):
         '''Set color to be used for high out-of-range values.
            Requires norm.clip = False
         '''
@@ -581,7 +605,7 @@ class LinearSegmentedColormap(Colormap):
     primary color, with the 0-1 domain divided into any number of
     segments.
     """
-    def __init__(self, name, segmentdata, N=256):
+    def __init__(self, name, segmentdata, N=256, gamma=1.0):
         """Create color map from linear mapping segments
 
         segmentdata argument is a dictionary with a red, green and blue
@@ -632,26 +656,46 @@ class LinearSegmentedColormap(Colormap):
                                  # needed for contouring.
         Colormap.__init__(self, name, N)
         self._segmentdata = segmentdata
+        self._gamma = gamma
 
     def _init(self):
         self._lut = np.ones((self.N + 3, 4), np.float)
-        self._lut[:-3, 0] = makeMappingArray(self.N, self._segmentdata['red'])
-        self._lut[:-3, 1] = makeMappingArray(self.N, self._segmentdata['green'])
-        self._lut[:-3, 2] = makeMappingArray(self.N, self._segmentdata['blue'])
+        self._lut[:-3, 0] = makeMappingArray(self.N,
+                self._segmentdata['red'], self._gamma)
+        self._lut[:-3, 1] = makeMappingArray(self.N,
+                self._segmentdata['green'], self._gamma)
+        self._lut[:-3, 2] = makeMappingArray(self.N,
+                self._segmentdata['blue'], self._gamma)
         self._isinit = True
         self._set_extremes()
 
+    def set_gamma(self, gamma):
+        """
+        Set a new gamma value and regenerate color map.
+        """
+        self._gamma = gamma
+        self._init()
+
     @staticmethod
-    def from_list(name, colors, N=256):
+    def from_list(name, colors, N=256, gamma=1.0):
         """
         Make a linear segmented colormap with *name* from a sequence
         of *colors* which evenly transitions from colors[0] at val=0
         to colors[-1] at val=1.  *N* is the number of rgb quantization
         levels.
+        Alternatively, a list of (value, color) tuples can be given
+        to divide the range unevenly.
         """
 
-        ncolors = len(colors)
-        vals = np.linspace(0., 1., ncolors)
+        if not cbook.iterable(colors):
+            raise ValueError('colors must be iterable')
+
+        if cbook.iterable(colors[0]) and len(colors[0]) == 2 and \
+                not cbook.is_string_like(colors[0]):
+            # List of value, color pairs
+            vals, colors = zip(*colors)
+        else:
+            vals = np.linspace(0., 1., len(colors))
 
         cdict = dict(red=[], green=[], blue=[])
         for val, color in zip(vals, colors):
@@ -660,7 +704,7 @@ class LinearSegmentedColormap(Colormap):
             cdict['green'].append((val, g, g))
             cdict['blue'].append((val, b, b))
 
-        return LinearSegmentedColormap(name, cdict, N)
+        return LinearSegmentedColormap(name, cdict, N, gamma)
 
 class ListedColormap(Colormap):
     """Colormap object generated from a list of colors.
@@ -767,11 +811,13 @@ class Normalize:
         elif vmin==vmax:
             result = 0.0 * val
         else:
+            vmin = float(vmin)
+            vmax = float(vmax)
             if clip:
                 mask = ma.getmask(val)
                 val = ma.array(np.clip(val.filled(vmax), vmin, vmax),
                                 mask=mask)
-            result = (val-vmin) * (1.0/(vmax-vmin))
+            result = (val-vmin) / (vmax-vmin)
         if vtype == 'scalar':
             result = result[0]
         return result
@@ -779,7 +825,8 @@ class Normalize:
     def inverse(self, value):
         if not self.scaled():
             raise ValueError("Not invertible until scaled")
-        vmin, vmax = self.vmin, self.vmax
+        vmin = float(self.vmin)
+        vmax = float(self.vmax)
 
         if cbook.iterable(value):
             val = ma.asarray(value)
@@ -787,18 +834,17 @@ class Normalize:
         else:
             return vmin + value * (vmax - vmin)
 
-
     def autoscale(self, A):
         '''
         Set *vmin*, *vmax* to min, max of *A*.
         '''
-        self.vmin = ma.minimum(A)
-        self.vmax = ma.maximum(A)
+        self.vmin = ma.min(A)
+        self.vmax = ma.max(A)
 
     def autoscale_None(self, A):
         ' autoscale only None-valued vmin or vmax'
-        if self.vmin is None: self.vmin = ma.minimum(A)
-        if self.vmax is None: self.vmax = ma.maximum(A)
+        if self.vmin is None: self.vmin = ma.min(A)
+        if self.vmax is None: self.vmax = ma.max(A)
 
     def scaled(self):
         'return true if vmin and vmax set'
@@ -818,6 +864,8 @@ class LogNorm(Normalize):
         else:
             vtype = 'scalar'
             val = ma.array([value]).astype(np.float)
+
+        val = ma.masked_less_equal(val, 0, copy=False)
 
         self.autoscale_None(val)
         vmin, vmax = self.vmin, self.vmax
@@ -847,6 +895,24 @@ class LogNorm(Normalize):
             return vmin * ma.power((vmax/vmin), val)
         else:
             return vmin * pow((vmax/vmin), value)
+
+    def autoscale(self, A):
+        '''
+        Set *vmin*, *vmax* to min, max of *A*.
+        '''
+        A = ma.masked_less_equal(A, 0, copy=False)
+        self.vmin = ma.min(A)
+        self.vmax = ma.max(A)
+
+    def autoscale_None(self, A):
+        ' autoscale only None-valued vmin or vmax'
+        if self.vmin is not None and self.vmax is not None:
+            return
+        A = ma.masked_less_equal(A, 0, copy=False)
+        if self.vmin is None:
+            self.vmin = ma.min(A)
+        if self.vmax is None:
+            self.vmax = ma.max(A)
 
 class BoundaryNorm(Normalize):
     '''
@@ -1025,6 +1091,19 @@ class LightSource(object):
         RGBA values are returned, which can then be used to
         plot the shaded image with imshow.
         """
+
+        rgb0 = cmap((data-data.min())/(data.max()-data.min()))
+        rgb1 = self.shade_rgb(rgb0, elevation=data)
+        rgb0[:,:,0:3] = rgb1
+        return rgb0
+
+    def shade_rgb(self,rgb, elevation, fraction=1.):
+        """
+        Take the input RGB array (ny*nx*3) adjust their color values
+        to given the impression of a shaded relief map with a
+        specified light source using the elevation (ny*nx).
+        A new RGB array ((ny*nx*3)) is returned.
+        """
         # imagine an artificial sun placed at infinity in
         # some azimuth and elevation position illuminating our surface. The parts of
         # the surface that slope toward the sun should brighten while those sides
@@ -1033,7 +1112,7 @@ class LightSource(object):
         az = self.azdeg*np.pi/180.0
         alt = self.altdeg*np.pi/180.0
         # gradient in x and y directions
-        dx, dy = np.gradient(data)
+        dx, dy = np.gradient(elevation)
         slope = 0.5*np.pi - np.arctan(np.hypot(dx, dy))
         aspect = np.arctan2(dx, dy)
         intensity = np.sin(alt)*np.sin(slope) + np.cos(alt)*np.cos(slope)*np.cos(-az -\
@@ -1041,9 +1120,9 @@ class LightSource(object):
         # rescale to interval -1,1
         # +1 means maximum sun exposure and -1 means complete shade.
         intensity = (intensity - intensity.min())/(intensity.max() - intensity.min())
-        intensity = 2.*intensity - 1.
+        intensity = (2.*intensity - 1.)*fraction
         # convert to rgb, then rgb to hsv
-        rgb = cmap((data-data.min())/(data.max()-data.min()))
+        #rgb = cmap((data-data.min())/(data.max()-data.min()))
         hsv = rgb_to_hsv(rgb[:,:,0:3])
         # modify hsv values to simulate illumination.
         hsv[:,:,1] = np.where(np.logical_and(np.abs(hsv[:,:,1])>1.e-10,intensity>0),\
@@ -1057,5 +1136,4 @@ class LightSource(object):
         hsv[:,:,1:] = np.where(hsv[:,:,1:]<0.,0,hsv[:,:,1:])
         hsv[:,:,1:] = np.where(hsv[:,:,1:]>1.,1,hsv[:,:,1:])
         # convert modified hsv back to rgb.
-        rgb[:,:,0:3] = hsv_to_rgb(hsv)
-        return rgb
+        return hsv_to_rgb(hsv)

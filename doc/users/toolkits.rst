@@ -31,7 +31,7 @@ Excel Tools
 
 mpl_toolkits.exceltools provides some utilities for working with
 Excel.  This toolkit ships with matplotlib, but requires
-`pyExcelerator <http://sourceforge.net/projects/pyexcelerator>`_
+`xlwt <http://pypi.python.org/pypi/xlwt>`_
 
 .. _toolkit_natgrid:
 
@@ -66,5 +66,5 @@ ease displaying multiple images in matplotlib. The AxesGrid toolkit is
 distributed with matplotlib source.
 
 .. image:: ../_static/demo_axes_grid.png
-
+ 
 See :ref:`toolkit_axesgrid-index` for documentations.

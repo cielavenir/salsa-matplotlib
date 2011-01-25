@@ -2,18 +2,20 @@
 # axes3d.py, original mplot3d version by John Porter
 # Created: 23 Sep 2005
 # Parts fixed by Reinier Heeres <reinier@heeres.eu>
+# Minor additions by Ben Axelrod <baxelrod@coroware.com>
 
 """
 Module containing Axes3D, an object which can plot 3D objects on a
 2D matplotlib figure.
 """
 
+import warnings
 from matplotlib.axes import Axes, rcParams
 from matplotlib import cbook
 from matplotlib.transforms import Bbox
 from matplotlib import collections
 import numpy as np
-from matplotlib.colors import Normalize, colorConverter
+from matplotlib.colors import Normalize, colorConverter, LightSource
 
 import art3d
 import proj3d
@@ -35,23 +37,40 @@ class Axes3D(Axes):
     """
     3D axes object.
     """
+    name = '3d'
 
     def __init__(self, fig, rect=None, *args, **kwargs):
+        '''
+        Build an :class:`Axes3D` instance in
+        :class:`~matplotlib.figure.Figure` *fig* with
+        *rect=[left, bottom, width, height]* in
+        :class:`~matplotlib.figure.Figure` coordinates
+
+        Optional keyword arguments:
+
+          ================   =========================================
+          Keyword            Description
+          ================   =========================================
+          *azim*             Azimuthal viewing angle (default -60)
+          *elev*             Elevation viewing angle (default 30)
+          ================   =========================================
+        '''
+
         if rect is None:
             rect = [0.0, 0.0, 1.0, 1.0]
         self.fig = fig
-        self.cids = []
+        self._cids = []
 
-        azim = kwargs.pop('azim', -60)
-        elev = kwargs.pop('elev', 30)
+        self.initial_azim = kwargs.pop('azim', -60)
+        self.initial_elev = kwargs.pop('elev', 30)
 
         self.xy_viewLim = unit_bbox()
         self.zz_viewLim = unit_bbox()
         self.xy_dataLim = unit_bbox()
         self.zz_dataLim = unit_bbox()
-        # inihibit autoscale_view until the axises are defined
+        # inihibit autoscale_view until the axes are defined
         # they can't be defined until Axes.__init__ has been called
-        self.view_init(elev, azim)
+        self.view_init(self.initial_elev, self.initial_azim)
         self._ready = 0
         Axes.__init__(self, self.fig, rect,
                       frameon=True,
@@ -75,8 +94,8 @@ class Axes3D(Axes):
         ydwl = (0.95/self.dist)
         ydw = (0.9/self.dist)
 
-        Axes.set_xlim(self, -xdwl, xdw)
-        Axes.set_ylim(self, -ydwl, ydw)
+        Axes.set_xlim(self, -xdwl, xdw, auto=None)
+        Axes.set_ylim(self, -ydwl, ydw, auto=None)
 
     def create_axes(self):
         self.w_xaxis = axis3d.XAxis('x', self.xy_viewLim.intervalx,
@@ -132,7 +151,7 @@ class Axes3D(Axes):
 
         # Calculate projection of collections and zorder them
         zlist = [(col.do_3d_projection(renderer), col) \
-                for col in self.collections]
+                 for col in self.collections]
         zlist.sort()
         zlist.reverse()
         for i, (z, col) in enumerate(zlist):
@@ -146,9 +165,12 @@ class Axes3D(Axes):
         for i, (z, patch) in enumerate(zlist):
             patch.zorder = i
 
-        self.w_xaxis.draw(renderer)
-        self.w_yaxis.draw(renderer)
-        self.w_zaxis.draw(renderer)
+        axes = (self.w_xaxis, self.w_yaxis, self.w_zaxis)
+        for ax in axes:
+            ax.draw_pane(renderer)
+        for ax in axes:
+            ax.draw(renderer)
+
         Axes.draw(self, renderer)
 
     def get_axis_position(self):
@@ -181,7 +203,7 @@ class Axes3D(Axes):
         # Let autoscale_view figure out how to use this data.
         self.autoscale_view()
 
-    def autoscale_view(self, scalex=True, scaley=True, scalez=True):
+    def autoscale_view(self, scalex=True, scaley=True, scalez=True, **kw):
         # This method looks at the rectanglular volume (see above)
         # of data and decides how to scale the view portal to fit it.
 
@@ -252,10 +274,30 @@ class Axes3D(Axes):
     def panpy(self, numsteps):
         print 'numsteps', numsteps
 
-    def view_init(self, elev, azim):
+    def view_init(self, elev=None, azim=None):
+        """
+        Set the elevation and azimuth of the axes.
+
+        This can be used to rotate the axes programatically.
+
+        'elev' stores the elevation angle in the z plane.
+        'azim' stores the azimuth angle in the x,y plane.
+
+        if elev or azim are None (default), then the initial value
+        is used which was specified in the :class:`Axes3D` constructor.
+        """
+
         self.dist = 10
-        self.elev = elev
-        self.azim = azim
+
+        if elev is None:
+            self.elev = self.initial_elev
+        else:
+            self.elev = elev
+
+        if azim is None:
+            self.azim = self.initial_azim
+        else:
+            self.azim = azim
 
     def get_proj(self):
         """Create the projection matrix from the current viewing
@@ -304,26 +346,57 @@ class Axes3D(Axes):
         M = np.dot(perspM, M0)
         return M
 
-    def mouse_init(self):
+    def mouse_init(self, rotate_btn=1, zoom_btn=3):
+        """Initializes mouse button callbacks to enable 3D rotation of
+        the axes.  Also optionally sets the mouse buttons for 3D rotation
+        and zooming.
+
+        ============  =======================================================
+        Argument      Description
+        ============  =======================================================
+        *rotate_btn*  The integer or list of integers specifying which mouse
+                      button or buttons to use for 3D rotation of the axes.
+                      Default = 1.
+
+        *zoom_btn*    The integer or list of integers specifying which mouse
+                      button or buttons to use to zoom the 3D axes.
+                      Default = 3.
+        ============  =======================================================
+
+        """
         self.button_pressed = None
         canv = self.figure.canvas
         if canv != None:
             c1 = canv.mpl_connect('motion_notify_event', self._on_move)
             c2 = canv.mpl_connect('button_press_event', self._button_press)
             c3 = canv.mpl_connect('button_release_event', self._button_release)
-            self.cids = [c1, c2, c3]
+            self._cids = [c1, c2, c3]
+        else:
+            warnings.warn('Axes3D.figure.canvas is \'None\', mouse rotation disabled.  Set canvas then call Axes3D.mouse_init().')
+
+        self._rotate_btn = np.atleast_1d(rotate_btn)
+        self._zoom_btn = np.atleast_1d(zoom_btn)
 
     def cla(self):
-        # Disconnect the various events we set.
-        for cid in self.cids:
-            self.figure.canvas.mpl_disconnect(cid)
-        self.cids = []
+        """Clear axes and disable mouse button callbacks.
+        """
+        self.disable_mouse_rotation()
         Axes.cla(self)
         self.grid(rcParams['axes3d.grid'])
 
+    def disable_mouse_rotation(self):
+        """Disable mouse button callbacks.
+        """
+        # Disconnect the various events we set.
+        for cid in self._cids:
+            self.figure.canvas.mpl_disconnect(cid)
+
+        self._cids = []
+
     def _button_press(self, event):
-        self.button_pressed = event.button
-        self.sx, self.sy = event.xdata, event.ydata
+        if event.inaxes == self:
+            self.button_pressed = event.button
+            self.sx, self.sy = event.xdata, event.ydata
 
     def _button_release(self, event):
         self.button_pressed = None
@@ -374,7 +447,7 @@ class Axes3D(Axes):
         if self.M is None:
             return ''
 
-        if self.button_pressed == 1:
+        if self.button_pressed in self._rotate_btn:
             return 'azimuth=%d deg, elevation=%d deg ' % (self.azim, self.elev)
             # ignore xd and yd and display angles instead
 
@@ -407,9 +480,10 @@ class Axes3D(Axes):
     def _on_move(self, event):
         """Mouse moving
 
-        button-1 rotates
-        button-3 zooms
+        button-1 rotates by default.  Can be set explicitly in mouse_init().
+        button-3 zooms by default.  Can be set explicitly in mouse_init().
         """
+
         if not self.button_pressed:
             return
 
@@ -428,7 +502,8 @@ class Axes3D(Axes):
         h = (y1-y0)
         self.sx, self.sy = x, y
 
-        if self.button_pressed == 1:
+        # Rotation
+        if self.button_pressed in self._rotate_btn:
             # rotate viewing point
             # get the x and y pixel coords
             if dx == 0 and dy == 0:
@@ -437,12 +512,15 @@ class Axes3D(Axes):
             self.azim = art3d.norm_angle(self.azim - (dx/w)*180)
             self.get_proj()
             self.figure.canvas.draw()
-        elif self.button_pressed == 2:
+
+#        elif self.button_pressed == 2:
             # pan view
             # project xv,yv,zv -> xw,yw,zw
             # pan
-            pass
-        elif self.button_pressed == 3:
+#            pass
+
+        # Zoom
+        elif self.button_pressed in self._zoom_btn:
             # zoom view
             # hmmm..this needs some help from clipping....
             minx, maxx, miny, maxy, minz, maxz = self.get_w_lims()
@@ -457,7 +535,7 @@ class Axes3D(Axes):
             self.figure.canvas.draw()
 
     def set_xlabel(self, xlabel, fontdict=None, **kwargs):
-        '''Set xlabel. '''
+        '''Set xlabel.'''
 
         label = self.w_xaxis.get_label()
         label.set_text(xlabel)
@@ -492,13 +570,18 @@ class Axes3D(Axes):
         '''
         self._draw_grid = on
 
-    def text(self, x, y, z, s, zdir=None):
-        '''Add text to the plot.'''
-        text = Axes.text(self, x, y, s)
+    def text(self, x, y, z, s, zdir=None, **kwargs):
+        '''
+        Add text to the plot. kwargs will be passed on to Axes.text,
+        except for the `zdir` keyword, which sets the direction to be
+        used as the z direction.
+        '''
+        text = Axes.text(self, x, y, s, **kwargs)
         art3d.text_2d_to_3d(text, z, zdir)
         return text
 
     text3D = text
+    text2D = Axes.text
 
     def plot(self, xs, ys, *args, **kwargs):
         '''
@@ -556,16 +639,23 @@ class Axes3D(Axes):
         but it also supports color mapping by supplying the *cmap*
         argument.
 
-        ==========  ================================================
-        Argument    Description
-        ==========  ================================================
-        *X*, *Y*,   Data values as numpy.arrays
-        *Z*
-        *rstride*   Array row stride (step size)
-        *cstride*   Array column stride (step size)
-        *color*     Color of the surface patches
-        *cmap*      A colormap for the surface patches.
-        ==========  ================================================
+        ============= ================================================
+        Argument      Description
+        ============= ================================================
+        *X*, *Y*, *Z* Data values as numpy.arrays
+        *rstride*     Array row stride (step size)
+        *cstride*     Array column stride (step size)
+        *color*       Color of the surface patches
+        *cmap*        A colormap for the surface patches.
+        *facecolors*  Face colors for the individual patches
+        *norm*        An instance of Normalize to map values to colors
+        *vmin*        Minimum value to map
+        *vmax*        Maximum value to map
+        *shade*       Whether to shade the facecolors
+        ============= ================================================
+
+        Other arguments are passed on to
+        :func:`~mpl_toolkits.mplot3d.art3d.Poly3DCollection.__init__`
         '''
 
         had_data = self.has_data()
@@ -575,13 +665,28 @@ class Axes3D(Axes):
         rstride = kwargs.pop('rstride', 10)
         cstride = kwargs.pop('cstride', 10)
 
-        color = kwargs.pop('color', 'b')
-        color = np.array(colorConverter.to_rgba(color))
+        if 'facecolors' in kwargs:
+            fcolors = kwargs.pop('facecolors')
+        else:
+            color = np.array(colorConverter.to_rgba(kwargs.pop('color', 'b')))
+            fcolors = None
+
         cmap = kwargs.get('cmap', None)
+        norm = kwargs.pop('norm', None)
+        vmin = kwargs.pop('vmin', None)
+        vmax = kwargs.pop('vmax', None)
+        linewidth = kwargs.get('linewidth', None)
+        shade = kwargs.pop('shade', cmap is None)
+        lightsource = kwargs.pop('lightsource', None)
+
+        # Shade the data
+        if shade and cmap is not None and fcolors is not None:
+            fcolors = self._shade_colors_lightsource(Z, cmap, lightsource)
 
         polys = []
         normals = []
-        avgz = []
+        #colset contains the data for coloring: either average z or the facecolor
+        colset = []
         for rs in np.arange(0, rows-1, rstride):
             for cs in np.arange(0, cols-1, cstride):
                 ps = []
@@ -609,19 +714,38 @@ class Axes3D(Axes):
                         lastp = p
                         avgzsum += p[2]
                 polys.append(ps2)
-                avgz.append(avgzsum / len(ps2))
 
-                v1 = np.array(ps2[0]) - np.array(ps2[1])
-                v2 = np.array(ps2[2]) - np.array(ps2[0])
-                normals.append(np.cross(v1, v2))
+                if fcolors is not None:
+                    colset.append(fcolors[rs][cs])
+                else:
+                    colset.append(avgzsum / len(ps2))
+
+                # Only need vectors to shade if no cmap
+                if cmap is None and shade:
+                    v1 = np.array(ps2[0]) - np.array(ps2[1])
+                    v2 = np.array(ps2[2]) - np.array(ps2[0])
+                    normals.append(np.cross(v1, v2))
 
         polyc = art3d.Poly3DCollection(polys, *args, **kwargs)
-        if cmap is not None:
-            polyc.set_array(np.array(avgz))
-            polyc.set_linewidth(0)
+
+        if fcolors is not None:
+            if shade:
+                colset = self._shade_colors(colset, normals)
+            polyc.set_facecolors(colset)
+            polyc.set_edgecolors(colset)
+        elif cmap:
+            colset = np.array(colset)
+            polyc.set_array(colset)
+            if vmin is not None or vmax is not None:
+                polyc.set_clim(vmin, vmax)
+            if norm is not None:
+                polyc.set_norm(norm)
         else:
-            colors = self._shade_colors(color, normals)
-            polyc.set_facecolors(colors)
+            if shade:
+                colset = self._shade_colors(color, normals)
+            else:
+                colset = color
+            polyc.set_facecolors(colset)
 
         self.add_collection(polyc)
         self.auto_scale_xyz(X, Y, Z, had_data)
@@ -643,23 +767,38 @@ class Axes3D(Axes):
         return normals
 
     def _shade_colors(self, color, normals):
+        '''
+        Shade *color* using normal vectors given by *normals*.
+        *color* can also be an array of the same length as *normals*.
+        '''
+
         shade = []
         for n in normals:
-            n = n / proj3d.mod(n) * 5
+            n = n / proj3d.mod(n)
             shade.append(np.dot(n, [-1, -1, 0.5]))
 
         shade = np.array(shade)
         mask = ~np.isnan(shade)
 
-    	if len(shade[mask]) > 0:
-           norm = Normalize(min(shade[mask]), max(shade[mask]))
-           color = color.copy()
-           color[3] = 1
-           colors = [color * (0.5 + norm(v) * 0.5) for v in shade]
+        if len(shade[mask]) > 0:
+            norm = Normalize(min(shade[mask]), max(shade[mask]))
+            if art3d.iscolor(color):
+                color = color.copy()
+                color[3] = 1
+                colors = [color * (0.5 + norm(v) * 0.5) for v in shade]
+            else:
+                colors = [np.array(colorConverter.to_rgba(c)) * \
+                            (0.5 + norm(v) * 0.5) \
+                            for c, v in zip(color, shade)]
         else:
-           colors = color.copy()
+            colors = color.copy()
 
         return colors
+
+    def _shade_colors_lightsource(self, data, cmap, lightsource):
+        if lightsource is None:
+            lightsource = LightSource(azdeg=135, altdeg=55)
+        return lightsource.shade(data, cmap)
 
     def plot_wireframe(self, X, Y, Z, *args, **kwargs):
         '''
@@ -748,15 +887,16 @@ class Axes3D(Axes):
 
             colors = self._shade_colors(color, normals)
             colors2 = self._shade_colors(color, normals)
-            polycol = art3d.Poly3DCollection(polyverts, facecolors=colors,
-                edgecolors=colors2)
+            polycol = art3d.Poly3DCollection(polyverts,
+                                             facecolors=colors,
+                                             edgecolors=colors2)
             polycol.set_sort_zpos(z)
             self.add_collection3d(polycol)
 
         for col in colls:
             self.collections.remove(col)
 
-    def contour(self, X, Y, Z, levels=10, **kwargs):
+    def contour(self, X, Y, Z, *args, **kwargs):
         '''
         Create a 3D contour plot.
 
@@ -765,28 +905,37 @@ class Axes3D(Axes):
         ==========  ================================================
         *X*, *Y*,   Data values as numpy.arrays
         *Z*
-        *levels*    Number of levels to use, defaults to 10. Can
-                    also be a tuple of specific levels.
         *extend3d*  Whether to extend contour in 3D (default: False)
         *stride*    Stride (step size) for extending contour
+        *zdir*      The direction to use: x, y or z (default)
+        *offset*    If specified plot a projection of the contour
+                    lines on this position in plane normal to zdir
         ==========  ================================================
 
-        Other keyword arguments are passed on to
+        The positional and other keyword arguments are passed on to
         :func:`~matplotlib.axes.Axes.contour`
+
+        Returns a :class:`~matplotlib.axes.Axes.contour`
         '''
 
         extend3d = kwargs.pop('extend3d', False)
         stride = kwargs.pop('stride', 5)
-        nlevels = kwargs.pop('nlevels', 15)
+        zdir = kwargs.pop('zdir', 'z')
+        offset = kwargs.pop('offset', None)
 
         had_data = self.has_data()
-        cset = Axes.contour(self, X, Y, Z, levels, **kwargs)
 
+        jX, jY, jZ = art3d.rotate_axes(X, Y, Z, zdir)
+        cset = Axes.contour(self, jX, jY, jZ, *args, **kwargs)
+
+        zdir = '-' + zdir
         if extend3d:
             self._3d_extend_contour(cset, stride)
         else:
             for z, linec in zip(cset.levels, cset.collections):
-                art3d.line_collection_2d_to_3d(linec, z)
+                if offset is not None:
+                    z = offset
+                art3d.line_collection_2d_to_3d(linec, z, zdir=zdir)
 
         self.auto_scale_xyz(X, Y, Z, had_data)
         return cset
@@ -799,8 +948,10 @@ class Axes3D(Axes):
 
         *X*, *Y*, *Z*: data points.
 
-        Keyword arguments are passed on to
-        :func:`~matplotlib.axes.Axes.contour`
+        The positional and keyword arguments are passed on to
+        :func:`~matplotlib.axes.Axes.contourf`
+
+        Returns a :class:`~matplotlib.axes.Axes.contourf`
         '''
 
         had_data = self.has_data()
@@ -924,24 +1075,65 @@ class Axes3D(Axes):
 
         return patches
 
-    def bar3d(self, x, y, z, dx, dy, dz, color='b'):
+    def bar3d(self, x, y, z, dx, dy, dz, color='b',
+              zsort='average', *args, **kwargs):
         '''
         Generate a 3D bar, or multiple bars.
 
         When generating multiple bars, x, y, z have to be arrays.
-        dx, dy, dz can still be scalars.
-        '''
+        dx, dy, dz can be arrays or scalars.
 
+        *color* can be:
+
+         - A single color value, to color all bars the same color.
+
+         - An array of colors of length N bars, to color each bar
+           independently.
+
+         - An array of colors of length 6, to color the faces of the
+           bars similarly.
+
+         - An array of colors of length 6 * N bars, to color each face
+           independently.
+
+         When coloring the faces of the boxes specifically, this is
+         the order of the coloring:
+
+          1. -Z (bottom of box)
+          2. +Z (top of box)
+          3. -Y
+          4. +Y
+          5. -X
+          6. +X
+
+        Keyword arguments are passed onto
+        :func:`~mpl_toolkits.mplot3d.art3d.Poly3DCollection`
+        '''
         had_data = self.has_data()
 
         if not cbook.iterable(x):
-            x, y, z = [x], [y], [z]
+            x = [x]
+        if not cbook.iterable(y):
+            y = [y]
+        if not cbook.iterable(z):
+            z = [z]
+
         if not cbook.iterable(dx):
-            dx, dy, dz = [dx], [dy], [dz]
+            dx = [dx]
+        if not cbook.iterable(dy):
+            dy = [dy]
+        if not cbook.iterable(dz):
+            dz = [dz]
+
         if len(dx) == 1:
             dx = dx * len(x)
-            dy = dy * len(x)
-            dz = dz * len(x)
+        if len(dy) == 1:
+            dy = dy * len(y)
+        if len(dz) == 1:
+            dz = dz * len(z)
+
+        if len(x) != len(y) or len(x) != len(z):
+            warnings.warn('x, y, and z must be the same length.')
 
         minx, miny, minz = 1e20, 1e20, 1e20
         maxx, maxy, maxz = -1e20, -1e20, -1e20
@@ -972,14 +1164,34 @@ class Axes3D(Axes):
                     (xi + dxi, yi + dyi, zi + dzi), (xi + dxi, yi, zi + dzi)),
             ])
 
-        color = np.array(colorConverter.to_rgba(color))
-        normals = self._generate_normals(polys)
-        colors = self._shade_colors(color, normals)
+        facecolors = []
+        if color is None:
+            # no color specified
+            facecolors = [None] * len(x)
+        elif len(color) == len(x):
+            # bar colors specified, need to expand to number of faces
+            for c in color:
+                facecolors.extend([c] * 6)
+        else:
+            # a single color specified, or face colors specified explicitly
+            facecolors = list(colorConverter.to_rgba_array(color))
+            if len(facecolors) < len(x):
+                facecolors *= (6 * len(x))
 
-        col = art3d.Poly3DCollection(polys, facecolor=colors)
+        normals = self._generate_normals(polys)
+        sfacecolors = self._shade_colors(facecolors, normals)
+        col = art3d.Poly3DCollection(polys,
+                                     zsort=zsort,
+                                     facecolor=sfacecolors,
+                                     *args, **kwargs)
         self.add_collection(col)
 
         self.auto_scale_xyz((minx, maxx), (miny, maxy), (minz, maxz), had_data)
+
+    def set_title(self, label, fontdict=None, **kwargs):
+        Axes.set_title(self, label, fontdict, **kwargs)
+        (x, y) = self.title.get_position()
+        self.title.set_y(0.92 * y)
 
 def get_test_data(delta=0.05):
     '''
@@ -999,3 +1211,11 @@ def get_test_data(delta=0.05):
     Z = Z * 500
     return X, Y, Z
 
+
+
+########################################################
+# Register Axes3D as a 'projection' object available 
+# for use just like any other axes
+########################################################
+import matplotlib.projections as proj
+proj.projection_registry.register(Axes3D)

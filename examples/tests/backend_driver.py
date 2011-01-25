@@ -181,7 +181,6 @@ files['pylab'] = [
     'shared_axis_across_figures.py',
     'shared_axis_demo.py',
     'simple_plot.py',
-    'simplification_clipping_test.py',
     'specgram_demo.py',
     'spine_placement_demo.py',
     'spy_demos.py',
@@ -336,7 +335,6 @@ def drive(backend, directories, python=['python'], switches = []):
     for fullpath in testcases:
         print ('\tdriving %-40s' % (fullpath)),
         sys.stdout.flush()
-
         fpath, fname = os.path.split(fullpath)
 
         if fname in exclude:
@@ -362,6 +360,8 @@ def drive(backend, directories, python=['python'], switches = []):
             'import matplotlib\n',
             'matplotlib.use("%s")\n' % backend,
             'from pylab import savefig\n',
+            'import numpy\n',
+            'numpy.seterr(invalid="ignore")\n',
             ))
         for line in file(fullpath):
             line_lstrip = line.lstrip()
@@ -389,7 +389,7 @@ def drive(backend, directories, python=['python'], switches = []):
     return failures
 
 def parse_options():
-    doc = __doc__.split('\n\n')
+    doc = (__doc__ and __doc__.split('\n\n')) or "  "
     op = OptionParser(description=doc[0].strip(),
                       usage='%prog [options] [--] [backends and switches]',
                       #epilog='\n'.join(doc[1:])  # epilog not supported on my python2.4 machine: JDH

@@ -1,6 +1,13 @@
 import matplotlib.pyplot as plt
-from demo_image import get_demo_image
-#import mpl_toolkits.imaging.axes_grid as imaging
+
+def get_demo_image():
+    import numpy as np
+    from matplotlib.cbook import get_sample_data
+    f = get_sample_data("axes_grid/bivariate_normal.npy", asfileobj=False)
+    z = np.load(f)
+    # z is a numpy array of 15x15
+    return z, (-3,4,-4,3)
+
 
 def demo_simple_image(ax):
     Z, extent = get_demo_image()
@@ -12,7 +19,7 @@ def demo_simple_image(ax):
 
 def demo_locatable_axes_hard(fig1):
 
-    from mpl_toolkits.axes_grid \
+    from mpl_toolkits.axes_grid1 \
          import SubplotDivider, LocatableAxes, Size
 
     divider = SubplotDivider(fig1, 2, 2, 2, aspect=True)
@@ -50,7 +57,7 @@ def demo_locatable_axes_hard(fig1):
 
 
 def demo_locatable_axes_easy(ax):
-    from mpl_toolkits.axes_grid import make_axes_locatable
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     divider = make_axes_locatable(ax)
 
@@ -69,7 +76,7 @@ def demo_locatable_axes_easy(ax):
 
 
 def demo_images_side_by_sied(ax):
-    from mpl_toolkits.axes_grid import make_axes_locatable
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     divider = make_axes_locatable(ax)
 
@@ -119,6 +126,4 @@ def demo():
     plt.show()
 
 
-
-if __name__ == "__main__":
-   demo()
+demo()

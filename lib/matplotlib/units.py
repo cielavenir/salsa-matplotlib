@@ -46,14 +46,15 @@ import numpy as np
 from matplotlib.cbook import iterable, is_numlike, is_string_like
 
 class AxisInfo:
-    'information to support default axis labeling and tick labeling'
+    'information to support default axis labeling and tick labeling, and default limits'
     def __init__(self, majloc=None, minloc=None,
-                 majfmt=None, minfmt=None, label=None):
+                 majfmt=None, minfmt=None, label=None, 
+                 default_limits=None):
         """
         majloc and minloc: TickLocators for the major and minor ticks
         majfmt and minfmt: TickFormatters for the major and minor ticks
         label: the default axis label
-
+        default_limits: the default min, max of the axis if no data is present
         If any of the above are None, the axis will simply use the default
         """
         self.majloc = majloc
@@ -61,6 +62,7 @@ class AxisInfo:
         self.majfmt = majfmt
         self.minfmt = minfmt
         self.label = label
+        self.default_limits = default_limits
 
 
 class ConversionInterface:
@@ -126,18 +128,14 @@ class Registry(dict):
         if classx is not None:
             converter = self.get(classx)
 
-        # Check explicity for strings here because they would otherwise
-        # lead to an infinite recursion, because a single character will
-        # pass the iterable() check.
-        if converter is None and iterable(x) and not is_string_like(x):
-            # if this is anything but an object array, we'll assume
-            # there are no custom units
-            if isinstance(x, np.ndarray) and x.dtype != np.object:
-                return None
-
+        if converter is None and iterable(x):
             for thisx in x:
-                converter = self.get_converter( thisx )
-                return converter
+                # Make sure that recursing might actually lead to a solution, if
+                # we are just going to re-examine another item of the same kind,
+                # then do not look at it.
+                if classx and classx != getattr(thisx, '__class__', None):
+                    converter = self.get_converter( thisx )
+                    return converter
 
         #DISABLED self._cached[idx] = converter
         return converter

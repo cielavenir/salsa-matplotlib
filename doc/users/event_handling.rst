@@ -46,6 +46,13 @@ disconnect the callback, just call::
 
     fig.canvas.mpl_disconnect(cid)
 
+.. note::
+   The canvas retains only weak references to the callbacks.  Therefore
+   if a callback is a method of a class instance, you need to retain
+   a reference to that instance.  Otherwise the instance will be
+   garbage-collected and the callback will vanish.
+
+
 Here are the events that you can connect to, the class instances that
 are sent back to you when the event occurs, and the event descriptions
 
@@ -111,6 +118,8 @@ following attributes
 Let's look a simple example of a canvas, where a simple line segment
 is created every time a mouse is pressed::
 
+    from matplotlib import pyplot as plt
+
     class LineBuilder:
         def __init__(self, line):
             self.line = line
@@ -132,6 +141,7 @@ is created every time a mouse is pressed::
     line, = ax.plot([0], [0])  # empty line
     linebuilder = LineBuilder(line)
 
+    plt.show()
 
 
 The :class:`~matplotlib.backend_bases.MouseEvent` that we just used is a

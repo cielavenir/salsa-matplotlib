@@ -3,8 +3,7 @@ Section: python
 Priority: optional
 Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
 Uploaders: Alexandre Fayolle <afayolle@debian.org>,
-           Sandro Tosi <morph@debian.org>,
-           Benjamin Drung <bdrung@ubuntu.com>
+           Sandro Tosi <morph@debian.org>
 Build-Depends: debhelper (>= 7),
                dvipng,
                graphviz,
@@ -22,9 +21,9 @@ Build-Depends: debhelper (>= 7),
                python-numpy (>= 1:1.3.0),
                python-numpy-dbg (>= 1:1.3.0),
                python-pkg-resources,
+               python-qt-dev,
                python-qt4,
                python-qt4-dev,
-               python-qt-dev,
                python-setuptools,
                python-sphinx (>= 0.5.1),
                python-support (>= 1.0.0),
@@ -33,6 +32,7 @@ Build-Depends: debhelper (>= 7),
                python-tz,
                python-wxgtk2.8,
                python-wxgtk2.8-dbg,
+               python-xlwt,
                tcl8.5-dev,
                texlive-fonts-recommended,
                texlive-latex-extra,
@@ -40,8 +40,7 @@ Build-Depends: debhelper (>= 7),
                tk8.5-dev,
                zlib1g-dev
 XS-Python-Version: all
-Standards-Version: 3.8.4
-XS-DM-Upload-Allowed: yes
+Standards-Version: 3.9.1
 Homepage: http://matplotlib.sf.net/
 Vcs-Svn: svn://svn.debian.org/svn/python-modules/packages/matplotlib/trunk/
 Vcs-Browser: http://svn.debian.org/viewsvn/python-modules/packages/matplotlib/trunk/
@@ -59,8 +58,7 @@ Depends: python-cairo,
          ${misc:Depends},
          ${python:Depends},
          ${shlibs:Depends}
-Recommends: python-glade2,
-            python-tk (>= 2.5.2-1.1)
+Recommends: python-glade2, python-tk (>= 2.5.2-1.1)
 Provides: ${python:Provides}
 Conflicts: python2.4-matplotlib
 Replaces: python2.4-matplotlib
@@ -70,15 +68,15 @@ Suggests: dvipng,
           librsvg2-common,
           python-configobj,
           python-excelerator,
+          python-gtk2,
           python-matplotlib-doc,
+          python-qt3,
+          python-qt4,
           python-scipy,
           python-traits (>= 2.0),
-          texlive-extra-utils,
-          texlive-latex-extra,
-          python-gtk2,
           python-wxgtk2.8,
-          python-qt3,
-          python-qt4
+          texlive-extra-utils,
+          texlive-latex-extra
 Description: Python based plotting system in a style similar to Matlab
  Matplotlib is a pure Python plotting library designed to bring
  publication quality plotting to Python with a syntax familiar to

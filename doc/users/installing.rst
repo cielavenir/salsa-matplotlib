@@ -64,7 +64,7 @@ Instructions for installing our OSX binaries are found in the FAQ
 
 
 Once you have ipython, numpy and matplotlib installed, in ipython's
-"pylab" mode you have a matlab-like environment that automatically
+"pylab" mode you have a MATLAB-like environment that automatically
 handles most of the configuration details for you, so you can get up
 and running quickly::
 
@@ -78,6 +78,9 @@ and running quickly::
     In [1]: x = randn(10000)
 
     In [2]: hist(x, 100)
+
+Instructions for installing our OSX binaries are found in the FAQ
+ref:`install_osx_binaries`.
 
 Note that when testing matplotlib installations from the interactive
 python console, there are some issues relating to user interface
@@ -123,7 +126,10 @@ These are external packages which you will need to install before
 installing matplotlib. Windows users only need the first two (python
 and numpy) since the others are built into the matplotlib windows
 installers available for download at the sourceforge site.  If you are
-building on OSX, see :ref:`build_osx`
+building on OSX, see :ref:`build_osx`. If you are installing
+dependencies with a package manager, you may need to install the
+development packages (look for a "-dev" postfix) in addition to the
+libraries themselves.
 
 :term:`python` 2.4 (or later but not python3)
     matplotlib requires python 2.4 or later (`download <http://www.python.org/download/>`__)
@@ -159,14 +165,17 @@ backends and the capabilities they provide
 :term:`pyqt` 4.0 or later
     The Qt4 widgets library python wrappers for the Qt4Agg backend
 
-:term:`pygtk` 2.2 or later
-    The python wrappers for the GTK widgets library for use with the GTK or GTKAgg backend
+:term:`pygtk` 2.4 or later
+    The python wrappers for the GTK widgets library for use with the
+    GTK or GTKAgg backend
 
 :term:`wxpython` 2.6 or later
-    The python wrappers for the wx widgets library for use with the WXAgg backend
+    The python wrappers for the wx widgets library for use with the
+    WXAgg backend
 
 :term:`wxpython` 2.8 or later
-    The python wrappers for the wx widgets library for use with the WX backend
+    The python wrappers for the wx widgets library for use with the
+    WX backend
 
 :term:`pyfltk` 1.0 or later
     The python wrappers of the FLTK widgets library for use with FLTKAgg

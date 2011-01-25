@@ -288,7 +288,8 @@ static void _draw_hatch(void *info, CGContextRef cr)
                                         0,
                                         0,
                                         rect,
-                                        QUANTIZE_FALSE,
+                                        SNAP_FALSE,
+                                        1.0,
                                         0);
     Py_DECREF(transform);
     if (!iterator)
@@ -320,6 +321,7 @@ static void _release_hatch(void* info)
 {   PyObject* manager;
 }
 - (Window*)initWithContentRect:(NSRect)rect styleMask:(unsigned int)mask backing:(NSBackingStoreType)bufferingType defer:(BOOL)deferCreation withManager: (PyObject*)theManager;
+- (NSRect)constrainFrameRect:(NSRect)rect toScreen:(NSScreen*)screen;
 - (BOOL)closeButtonPressed;
 - (void)close;
 - (void)dealloc;
@@ -336,21 +338,28 @@ static void _release_hatch(void* info)
 @interface View : NSView
 {   PyObject* canvas;
     NSRect rubberband;
+    BOOL inside;
+    NSTrackingRectTag tracking;
 }
 - (void)dealloc;
 - (void)drawRect:(NSRect)rect;
 - (void)windowDidResize:(NSNotification*)notification;
-- (View*)initWithFrame:(NSRect)rect canvas:(PyObject*)fc;
+- (View*)initWithFrame:(NSRect)rect;
+- (void)setCanvas: (PyObject*)newCanvas;
 - (BOOL)windowShouldClose:(NSNotification*)notification;
 - (BOOL)isFlipped;
+- (void)mouseEntered:(NSEvent*)event;
+- (void)mouseExited:(NSEvent*)event;
 - (void)mouseDown:(NSEvent*)event;
 - (void)mouseUp:(NSEvent*)event;
 - (void)mouseDragged:(NSEvent*)event;
 - (void)mouseMoved:(NSEvent*)event;
 - (void)rightMouseDown:(NSEvent*)event;
 - (void)rightMouseUp:(NSEvent*)event;
+- (void)rightMouseDragged:(NSEvent*)event;
 - (void)otherMouseDown:(NSEvent*)event;
 - (void)otherMouseUp:(NSEvent*)event;
+- (void)otherMouseDragged:(NSEvent*)event;
 - (void)setRubberband:(NSRect)rect;
 - (void)removeRubberband;
 - (const char*)convertKeyEvent:(NSEvent*)event;
@@ -437,13 +446,13 @@ static CGMutablePathRef _create_path(void* iterator)
     return p;
 }
 
-static int _get_snap(GraphicsContext* self, enum e_quantize_mode* mode)
+static int _get_snap(GraphicsContext* self, enum e_snap_mode* mode)
 {
     PyObject* snap = PyObject_CallMethod((PyObject*)self, "get_snap", "");
     if(!snap) return 0;
-    if(snap==Py_None) *mode = QUANTIZE_AUTO;
-    else if (PyBool_Check(snap)) *mode = QUANTIZE_TRUE;
-    else *mode = QUANTIZE_FALSE;
+    if(snap==Py_None) *mode = SNAP_AUTO;
+    else if (PyBool_Check(snap)) *mode = SNAP_TRUE;
+    else *mode = SNAP_FALSE;
     Py_DECREF(snap);
     return 1;
 }
@@ -653,7 +662,8 @@ GraphicsContext_set_clip_path (GraphicsContext* self, PyObject* args)
                                         0,
                                         0,
                                         rect,
-                                        QUANTIZE_AUTO,
+                                        SNAP_AUTO,
+                                        1.0,
                                         0);
     Py_DECREF(transform);
     if (!iterator)
@@ -854,6 +864,7 @@ GraphicsContext_draw_path (GraphicsContext* self, PyObject* args)
     PyObject* path;
     PyObject* transform;
     PyObject* rgbFace;
+    float linewidth;
 
     int n;
 
@@ -868,9 +879,10 @@ GraphicsContext_draw_path (GraphicsContext* self, PyObject* args)
         return NULL;
     }
 
-    if(!PyArg_ParseTuple(args, "OO|O",
+    if(!PyArg_ParseTuple(args, "OOf|O",
                                &path,
                                &transform,
+                               &linewidth,
                                &rgbFace)) return NULL;
 
     if(rgbFace==Py_None) rgbFace = NULL;
@@ -880,7 +892,8 @@ GraphicsContext_draw_path (GraphicsContext* self, PyObject* args)
                                   1,
                                   0,
                                   rect,
-                                  QUANTIZE_AUTO,
+                                  SNAP_AUTO,
+                                  linewidth,
                                   rgbFace == NULL);
     if (!iterator)
     {
@@ -957,7 +970,8 @@ GraphicsContext_draw_path (GraphicsContext* self, PyObject* args)
                                           1,
                                           0,
                                           rect,
-                                          QUANTIZE_AUTO,
+                                          SNAP_AUTO,
+                                          linewidth,
                                           0);
             if (!iterator)
             {
@@ -983,6 +997,7 @@ GraphicsContext_draw_markers (GraphicsContext* self, PyObject* args)
     PyObject* marker_transform;
     PyObject* path;
     PyObject* transform;
+    float linewidth;
     PyObject* rgbFace;
 
     int ok;
@@ -991,7 +1006,7 @@ GraphicsContext_draw_markers (GraphicsContext* self, PyObject* args)
     CGMutablePathRef marker;
     void* iterator;
     double rect[4] = {0.0, 0.0, self->size.width, self->size.height};
-    enum e_quantize_mode mode;
+    enum e_snap_mode mode;
     double xc, yc;
     unsigned code;
 
@@ -1003,11 +1018,12 @@ GraphicsContext_draw_markers (GraphicsContext* self, PyObject* args)
         return NULL;
     }
 
-    if(!PyArg_ParseTuple(args, "OOOO|O",
+    if(!PyArg_ParseTuple(args, "OOOOf|O",
                                &marker_path,
                                &marker_transform,
                                &path,
                                &transform,
+                               &linewidth,
                                &rgbFace)) return NULL;
 
     if(rgbFace==Py_None) rgbFace = NULL;
@@ -1034,6 +1050,7 @@ GraphicsContext_draw_markers (GraphicsContext* self, PyObject* args)
                                  0,
                                  rect,
                                  mode,
+                                 linewidth,
                                  0);
     if (!iterator)
     {
@@ -1054,7 +1071,8 @@ GraphicsContext_draw_markers (GraphicsContext* self, PyObject* args)
                                  1,
                                  1,
                                  rect,
-                                 QUANTIZE_TRUE,
+                                 SNAP_TRUE,
+                                 1.0,
                                  0);
     if (!iterator)
     {
@@ -1162,7 +1180,6 @@ _set_offset(CGContextRef cr, PyObject* offsets, int index, PyObject* transform)
 static PyObject*
 GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
 {
-    PyObject* master_transform;
     PyObject* cliprect;
     PyObject* clippath;
     PyObject* clippath_transform;
@@ -1184,19 +1201,18 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
         return NULL;
     }
 
-    if(!PyArg_ParseTuple(args, "OOOOOOOOOOOOO", &master_transform,
-                                                &cliprect,
-                                                &clippath,
-                                                &clippath_transform,
-                                                &paths,
-                                                &transforms,
-                                                &offsets,
-                                                &offset_transform,
-                                                &facecolors,
-                                                &edgecolors,
-                                                &linewidths,
-                                                &linestyles,
-                                                &antialiaseds))
+    if(!PyArg_ParseTuple(args, "OOOOOOOOOOOO", &cliprect,
+                                               &clippath,
+                                               &clippath_transform,
+                                               &paths,
+                                               &transforms,
+                                               &offsets,
+                                               &offset_transform,
+                                               &facecolors,
+                                               &edgecolors,
+                                               &linewidths,
+                                               &linestyles,
+                                               &antialiaseds))
         return NULL;
 
     int ok = 1;
@@ -1209,7 +1225,7 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
     /* --------- Prepare some variables for the path iterator ------------- */
     void* iterator;
     double rect[4] = {0.0, 0.0, self->size.width, self->size.height};
-    enum e_quantize_mode mode;
+    enum e_snap_mode mode;
     ok = _get_snap(self, &mode);
     if (!ok)
     {
@@ -1232,43 +1248,22 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
         PyErr_SetString(PyExc_ValueError, "transforms must be a sequence object");
         return NULL;
     }
-    Py_ssize_t Ntransforms = PySequence_Size(transforms);
+    const Py_ssize_t Ntransforms = PySequence_Size(transforms);
+    if (Ntransforms==0)
+    {
+        PyErr_SetString(PyExc_ValueError, "transforms should contain at least one item");
+        return NULL;
+    }
+
+    /* ------------------- Read drawing arrays ---------------------------- */
 
     CGContextSaveGState(cr);
-    /* ------------------- Set master transform --------------------------- */
-
-    if (Ntransforms)
-    {
-        CGAffineTransform master;
-        double a, b, c, d, tx, ty;
-        PyObject* values = PyObject_CallMethod(master_transform, "to_values", "");
-        if (!values)
-        {
-            ok = 0;
-            goto exit;
-        }
-        if (!PyTuple_Check(values))
-        {
-            Py_DECREF(values);
-            ok = 0;
-            goto exit;
-        }
-        /* CGAffineTransform contains CGFloat; cannot use master directly */
-        ok = PyArg_ParseTuple(values, "dddddd", &a, &b, &c, &d, &tx, &ty);
-        Py_DECREF(values);
-        master.a = a;
-        master.b = b;
-        master.c = c;
-        master.d = d;
-        master.tx = tx;
-        master.ty = ty;
-        if (!ok) goto exit;
-        CGContextConcatCTM(cr, master);
-    }
+    offsets = PyArray_FromObject(offsets, NPY_DOUBLE, 0, 2);
+    facecolors = PyArray_FromObject(facecolors, NPY_DOUBLE, 1, 2);
+    edgecolors = PyArray_FromObject(edgecolors, NPY_DOUBLE, 1, 2);
 
     /* ------------------- Check offsets array ---------------------------- */
 
-    offsets = PyArray_FromObject(offsets, NPY_DOUBLE, 0, 2);
     if (!offsets ||
         (PyArray_NDIM(offsets)==2 && PyArray_DIM(offsets, 1)!=2) ||
         (PyArray_NDIM(offsets)==1 && PyArray_DIM(offsets, 0)!=0))
@@ -1279,11 +1274,36 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
     }
     const Py_ssize_t Noffsets = PyArray_DIM(offsets, 0);
 
+    /* ------------------- Check facecolors array ------------------------- */
+
+    if (!facecolors ||
+        (PyArray_NDIM(facecolors)==1 && PyArray_DIM(facecolors, 0)!=0) ||
+        (PyArray_NDIM(facecolors)==2 && PyArray_DIM(facecolors, 1)!=4))
+    {
+        PyErr_SetString(PyExc_ValueError, "Facecolors must by a Nx4 numpy array or empty");
+        ok = 0;
+        goto exit;
+    }
+
+    /* ------------------- Check edgecolors array ------------------------- */
+
+    if (!edgecolors ||
+        (PyArray_NDIM(edgecolors)==1 && PyArray_DIM(edgecolors, 0)!=0) ||
+        (PyArray_NDIM(edgecolors)==2 && PyArray_DIM(edgecolors, 1)!=4))
+    {
+        PyErr_SetString(PyExc_ValueError, "Edgecolors must by a Nx4 numpy array or empty");
+        ok = 0;
+        goto exit;
+    }
+
+    /* -------------------------------------------------------------------- */
+
+    if (Npaths==0) goto exit; /* Nothing to do */
+
     /* -------------------------------------------------------------------- */
 
     Np = Npaths > Ntransforms ? Npaths : Ntransforms;
     N = Np > Noffsets ? Np : Noffsets;
-    if (N < Ntransforms) Ntransforms = N;
 
     p = malloc(Np*sizeof(CGMutablePathRef));
     if (!p)
@@ -1302,35 +1322,33 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
             ok = 0;
             goto exit;
         }
-        if (Ntransforms)
+        transform = PySequence_ITEM(transforms, i % Ntransforms);
+        if (!transform)
         {
-            transform = PySequence_ITEM(transforms, i % Ntransforms);
-            if (!transform)
-            {
-                PyErr_SetString(PyExc_RuntimeError,
-                                "failed to obtain transform");
-                ok = 0;
-                goto exit;
-            }
-            iterator = get_path_iterator(path,
-                                         transform,
-                                         1,
-                                         0,
-                                         rect,
-                                         mode,
-                                         0);
-            Py_DECREF(transform);
+            PyErr_SetString(PyExc_RuntimeError, "failed to obtain transform");
+            Py_DECREF(path);
+            ok = 0;
+            goto exit;
         }
-        else
-        {
-            iterator = get_path_iterator(path,
-                                         master_transform,
-                                         1,
-                                         0,
-                                         rect,
-                                         mode,
-                                         0);
-        }
+        iterator = get_path_iterator(path,
+                                     transform,
+                                     1,
+                                     0,
+                                     rect,
+                                     mode,
+                                     1.0,
+                                     /* Hardcoding stroke width to 1.0
+                                        here, but for true
+                                        correctness, the paths would
+                                        need to be set up for each
+                                        different linewidth that may
+                                        be applied below.  This
+                                        difference is very minute in
+                                        practice, so this hardcoding
+                                        is probably ok for now.  --
+                                        MGD */
+                                     0);
+        Py_DECREF(transform);
         Py_DECREF(path);
         if (!iterator)
         {
@@ -1364,7 +1382,8 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
                                       0,
                                       0,
                                       rect,
-                                      QUANTIZE_AUTO,
+                                      SNAP_AUTO,
+                                      1.0,
                                       0);
         if (!iterator)
         {
@@ -1376,30 +1395,6 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
         n = _draw_path(cr, iterator);
         free_path_iterator(iterator);
         if (n > 0) CGContextClip(cr);
-    }
-
-    /* ------------------- Check facecolors array ------------------------- */
-
-    facecolors = PyArray_FromObject(facecolors, NPY_DOUBLE, 1, 2);
-    if (!facecolors ||
-        (PyArray_NDIM(facecolors)==1 && PyArray_DIM(facecolors, 0)!=0) ||
-        (PyArray_NDIM(facecolors)==2 && PyArray_DIM(facecolors, 1)!=4))
-    {
-        PyErr_SetString(PyExc_ValueError, "Facecolors must by a Nx4 numpy array or empty");
-        ok = 0;
-        goto exit;
-    }
-
-    /* ------------------- Check edgecolors array ------------------------- */
-
-    edgecolors = PyArray_FromObject(edgecolors, NPY_DOUBLE, 1, 2);
-    if (!edgecolors ||
-        (PyArray_NDIM(edgecolors)==1 && PyArray_DIM(edgecolors, 0)!=0) ||
-        (PyArray_NDIM(edgecolors)==2 && PyArray_DIM(edgecolors, 1)!=4))
-    {
-        PyErr_SetString(PyExc_ValueError, "Edgecolors must by a Nx4 numpy array or empty");
-        ok = 0;
-        goto exit;
     }
 
     /* ------------------- Check the other arguments ---------------------- */
@@ -1607,7 +1602,6 @@ exit:
         free(p);
     }
     if (!ok) return NULL;
-
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -1696,7 +1690,8 @@ GraphicsContext_draw_quad_mesh (GraphicsContext* self, PyObject* args)
                                             0,
                                             0,
                                             rect,
-                                            QUANTIZE_AUTO,
+                                            SNAP_AUTO,
+                                            1.0,
                                             0);
         if (iterator)
         {
@@ -2387,7 +2382,6 @@ GraphicsContext_draw_text (GraphicsContext* self, PyObject* args)
         PyErr_SetString(PyExc_RuntimeError, "ATSUDrawText failed");
         return NULL;
     }
-
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -2682,7 +2676,8 @@ GraphicsContext_draw_image(GraphicsContext* self, PyObject* args)
                                             0,
                                             0,
                                             rect,
-                                            QUANTIZE_AUTO,
+                                            SNAP_AUTO,
+                                            1.0,
                                             0);
         if (iterator)
         {
@@ -2894,8 +2889,20 @@ FigureCanvas_init(FigureCanvas *self, PyObject *args, PyObject *kwds)
     if(!PyArg_ParseTuple(args, "ii", &width, &height)) return -1;
 
     NSRect rect = NSMakeRect(0.0, 0.0, width, height);
-    self->view = [self->view initWithFrame: rect canvas: (PyObject*)self];
+    self->view = [self->view initWithFrame: rect];
+    [self->view setCanvas: (PyObject*)self];
     return 0;
+}
+
+static void
+FigureCanvas_dealloc(FigureCanvas* self)
+{
+    if (self->view)
+    {
+        [self->view setCanvas: NULL];
+        [self->view release];
+    }
+    self->ob_type->tp_free((PyObject*)self);
 }
 
 static PyObject*
@@ -3241,7 +3248,7 @@ static PyTypeObject FigureCanvasType = {
     "_macosx.FigureCanvas",    /*tp_name*/
     sizeof(FigureCanvas),      /*tp_basicsize*/
     0,                         /*tp_itemsize*/
-    0,                         /*tp_dealloc*/
+    (destructor)FigureCanvas_dealloc,     /*tp_dealloc*/
     0,                         /*tp_print*/
     0,                         /*tp_getattr*/
     0,                         /*tp_setattr*/
@@ -4392,16 +4399,6 @@ set_cursor(PyObject* unused, PyObject* args)
     return Py_None;
 }
 
-static char show__doc__[] = "Show all the figures and enter the main loop.\nThis function does not return until all Matplotlib windows are closed,\nand is normally not needed in interactive sessions.";
-
-static PyObject*
-show(PyObject* self)
-{
-    if(nwin > 0) [NSApp run];
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
 @implementation Window
 - (Window*)initWithContentRect:(NSRect)rect styleMask:(unsigned int)mask backing:(NSBackingStoreType)bufferingType defer:(BOOL)deferCreation withManager: (PyObject*)theManager
 {
@@ -4412,6 +4409,16 @@ show(PyObject* self)
     manager = theManager;
     Py_INCREF(manager);
     return self;
+}
+
+- (NSRect)constrainFrameRect:(NSRect)rect toScreen:(NSScreen*)screen
+{
+    /* Allow window sizes larger than the screen */
+    NSRect suggested = [super constrainFrameRect: rect toScreen: screen];
+    const CGFloat difference = rect.size.height - suggested.size.height;
+    suggested.origin.y -= difference;
+    suggested.size.height += difference;
+    return suggested;
 }
 
 - (BOOL)closeButtonPressed
@@ -4481,25 +4488,26 @@ show(PyObject* self)
     return NO;
 }
 
-- (View*)initWithFrame:(NSRect)rect canvas: (PyObject*)fc
+- (View*)initWithFrame:(NSRect)rect
 {
     self = [super initWithFrame: rect];
     rubberband = NSZeroRect;
-    if (canvas)
-    {
-        Py_DECREF(canvas);
-    }
-    canvas = fc;
-    Py_INCREF(canvas);
+    inside = false;
+    tracking = 0;
     return self;
 }
 
 - (void)dealloc
 {
     FigureCanvas* fc = (FigureCanvas*)canvas;
-    fc->view = NULL;
-    Py_DECREF(canvas);
+    if (fc) fc->view = NULL;
+    [self removeTrackingRect: tracking];
     [super dealloc];
+}
+
+- (void)setCanvas: (PyObject*)newCanvas
+{
+    canvas = newCanvas;
 }
 
 -(void)drawRect:(NSRect)rect
@@ -4575,6 +4583,11 @@ show(PyObject* self)
     else
         PyErr_Print();
     PyGILState_Release(gstate);
+    if (tracking) [self removeTrackingRect: tracking];
+    tracking = [self addTrackingRect: [self bounds]
+                               owner: self
+                            userData: nil
+                        assumeInside: NO];
     [self setNeedsDisplay: YES];
 }
 
@@ -4597,6 +4610,45 @@ show(PyObject* self)
       if (closed) return NO;
     }
     return YES;
+}
+
+- (void)mouseEntered:(NSEvent *)event
+{
+    PyGILState_STATE gstate;
+    PyObject* result;
+    NSWindow* window = [self window];
+    if ([window isKeyWindow]==false) return;
+
+    gstate = PyGILState_Ensure();
+    result = PyObject_CallMethod(canvas, "enter_notify_event", "");
+    if(result)
+        Py_DECREF(result);
+    else
+        PyErr_Print();
+    PyGILState_Release(gstate);
+
+    [window setAcceptsMouseMovedEvents: YES];
+    inside = true;
+}
+
+- (void)mouseExited:(NSEvent *)event
+{
+    PyGILState_STATE gstate;
+    PyObject* result;
+    NSWindow* window = [self window];
+    if ([window isKeyWindow]==false) return;
+
+    if (inside==false) return;
+    gstate = PyGILState_Ensure();
+    result = PyObject_CallMethod(canvas, "leave_notify_event", "");
+    if(result)
+        Py_DECREF(result);
+    else
+        PyErr_Print();
+    PyGILState_Release(gstate);
+
+    [[self window] setAcceptsMouseMovedEvents: NO];
+    inside = false;
 }
 
 - (void)mouseDown:(NSEvent *)event
@@ -4744,6 +4796,23 @@ show(PyObject* self)
     PyGILState_Release(gstate);
 }
 
+- (void)rightMouseDragged:(NSEvent *)event
+{
+    int x, y;
+    NSPoint location = [event locationInWindow];
+    location = [self convertPoint: location fromView: nil];
+    x = location.x;
+    y = location.y;
+    PyGILState_STATE gstate = PyGILState_Ensure();
+    PyObject* result = PyObject_CallMethod(canvas, "motion_notify_event", "ii", x, y);
+    if(result)
+        Py_DECREF(result);
+    else
+        PyErr_Print();
+
+    PyGILState_Release(gstate);
+}
+
 - (void)otherMouseDown:(NSEvent *)event
 {
     int x, y;
@@ -4776,6 +4845,23 @@ show(PyObject* self)
     y = location.y;
     gstate = PyGILState_Ensure();
     result = PyObject_CallMethod(canvas, "button_release_event", "iii", x, y, num);
+    if(result)
+        Py_DECREF(result);
+    else
+        PyErr_Print();
+
+    PyGILState_Release(gstate);
+}
+
+- (void)otherMouseDragged:(NSEvent *)event
+{
+    int x, y;
+    NSPoint location = [event locationInWindow];
+    location = [self convertPoint: location fromView: nil];
+    x = location.x;
+    y = location.y;
+    PyGILState_STATE gstate = PyGILState_Ensure();
+    PyObject* result = PyObject_CallMethod(canvas, "motion_notify_event", "ii", x, y);
     if(result)
         Py_DECREF(result);
     else
@@ -5043,11 +5129,32 @@ show(PyObject* self)
 }
 @end
 
+
+static PyObject*
+show(PyObject* self)
+{
+    if(nwin > 0) [NSApp run];
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject*
+verify_main_display(PyObject* self)
+{
+    CGDirectDisplayID display = CGMainDisplayID();
+    if (display == 0) {
+        PyErr_SetString(PyExc_RuntimeError, "Failed to obtain the display ID of the main display");
+        return NULL;
+    }
+    Py_INCREF(Py_True);
+    return Py_True;
+}
+
 static struct PyMethodDef methods[] = {
    {"show",
     (PyCFunction)show,
     METH_NOARGS,
-    show__doc__
+    "Show all the figures and enter the main loop.\nThis function does not return until all Matplotlib windows are closed,\nand is normally not needed in interactive sessions."
    },
    {"choose_save_file",
     (PyCFunction)choose_save_file,
@@ -5059,11 +5166,17 @@ static struct PyMethodDef methods[] = {
     METH_VARARGS,
     "Sets the active cursor."
    },
+   {"verify_main_display",
+    (PyCFunction)verify_main_display,
+    METH_NOARGS,
+    "Verifies if the main display can be found. This function fails if Python is not built as a framework."
+   },
    {NULL,          NULL, 0, NULL}/* sentinel */
 };
 
 void init_macosx(void)
 {   PyObject *m;
+
     import_array();
 
     if (PyType_Ready(&GraphicsContextType) < 0) return;

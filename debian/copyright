@@ -71,7 +71,7 @@ License:
 
 The Debian packaging is:
 
-    Copyright (C) 2008-2009 Sandro Tosi <morph@debian.org>
+    Copyright (C) 2008-2011 Sandro Tosi <morph@debian.org>
 
 and is licensed under the same terms as upstream code.
 
@@ -399,7 +399,7 @@ ttconv/*
     ** There are many things in this file you may want to change.  This file
     ** should be the first include file.  It is the header file for the whole
     ** project.
-    **  
+    **
     ** This file was last modified 22 December 1995.
     */
 

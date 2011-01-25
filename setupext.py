@@ -1,8 +1,10 @@
 """
 Some helper functions for building the C extensions
 
-you may need to edit basedir to point to the default location of your
-required libs, eg, png, z, freetype
+You may need to use the "basedirlist" option in setup.cfg to point
+to the location of your required libs, eg, png, z, freetype,
+overriding the settings hard-coded in the "basedir" directory
+below.
 
 DARWIN
 
@@ -71,6 +73,7 @@ basedir = {
     'gnukfreebsd6' : ['/usr/local', '/usr'],
     'gnukfreebsd7' : ['/usr/local', '/usr'],
     'gnukfreebsd8' : ['/usr/local', '/usr'],
+    'gnu0' : ['/usr'],
     'aix5' : ['/usr/local'],
 }
 
@@ -99,6 +102,7 @@ BUILT_NXUTILS   = False
 BUILT_CONTOUR   = False
 BUILT_GDK       = False
 BUILT_PATH      = False
+BUILT_TRI       = False
 
 AGG_VERSION = 'agg24'
 TCL_TK_CACHE = None
@@ -119,7 +123,12 @@ options = {'display_status': True,
            'build_macosx': 'auto',
            'build_image': True,
            'build_windowing': True,
-           'backend': None}
+           'backend': None,
+           'basedirlist': None}
+
+defines = [
+        ('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API'),
+        ('PYCXX_ISO_CPP_LIB', '1')]
 
 # Based on the contents of setup.cfg, determine the build options
 if os.path.exists("setup.cfg"):
@@ -157,6 +166,15 @@ if os.path.exists("setup.cfg"):
     try: options['backend'] = config.get("rc_options", "backend")
     except: pass
 
+    try: options['basedirlist'] = config.get("directories", "basedirlist")
+    except: pass
+
+# For get_base_flags:
+if options['basedirlist']:
+    basedirlist = options['basedirlist'].split()
+else:
+    basedirlist = basedir[sys.platform]
+print "basedirlist is:", basedirlist
 
 if options['display_status']:
     def print_line(char='='):
@@ -327,10 +345,10 @@ def check_for_libpng():
 
 def add_base_flags(module):
     incdirs = filter(os.path.exists,
-                     [os.path.join(p, 'include') for p in basedir[sys.platform] ])
+                     [os.path.join(p, 'include') for p in basedirlist ])
     libdirs = filter(os.path.exists,
-                     [os.path.join(p, 'lib')     for p in basedir[sys.platform] ]+
-                     [os.path.join(p, 'lib64')     for p in basedir[sys.platform] ] )
+                     [os.path.join(p, 'lib')     for p in basedirlist ]+
+                     [os.path.join(p, 'lib64')     for p in basedirlist ] )
 
     module.include_dirs.extend(incdirs)
     module.include_dirs.append('.')
@@ -499,9 +517,10 @@ def check_for_numpy():
         return False
     nn = numpy.__version__.split('.')
     if not (int(nn[0]) >= 1 and int(nn[1]) >= 1):
-        if not int(nn[0]) >= 1:
+        if not (int(nn[0]) >= 2):
             print_message(
-                'numpy 1.1 or later is required; you have %s' % numpy.__version__)
+               'numpy 1.1 or later is required; you have %s' %
+               numpy.__version__)
             return False
     module = Extension('test', [])
     add_numpy_flags(module)
@@ -978,7 +997,7 @@ def add_tk_flags(module):
     message = None
     if sys.platform == 'win32':
         major, minor1, minor2, s, tmp = sys.version_info
-        if major == 2 and minor1 == 6:
+        if major == 2 and minor1 in [6, 7]:
             module.include_dirs.extend(['win32_static/include/tcl85'])
             module.libraries.extend(['tk85', 'tcl85'])
         elif major == 2 and minor1 in [3, 4, 5]:
@@ -1106,7 +1125,7 @@ def build_ft2font(ext_modules, packages):
     deps.extend(glob.glob('CXX/*.c'))
 
     module = Extension('matplotlib.ft2font', deps,
-                       define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')])
+                       define_macros=defines)
     add_ft2font_flags(module)
     ext_modules.append(module)
     BUILT_FT2FONT = True
@@ -1119,7 +1138,8 @@ def build_ttconv(ext_modules, packages):
             'ttconv/pprdrv_tt2.cpp',
             'ttconv/ttutil.cpp']
 
-    module = Extension('matplotlib.ttconv', deps)
+    module = Extension('matplotlib.ttconv', deps,
+                       define_macros=defines)
     add_base_flags(module)
     ext_modules.append(module)
     BUILT_TTCONV = True
@@ -1133,7 +1153,7 @@ def build_gtkagg(ext_modules, packages):
 
     module = Extension('matplotlib.backends._gtkagg',
                        deps,
-                       define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+                       define_macros=defines
                        )
 
     # add agg flags before pygtk because agg only supports freetype1
@@ -1156,7 +1176,7 @@ def build_tkagg(ext_modules, packages):
 
     module = Extension('matplotlib.backends._tkagg',
                        deps,
-                       define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+                       define_macros=defines
                        )
 
     add_tk_flags(module) # do this first
@@ -1199,7 +1219,7 @@ def build_macosx(ext_modules, packages):
     module = Extension('matplotlib.backends._macosx',
                        deps,
                        extra_link_args = ['-framework','Cocoa'],
-                       define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+                       define_macros=defines
                       )
     add_numpy_flags(module)
     add_agg_flags(module)
@@ -1218,7 +1238,7 @@ def build_png(ext_modules, packages):
         'matplotlib._png',
         deps,
         include_dirs=numpy_inc_dirs,
-        define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+        define_macros=defines
         )
 
     add_png_flags(module)
@@ -1250,7 +1270,7 @@ def build_agg(ext_modules, packages):
         'matplotlib.backends._backend_agg',
         deps,
         include_dirs=numpy_inc_dirs,
-        define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+        define_macros=defines
         )
 
     add_numpy_flags(module)
@@ -1283,7 +1303,7 @@ def build_path(ext_modules, packages):
         'matplotlib._path',
         deps,
         include_dirs=numpy_inc_dirs,
-        define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+        define_macros=defines
         )
 
     add_numpy_flags(module)
@@ -1312,7 +1332,7 @@ def build_image(ext_modules, packages):
         'matplotlib._image',
         deps,
         include_dirs=numpy_inc_dirs,
-        define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+        define_macros=defines
         )
 
     add_numpy_flags(module)
@@ -1333,7 +1353,7 @@ def build_delaunay(ext_modules, packages):
     sourcefiles = [os.path.join('lib/matplotlib/delaunay',s) for s in sourcefiles]
     delaunay = Extension('matplotlib._delaunay',sourcefiles,
                          include_dirs=numpy_inc_dirs,
-                         define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+                         define_macros=defines
                          )
     add_numpy_flags(delaunay)
     add_base_flags(delaunay)
@@ -1350,7 +1370,7 @@ def build_contour(ext_modules, packages):
         'matplotlib._cntr',
         [ 'src/cntr.c'],
         include_dirs=numpy_inc_dirs,
-        define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+        define_macros=defines
         )
     add_numpy_flags(module)
     add_base_flags(module)
@@ -1366,7 +1386,7 @@ def build_nxutils(ext_modules, packages):
         'matplotlib.nxutils',
         [ 'src/nxutils.c'],
         include_dirs=numpy_inc_dirs,
-        define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+        define_macros=defines
         )
     add_numpy_flags(module)
     add_base_flags(module)
@@ -1385,7 +1405,7 @@ def build_gdk(ext_modules, packages):
         ['src/backend_gdk.c'],
         libraries = [],
         include_dirs=numpy_inc_dirs,
-        define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+        define_macros=defines
         )
 
     add_numpy_flags(module)
@@ -1395,3 +1415,18 @@ def build_gdk(ext_modules, packages):
 
     BUILT_GDK = True
 
+
+def build_tri(ext_modules, packages):
+    global BUILT_TRI
+    if BUILT_TRI: return # only build it if you you haven't already
+
+    deps = ['lib/matplotlib/tri/_tri.cpp', 'src/mplutils.cpp']
+    deps.extend(glob.glob('CXX/*.cxx'))
+    deps.extend(glob.glob('CXX/*.c'))
+
+    module = Extension('matplotlib._tri', deps,
+                       define_macros=defines)
+    add_numpy_flags(module)
+    add_base_flags(module)
+    ext_modules.append(module)
+    BUILT_TRI = True

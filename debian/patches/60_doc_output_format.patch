@@ -1,0 +1,15 @@
+Description: obtain output format information even if it's a unicode string
+
+Index: matplotlib-1.0.1/lib/matplotlib/sphinxext/plot_directive.py
+===================================================================
+--- matplotlib-1.0.1.orig/lib/matplotlib/sphinxext/plot_directive.py	2011-01-06 14:48:13.000000000 +0100
++++ matplotlib-1.0.1/lib/matplotlib/sphinxext/plot_directive.py	2011-01-13 23:50:58.838682411 +0100
+@@ -346,7 +346,7 @@
+         del options['nofigs']
+ 
+     formats = setup.config.plot_formats
+-    if type(formats) == str:
++    if isinstance(formats, basestring):
+         formats = eval(formats)
+ 
+     fname = os.path.basename(plot_path)

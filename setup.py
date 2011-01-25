@@ -42,18 +42,24 @@ from setupext import build_agg, build_gtkagg, build_tkagg, build_wxagg,\
      check_for_qt, check_for_qt4, check_for_cairo, \
      check_provide_pytz, check_provide_dateutil,\
      check_for_dvipng, check_for_ghostscript, check_for_latex, \
-     check_for_pdftops, check_for_datetime, options, build_png
+     check_for_pdftops, check_for_datetime, options, build_png, build_tri
 #import distutils.sysconfig
 
 # jdh
 packages = [
     'matplotlib',
     'matplotlib.backends',
+    'matplotlib.backends.qt4_editor',
     'matplotlib.projections',
+    'matplotlib.testing',
+    'matplotlib.testing.jpl_units',
+    'matplotlib.tests',
 #   'matplotlib.toolkits',
     'mpl_toolkits',
     'mpl_toolkits.mplot3d',
     'mpl_toolkits.axes_grid',
+    'mpl_toolkits.axes_grid1',
+    'mpl_toolkits.axisartist',
     'matplotlib.sphinxext',
     # The following are deprecated and will be removed.
     'matplotlib.numerix',
@@ -62,6 +68,7 @@ packages = [
     'matplotlib.numerix.linear_algebra',
     'matplotlib.numerix.random_array',
     'matplotlib.numerix.fft',
+    'matplotlib.tri',
 
     ]
 
@@ -88,6 +95,10 @@ package_data = {'matplotlib':['mpl-data/fonts/afm/*.afm',
                               'mpl-data/fonts/pdfcorefonts/*.afm',
                               'mpl-data/fonts/pdfcorefonts/*.txt',
                               'mpl-data/fonts/ttf/*.ttf',
+                              'mpl-data/fonts/ttf/LICENSE_STIX',
+                              'mpl-data/fonts/ttf/COPYRIGHT.TXT',
+                              'mpl-data/fonts/ttf/README.TXT',
+                              'mpl-data/fonts/ttf/RELEASENOTES.TXT',
                               'mpl-data/images/*.xpm',
                               'mpl-data/images/*.svg',
                               'mpl-data/images/*.png',
@@ -98,6 +109,18 @@ package_data = {'matplotlib':['mpl-data/fonts/afm/*.afm',
                               'mpl-data/*.glade',
                               'backends/Matplotlib.nib/*',
                               ]}
+
+if 1:
+    # TODO: exclude these when making release?
+    baseline_images = glob.glob(os.path.join('lib','matplotlib','tests',
+                                             'baseline_images','*','*'))
+    def chop_package(fname):
+        badstr = os.path.join('lib','matplotlib','')
+        assert fname.startswith(badstr)
+        result = fname[ len(badstr): ]
+        return result
+    baseline_images = [chop_package(f) for f in baseline_images]
+    package_data['matplotlib'].extend(baseline_images)
 
 if not check_for_numpy():
     sys.exit(1)
@@ -111,6 +134,7 @@ build_contour(ext_modules, packages)
 build_delaunay(ext_modules, packages)
 build_nxutils(ext_modules, packages)
 build_path(ext_modules, packages)
+build_tri(ext_modules, packages)
 
 print_raw("")
 print_raw("OPTIONAL BACKEND DEPENDENCIES")

@@ -58,6 +58,8 @@ class MixedModeRenderer(object):
         finalize flipy get_canvas_width_height get_image_magnification
         get_texmanager get_text_width_height_descent new_gc open_group
         option_image_nocomposite points_to_pixels strip_math
+        start_filter stop_filter draw_gouraud_triangle
+        draw_gouraud_triangles option_scale_image
         """.split()
     def _set_current_renderer(self, renderer):
         self._renderer = renderer
@@ -117,10 +119,12 @@ class MixedModeRenderer(object):
                 image = frombuffer(buffer, w, h, True)
                 image.is_grayscale = False
                 image.flipud_out()
+                gc = self._renderer.new_gc()
                 self._renderer.draw_image(
+                    gc,
                     float(l)/self.dpi*72.,
                     (float(height) - b - h)/self.dpi*72.,
-                    image, None)
+                    image)
             self._raster_renderer = None
             self._rasterizing = False
 

@@ -1,3 +1,37 @@
+matplotlib (1.0.1-1) experimental; urgency=low
+
+  * New upstream release; Closes: #606116
+  * debian/patches/{10_build_fix.patch, 20_matplotlibrc_path_search_fix.patch}
+    - updated to new upstream code
+  * debian/patches/30_doc_pass_dpi.patch
+    - removed, merged upstream
+  * debian/rules
+    - don't compress objects.inv; thanks to Michael Fladischer for the report;
+      Closes: #608760
+  * debian/rules, debian/patches/30_disable_sample_downloads.patch
+    - bypass examples data download from internet, but use local copy instead
+  * debian/python-matplotlib-data.install
+    - install examples sample data
+  * debian/control
+    - bump Standards-Version: to 3.9.1 (no changes needed)
+    - removed DM-U-A flag, no more needed
+    - added python-xlwt to b-d, needed to build doc examples
+    - Benjamin Drung removed himself from the Uploaders list
+  * debian/copyright
+    - updated debian packaging copyright
+  * debian/patches/40_bts608939_draw_markers_description.patch
+    - fix a glitch (missing reference to documentation page) in draw_markers()
+      description; thanks to Jakub Wilk for report and patch; Closes: #608939
+  * debian/patches/50_bts608942_spaces_in_param_args.patch
+    - don't separate param and its argument with a space, new sphinx consider
+      the first argument as the type; thanks to Jakub Wilk for the report;
+      Closes: #608942
+  * debian/patches/60_doc_output_format.patch
+    - obtain the documentation output format even if the value is a unicode (as
+      returned by recent sphinx); thanks to Jakub Wilk for the tip on IRC
+
+ -- Sandro Tosi <morph@debian.org>  Tue, 25 Jan 2011 18:17:56 +0100
+
 matplotlib (0.99.3-1) unstable; urgency=low
 
   * New upstream release

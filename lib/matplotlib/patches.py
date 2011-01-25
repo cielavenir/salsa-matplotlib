@@ -9,13 +9,14 @@ import matplotlib.cbook as cbook
 import matplotlib.artist as artist
 from matplotlib.artist import allow_rasterization
 import matplotlib.colors as colors
+from matplotlib import docstring
 import matplotlib.transforms as transforms
 from matplotlib.path import Path
 
 # these are not available for the object inspector until after the
 # class is built so we define an initial set here for the init
 # function and they will be overridden after object definition
-artist.kwdocd['Patch'] = """
+docstring.interpd.update(Patch = """
 
           =================   ==============================================
           Property            Description
@@ -38,7 +39,7 @@ artist.kwdocd['Patch'] = """
           zorder              any number
           =================   ==============================================
 
-          """
+          """)
 
 class Patch(artist.Artist):
     """
@@ -51,11 +52,56 @@ class Patch(artist.Artist):
     def __str__(self):
         return str(self.__class__).split('.')[-1]
 
+    def __init__(self,
+                 edgecolor=None,
+                 facecolor=None,
+                 color=None,
+                 linewidth=None,
+                 linestyle=None,
+                 antialiased = None,
+                 hatch = None,
+                 fill=True,
+                 path_effects = None,
+                 **kwargs
+                 ):
+        """
+        The following kwarg properties are supported
+
+        %(Patch)s
+        """
+        artist.Artist.__init__(self)
+
+        if linewidth is None: linewidth = mpl.rcParams['patch.linewidth']
+        if linestyle is None: linestyle = "solid"
+        if antialiased is None: antialiased = mpl.rcParams['patch.antialiased']
+
+        self._fill = True # needed for set_facecolor call
+        if color is not None:
+            if (edgecolor is not None or
+                facecolor is not None):
+                import warnings
+                warnings.warn("Setting the 'color' property will override"
+                              "the edgecolor or facecolor properties. ")
+            self.set_color(color)
+        else:
+            self.set_edgecolor(edgecolor)
+            self.set_facecolor(facecolor)
+        self.set_linewidth(linewidth)
+        self.set_linestyle(linestyle)
+        self.set_antialiased(antialiased)
+        self.set_hatch(hatch)
+        self.set_fill(fill)
+        self._combined_transform = transforms.IdentityTransform()
+
+        self.set_path_effects(path_effects)
+
+        if len(kwargs): artist.setp(self, **kwargs)
+
     def get_verts(self):
         """
         Return a copy of the vertices used in this patch
 
-        If the patch contains Bézier curves, the curves will be
+        If the patch contains Bezier curves, the curves will be
         interpolated by line segments.  To access the curves as
         curves, use :meth:`get_path`.
         """
@@ -180,7 +226,7 @@ class Patch(artist.Artist):
         ACCEPTS: mpl color spec, or None for default, or 'none' for no color
         """
         if color is None: color = mpl.rcParams['patch.edgecolor']
-        self._edgecolor = color
+        self._edgecolor = colors.colorConverter.to_rgba(color, self._alpha)
 
     def set_ec(self, color):
         """alias for set_edgecolor"""
@@ -193,7 +239,12 @@ class Patch(artist.Artist):
         ACCEPTS: mpl color spec, or None for default, or 'none' for no color
         """
         if color is None: color = mpl.rcParams['patch.facecolor']
-        self._facecolor = color
+        self._original_facecolor = color # save: otherwise changing _fill
+                                         # may lose alpha information
+        self._facecolor = colors.colorConverter.to_rgba(color, self._alpha)
+        if not self._fill:
+            self._facecolor = list(self._facecolor)
+            self._facecolor[3] = 0
 
     def set_fc(self, color):
         """alias for set_facecolor"""
@@ -213,6 +264,21 @@ class Patch(artist.Artist):
         self.set_facecolor(c)
         self.set_edgecolor(c)
 
+    def set_alpha(self, alpha):
+        """
+        Set the alpha tranparency of the patch.
+
+        ACCEPTS: float or None
+        """
+        if alpha is not None:
+            try:
+                float(alpha)
+            except TypeError:
+                raise TypeError('alpha must be a float or None')
+        artist.Artist.set_alpha(self, alpha)
+        self.set_facecolor(self._original_facecolor) # using self._fill and self._alpha
+        self._edgecolor = colors.colorConverter.to_rgba(
+                                        self._edgecolor[:3], self._alpha)
 
     def set_linewidth(self, w):
         """
@@ -246,11 +312,17 @@ class Patch(artist.Artist):
 
         ACCEPTS: [True | False]
         """
-        self.fill = b
+        self._fill = bool(b)
+        self.set_facecolor(self._original_facecolor)
 
     def get_fill(self):
         'return whether fill is set'
-        return self.fill
+        return self._fill
+
+    # Make fill a property so as to preserve the long-standing
+    # but somewhat inconsistent behavior in which fill was an
+    # attribute.
+    fill = property(get_fill, set_fill)
 
     def set_hatch(self, hatch):
         """
@@ -284,6 +356,16 @@ class Patch(artist.Artist):
         'Return the current hatching pattern'
         return self._hatch
 
+    def set_path_effects(self, path_effects):
+        """
+        set path_effects, which should be a list of instances of
+        matplotlib.patheffect._Base class or its derivatives.
+        """
+        self._path_effects = path_effects
+
+    def get_path_effects(self):
+        return self._path_effects
+
     @allow_rasterization
     def draw(self, renderer):
         'Draw the :class:`Patch` to the given *renderer*.'
@@ -292,28 +374,27 @@ class Patch(artist.Artist):
         renderer.open_group('patch', self.get_gid())
         gc = renderer.new_gc()
 
-        if cbook.is_string_like(self._edgecolor) and self._edgecolor.lower()=='none':
-            gc.set_linewidth(0)
-        else:
-            gc.set_foreground(self._edgecolor)
-            gc.set_linewidth(self._linewidth)
-            gc.set_linestyle(self._linestyle)
+        gc.set_foreground(self._edgecolor, isRGB=True)
+
+        lw = self._linewidth
+        if self._edgecolor[3] == 0:
+            lw = 0
+        gc.set_linewidth(lw)
+        gc.set_linestyle(self._linestyle)
 
         gc.set_antialiased(self._antialiased)
         self._set_gc_clip(gc)
         gc.set_capstyle('projecting')
         gc.set_url(self._url)
-        gc.set_snap(self._snap)
+        gc.set_snap(self.get_snap())
 
-        if (not self.fill or self._facecolor is None or
-            (cbook.is_string_like(self._facecolor) and self._facecolor.lower()=='none')):
-            rgbFace = None
-            gc.set_alpha(1.0)
-        else:
-            r, g, b, a = colors.colorConverter.to_rgba(self._facecolor, self._alpha)
-            rgbFace = (r, g, b)
-            gc.set_alpha(a)
+        rgbFace = self._facecolor
+        if rgbFace[3] == 0:
+            rgbFace = None # (some?) renderers expect this as no-fill signal
 
+        gc.set_alpha(self._edgecolor[3])
+        if self._edgecolor[3] == 0:
+            gc.set_alpha(self._facecolor[3])
 
         if self._hatch:
             gc.set_hatch(self._hatch )
@@ -323,7 +404,11 @@ class Patch(artist.Artist):
         tpath = transform.transform_path_non_affine(path)
         affine = transform.get_affine()
 
-        renderer.draw_path(gc, tpath, affine, rgbFace)
+        if self.get_path_effects():
+            for path_effect in self.get_path_effects():
+                path_effect.draw_path(renderer, gc, tpath, affine, rgbFace)
+        else:
+            renderer.draw_path(gc, tpath, affine, rgbFace)
 
         gc.restore()
         renderer.close_group('patch')
@@ -337,53 +422,20 @@ class Patch(artist.Artist):
     def get_window_extent(self, renderer=None):
         return self.get_path().get_extents(self.get_transform())
 
-artist.kwdocd['Patch'] = patchdoc = artist.kwdoc(Patch)
+patchdoc = artist.kwdoc(Patch)
 for k in ('Rectangle', 'Circle', 'RegularPolygon', 'Polygon', 'Wedge', 'Arrow',
           'FancyArrow', 'YAArrow', 'CirclePolygon', 'Ellipse', 'Arc',
-          'FancyBboxPatch'):
-    artist.kwdocd[k] = patchdoc
+          'FancyBboxPatch', 'Patch'):
+    docstring.interpd.update({k:patchdoc})
 
-# define Patch.__init__ after the class so that the docstring can be
-# auto-generated.
-def __patch__init__(self,
-                    edgecolor=None,
-                    facecolor=None,
-                    linewidth=None,
-                    linestyle=None,
-                    antialiased = None,
-                    hatch = None,
-                    fill=True,
-                    **kwargs
-                    ):
-    """
-    The following kwarg properties are supported
-
-    %(Patch)s
-    """
-    artist.Artist.__init__(self)
-
-    if linewidth is None: linewidth = mpl.rcParams['patch.linewidth']
-    if linestyle is None: linestyle = "solid"
-    if antialiased is None: antialiased = mpl.rcParams['patch.antialiased']
-
-    self.set_edgecolor(edgecolor)
-    self.set_facecolor(facecolor)
-    self.set_linewidth(linewidth)
-    self.set_linestyle(linestyle)
-    self.set_antialiased(antialiased)
-    self.set_hatch(hatch)
-    self.fill = fill
-    self._combined_transform = transforms.IdentityTransform()
-
-    if len(kwargs): artist.setp(self, **kwargs)
-
-__patch__init__.__doc__ = cbook.dedent(__patch__init__.__doc__) % artist.kwdocd
-Patch.__init__ = __patch__init__
+# define Patch.__init__ docstring after the class has been added to interpd
+docstring.dedent_interpd(Patch.__init__.im_func)
 
 class Shadow(Patch):
     def __str__(self):
         return "Shadow(%s)"%(str(self.patch))
 
+    @docstring.dedent_interpd
     def __init__(self, patch, ox, oy, props=None, **kwargs):
         """
         Create a shadow of the given *patch* offset by *ox*, *oy*.
@@ -400,7 +452,6 @@ class Shadow(Patch):
         self._ox, self._oy = ox, oy
         self._shadow_transform = transforms.Affine2D()
         self._update()
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def _update(self):
         self.update_from(self.patch)
@@ -452,6 +503,7 @@ class Rectangle(Patch):
         return self.__class__.__name__ \
             + "(%g,%g;%gx%g)" % (self._x, self._y, self._width, self._height)
 
+    @docstring.dedent_interpd
     def __init__(self, xy, width, height, **kwargs):
         """
 
@@ -469,7 +521,6 @@ class Rectangle(Patch):
         self._height = height
         # Note: This cannot be calculated until this is added to an Axes
         self._rect_transform = transforms.IdentityTransform()
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def get_path(self):
         """
@@ -590,6 +641,7 @@ class RegularPolygon(Patch):
     def __str__(self):
         return "Poly%d(%g,%g)"%(self._numVertices,self._xy[0],self._xy[1])
 
+    @docstring.dedent_interpd
     def __init__(self, xy, numVertices, radius=5, orientation=0,
                  **kwargs):
         """
@@ -619,8 +671,6 @@ class RegularPolygon(Patch):
         self._update_transform()
 
         Patch.__init__(self, **kwargs)
-
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def _update_transform(self):
         self._poly_transform.clear() \
@@ -669,6 +719,7 @@ class PathPatch(Patch):
     def __str__(self):
         return "Poly((%g, %g) ...)" % tuple(self._path.vertices[0])
 
+    @docstring.dedent_interpd
     def __init__(self, path, **kwargs):
         """
         *path* is a :class:`matplotlib.path.Path` object.
@@ -684,7 +735,6 @@ class PathPatch(Patch):
         """
         Patch.__init__(self, **kwargs)
         self._path = path
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def get_path(self):
         return self._path
@@ -696,6 +746,7 @@ class Polygon(Patch):
     def __str__(self):
         return "Poly((%g, %g) ...)" % tuple(self._path.vertices[0])
 
+    @docstring.dedent_interpd
     def __init__(self, xy, closed=True, **kwargs):
         """
         *xy* is a numpy array with shape Nx2.
@@ -716,8 +767,6 @@ class Polygon(Patch):
         xy = np.asarray(xy, np.float_)
         self._path = Path(xy)
         self.set_closed(closed)
-
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def get_path(self):
         return self._path
@@ -757,6 +806,7 @@ class Wedge(Patch):
     def __str__(self):
         return "Wedge(%g,%g)"%(self.theta1,self.theta2)
 
+    @docstring.dedent_interpd
     def __init__(self, center, r, theta1, theta2, width=None, **kwargs):
         """
         Draw a wedge centered at *x*, *y* center with radius *r* that
@@ -802,7 +852,6 @@ class Wedge(Patch):
         v += np.asarray(center)
         self._path = Path(v,c)
         self._patch_transform = transforms.IdentityTransform()
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def get_path(self):
         return self._path
@@ -822,6 +871,7 @@ class Arrow(Patch):
             [ 1.0,  0.0 ], [ 0.8,  0.3],
             [ 0.8,  0.1 ], [ 0.0,  0.1] ] )
 
+    @docstring.dedent_interpd
     def __init__( self, x, y, dx, dy, width=1.0, **kwargs ):
         """
         Draws an arrow, starting at (*x*, *y*), direction and length
@@ -840,7 +890,6 @@ class Arrow(Patch):
         trans3 = transforms.Affine2D().translate(x, y)
         trans = trans1 + trans2 + trans3
         self._patch_transform = trans.frozen()
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def get_path(self):
         return self._path
@@ -856,6 +905,7 @@ class FancyArrow(Polygon):
     def __str__(self):
         return "FancyArrow()"
 
+    @docstring.dedent_interpd
     def __init__(self, x, y, dx, dy, width=0.001, length_includes_head=False, \
         head_width=None, head_length=None, shape='full', overhang=0, \
         head_starts_at_zero=False,**kwargs):
@@ -928,7 +978,6 @@ class FancyArrow(Polygon):
             verts = np.dot(coords, M) + (x+dx, y+dy)
 
         Polygon.__init__(self, map(tuple, verts), **kwargs)
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
 class YAArrow(Patch):
     """
@@ -940,6 +989,7 @@ class YAArrow(Patch):
     def __str__(self):
         return "YAArrow()"
 
+    @docstring.dedent_interpd
     def __init__(self, figure, xytip, xybase, width=4, frac=0.1, headwidth=12, **kwargs):
         """
         Constructor arguments:
@@ -974,7 +1024,6 @@ class YAArrow(Patch):
         self.frac = frac
         self.headwidth = headwidth
         Patch.__init__(self, **kwargs)
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def get_path(self):
         # Since this is dpi dependent, we need to recompute the path
@@ -1038,6 +1087,7 @@ class CirclePolygon(RegularPolygon):
     def __str__(self):
         return "CirclePolygon(%d,%d)"%self.center
 
+    @docstring.dedent_interpd
     def __init__(self, xy, radius=5,
                  resolution=20,  # the number of vertices
                  **kwargs):
@@ -1056,7 +1106,6 @@ class CirclePolygon(RegularPolygon):
                                 radius,
                                 orientation=0,
                                 **kwargs)
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
 
 class Ellipse(Patch):
@@ -1066,16 +1115,17 @@ class Ellipse(Patch):
     def __str__(self):
         return "Ellipse(%s,%s;%sx%s)"%(self.center[0],self.center[1],self.width,self.height)
 
+    @docstring.dedent_interpd
     def __init__(self, xy, width, height, angle=0.0, **kwargs):
         """
         *xy*
           center of ellipse
 
         *width*
-          length of horizontal axis
+          total length (diameter) of horizontal axis
 
         *height*
-          length of vertical axis
+          total length (diameter) of vertical axis
 
         *angle*
           rotation in degrees (anti-clockwise)
@@ -1091,7 +1141,6 @@ class Ellipse(Patch):
         self._path = Path.unit_circle()
         # Note: This cannot be calculated until this is added to an Axes
         self._patch_transform = transforms.IdentityTransform()
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def _recompute_transform(self):
         """NOTE: This cannot be called until after this has been added
@@ -1131,6 +1180,7 @@ class Circle(Ellipse):
     def __str__(self):
         return "Circle((%g,%g),r=%g)"%(self.center[0],self.center[1],self.radius)
 
+    @docstring.dedent_interpd
     def __init__(self, xy, radius=5, **kwargs):
         """
         Create true circle at center *xy* = (*x*, *y*) with given
@@ -1149,7 +1199,6 @@ class Circle(Ellipse):
 
         self.radius = radius
         Ellipse.__init__(self, xy, radius*2, radius*2, **kwargs)
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def set_radius(self, radius):
         """
@@ -1179,6 +1228,7 @@ class Arc(Ellipse):
     def __str__(self):
         return "Arc(%s,%s;%sx%s)"%(self.center[0],self.center[1],self.width,self.height)
 
+    @docstring.dedent_interpd
     def __init__(self, xy, width, height, angle=0.0, theta1=0.0, theta2=360.0, **kwargs):
         """
         The following args are supported:
@@ -1216,7 +1266,9 @@ class Arc(Ellipse):
 
         self.theta1 = theta1
         self.theta2 = theta2
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
+
+        self._path = Path.arc(self.theta1, self.theta2)
+
 
     @allow_rasterization
     def draw(self, renderer):
@@ -1277,7 +1329,7 @@ class Arc(Ellipse):
         inv_error = (1.0 / 1.89818e-6) * 0.5
 
         if width < inv_error and height < inv_error:
-            self._path = Path.arc(self.theta1, self.theta2)
+            #self._path = Path.arc(self.theta1, self.theta2)
             return Patch.draw(self, renderer)
 
         def iter_circle_intersect_on_line(x0, y0, x1, y1):
@@ -1359,14 +1411,21 @@ class Arc(Ellipse):
         last_theta = theta1
         theta1_rad = theta1 * DEG2RAD
         inside = box_path.contains_point((np.cos(theta1_rad), np.sin(theta1_rad)))
+
+        # save original path
+        path_original = self._path
         for theta in thetas:
             if inside:
-                self._path = Path.arc(last_theta, theta, 8)
+                _path = Path.arc(last_theta, theta, 8)
                 Patch.draw(self, renderer)
                 inside = False
             else:
                 inside = True
             last_theta = theta
+
+        # restore original path
+        self._path = path_original
+
 
 def bbox_artist(artist, renderer, props=None, fill=True):
     """
@@ -1991,9 +2050,11 @@ class BoxStyle(_Style):
 
     _style_list["roundtooth"] = Roundtooth
 
-    __doc__ = cbook.dedent(__doc__) % \
-           {"AvailableBoxstyles": _pprint_styles(_style_list)}
+    if __doc__: # __doc__ could be None if -OO optimization is enabled
+        __doc__ = cbook.dedent(__doc__) % \
+               {"AvailableBoxstyles": _pprint_styles(_style_list)}
 
+docstring.interpd.update(AvailableBoxstyles=_pprint_styles(BoxStyle._style_list))
 
 class FancyBboxPatch(Patch):
     """
@@ -2011,6 +2072,7 @@ class FancyBboxPatch(Patch):
         return self.__class__.__name__ \
             + "FancyBboxPatch(%g,%g;%gx%g)" % (self._x, self._y, self._width, self._height)
 
+    @docstring.dedent_interpd
     def __init__(self, xy, width, height,
                  boxstyle="round",
                  bbox_transmuter=None,
@@ -2058,13 +2120,7 @@ class FancyBboxPatch(Patch):
         self._mutation_aspect=mutation_aspect
 
 
-    kwdoc = dict()
-    kwdoc["AvailableBoxstyles"]=_pprint_styles(BoxStyle._style_list)
-    kwdoc.update(artist.kwdocd)
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % kwdoc
-    del kwdoc
-
-
+    @docstring.dedent_interpd
     def set_boxstyle(self, boxstyle=None, **kw):
         """
         Set the box style.
@@ -2095,12 +2151,6 @@ class FancyBboxPatch(Patch):
         else:
             self._bbox_transmuter = BoxStyle(boxstyle, **kw)
 
-
-    kwdoc = dict()
-    kwdoc["AvailableBoxstyles"]=_pprint_styles(BoxStyle._style_list)
-    kwdoc.update(artist.kwdocd)
-    set_boxstyle.__doc__ = cbook.dedent(set_boxstyle.__doc__) % kwdoc
-    del kwdoc
 
     def set_mutation_scale(self, scale):
         """
@@ -2686,9 +2736,9 @@ class ConnectionStyle(_Style):
 
     _style_list["bar"] = Bar
 
-
-    __doc__ = cbook.dedent(__doc__) % \
-           {"AvailableConnectorstyles": _pprint_styles(_style_list)}
+    if __doc__:
+        __doc__ = cbook.dedent(__doc__) % \
+               {"AvailableConnectorstyles": _pprint_styles(_style_list)}
 
 
 
@@ -2849,29 +2899,12 @@ class ArrowStyle(_Style):
             super(ArrowStyle._Curve, self).__init__()
 
 
-        def _get_pad_projected(self, x0, y0, x1, y1, linewidth):
-            # when no arrow head is drawn
-
-            dx, dy = x0 - x1, y0 - y1
-            cp_distance = math.sqrt(dx**2 + dy**2)
-
-            # padx_projected, pady_projected : amount of pad to account
-            # projection of the wedge
-            padx_projected = (.5*linewidth)
-            pady_projected = (.5*linewidth)
-
-            # apply pad for projected edge
-            ddx = padx_projected * dx / cp_distance
-            ddy = pady_projected * dy / cp_distance
-
-            return ddx, ddy
-
         def _get_arrow_wedge(self, x0, y0, x1, y1,
                              head_dist, cos_t, sin_t, linewidth
                              ):
             """
             Return the paths for arrow heads. Since arrow lines are
-            drawn with capstyle=projected, The arrow is goes beyond the
+            drawn with capstyle=projected, The arrow goes beyond the
             desired point. This method also returns the amount of the path
             to be shrinked so that it does not overshoot.
             """
@@ -2882,14 +2915,13 @@ class ArrowStyle(_Style):
             dx, dy = x0 - x1, y0 - y1
             cp_distance = math.sqrt(dx**2 + dy**2)
 
-            # padx_projected, pady_projected : amount of pad for account
-            # the overshooting of the projection of the wedge
-            padx_projected = (.5*linewidth / cos_t)
-            pady_projected = (.5*linewidth / sin_t)
+            # pad_projected : amount of pad to account the
+            # overshooting of the projection of the wedge
+            pad_projected = (.5*linewidth / sin_t)
 
             # apply pad for projected edge
-            ddx = padx_projected * dx / cp_distance
-            ddy = pady_projected * dy / cp_distance
+            ddx = pad_projected * dx / cp_distance
+            ddy = pad_projected * dy / cp_distance
 
             # offset for arrow wedge
             dx, dy = dx / cp_distance * head_dist, dy / cp_distance * head_dist
@@ -2898,7 +2930,7 @@ class ArrowStyle(_Style):
             dx2, dy2 = cos_t * dx - sin_t * dy, sin_t * dx + cos_t * dy
 
             vertices_arrow = [(x1+ddx+dx1, y1+ddy+dy1),
-                              (x1+ddx, y1++ddy),
+                              (x1+ddx, y1+ddy),
                               (x1+ddx+dx2, y1+ddy+dy2)]
             codes_arrow = [Path.MOVETO,
                            Path.LINETO,
@@ -3199,6 +3231,63 @@ class ArrowStyle(_Style):
 
             return p, False
 
+    class BracketAB(_Bracket):
+        """
+        An arrow with a bracket(])  at both ends.
+        """
+
+        def __init__(self,
+                     widthA=1., lengthA=0.2, angleA=None,
+                     widthB=1., lengthB=0.2, angleB=None):
+            """
+            *widthA*
+              width of the bracket
+
+            *lengthA*
+              length of the bracket
+
+            *angleA*
+              angle between the bracket and the line
+
+            *widthB*
+              width of the bracket
+
+            *lengthB*
+              length of the bracket
+
+            *angleB*
+              angle between the bracket and the line
+            """
+
+            super(ArrowStyle.BracketAB, self).__init__(True, True, \
+                        widthA=widthA, lengthA=lengthA, angleA=angleA,
+                        widthB=widthB, lengthB=lengthB, angleB=angleB)
+
+    _style_list["]-["] = BracketAB
+
+
+    class BracketA(_Bracket):
+        """
+        An arrow with a bracket(])  at its end.
+        """
+
+        def __init__(self, widthA=1., lengthA=0.2, angleA=None):
+            """
+            *widthA*
+              width of the bracket
+
+            *lengthA*
+              length of the bracket
+
+            *angleA*
+              angle between the bracket and the line
+            """
+
+            super(ArrowStyle.BracketA, self).__init__(None, True,
+                     widthA=widthA, lengthA=lengthA, angleA=angleA )
+
+    _style_list["]-"] = BracketA
+
 
     class BracketB(_Bracket):
         """
@@ -3218,10 +3307,44 @@ class ArrowStyle(_Style):
             """
 
             super(ArrowStyle.BracketB, self).__init__(None, True,
-                     widthB=widthB, lengthB=lengthB, angleB=None )
+                     widthB=widthB, lengthB=lengthB, angleB=angleB )
 
-    #_style_list["-["] = BracketB
     _style_list["-["] = BracketB
+
+
+    class BarAB(_Bracket):
+        """
+        An arrow with a bracket(])  at both ends.
+        """
+
+        def __init__(self,
+                     widthA=1., angleA=None,
+                     widthB=1., angleB=None):
+            """
+            *widthA*
+              width of the bracket
+
+            *lengthA*
+              length of the bracket
+
+            *angleA*
+              angle between the bracket and the line
+
+            *widthB*
+              width of the bracket
+
+            *lengthB*
+              length of the bracket
+
+            *angleB*
+              angle between the bracket and the line
+            """
+
+            super(ArrowStyle.BarAB, self).__init__(True, True, \
+                        widthA=widthA, lengthA=0, angleA=angleA,
+                        widthB=widthB, lengthB=0, angleB=angleB)
+
+    _style_list["|-|"] = BarAB
 
 
     class Simple(_Base):
@@ -3442,11 +3565,16 @@ class ArrowStyle(_Style):
 
     _style_list["wedge"] = Wedge
 
-    __doc__ = cbook.dedent(__doc__) % \
-           {"AvailableArrowstyles": _pprint_styles(_style_list)}
+    if __doc__:
+        __doc__ = cbook.dedent(__doc__) % \
+               {"AvailableArrowstyles": _pprint_styles(_style_list)}
 
 
 
+docstring.interpd.update(
+    AvailableArrowstyles = _pprint_styles(ArrowStyle._style_list),
+    AvailableConnectorstyles = _pprint_styles(ConnectionStyle._style_list),
+)
 
 class FancyArrowPatch(Patch):
     """
@@ -3455,9 +3583,18 @@ class FancyArrowPatch(Patch):
 
 
     def __str__(self):
-        return self.__class__.__name__ \
-            + "FancyArrowPatch(%g,%g,%g,%g,%g,%g)" % tuple(self._q_bezier)
 
+
+        if self._posA_posB is not None:
+            (x1, y1), (x2, y2) = self._posA_posB
+            return self.__class__.__name__ \
+                   + "(%g,%g->%g,%g)" % (x1, y1, x2, y2)
+        else:
+            return self.__class__.__name__ \
+                   + "(%s)" % (str(self._path_original),)
+
+
+    @docstring.dedent_interpd
     def __init__(self, posA=None, posB=None,
                  path=None,
                  arrowstyle="simple",
@@ -3470,6 +3607,7 @@ class FancyArrowPatch(Patch):
                  shrinkB=2.,
                  mutation_scale=1.,
                  mutation_aspect=None,
+                 dpi_cor=1.,
                  **kwargs):
         """
         If *posA* and *posB* is given, a path connecting two point are
@@ -3537,16 +3675,26 @@ class FancyArrowPatch(Patch):
         self._mutation_scale=mutation_scale
         self._mutation_aspect=mutation_aspect
 
+        self.set_dpi_cor(dpi_cor)
         #self._draw_in_display_coordinate = True
 
-    kwdoc = dict()
-    kwdoc["AvailableArrowstyles"]=_pprint_styles(ArrowStyle._style_list)
-    kwdoc["AvailableConnectorstyles"]=_pprint_styles(ConnectionStyle._style_list)
+    def set_dpi_cor(self, dpi_cor):
+        """
+        dpi_cor is currently used for linewidth-related things and
+        shink factor. Mutation scale is not affected by this.
+        """
+        
+        self._dpi_cor = dpi_cor
 
-    kwdoc.update(artist.kwdocd)
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % kwdoc
-    del kwdoc
+    def get_dpi_cor(self):
+        """
+        dpi_cor is currently used for linewidth-related things and
+        shink factor. Mutation scale is not affected by this.
+        """
+        
+        return self._dpi_cor
 
+        
     def set_positions(self, posA, posB):
         """ set the begin end end positions of the connecting
         path. Use current vlaue if None.
@@ -3667,8 +3815,8 @@ class FancyArrowPatch(Patch):
     def get_path(self):
         """
         return the path of the arrow in the data coordinate. Use
-        get_path_in_displaycoord() medthod to retrieve the arrow path
-        in the disaply coord.
+        get_path_in_displaycoord() method to retrieve the arrow path
+        in the disaply coord.  
         """
         _path, fillable = self.get_path_in_displaycoord()
 
@@ -3683,14 +3831,16 @@ class FancyArrowPatch(Patch):
         Return the mutated path of the arrow in the display coord
         """
 
+        dpi_cor = self.get_dpi_cor()
+
         if self._posA_posB is not None:
             posA = self.get_transform().transform_point(self._posA_posB[0])
             posB = self.get_transform().transform_point(self._posA_posB[1])
             _path = self.get_connectionstyle()(posA, posB,
                                                patchA=self.patchA,
                                                patchB=self.patchB,
-                                               shrinkA=self.shrinkA,
-                                               shrinkB=self.shrinkB
+                                               shrinkA=self.shrinkA*dpi_cor,
+                                               shrinkB=self.shrinkB*dpi_cor
                                                )
         else:
             _path = self.get_transform().transform_path(self._path_original)
@@ -3699,12 +3849,12 @@ class FancyArrowPatch(Patch):
 
         _path, fillable = self.get_arrowstyle()(_path,
                                                 self.get_mutation_scale(),
-                                                self.get_linewidth(),
+                                                self.get_linewidth()*dpi_cor,
                                                 self.get_mutation_aspect()
                                                 )
 
         #if not fillable:
-        #    self.fill = False
+        #    self._fill = False
 
         return _path, fillable
 
@@ -3712,35 +3862,39 @@ class FancyArrowPatch(Patch):
 
     def draw(self, renderer):
         if not self.get_visible(): return
-        #renderer.open_group('patch')
+
+        renderer.open_group('patch', self.get_gid())
         gc = renderer.new_gc()
 
+        gc.set_foreground(self._edgecolor, isRGB=True)
 
-        if cbook.is_string_like(self._edgecolor) and self._edgecolor.lower()=='none':
-            gc.set_linewidth(0)
-        else:
-            gc.set_foreground(self._edgecolor)
-            gc.set_linewidth(self._linewidth)
-            gc.set_linestyle(self._linestyle)
+        lw = self._linewidth
+        if self._edgecolor[3] == 0:
+            lw = 0
+        gc.set_linewidth(lw)
+        gc.set_linestyle(self._linestyle)
 
         gc.set_antialiased(self._antialiased)
         self._set_gc_clip(gc)
         gc.set_capstyle('round')
+        gc.set_snap(self.get_snap())
 
-        if (not self.fill or self._facecolor is None or
-            (cbook.is_string_like(self._facecolor) and self._facecolor.lower()=='none')):
-            rgbFace = None
-            gc.set_alpha(1.0)
-        else:
-            r, g, b, a = colors.colorConverter.to_rgba(self._facecolor, self._alpha)
-            rgbFace = (r, g, b)
-            gc.set_alpha(a)
+        rgbFace = self._facecolor
+        if rgbFace[3] == 0:
+            rgbFace = None # (some?) renderers expect this as no-fill signal
 
+        gc.set_alpha(self._edgecolor[3])
+        if self._edgecolor[3] == 0:
+            gc.set_alpha(self._facecolor[3])
 
         if self._hatch:
             gc.set_hatch(self._hatch )
 
-
+        # FIXME : dpi_cor is for the dpi-dependecy of the
+        # linewidth. There could be room for improvement.
+        # 
+        #dpi_cor = renderer.points_to_pixels(1.)
+        self.set_dpi_cor(renderer.points_to_pixels(1.))
         path, fillable = self.get_path_in_displaycoord()
 
         if not cbook.iterable(fillable):
@@ -3750,13 +3904,20 @@ class FancyArrowPatch(Patch):
 
         affine = transforms.IdentityTransform()
 
-        renderer.open_group('patch', self.get_gid())
 
-        for p, f in zip(path, fillable):
-            if f:
-                renderer.draw_path(gc, p, affine, rgbFace)
-            else:
-                renderer.draw_path(gc, p, affine, None)
+        if self.get_path_effects():
+            for path_effect in self.get_path_effects():
+                for p, f in zip(path, fillable):
+                    if f:
+                        path_effect.draw_path(renderer, gc, p, affine, rgbFace)
+                    else:
+                        path_effect.draw_path(renderer, gc, p, affine, None)
+        else:
+            for p, f in zip(path, fillable):
+                if f:
+                    renderer.draw_path(gc, p, affine, rgbFace)
+                else:
+                    renderer.draw_path(gc, p, affine, None)
 
 
         gc.restore()
@@ -3772,6 +3933,7 @@ class ConnectionPatch(FancyArrowPatch):
         return "ConnectionPatch((%g,%g),(%g,%g))" % \
                (self.xy1[0],self.xy1[1],self.xy2[0],self.xy2[1])
 
+    @docstring.dedent_interpd
     def __init__(self, xyA, xyB, coordsA, coordsB=None,
                  axesA=None, axesB=None,
                  arrowstyle="-",
@@ -3785,6 +3947,7 @@ class ConnectionPatch(FancyArrowPatch):
                  mutation_scale=10.,
                  mutation_aspect=None,
                  clip_on=False,
+                 dpi_cor=1.,
                  **kwargs):
         """
         Connect point *xyA* in *coordsA* with point *xyB* in *coordsB*
@@ -3858,12 +4021,11 @@ class ConnectionPatch(FancyArrowPatch):
                                  mutation_scale=mutation_scale,
                                  mutation_aspect=mutation_aspect,
                                  clip_on=clip_on,
+                                 dpi_cor=dpi_cor,
                                  **kwargs)
 
         # if True, draw annotation only if self.xy is inside the axes
         self._annotation_clip = None
-
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
 
     def _get_xy(self, x, y, s, axes=None):
@@ -3991,6 +4153,8 @@ class ConnectionPatch(FancyArrowPatch):
         Return the mutated path of the arrow in the display coord
         """
 
+        dpi_cor = self.get_dpi_cor()
+        
         x, y = self.xy1
         posA = self._get_xy(x, y, self.coords1, self.axesA)
 
@@ -4000,15 +4164,15 @@ class ConnectionPatch(FancyArrowPatch):
         _path = self.get_connectionstyle()(posA, posB,
                                            patchA=self.patchA,
                                            patchB=self.patchB,
-                                           shrinkA=self.shrinkA,
-                                           shrinkB=self.shrinkB
+                                           shrinkA=self.shrinkA*dpi_cor,
+                                           shrinkB=self.shrinkB*dpi_cor
                                            )
 
 
 
         _path, fillable = self.get_arrowstyle()(_path,
                                                 self.get_mutation_scale(),
-                                                self.get_linewidth(),
+                                                self.get_linewidth()*dpi_cor,
                                                 self.get_mutation_aspect()
                                                 )
 
