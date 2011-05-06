@@ -9,8 +9,10 @@ matplotlib (1.0.1-2) UNRELEASED; urgency=low
   * debian/patches/70_search_new_tkdir.patch
     - added patch to look for the updated location of 'tkConfig.sh' script;
       thanks to Julian Taylor for the report and patch; Closes: #621700
+  * debian/control
+    - bump Standards-Version to 3.9.2 (no changes needed)
 
- -- Sandro Tosi <morph@debian.org>  Sat, 07 May 2011 00:46:48 +0200
+ -- Sandro Tosi <morph@debian.org>  Sat, 07 May 2011 01:25:39 +0200
 
 matplotlib (1.0.1-1) experimental; urgency=low
 
