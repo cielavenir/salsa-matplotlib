@@ -6,8 +6,11 @@ matplotlib (1.0.1-2) UNRELEASED; urgency=low
       Rivera for the analysis; Closes: #625150
   * debian/rules
     - remove verbose logging for debhelper
+  * debian/patches/70_search_new_tkdir.patch
+    - added patch to look for the updated location of 'tkConfig.sh' script;
+      thanks to Julian Taylor for the report and patch; Closes: #621700
 
- -- Sandro Tosi <morph@debian.org>  Sat, 07 May 2011 00:23:45 +0200
+ -- Sandro Tosi <morph@debian.org>  Sat, 07 May 2011 00:46:48 +0200
 
 matplotlib (1.0.1-1) experimental; urgency=low
 
