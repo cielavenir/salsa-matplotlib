@@ -11,8 +11,9 @@ matplotlib (1.0.1-2) UNRELEASED; urgency=low
       thanks to Julian Taylor for the report and patch; Closes: #621700
   * debian/control
     - bump Standards-Version to 3.9.2 (no changes needed)
+    - removed XB-P-V/Conflicts/Replaces/Provides, no more needed
 
- -- Sandro Tosi <morph@debian.org>  Sat, 07 May 2011 01:25:39 +0200
+ -- Sandro Tosi <morph@debian.org>  Sat, 07 May 2011 01:38:28 +0200
 
 matplotlib (1.0.1-1) experimental; urgency=low
 
