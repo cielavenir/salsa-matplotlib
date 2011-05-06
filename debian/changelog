@@ -1,9 +1,13 @@
 matplotlib (1.0.1-2) UNRELEASED; urgency=low
 
+  * Upload to unstable
+    - fixed a FTBFS since the failing code (unicode vs byte-string) is rewritten
+      in 1.0.x branch; thanks to Lucas Nussbaum for the report and to Stefano
+      Rivera for the analysis; Closes: #625150
   * debian/rules
     - remove verbose logging for debhelper
 
- -- Sandro Tosi <morph@debian.org>  Tue, 25 Jan 2011 19:30:47 +0100
+ -- Sandro Tosi <morph@debian.org>  Sat, 07 May 2011 00:23:45 +0200
 
 matplotlib (1.0.1-1) experimental; urgency=low
 
