@@ -126,6 +126,8 @@ binary-indep: build-indep install-indep
 	dh_testroot -i
 	dh_installchangelogs -i CHANGELOG
 	dh_installdocs -p$(pd) -i doc/build/html/ doc/build/latex/Matplotlib.pdf
+	# remove pyc file from doc
+	find $(CURDIR)/debian/$(pd)/ -type f -name '*.pyc' | xargs rm -f
 	dh_installexamples -p$(pd) -i examples/*
 	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js -Xobjects.inv
 	ln -sf /usr/share/javascript/jquery/jquery.js \
