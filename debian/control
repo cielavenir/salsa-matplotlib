@@ -40,14 +40,13 @@ Build-Depends: debhelper (>= 7),
                tk8.5-dev,
                zlib1g-dev
 XS-Python-Version: all
-Standards-Version: 3.9.1
+Standards-Version: 3.9.2
 Homepage: http://matplotlib.sf.net/
 Vcs-Svn: svn://svn.debian.org/svn/python-modules/packages/matplotlib/trunk/
 Vcs-Browser: http://svn.debian.org/viewsvn/python-modules/packages/matplotlib/trunk/
 
 Package: python-matplotlib
 Architecture: any
-XB-Python-Version: ${python:Versions}
 Depends: python-cairo,
          python-dateutil,
          python-gobject,
@@ -59,9 +58,6 @@ Depends: python-cairo,
          ${python:Depends},
          ${shlibs:Depends}
 Recommends: python-glade2, python-tk (>= 2.5.2-1.1)
-Provides: ${python:Provides}
-Conflicts: python2.4-matplotlib
-Replaces: python2.4-matplotlib
 Enhances: ipython
 Suggests: dvipng,
           ipython (>= 0.6.3),

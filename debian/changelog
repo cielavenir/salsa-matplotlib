@@ -1,3 +1,21 @@
+matplotlib (1.0.1-2) unstable; urgency=low
+
+  * Upload to unstable
+    - fixed a FTBFS since the failing code (unicode vs byte-string) is rewritten
+      in 1.0.x branch; thanks to Lucas Nussbaum for the report and to Stefano
+      Rivera for the analysis; Closes: #625150
+  * debian/rules
+    - remove verbose logging for debhelper
+    - remove compiled python code from documentation
+  * debian/patches/70_search_new_tkdir.patch
+    - added patch to look for the updated location of 'tkConfig.sh' script;
+      thanks to Julian Taylor for the report and patch; Closes: #621700
+  * debian/control
+    - bump Standards-Version to 3.9.2 (no changes needed)
+    - removed XB-P-V/Conflicts/Replaces/Provides, no more needed
+
+ -- Sandro Tosi <morph@debian.org>  Sat, 07 May 2011 11:14:24 +0200
+
 matplotlib (1.0.1-1) experimental; urgency=low
 
   * New upstream release; Closes: #606116
