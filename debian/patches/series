@@ -5,3 +5,4 @@
 50_bts608942_spaces_in_param_args.patch
 60_doc_output_format.patch
 70_search_new_tkdir.patch
+80_fix_tkinter_version_detection.patch
