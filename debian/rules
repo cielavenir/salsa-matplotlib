@@ -156,6 +156,7 @@ binary-arch: build-arch install-arch
 	dh_link -a
 	dh_lintian -a
 	dh_strip -a --dbg-package=$(pdbg)
+	# fix python-debug-in-wrong-location lintian warning
 	cd debian/*-dbg/usr/lib/debug/usr/lib && mv pyshared pymodules
 	dh_compress -a
 	dh_fixperms -a
