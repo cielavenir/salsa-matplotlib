@@ -7,8 +7,10 @@ matplotlib (1.1.0~rc1-1) UNRELEASED; urgency=low
     - install debug files where gdb looks for them
   * debian/copyright
     - updated to new release
+  * debian/patches/*
+    - updated/deleted/refreshed as per new code
 
- -- Sandro Tosi <morph@debian.org>  Mon, 26 Sep 2011 23:02:36 +0200
+ -- Sandro Tosi <morph@debian.org>  Mon, 26 Sep 2011 23:47:21 +0200
 
 matplotlib (1.0.1-3) unstable; urgency=low
 

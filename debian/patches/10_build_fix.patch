@@ -3,11 +3,11 @@ Forwarded: no
 Author: Sandro Tosi <morph@debian.org>
 Last-Update: 2010-02-06
 
-Index: matplotlib-1.0~rc1/setupext.py
+Index: matplotlib-1.1.0~rc1/setupext.py
 ===================================================================
---- matplotlib-1.0~rc1.orig/setupext.py	2010-06-07 15:11:57.000000000 +0200
-+++ matplotlib-1.0~rc1/setupext.py	2010-06-30 20:05:25.676158843 +0200
-@@ -49,12 +49,12 @@
+--- matplotlib-1.1.0~rc1.orig/setupext.py	2011-09-24 17:08:27.000000000 +0200
++++ matplotlib-1.1.0~rc1/setupext.py	2011-09-26 23:37:43.195196916 +0200
+@@ -50,13 +50,13 @@
  
  basedir = {
      'win32'  : ['win32_static',],
@@ -16,17 +16,19 @@ Index: matplotlib-1.0~rc1/setupext.py
 -    'linux2-mips' : ['/usr/local', '/usr'],
 -    'linux2-sparc' : ['/usr/local', '/usr'],
 -    'linux2' : ['/usr/local', '/usr'],
+-    'linux3' : ['/usr/local', '/usr'],
 -    'linux'  : ['/usr/local', '/usr',],
 +    'linux2-alpha' : ['/usr'],
 +    'linux2-hppa' : ['/usr'],
 +    'linux2-mips' : ['/usr'],
 +    'linux2-sparc' : ['/usr'],
 +    'linux2' : ['/usr'],
++    'linux3' : ['/usr'],
 +    'linux'  : ['/usr',],
      'cygwin' : ['/usr/local', '/usr',],
      '_darwin' : ['/sw/lib/freetype2', '/sw/lib/freetype219', '/usr/local',
                  '/usr', '/sw'],
-@@ -69,10 +69,10 @@
+@@ -71,10 +71,10 @@
      'freebsd5' : ['/usr/local', '/usr'],
      'freebsd6' : ['/usr/local', '/usr'],
      'sunos5' : [os.getenv('MPLIB_BASE') or '/usr/local',],
