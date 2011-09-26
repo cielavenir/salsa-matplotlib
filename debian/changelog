@@ -5,8 +5,10 @@ matplotlib (1.1.0~rc1-1) UNRELEASED; urgency=low
     - remove Alexandre from Uploaders: thanks for all the work!
   * debian/rules
     - install debug files where gdb looks for them
+  * debian/copyright
+    - updated to new release
 
- -- Sandro Tosi <morph@debian.org>  Mon, 26 Sep 2011 22:54:03 +0200
+ -- Sandro Tosi <morph@debian.org>  Mon, 26 Sep 2011 23:02:36 +0200
 
 matplotlib (1.0.1-3) unstable; urgency=low
 
