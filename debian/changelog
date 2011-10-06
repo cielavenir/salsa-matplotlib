@@ -1,6 +1,6 @@
-matplotlib (1.1.0~rc1-1) UNRELEASED; urgency=low
+matplotlib (1.1.0-1) UNRELEASED; urgency=low
 
-  * New upstream release (candidate)
+  * New upstream release
   * debian/control
     - remove Alexandre from Uploaders: thanks for all the work!
   * debian/rules
@@ -10,7 +10,7 @@ matplotlib (1.1.0~rc1-1) UNRELEASED; urgency=low
   * debian/patches/*
     - updated/deleted/refreshed as per new code
 
- -- Sandro Tosi <morph@debian.org>  Mon, 26 Sep 2011 23:47:21 +0200
+ -- Sandro Tosi <morph@debian.org>  Thu, 06 Oct 2011 18:47:49 +0200
 
 matplotlib (1.0.1-3) unstable; urgency=low
 
