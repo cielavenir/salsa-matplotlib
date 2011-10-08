@@ -6,12 +6,14 @@ matplotlib (1.1.0-1) UNRELEASED; urgency=low
   * debian/rules
     - install debug files where gdb looks for them
     - removed some doc files no more present in upstream tarball
+    - don't install baseline_images dir, contains images only needed for tests
+      and takes a lot of disk space
   * debian/copyright
     - updated to new release
   * debian/patches/*
     - updated/deleted/refreshed as per new code
 
- -- Sandro Tosi <morph@debian.org>  Thu, 06 Oct 2011 21:36:23 +0200
+ -- Sandro Tosi <morph@debian.org>  Sat, 08 Oct 2011 17:13:29 +0200
 
 matplotlib (1.0.1-3) unstable; urgency=low
 
