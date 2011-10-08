@@ -1,3 +1,5 @@
+/* -*- mode: c++; c-basic-offset: 4 -*- */
+
 /* A python interface to freetype2 */
 #ifndef _FT2FONT_H
 #define _FT2FONT_H
@@ -92,10 +94,8 @@ public:
     Py::Object getattr(const char *_name);
     static void init_type(void);
     size_t glyphInd;
-    Py::Object get_path(const FT_Face& face);
 private:
     Py::Dict __dict__;
-    static char get_path__doc__[];
 };
 
 class FT2Font : public Py::PythonExtension<FT2Font>
@@ -130,6 +130,7 @@ public:
     Py::Object attach_file(const Py::Tuple & args);
     int setattr(const char *_name, const Py::Object &value);
     Py::Object getattr(const char *_name);
+    Py::Object get_path();
     FT2Image* image;
 
 private:
@@ -171,6 +172,7 @@ private:
     static char get_sfnt_table__doc__[];
     static char get_image__doc__[];
     static char attach_file__doc__[];
+    static char get_path__doc__[];
 };
 
 // the extension module

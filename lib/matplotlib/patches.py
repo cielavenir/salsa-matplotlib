@@ -112,7 +112,7 @@ class Patch(artist.Artist):
             return polygons[0]
         return []
 
-    def contains(self, mouseevent):
+    def contains(self, mouseevent, radius=None):
         """Test whether the mouse event occurred in the patch.
 
         Returns T/F, {}
@@ -122,18 +122,20 @@ class Patch(artist.Artist):
         # algebraic solution to hit-testing should override this
         # method.
         if callable(self._contains): return self._contains(self,mouseevent)
-
+        if radius is None:
+            radius = self.get_linewidth()
         inside = self.get_path().contains_point(
-            (mouseevent.x, mouseevent.y), self.get_transform())
+            (mouseevent.x, mouseevent.y), self.get_transform(), radius)
         return inside, {}
 
-    def contains_point(self, point):
+    def contains_point(self, point, radius=None):
         """
         Returns *True* if the given point is inside the path
         (transformed with its transform attribute).
         """
-        return self.get_path().contains_point(point,
-                                              self.get_transform())
+        if radius is None:
+            radius = self.get_linewidth()
+        return self.get_path().contains_point(point, self.get_transform(), radius)
 
     def update_from(self, other):
         """
@@ -979,6 +981,8 @@ class FancyArrow(Polygon):
 
         Polygon.__init__(self, map(tuple, verts), **kwargs)
 
+docstring.interpd.update({"FancyArrow":FancyArrow.__init__.__doc__})
+
 class YAArrow(Patch):
     """
     Yet another arrow class.
@@ -1597,6 +1601,15 @@ class _Style(object):
         return _pprint_styles(klass._style_list)
 
 
+    @classmethod
+    def register(klass, name, style):
+        """
+        Register a new style.
+        """
+
+        if not issubclass(style, klass._Base):
+            raise ValueError("%s must be a subclass of %s" % (style, klass._Base))
+        klass._style_list[name] = style
 
 
 class BoxStyle(_Style):
@@ -2137,7 +2150,7 @@ class FancyBboxPatch(Patch):
         Without argument (or with *boxstyle* = None), it returns
         available box styles.
 
-        ACCEPTS: [ %(AvailableBoxstyles)s ]
+        ACCEPTS: %(AvailableBoxstyles)s
 
         """
 
@@ -3283,7 +3296,7 @@ class ArrowStyle(_Style):
               angle between the bracket and the line
             """
 
-            super(ArrowStyle.BracketA, self).__init__(None, True,
+            super(ArrowStyle.BracketA, self).__init__(True, None,
                      widthA=widthA, lengthA=lengthA, angleA=angleA )
 
     _style_list["]-"] = BracketA
@@ -3314,7 +3327,7 @@ class ArrowStyle(_Style):
 
     class BarAB(_Bracket):
         """
-        An arrow with a bracket(])  at both ends.
+        An arrow with a bar(|) at both ends.
         """
 
         def __init__(self,
@@ -3816,7 +3829,7 @@ class FancyArrowPatch(Patch):
         """
         return the path of the arrow in the data coordinate. Use
         get_path_in_displaycoord() method to retrieve the arrow path
-        in the disaply coord.  
+        in the display coord.
         """
         _path, fillable = self.get_path_in_displaycoord()
 

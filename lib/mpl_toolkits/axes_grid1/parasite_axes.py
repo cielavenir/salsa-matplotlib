@@ -208,13 +208,14 @@ def parasite_axes_auxtrans_class_factory(axes_class=None):
         parasite_axes_class = parasite_axes_class_factory(axes_class)
     else:
         parasite_axes_class = axes_class
-        
+
     new_class = _parasite_axes_auxtrans_classes.get(parasite_axes_class)
     if new_class is None:
         import new
         new_class = new.classobj("%sParasiteAuxTrans" % (parasite_axes_class.__name__),
                                  (ParasiteAxesAuxTransBase, parasite_axes_class),
-                                 {'_parasite_axes_class': parasite_axes_class})
+                                 {'_parasite_axes_class': parasite_axes_class,
+                                  'name': 'parasite_axes'})
         _parasite_axes_auxtrans_classes[parasite_axes_class] = new_class
 
     return new_class
@@ -232,6 +233,9 @@ def _get_handles(ax):
                     if isinstance(c, mcoll.LineCollection)])
     handles.extend([c for c in ax.collections
                     if isinstance(c, mcoll.RegularPolyCollection)])
+    handles.extend([c for c in ax.collections
+                    if isinstance(c, mcoll.CircleCollection)])
+
     return handles
 
 
@@ -250,51 +254,15 @@ class HostAxesBase:
         self.parasites.append(ax2)
         return ax2
 
-    def legend(self, *args, **kwargs):
 
-        if len(args)==0:
-            all_handles = _get_handles(self)
-            for ax in self.parasites:
-                all_handles.extend(_get_handles(ax))
-            handles = []
-            labels = []
-            for handle in all_handles:
-                label = handle.get_label()
-                if (label is not None and
-                    label != '' and not label.startswith('_')):
-                    handles.append(handle)
-                    labels.append(label)
-            if len(handles) == 0:
-                warnings.warn("No labeled objects found. "
-                              "Use label='...' kwarg on individual plots.")
-                return None
+    def _get_legend_handles(self, legend_handler_map=None):
+        Axes_get_legend_handles = self._get_base_axes_attr("_get_legend_handles")
+        all_handles = Axes_get_legend_handles(self, legend_handler_map)
 
-        elif len(args)==1:
-            # LABELS
-            labels = args[0]
-            handles = [h for h, label in zip(all_handles, labels)]
+        for ax in self.parasites:
+            all_handles.extend(ax._get_legend_handles(legend_handler_map))
 
-        elif len(args)==2:
-            if is_string_like(args[1]) or isinstance(args[1], int):
-                # LABELS, LOC
-                labels, loc = args
-                handles = [h for h, label in zip(all_handles, labels)]
-                kwargs['loc'] = loc
-            else:
-                # LINES, LABELS
-                handles, labels = args
-
-        elif len(args)==3:
-            # LINES, LABELS, LOC
-            handles, labels, loc = args
-            kwargs['loc'] = loc
-        else:
-            raise TypeError('Invalid arguments to legend')
-
-
-        handles = cbook.flatten(handles)
-        self.legend_ = mlegend.Legend(self, handles, labels, **kwargs)
-        return self.legend_
+        return all_handles
 
 
     def draw(self, renderer):
@@ -351,7 +319,7 @@ class HostAxesBase:
             axes_class = self._get_base_axes()
 
         parasite_axes_class = parasite_axes_class_factory(axes_class)
-            
+
         ax2 = parasite_axes_class(self, sharex=self, frameon=False)
         self.parasites.append(ax2)
 
@@ -385,7 +353,7 @@ class HostAxesBase:
             axes_class = self._get_base_axes()
 
         parasite_axes_class = parasite_axes_class_factory(axes_class)
-            
+
         ax2 = parasite_axes_class(self, sharey=self, frameon=False)
         self.parasites.append(ax2)
 
@@ -418,7 +386,7 @@ class HostAxesBase:
             axes_class = self._get_base_axes()
 
         parasite_axes_auxtrans_class = parasite_axes_auxtrans_class_factory(axes_class)
-            
+
         if aux_trans is None:
             ax2 = parasite_axes_auxtrans_class(self, mtransforms.IdentityTransform(),
                                                viewlim_mode="equal",
@@ -468,23 +436,24 @@ class HostAxesBase:
 
         return ax2
 
-    def get_tightbbox(self, renderer):
+    def get_tightbbox(self, renderer, call_axes_locator=True):
 
-        bbs = [ax.get_tightbbox(renderer) for ax in self.parasites]
+        bbs = [ax.get_tightbbox(renderer, call_axes_locator) \
+               for ax in self.parasites]
         get_tightbbox = self._get_base_axes_attr("get_tightbbox")
-        bbs.append(get_tightbbox(self, renderer))
+        bbs.append(get_tightbbox(self, renderer, call_axes_locator))
 
         _bbox = Bbox.union([b for b in bbs if b.width!=0 or b.height!=0])
 
         return _bbox
-    
+
 
 
 _host_axes_classes = {}
 def host_axes_class_factory(axes_class=None):
     if axes_class is None:
         axes_class = Axes
-        
+
     new_class = _host_axes_classes.get(axes_class)
     if new_class is None:
         import new

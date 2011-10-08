@@ -1,10 +1,10 @@
-*******************
-matplotlib gridspec
-*******************
+********
+gridspec
+********
 
 
 :mod:`matplotlib.gridspec`
-====================
+==========================
 
 .. automodule:: matplotlib.gridspec
    :members:

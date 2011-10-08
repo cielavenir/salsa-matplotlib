@@ -127,7 +127,6 @@ class GridSpecBase(object):
 
         return figBottoms, figTops, figLefts, figRights
 
-
     def __getitem__(self, key):
         """
         create and return a SuplotSpec instance.
@@ -146,6 +145,8 @@ class GridSpecBase(object):
             else:
                 if k1 < 0:
                     k1 += nrows
+                if k1 >= nrows or k1 < 0 :
+                    raise IndexError("index out of range")
                 row1, row2 = k1, k1+1
 
 
@@ -154,6 +155,8 @@ class GridSpecBase(object):
             else:
                 if k2 < 0:
                     k2 += ncols
+                if k2 >= ncols or k2 < 0 :
+                    raise IndexError("index out of range")
                 col1, col2 = k2, k2+1
 
 
@@ -168,6 +171,8 @@ class GridSpecBase(object):
             else:
                 if key < 0:
                     key += total
+                if key >= total or key < 0 :
+                    raise IndexError("index out of range")
                 num1, num2 = key, None
 
 
@@ -258,6 +263,87 @@ class GridSpec(GridSpecBase):
 
         return subplotpars
 
+    def locally_modified_subplot_params(self):
+        return [k for k in self._AllowedKeys if getattr(self, k)]
+
+
+    def tight_layout(self, fig, renderer=None, pad=1.2, h_pad=None, w_pad=None, rect=None):
+        """
+        Adjust subplot parameters to give specified padding.
+
+        Parameters:
+        
+        pad : float
+            padding between the figure edge and the edges of subplots, as a fraction of the font-size.
+        h_pad, w_pad : float
+            padding (height/width) between edges of adjacent subplots.
+            Defaults to `pad_inches`.
+        """
+
+        from tight_layout import auto_adjust_subplotpars, get_renderer
+
+        if renderer is None:
+            renderer = get_renderer(fig)
+
+        subplot_list = []
+        num1num2_list = []
+        subplot_dict = {}
+        
+        for ax in fig.axes:
+            locator = ax.get_axes_locator()
+            if hasattr(locator, "get_subplotspec"):
+                subplotspec = locator.get_subplotspec()
+            elif hasattr(ax, "get_subplotspec"):
+                subplotspec = ax.get_subplotspec()
+            else:
+                continue
+
+            if subplotspec.get_gridspec() != self: continue
+
+            subplots = subplot_dict.get(subplotspec, [])
+
+            if not subplots:
+                _, _, num1, num2 = subplotspec.get_geometry()
+                num1num2_list.append((num1, num2))
+                subplot_list.append(subplots)
+
+            subplots.append(ax)
+
+
+        kwargs = auto_adjust_subplotpars(fig, renderer,
+                                          nrows_ncols=self.get_geometry(),
+                                          num1num2_list=num1num2_list,
+                                          subplot_list=subplot_list,
+                                          pad=pad, h_pad=h_pad, w_pad=w_pad)
+
+        if rect is not None:
+            # if rect is given, the whole subplots area (including
+            # labels) will fit into the rect instead of the
+            # figure. Note that the rect argument of
+            # *auto_adjust_subplotpars* specify the area that will be
+            # covered by the total area of axes.bbox. Thus we call
+            # auto_adjust_subplotpars twice, where the second run
+            # with adjusted rect parameters.
+
+            left, bottom, right, top = rect
+            if left is not None: left += kwargs["left"]
+            if bottom is not None: bottom += kwargs["bottom"]
+            if right is not None: right -= (1 - kwargs["right"])
+            if top is not None: top -= (1 - kwargs["top"])
+
+            #if h_pad is None: h_pad = pad
+            #if w_pad is None: w_pad = pad
+
+            kwargs = auto_adjust_subplotpars(fig, renderer,
+                                             nrows_ncols=self.get_geometry(),
+                                             num1num2_list=num1num2_list,
+                                             subplot_list=subplot_list,
+                                             pad=pad, h_pad=h_pad, w_pad=w_pad,
+                                             rect=(left, bottom, right, top))
+
+            
+        self.update(**kwargs)
+
 
 class GridSpecFromSubplotSpec(GridSpecBase):
     """
@@ -318,6 +404,9 @@ class GridSpecFromSubplotSpec(GridSpecBase):
         return sp
 
 
+    def get_topmost_subplotspec(self):
+        'get the topmost SubplotSpec instance associated with the subplot'
+        return self._subplot_spec.get_topmost_subplotspec()
 
 
 class SubplotSpec(object):
@@ -395,3 +484,10 @@ class SubplotSpec(object):
             return figbox
 
 
+    def get_topmost_subplotspec(self):
+        'get the topmost SubplotSpec instance associated with the subplot'
+        gridspec = self.get_gridspec()
+        if hasattr(gridspec, "get_topmost_subplotspec"):
+            return gridspec.get_topmost_subplotspec()
+        else:
+            return self

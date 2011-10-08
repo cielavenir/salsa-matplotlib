@@ -147,7 +147,7 @@ class Text(Artist):
     cached = maxdict(50)
 
     def __str__(self):
-        return "Text(%g,%g,%s)"%(self._y,self._y,repr(self._text))
+        return "Text(%g,%g,%s)"%(self._x,self._y,repr(self._text))
 
     def __init__(self,
                  x=0, y=0, text='',
@@ -603,7 +603,7 @@ class Text(Artist):
 
     def get_font_properties(self):
         'alias for get_fontproperties'
-        return self.get_fontproperties
+        return self.get_fontproperties()
 
     def get_family(self):
         "Return the list of font families used for font lookup"

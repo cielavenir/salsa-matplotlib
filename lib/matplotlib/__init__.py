@@ -99,9 +99,7 @@ to MATLAB&reg;, a registered trademark of The MathWorks, Inc.
 """
 from __future__ import generators
 
-__version__  = '1.0.1'
-__revision__ = '$Revision: 8897 $'
-__date__     = '$Date: 2011-01-06 05:50:07 -0800 (Thu, 06 Jan 2011) $'
+__version__  = '1.1.0'
 
 import os, re, shutil, subprocess, sys, warnings
 import distutils.sysconfig
@@ -456,6 +454,8 @@ def _get_configdir():
 
     configdir = os.environ.get('MPLCONFIGDIR')
     if configdir is not None:
+        if not os.path.exists(configdir):
+            os.makedirs(configdir)
         if not _is_writable_dir(configdir):
             raise RuntimeError('Could not write to MPLCONFIGDIR="%s"'%configdir)
         return configdir
@@ -610,6 +610,7 @@ _deprecated_map = {
     'text.fontweight':  'font.weight',
     'text.fontsize':    'font.size',
     'tick.size' :       'tick.major.size',
+    'svg.embed_char_paths' : 'svg.fonttype'
     }
 
 _deprecated_ignore_map = {
@@ -762,6 +763,21 @@ Please do not ask for support with these customizations active.
 
 # this is the instance used by the matplotlib classes
 rcParams = rc_params()
+
+if rcParams['examples.directory']:
+    # paths that are intended to be relative to matplotlib_fname()
+    # are allowed for the examples.directory parameter.
+    # However, we will need to fully qualify the path because
+    # Sphinx requires absolute paths.
+    if not os.path.isabs(rcParams['examples.directory']):
+        _basedir, _fname = os.path.split(matplotlib_fname())
+        # Sometimes matplotlib_fname() can return relative paths,
+        # Also, using realpath() guarentees that Sphinx will use
+        # the same path that matplotlib sees (in case of weird symlinks).
+        _basedir = os.path.realpath(_basedir)
+        _fullpath = os.path.join(_basedir, rcParams['examples.directory'])
+        rcParams['examples.directory'] = _fullpath
+
 rcParamsOrig = rcParams.copy()
 
 rcParamsDefault = RcParams([ (key, default) for key, (default, converter) in \
@@ -769,6 +785,10 @@ rcParamsDefault = RcParams([ (key, default) for key, (default, converter) in \
 
 rcParams['ps.usedistiller'] = checkdep_ps_distiller(rcParams['ps.usedistiller'])
 rcParams['text.usetex'] = checkdep_usetex(rcParams['text.usetex'])
+
+if rcParams['axes.formatter.use_locale']:
+    import locale
+    locale.setlocale(locale.LC_ALL, '')
 
 def rc(group, **kwargs):
     """
@@ -887,10 +907,11 @@ def use(arg, warn=True):
     if 'matplotlib.backends' in sys.modules:
         if warn: warnings.warn(_use_error_msg)
         return
-    arg = arg.lower()
     if arg.startswith('module://'):
         name = arg
     else:
+        # Lowercase only non-module backend names (modules are case-sensitive)
+        arg = arg.lower()
         be_parts = arg.split('.')
         name = validate_backend(be_parts[0])
         if len(be_parts) > 1:
@@ -946,11 +967,14 @@ default_test_modules = [
     'matplotlib.tests.test_mlab',
     'matplotlib.tests.test_transforms',
     'matplotlib.tests.test_axes',
+    'matplotlib.tests.test_figure',
     'matplotlib.tests.test_dates',
     'matplotlib.tests.test_spines',
     'matplotlib.tests.test_image',
     'matplotlib.tests.test_simplification',
-    'matplotlib.tests.test_mathtext'
+    'matplotlib.tests.test_mathtext',
+    'matplotlib.tests.test_text',
+    'matplotlib.tests.test_tightlayout'
     ]
 
 def test(verbosity=0):
@@ -979,6 +1003,5 @@ test.__test__ = False # nose: this function is not a test
 verbose.report('matplotlib version %s'%__version__)
 verbose.report('verbose.level %s'%verbose.level)
 verbose.report('interactive is %s'%rcParams['interactive'])
-verbose.report('units is %s'%rcParams['units'])
 verbose.report('platform is %s'%sys.platform)
 verbose.report('loaded modules: %s'%sys.modules.keys(), 'debug')

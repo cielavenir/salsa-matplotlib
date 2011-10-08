@@ -1,9 +1,9 @@
-\.. _gridspec-guide:
+.. _gridspec-guide:
 
 
-************************************************
- Customizing Location of Subplot Using GridSpec
-************************************************
+**********************************************
+Customizing Location of Subplot Using GridSpec
+**********************************************
 
     ``GridSpec``
         specifies the geometry of the grid that a subplot will be
@@ -19,8 +19,8 @@
         0-based indexing and let subplot to occupy multiple cells.
 
 
- Basic Example of using subplot2grid
-====================================
+Basic Example of using subplot2grid
+===================================
 
 To use subplot2grid, you provide geometry of the grid and the location
 of the subplot in the grid. For a simple single-cell subplot::
@@ -127,6 +127,16 @@ parameters are set to that of the location of the given SubplotSpec. ::
 
 
 .. plot:: users/plotting/examples/demo_gridspec04.py
+
+
+A Complex Nested GridSpec using SubplotSpec
+===========================================
+
+Here's a more sophisticated example of nested gridspec where we put
+a box around each cell of the outer 4x4 grid, by hiding appropriate 
+spines in each of the inner 3x3 grids. ::
+
+.. plot:: users/plotting/examples/demo_gridspec06.py
 
 
 GridSpec with Varying Cell Sizes

@@ -59,6 +59,8 @@ class Collection(artist.Artist, cm.ScalarMappable):
     scalar mappable will be made to set the face colors.
     """
     _offsets = np.array([], np.float_)
+    # _offsets must be a Nx2 array!
+    _offsets.shape = (0, 2)
     _transOffset = transforms.IdentityTransform()
     _transforms = []
 
@@ -90,22 +92,23 @@ class Collection(artist.Artist, cm.ScalarMappable):
         self.set_linewidth(linewidths)
         self.set_linestyle(linestyles)
         self.set_antialiased(antialiaseds)
+        self.set_pickradius(pickradius)
         self.set_urls(urls)
 
 
         self._uniform_offsets = None
         self._offsets = np.array([], np.float_)
+        # Force _offsets to be Nx2
+        self._offsets.shape = (0, 2)
         if offsets is not None:
-            offsets = np.asarray(offsets)
-            if len(offsets.shape) == 1:
-                offsets = offsets[np.newaxis,:]  # Make it Nx2.
+            offsets = np.asanyarray(offsets)
+            offsets.shape = (-1, 2)             # Make it Nx2
             if transOffset is not None:
                 self._offsets = offsets
                 self._transOffset = transOffset
             else:
                 self._uniform_offsets = offsets
 
-        self._pickradius = pickradius
         self.update(kwargs)
         self._paths = None
 
@@ -148,13 +151,20 @@ class Collection(artist.Artist, cm.ScalarMappable):
         transOffset = self._transOffset
         offsets = self._offsets
         paths = self.get_paths()
+
+
         if not transform.is_affine:
             paths = [transform.transform_path_non_affine(p) for p in paths]
             transform = transform.get_affine()
         if not transOffset.is_affine:
             offsets = transOffset.transform_non_affine(offsets)
             transOffset = transOffset.get_affine()
-        offsets = np.asarray(offsets, np.float_)
+
+        offsets = np.asanyarray(offsets, np.float_)
+        if np.ma.isMaskedArray(offsets):
+            offsets = offsets.filled(np.nan)
+            # get_path_collection_extents handles nan but not masked arrays
+        offsets.shape = (-1, 2)                     # Make it Nx2
 
         result = mpath.get_path_collection_extents(
             transform.frozen(), paths, self.get_transforms(),
@@ -176,6 +186,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         offsets = self._offsets
         paths = self.get_paths()
 
+
         if self.have_units():
             paths = []
             for path in self.get_paths():
@@ -184,19 +195,27 @@ class Collection(artist.Artist, cm.ScalarMappable):
                 xs = self.convert_xunits(xs)
                 ys = self.convert_yunits(ys)
                 paths.append(mpath.Path(zip(xs, ys), path.codes))
-            if len(self._offsets):
-                xs = self.convert_xunits(self._offsets[:,0])
-                ys = self.convert_yunits(self._offsets[:,1])
+
+            if offsets.size > 0:
+                xs = self.convert_xunits(offsets[:,0])
+                ys = self.convert_yunits(offsets[:,1])
                 offsets = zip(xs, ys)
 
-        offsets = np.asarray(offsets, np.float_)
+        offsets = np.asanyarray(offsets, np.float_)
+        offsets.shape = (-1, 2)             # Make it Nx2
 
         if not transform.is_affine:
             paths = [transform.transform_path_non_affine(path) for path in paths]
             transform = transform.get_affine()
-        if not transOffset.is_affine:
+        if not transOffset.is_affine :
             offsets = transOffset.transform_non_affine(offsets)
+            # This might have changed an ndarray into a masked array.
             transOffset = transOffset.get_affine()
+
+        if np.ma.isMaskedArray(offsets):
+            offsets = offsets.filled(np.nan)
+            # Changing from a masked array to nan-filled ndarray
+            # is probably most efficient at this point.
 
         return transform, transOffset, offsets, paths
 
@@ -221,6 +240,12 @@ class Collection(artist.Artist, cm.ScalarMappable):
         gc.restore()
         renderer.close_group(self.__class__.__name__)
 
+    def set_pickradius(self, pr):
+        self._pickradius = pr
+
+    def get_pickradius(self):
+        return self._pickradius
+
     def contains(self, mouseevent):
         """
         Test whether the mouse event occurred in the collection.
@@ -228,19 +253,35 @@ class Collection(artist.Artist, cm.ScalarMappable):
         Returns True | False, ``dict(ind=itemlist)``, where every
         item in itemlist contains the event.
         """
-        if callable(self._contains): return self._contains(self,mouseevent)
-        if not self.get_visible(): return False,{}
+        if callable(self._contains):
+            return self._contains(self,mouseevent)
+
+        if not self.get_visible():
+            return False, {}
+
+        if self._picker is True:  # the Boolean constant, not just nonzero or 1
+            pickradius = self._pickradius
+        else:
+            try:
+                pickradius = float(self._picker)
+            except TypeError:
+                # This should not happen if "contains" is called via
+                # pick, the normal route; the check is here in case
+                # it is called through some unanticipated route.
+                warnings.warn(
+                    "Collection picker %s could not be converted to float"
+                                        % self._picker)
+                pickradius = self._pickradius
 
         transform, transOffset, offsets, paths = self._prepare_points()
 
         ind = mpath.point_in_path_collection(
-            mouseevent.x, mouseevent.y, self._pickradius,
+            mouseevent.x, mouseevent.y, pickradius,
             transform.frozen(), paths, self.get_transforms(),
-            offsets, transOffset, len(self._facecolors)>0)
-        return len(ind)>0,dict(ind=ind)
+            offsets, transOffset, pickradius <= 0)
 
-    def set_pickradius(self,pickradius): self.pickradius = 5
-    def get_pickradius(self): return self.pickradius
+        return len(ind)>0, dict(ind=ind)
+
 
     def set_urls(self, urls):
         if urls is None:
@@ -257,9 +298,8 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
         ACCEPTS: float or sequence of floats
         """
-        offsets = np.asarray(offsets, np.float_)
-        if len(offsets.shape) == 1:
-            offsets = offsets[np.newaxis,:]  # Make it Nx2.
+        offsets = np.asanyarray(offsets, np.float_)
+        offsets.shape = (-1, 2)             # Make it Nx2
         #This decision is based on how they are initialized above
         if self._uniform_offsets is None:
             self._offsets = offsets
@@ -428,13 +468,17 @@ class Collection(artist.Artist, cm.ScalarMappable):
                 self._is_stroked = False
         except AttributeError:
             pass
-        if c == 'face':
-            self._edgecolors = 'face'
-            self._edgecolors_original = 'face'
-        else:
-            if c is None: c = mpl.rcParams['patch.edgecolor']
-            self._edgecolors_original = c
-            self._edgecolors = mcolors.colorConverter.to_rgba_array(c, self._alpha)
+        try:
+            if c.lower() == 'face':
+                self._edgecolors = 'face'
+                self._edgecolors_original = 'face'
+                return
+        except AttributeError:
+            pass
+        if c is None:
+            c = mpl.rcParams['patch.edgecolor']
+        self._edgecolors_original = c
+        self._edgecolors = mcolors.colorConverter.to_rgba_array(c, self._alpha)
 
 
     def set_edgecolors(self, c):
@@ -479,9 +523,12 @@ class Collection(artist.Artist, cm.ScalarMappable):
         If the scalar mappable array is not none, update colors
         from scalar data
         """
-        if self._A is None: return
+        if self._A is None:
+            return
         if self._A.ndim > 1:
             raise ValueError('Collections can only map rank 1 arrays')
+        if not self.check_update("array"):
+            return
         if self._is_filled:
             self._facecolors = self.to_rgba(self._A, self._alpha)
         elif self._is_stroked:
@@ -536,7 +583,7 @@ class PathCollection(Collection):
     This is the most basic :class:`Collection` subclass.
     """
     @docstring.dedent_interpd
-    def __init__(self, paths, **kwargs):
+    def __init__(self, paths, sizes=None, **kwargs):
         """
         *paths* is a sequence of :class:`matplotlib.path.Path`
         instances.
@@ -546,11 +593,25 @@ class PathCollection(Collection):
 
         Collection.__init__(self, **kwargs)
         self.set_paths(paths)
-
+        self._sizes = sizes
 
     def set_paths(self, paths):
         self._paths = paths
 
+    def get_paths(self):
+        return self._paths
+
+    def get_sizes(self):
+        return self._sizes
+
+    @allow_rasterization
+    def draw(self, renderer):
+        if self._sizes is not None:
+            self._transforms = [
+                transforms.Affine2D().scale(
+                    (np.sqrt(x) * self.figure.dpi / 72.0))
+                for x in self._sizes]
+        return Collection.draw(self, renderer)
 
 class PolyCollection(Collection):
     @docstring.dedent_interpd
@@ -807,7 +868,7 @@ class LineCollection(Collection):
         The default is 5 pt.
 
         The use of :class:`~matplotlib.cm.ScalarMappable` is optional.
-        If the :class:`~matplotlib.cm.ScalarMappable` matrix
+        If the :class:`~matplotlib.cm.ScalarMappable` array
         :attr:`~matplotlib.cm.ScalarMappable._A` is not None (ie a call to
         :meth:`~matplotlib.cm.ScalarMappable.set_array` has been made), at
         draw time a call to scalar mappable will be made to set the colors.
@@ -940,14 +1001,15 @@ class EllipseCollection(Collection):
             angles of first axes, degrees CCW from the X-axis
 
         *units*: ['points' | 'inches' | 'dots' | 'width' | 'height'
-                        | 'x' | 'y' | 'xy']
-            units in which majors and minors are given; 'width' and 'height'
-            refer to the dimensions of the axes, while 'x' and 'y'
-            refer to the *offsets* data units. 'xy' differs from all
-            others in that the angle as plotted varies with the
-            aspect ratio, and equals the specified angle only when
-            the aspect ratio is unity.  Hence it behaves the same
-            as the :class:`~matplotlib.patches.Ellipse` with
+        | 'x' | 'y' | 'xy']
+
+            units in which majors and minors are given; 'width' and
+            'height' refer to the dimensions of the axes, while 'x'
+            and 'y' refer to the *offsets* data units. 'xy' differs
+            from all others in that the angle as plotted varies with
+            the aspect ratio, and equals the specified angle only when
+            the aspect ratio is unity.  Hence it behaves the same as
+            the :class:`~matplotlib.patches.Ellipse` with
             axes.transData as its transform.
 
         Additional kwargs inherited from the base :class:`Collection`:
@@ -1214,9 +1276,9 @@ class QuadMesh(Collection):
                 offsets = zip(xs, ys)
 
         offsets = np.asarray(offsets, np.float_)
+        offsets.shape = (-1, 2)                 # Make it Nx2
 
-        if self.check_update('array'):
-            self.update_scalarmappable()
+        self.update_scalarmappable()
 
         if not transform.is_affine:
             coordinates = self._coordinates.reshape(

@@ -406,6 +406,89 @@ class HPacker(PackerBase):
 
 
 
+
+class PaddedBox(OffsetBox):
+    def __init__(self, child, pad=None, draw_frame=False, patch_attrs=None):
+        """
+        *pad* : boundary pad
+
+        .. note::
+          *pad* need to given in points and will be
+          scale with the renderer dpi, while *width* and *hight*
+          need to be in pixels.
+        """
+
+        super(PaddedBox, self).__init__()
+
+        self.pad = pad
+        self._children = [child]
+
+        self.patch = FancyBboxPatch(
+            xy=(0.0, 0.0), width=1., height=1.,
+            facecolor='w', edgecolor='k',
+            mutation_scale=1, #self.prop.get_size_in_points(),
+            snap=True
+            )
+
+        self.patch.set_boxstyle("square",pad=0)
+
+        if patch_attrs is not None:
+            self.patch.update(patch_attrs)
+
+        self._drawFrame =  draw_frame
+
+
+    def get_extent_offsets(self, renderer):
+        """
+        update offset of childrens and return the extents of the box
+        """
+
+        dpicor = renderer.points_to_pixels(1.)
+        pad = self.pad * dpicor
+
+        w, h, xd, yd = self._children[0].get_extent(renderer)
+
+        return w + 2*pad, h + 2*pad, \
+               xd+pad, yd+pad, \
+               [(0, 0)]
+
+
+    def draw(self, renderer):
+        """
+        Update the location of children if necessary and draw them
+        to the given *renderer*.
+        """
+
+        width, height, xdescent, ydescent, offsets = self.get_extent_offsets(renderer)
+
+        px, py = self.get_offset(width, height, xdescent, ydescent, renderer)
+
+        for c, (ox, oy) in zip(self.get_visible_children(), offsets):
+            c.set_offset((px+ox, py+oy))
+
+        self.draw_frame(renderer)
+
+        for c in self.get_visible_children():
+            c.draw(renderer)
+
+        #bbox_artist(self, renderer, fill=False, props=dict(pad=0.))
+
+    def update_frame(self, bbox, fontsize=None):
+        self.patch.set_bounds(bbox.x0, bbox.y0,
+                              bbox.width, bbox.height)
+
+        if fontsize:
+            self.patch.set_mutation_scale(fontsize)
+
+    def draw_frame(self, renderer):
+        # update the location and size of the legend
+        bbox = self.get_window_extent(renderer)
+        self.update_frame(bbox)
+
+        if self._drawFrame:
+            self.patch.draw(renderer)
+
+
 class DrawingArea(OffsetBox):
     """
     The DrawingArea can contain any Artist as a child. The DrawingArea
@@ -491,7 +574,8 @@ class DrawingArea(OffsetBox):
     def add_artist(self, a):
         'Add any :class:`~matplotlib.artist.Artist` to the container box'
         self._children.append(a)
-        a.set_transform(self.get_transform())
+        if not a.is_transform_set():
+            a.set_transform(self.get_transform())
 
 
     def draw(self, renderer):
@@ -1499,6 +1583,7 @@ class DraggableOffsetBox(DraggableBase):
         w, h, xd, yd = offsetbox.get_extent(renderer)
         offset = offsetbox.get_offset(w, h, xd, yd, renderer)
         self.offsetbox_x, self.offsetbox_y = offset
+        self.offsetbox.set_offset(offset)
 
     def update_offset(self, dx, dy):
         loc_in_canvas = self.offsetbox_x + dx, self.offsetbox_y + dy
@@ -1533,6 +1618,7 @@ class DraggableAnnotation(DraggableBase):
 
         self.ox, self.oy = ox0, oy0
         self.annotation.textcoords = "figure pixels"
+        self.update_offset(0, 0)
 
     def update_offset(self, dx, dy):
         ann = self.annotation

@@ -115,6 +115,10 @@ lib/matplotlib/pyparsing.py
     # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
     # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+lib/matplotlib/sankey.py
+    Author: Kevin L. Davies
+    License: BSD
+
 lib/matplotlib/table.py
     Author    : John Gill <jng@europe.renre.com>
     Copyright : 2004 John Gill and John Hunter

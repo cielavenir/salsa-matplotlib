@@ -6,6 +6,7 @@ MaskedArray = ma.MaskedArray
 from cbook import dedent
 from ticker import NullFormatter, ScalarFormatter, LogFormatterMathtext, Formatter
 from ticker import NullLocator, LogLocator, AutoLocator, SymmetricalLogLocator, FixedLocator
+from ticker import is_decade
 from transforms import Transform, IdentityTransform
 from matplotlib import docstring
 
@@ -244,9 +245,9 @@ class LogScale(ScaleBase):
         *subsx*/*subsy*:
            Where to place the subticks between each major tick.
            Should be a sequence of integers.  For example, in a log10
-           scale: ``[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]``
+           scale: ``[2, 3, 4, 5, 6, 7, 8, 9]``
 
-           will place 10 logarithmically spaced minor ticks between
+           will place 8 logarithmically spaced minor ticks between
            each major tick.
         """
         if axis.axis_name == 'x':
@@ -311,31 +312,28 @@ class SymmetricalLogScale(ScaleBase):
     name = 'symlog'
 
     class SymmetricalLogTransform(Transform):
-        input_dims = 1
-        output_dims = 1
-        is_separable = True
+            input_dims = 1
+            output_dims = 1
+            is_separable = True
 
-        def __init__(self, base, linthresh):
-            Transform.__init__(self)
-            self.base = base
-            self.linthresh = linthresh
-            self._log_base = np.log(base)
-            self._linadjust = (np.log(linthresh) / self._log_base) / linthresh
+            def __init__(self, base, linthresh):
+                Transform.__init__(self)
+                self.base = base
+                self.linthresh = linthresh
+                self._log_base = np.log(base)
+                self._linadjust = (np.log(linthresh) / self._log_base) / linthresh
 
-        def transform(self, a):
-            a = np.asarray(a)
-            sign = np.sign(a)
-            masked = ma.masked_inside(a, -self.linthresh, self.linthresh, copy=False)
-            log = sign * ma.log(np.abs(masked)) / self._log_base
-            if masked.mask.any():
-                return np.asarray(ma.where(masked.mask,
-                                            a * self._linadjust,
-                                            log))
-            else:
-                return np.asarray(log)
+            def transform(self, a):
+                sign = np.sign(a)
+                masked = ma.masked_inside(a, -self.linthresh, self.linthresh, copy=False)
+                log = sign * self.linthresh * (1 + ma.log(np.abs(masked) / self.linthresh))
+                if masked.mask.any():
+                    return ma.where(masked.mask, a, log)
+                else:
+                    return log
 
-        def inverted(self):
-            return SymmetricalLogScale.InvertedSymmetricalLogTransform(self.base, self.linthresh)
+            def inverted(self):
+                return SymmetricalLogScale.InvertedSymmetricalLogTransform(self.base, self.linthresh)
 
     class InvertedSymmetricalLogTransform(Transform):
         input_dims = 1
@@ -351,15 +349,13 @@ class SymmetricalLogScale(ScaleBase):
             self._linadjust = linthresh / (np.log(linthresh) / self._log_base)
 
         def transform(self, a):
-            a = np.asarray(a)
-            return np.where(a <= self._log_linthresh,
-                             np.where(a >= -self._log_linthresh,
-                                       a * self._linadjust,
-                                       -(np.power(self.base, -a))),
-                             np.power(self.base, a))
-
-        def inverted(self):
-            return SymmetricalLogScale.SymmetricalLogTransform(self.base)
+            sign = np.sign(a)
+            masked = ma.masked_inside(a, -self.linthresh, self.linthresh, copy=False)
+            exp = sign * self.linthresh * ma.exp(sign * masked / self.linthresh - 1)
+            if masked.mask.any():
+                return ma.where(masked.mask, a, exp)
+            else:
+                return exp
 
     def __init__(self, axis, **kwargs):
         """
@@ -373,9 +369,9 @@ class SymmetricalLogScale(ScaleBase):
         *subsx*/*subsy*:
            Where to place the subticks between each major tick.
            Should be a sequence of integers.  For example, in a log10
-           scale: ``[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]``
+           scale: ``[2, 3, 4, 5, 6, 7, 8, 9]``
 
-           will place 10 logarithmically spaced minor ticks between
+           will place 8 logarithmically spaced minor ticks between
            each major tick.
         """
         if axis.axis_name == 'x':
@@ -388,6 +384,9 @@ class SymmetricalLogScale(ScaleBase):
             subs = kwargs.pop('subsy', None)
 
         self._transform = self.SymmetricalLogTransform(base, linthresh)
+
+        assert base > 0.0
+        assert linthresh > 0.0
 
         self.base = base
         self.linthresh = linthresh

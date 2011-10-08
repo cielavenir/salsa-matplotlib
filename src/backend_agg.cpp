@@ -1,3 +1,5 @@
+/* -*- mode: c++; c-basic-offset: 4 -*- */
+
 /* A rewrite of _backend_agg using PyCXX to handle ref counting, etc..
  */
 
@@ -108,7 +110,7 @@ Py::Object
 BufferRegion::set_x(const Py::Tuple &args)
 {
     args.verify_length(1);
-    size_t x = Py::Int(args[0]);
+    size_t x = (long) Py::Int(args[0]);
     rect.x1 = x;
     return Py::Object();
 }
@@ -118,7 +120,7 @@ Py::Object
 BufferRegion::set_y(const Py::Tuple &args)
 {
     args.verify_length(1);
-    size_t y = Py::Int(args[0]);
+    size_t y = (long)Py::Int(args[0]);
     rect.y1 = y;
     return Py::Object();
 }
@@ -358,6 +360,8 @@ GCAgg::_set_hatch_path(const Py::Object& gc)
     Py::Object method_obj = gc.getAttr("get_hatch_path");
     Py::Callable method(method_obj);
     hatchpath = method.apply(Py::Tuple());
+    if (hatchpath.ptr() == NULL)
+        throw Py::Exception();
 }
 
 
@@ -429,8 +433,10 @@ RendererAgg::set_clipbox(const Py::Object& cliprect, R& rasterizer)
     double l, b, r, t;
     if (py_convert_bbox(cliprect.ptr(), l, b, r, t))
     {
-        rasterizer.clip_box(int(mpl_round(l)), height - int(mpl_round(b)),
-                            int(mpl_round(r)), height - int(mpl_round(t)));
+        rasterizer.clip_box(std::max(int(mpl_round(l)), 0),
+                            std::max(int(height) - int(mpl_round(b)), 0),
+                            std::min(int(mpl_round(r)), int(width)),
+                            std::min(int(height) - int(mpl_round(t)), int(height)));
     }
     else
     {
@@ -657,9 +663,9 @@ RendererAgg::draw_markers(const Py::Tuple& args)
     PathIterator path(path_obj);
     transformed_path_t path_transformed(path, trans);
     snap_t             path_snapped(path_transformed,
-                                    gc.snap_mode,
+                                    SNAP_TRUE,
                                     path.total_vertices(),
-                                    1.0);
+                                    0.0);
     curve_t            path_curve(path_snapped);
     path_curve.rewind(0);
 
@@ -1311,11 +1317,15 @@ RendererAgg::draw_path(const Py::Tuple& args)
     trans *= agg::trans_affine_translation(0.0, (double)height);
     bool clip = !face.first && gc.hatchpath.isNone() && !path.has_curves();
     bool simplify = path.should_simplify() && clip;
+    double snapping_linewidth = gc.linewidth;
+    if (gc.color.a == 0.0) {
+        snapping_linewidth = 0.0;
+    }
 
     transformed_path_t tpath(path, trans);
     nan_removed_t      nan_removed(tpath, true, path.has_curves());
     clipped_t          clipped(nan_removed, clip, width, height);
-    snapped_t          snapped(clipped, gc.snap_mode, path.total_vertices(), gc.linewidth);
+    snapped_t          snapped(clipped, gc.snap_mode, path.total_vertices(), snapping_linewidth);
     simplify_t         simplified(snapped, simplify, path.simplify_threshold());
     curve_t            curve(simplified);
 
@@ -1732,16 +1742,16 @@ RendererAgg::draw_quad_mesh(const Py::Tuple& args)
 
     //segments, trans, clipbox, colors, linewidths, antialiaseds
     GCAgg gc(args[0], dpi);
-    agg::trans_affine       master_transform = py_to_agg_transformation_matrix(args[1].ptr());
-    size_t                  mesh_width       = Py::Int(args[2]);
-    size_t                  mesh_height      = Py::Int(args[3]);
-    Py::Object              coordinates      = args[4];
-    Py::Object              offsets_obj      = args[5];
-    agg::trans_affine       offset_trans     = py_to_agg_transformation_matrix(args[6].ptr());
-    Py::Object              facecolors_obj   = args[7];
-    bool                    antialiased      = (bool)Py::Int(args[8]);
-    bool                    showedges        = (bool)Py::Int(args[9]);
-    bool                    free_edgecolors  = false;
+    agg::trans_affine master_transform = py_to_agg_transformation_matrix(args[1].ptr());
+    size_t            mesh_width       = (long)Py::Int(args[2]);
+    size_t            mesh_height      = (long)Py::Int(args[3]);
+    Py::Object        coordinates      = args[4];
+    Py::Object        offsets_obj      = args[5];
+    agg::trans_affine offset_trans     = py_to_agg_transformation_matrix(args[6].ptr());
+    Py::Object        facecolors_obj   = args[7];
+    bool              antialiased      = (bool)Py::Boolean(args[8]);
+    bool              showedges        = (bool)Py::Boolean(args[9]);
+    bool              free_edgecolors  = false;
 
     QuadMeshGenerator path_generator(mesh_width, mesh_height, coordinates.ptr());
 
@@ -1914,13 +1924,15 @@ RendererAgg::draw_gouraud_triangles(const Py::Tuple& args)
     Py::Object        points_obj = args[1];
     Py::Object        colors_obj = args[2];
     agg::trans_affine trans      = py_to_agg_transformation_matrix(args[3].ptr());
+    double            c_points[6];
+    double            c_colors[12];
 
     theRasterizer.reset_clipping();
     rendererBase.reset_clipping(true);
     set_clipbox(gc.cliprect, theRasterizer);
     bool has_clippath = render_clippath(gc.clippath, gc.clippath_trans);
 
-    PyArrayObject* points = (PyArrayObject*)PyArray_ContiguousFromAny
+    PyArrayObject* points = (PyArrayObject*)PyArray_FromObject
         (points_obj.ptr(), PyArray_DOUBLE, 3, 3);
     if (!points ||
         PyArray_DIM(points, 1) != 3 || PyArray_DIM(points, 2) != 2)
@@ -1930,7 +1942,7 @@ RendererAgg::draw_gouraud_triangles(const Py::Tuple& args)
     }
     points_obj = Py::Object((PyObject*)points, true);
 
-    PyArrayObject* colors = (PyArrayObject*)PyArray_ContiguousFromAny
+    PyArrayObject* colors = (PyArrayObject*)PyArray_FromObject
         (colors_obj.ptr(), PyArray_DOUBLE, 3, 3);
     if (!colors ||
         PyArray_DIM(colors, 1) != 3 || PyArray_DIM(colors, 2) != 4)
@@ -1947,9 +1959,20 @@ RendererAgg::draw_gouraud_triangles(const Py::Tuple& args)
 
     for (int i = 0; i < PyArray_DIM(points, 0); ++i)
     {
+        for (int j = 0; j < 3; ++j) {
+            for (int k = 0; k < 2; ++k) {
+                c_points[j*2+k] = *(double *)PyArray_GETPTR3(points, i, j, k);
+            }
+        }
+
+        for (int j = 0; j < 3; ++j) {
+            for (int k = 0; k < 4; ++k) {
+                c_colors[j*4+k] = *(double *)PyArray_GETPTR3(colors, i, j, k);
+            }
+        }
+
         _draw_gouraud_triangle(
-            (double*)PyArray_GETPTR1(points, i),
-            (double*)PyArray_GETPTR1(colors, i), trans, has_clippath);
+                c_points, c_colors, trans, has_clippath);
     }
 
     return Py::Object();

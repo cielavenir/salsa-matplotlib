@@ -48,7 +48,11 @@ import matplotlib.tight_bbox as tight_bbox
 import matplotlib.textpath as textpath
 from matplotlib.path import Path
 
-
+try:
+    from PIL import Image
+    _has_pil = True
+except ImportError:
+    _has_pil = False
 
 _backend_d = {}
 
@@ -62,9 +66,14 @@ class ShowBase(object):
 
     Subclass must override mainloop() method.
     """
-    def __call__(self):
+    def __call__(self, block=None):
         """
-        Show all figures.
+        Show all figures.  If *block* is not None, then
+        it is a boolean that overrides all other factors
+        determining whether show blocks by calling mainloop().
+        The other factors are:
+        it does not block if run inside "ipython --pylab";
+        it does not block in interactive mode.
         """
         managers = Gcf.get_all_fig_managers()
         if not managers:
@@ -73,11 +82,28 @@ class ShowBase(object):
         for manager in managers:
             manager.show()
 
-        try:
-            if not self._needmain:  # ipython flag
+        if block is not None:
+            if block:
+                self.mainloop()
                 return
+            else:
+                return
+
+        # Hack: determine at runtime whether we are
+        # inside ipython in pylab mode.
+        from matplotlib import pyplot
+        try:
+            ipython_pylab = not pyplot.show._needmain
+            # IPython versions >= 0.10 tack the _needmain
+            # attribute onto pyplot.show, and always set
+            # it to False, when in --pylab mode.
         except AttributeError:
-            pass
+            ipython_pylab = False
+
+        # Leave the following as a separate step in case we
+        # want to control this behavior with an rcParam.
+        if ipython_pylab:
+            return
 
         if not is_interactive():
             self.mainloop()
@@ -633,6 +659,7 @@ class GraphicsContextBase:
 
     def __init__(self):
         self._alpha = 1.0
+        self._forced_alpha = False # if True, _alpha overrides A from RGBA
         self._antialiased = 1  # use 0,1 not True, False for extension code
         self._capstyle = 'butt'
         self._cliprect = None
@@ -738,8 +765,7 @@ class GraphicsContextBase:
 
     def get_rgb(self):
         """
-        returns a tuple of three floats from 0-1.  color can be a
-        MATLAB format string, a html hex color string, or a rgb tuple
+        returns a tuple of three or four floats from 0-1.
         """
         return self._rgb
 
@@ -767,9 +793,11 @@ class GraphicsContextBase:
         Set the alpha value used for blending - not supported on
         all backends
         """
-        if alpha is None:
-            alpha = 1.0
-        self._alpha = alpha
+        if alpha is not None:
+            self._alpha = alpha
+            self._forced_alpha = True
+        else:
+            self._forced_alpha = False
 
     def set_antialiased(self, b):
         """
@@ -819,17 +847,21 @@ class GraphicsContextBase:
     def set_foreground(self, fg, isRGB=False):
         """
         Set the foreground color.  fg can be a MATLAB format string, a
-        html hex color string, an rgb unit tuple, or a float between 0
+        html hex color string, an rgb or rgba unit tuple, or a float between 0
         and 1.  In the latter case, grayscale is used.
 
-        The :class:`GraphicsContextBase` converts colors to rgb
-        internally.  If you know the color is rgb already, you can set
-        ``isRGB=True`` to avoid the performace hit of the conversion
+        If you know fg is rgb or rgba, set ``isRGB=True`` for
+        efficiency.
         """
         if isRGB:
             self._rgb = fg
         else:
             self._rgb = colors.colorConverter.to_rgba(fg)
+        if len(self._rgb) == 4 and not self._forced_alpha:
+            self.set_alpha(self._rgb[3])
+            # Use set_alpha method here so that subclasses will
+            # be calling their own version, which may set their
+            # own attributes.
 
     def set_graylevel(self, frac):
         """
@@ -855,12 +887,22 @@ class GraphicsContextBase:
     def set_linestyle(self, style):
         """
         Set the linestyle to be one of ('solid', 'dashed', 'dashdot',
-        'dotted').
+        'dotted'). One may specify customized dash styles by providing
+        a tuple of (offset, dash pairs). For example, the predefiend
+        linestyles have following values.:
+
+         'dashed'  : (0, (6.0, 6.0)),
+         'dashdot' : (0, (3.0, 5.0, 1.0, 5.0)),
+         'dotted'  : (0, (1.0, 3.0)),
         """
-        try:
+
+        if style in self.dashd.keys():
             offset, dashes = self.dashd[style]
-        except:
-            raise ValueError('Unrecognized linestyle: %s' % style)
+        elif isinstance(style, tuple):
+            offset, dashes = style
+        else:
+            raise ValueError('Unrecognized linestyle: %s' % str(style))
+
         self._linestyle = style
         self.set_dashes(offset, dashes)
 
@@ -912,28 +954,42 @@ class TimerBase(object):
     event loops.
 
     Mandatory functions that must be implemented:
-    * _timer_start: Contains backend-specific code for starting the timer
-    * _timer_stop: Contains backend-specific code for stopping the timer
+
+        * `_timer_start`: Contains backend-specific code for starting
+          the timer
+
+        * `_timer_stop`: Contains backend-specific code for stopping
+          the timer
 
     Optional overrides:
-    * _timer_set_single_shot: Code for setting the timer to single shot
-        operating mode, if supported by the timer object. If not, the Timer
-        class itself will store the flag and the _on_timer method should
-        be overridden to support such behavior.
-    * _timer_set_interval: Code for setting the interval on the timer, if
-        there is a method for doing so on the timer object.
-    * _on_timer: This is the internal function that any timer object should
-        call, which will handle the task of running all callbacks that have
-        been set.
+
+        * `_timer_set_single_shot`: Code for setting the timer to
+          single shot operating mode, if supported by the timer
+          object. If not, the `Timer` class itself will store the flag
+          and the `_on_timer` method should be overridden to support
+          such behavior.
+
+        * `_timer_set_interval`: Code for setting the interval on the
+          timer, if there is a method for doing so on the timer
+          object.
+
+        * `_on_timer`: This is the internal function that any timer
+          object should call, which will handle the task of running
+          all callbacks that have been set.
 
     Attributes:
-    * interval: The time between timer events in milliseconds. Default
-        is 1000 ms.
-    * single_shot: Boolean flag indicating whether this timer should
-        operate as single shot (run once and then stop). Defaults to False.
-    * callbacks: Stores list of (func, args) tuples that will be called
-        upon timer events. This list can be manipulated directly, or the
-        functions add_callback and remove_callback can be used.
+
+        * `interval`: The time between timer events in
+          milliseconds. Default is 1000 ms.
+
+        * `single_shot`: Boolean flag indicating whether this timer
+          should operate as single shot (run once and then
+          stop). Defaults to `False`.
+
+        * `callbacks`: Stores list of (func, args) tuples that will be
+          called upon timer events. This list can be manipulated
+          directly, or the functions `add_callback` and
+          `remove_callback` can be used.
     '''
     def __init__(self, interval=None, callbacks=None):
         #Initialize empty callbacks list and setup default settings if necssary
@@ -1335,7 +1391,7 @@ class KeyEvent(LocationEvent):
 
 
 
-class FigureCanvasBase:
+class FigureCanvasBase(object):
     """
     The canvas the figure renders into.
 
@@ -1368,7 +1424,7 @@ class FigureCanvasBase:
         figure.set_canvas(self)
         self.figure = figure
         # a dictionary from event name to a dictionary that maps cid->func
-        self.callbacks = cbook.CallbackRegistry(self.events)
+        self.callbacks = cbook.CallbackRegistry()
         self.widgetlock = widgets.LockDraw()
         self._button     = None  # the button pressed
         self._key        = None  # the key pressed
@@ -1757,6 +1813,44 @@ class FigureCanvasBase:
         from backends.backend_svg import FigureCanvasSVG # lazy import
         svg = self.switch_backends(FigureCanvasSVG)
         return svg.print_svgz(*args, **kwargs)
+
+    if _has_pil:
+        filetypes['jpg'] = filetypes['jpeg'] = 'Joint Photographic Experts Group'
+        def print_jpg(self, filename_or_obj, *args, **kwargs):
+            """
+            Supported kwargs:
+
+            *quality*: The image quality, on a scale from 1 (worst) to
+                95 (best). The default is 75. Values above 95 should
+                be avoided; 100 completely disables the JPEG
+                quantization stage.
+
+            *optimize*: If present, indicates that the encoder should
+                make an extra pass over the image in order to select
+                optimal encoder settings.
+
+            *progressive*: If present, indicates that this image
+                should be stored as a progressive JPEG file.
+            """
+            from backends.backend_agg import FigureCanvasAgg # lazy import
+            agg = self.switch_backends(FigureCanvasAgg)
+            buf, size = agg.print_to_buffer()
+            if kwargs.pop("dryrun", False): return
+            image = Image.frombuffer('RGBA', size, buf, 'raw', 'RGBA', 0, 1)
+            options = cbook.restrict_dict(kwargs, ['quality', 'optimize',
+                                                   'progressive'])
+            return image.save(filename_or_obj, **options)
+        print_jpeg = print_jpg
+
+        filetypes['tif'] = filetypes['tiff'] = 'Tagged Image File Format'
+        def print_tif(self, filename_or_obj, *args, **kwargs):
+            from backends.backend_agg import FigureCanvasAgg # lazy import
+            agg = self.switch_backends(FigureCanvasAgg)
+            buf, size = agg.print_to_buffer()
+            if kwargs.pop("dryrun", False): return
+            image = Image.frombuffer('RGBA', size, buf, 'raw', 'RGBA', 0, 1)
+            return image.save(filename_or_obj)
+        print_tiff = print_tif
 
     def get_supported_filetypes(self):
         return self.filetypes
@@ -2252,7 +2346,7 @@ cursors = Cursors()
 
 
 
-class NavigationToolbar2:
+class NavigationToolbar2(object):
     """
     Base class for the navigation cursor, version 2
 
@@ -2456,11 +2550,13 @@ class NavigationToolbar2:
 
         self._xypress=[]
         for i, a in enumerate(self.canvas.figure.get_axes()):
-            if x is not None and y is not None and a.in_axes(event) and a.get_navigate():
+            if (x is not None and y is not None and a.in_axes(event) and
+                a.get_navigate() and a.can_pan()) :
                 a.start_pan(x, y, event.button)
                 self._xypress.append((a, i))
                 self.canvas.mpl_disconnect(self._idDrag)
-                self._idDrag=self.canvas.mpl_connect('motion_notify_event', self.drag_pan)
+                self._idDrag=self.canvas.mpl_connect('motion_notify_event',
+                                                     self.drag_pan)
 
         self.press(event)
 
@@ -2481,9 +2577,10 @@ class NavigationToolbar2:
 
         self._xypress=[]
         for i, a in enumerate(self.canvas.figure.get_axes()):
-            if x is not None and y is not None and a.in_axes(event) \
-                    and a.get_navigate() and a.can_zoom():
-                self._xypress.append(( x, y, a, i, a.viewLim.frozen(), a.transData.frozen()))
+            if (x is not None and y is not None and a.in_axes(event) and
+                a.get_navigate() and a.can_zoom()) :
+                self._xypress.append(( x, y, a, i, a.viewLim.frozen(),
+                                       a.transData.frozen() ))
 
         id1 = self.canvas.mpl_connect('motion_notify_event', self.drag_zoom)
 

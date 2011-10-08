@@ -15,14 +15,14 @@ from matplotlib._pylab_helpers import Gcf
 from matplotlib.figure import Figure
 from matplotlib.mathtext import MathTextParser
 from matplotlib.widgets import SubplotTool
-import matplotlib.backends.qt4_editor.figureoptions as figureoptions
-
 try:
-    from PyQt4 import QtCore, QtGui, Qt
+    import matplotlib.backends.qt4_editor.figureoptions as figureoptions
 except ImportError:
-    raise ImportError("Qt4 backend requires that PyQt4 is installed.")
+    figureoptions = None
 
-backend_version = "0.9.1"
+from qt4_compat import QtCore, QtGui, _getSaveFileName, __version__
+
+backend_version = __version__
 def fn_name(): return sys._getframe(1).f_code.co_name
 
 DEBUG = False
@@ -50,18 +50,17 @@ def _create_qApp():
     if QtGui.QApplication.startingUp():
         if DEBUG: print "Starting up QApplication"
         global qApp
-        qApp = QtGui.QApplication( [" "] )
-        QtCore.QObject.connect( qApp, QtCore.SIGNAL( "lastWindowClosed()" ),
-                            qApp, QtCore.SLOT( "quit()" ) )
-        #remember that matplotlib created the qApp - will be used by show()
-        _create_qApp.qAppCreatedHere = True
-
-_create_qApp.qAppCreatedHere = False
+        app = QtGui.QApplication.instance()
+        if app is None:
+            qApp = QtGui.QApplication( [" "] )
+            QtCore.QObject.connect( qApp, QtCore.SIGNAL( "lastWindowClosed()" ),
+                                qApp, QtCore.SLOT( "quit()" ) )
+        else:
+            qApp = app
 
 class Show(ShowBase):
     def mainloop(self):
-        if _create_qApp.qAppCreatedHere:
-            QtGui.qApp.exec_()
+        QtGui.qApp.exec_()
 
 show = Show()
 
@@ -188,11 +187,15 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
 
     def keyPressEvent( self, event ):
         key = self._get_key( event )
+        if key is None:
+            return
         FigureCanvasBase.key_press_event( self, key )
         if DEBUG: print 'key press', key
 
     def keyReleaseEvent( self, event ):
         key = self._get_key(event)
+        if key is None:
+            return
         FigureCanvasBase.key_release_event( self, key )
         if DEBUG: print 'key release', key
 
@@ -217,6 +220,8 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
         return QtCore.QSize( 10, 10 )
 
     def _get_key( self, event ):
+        if event.isAutoRepeat():
+            return None
         if event.key() < 256:
             key = str(event.text())
         elif event.key() in self.keyvald:
@@ -243,7 +248,7 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
         return TimerQT(*args, **kwargs)
 
     def flush_events(self):
-        Qt.qApp.processEvents()
+        QtGui.qApp.processEvents()
 
     def start_event_loop(self,timeout):
         FigureCanvasBase.start_event_loop_default(self,timeout)
@@ -262,22 +267,6 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
             self._idle = True
         if d: QtCore.QTimer.singleShot(0, idle_draw)
 
-
-# XXX Hackish fix: There's a bug in PyQt.  See this thread for details:
-# http://old.nabble.com/Qt4-backend:-critical-bug-with-PyQt4-v4.6%2B-td26205716.html
-# Once a release of Qt/PyQt is available without the bug, the version check
-# below can be tightened further to only be applied in the necessary versions.
-if Qt.PYQT_VERSION_STR.startswith('4.6'):
-    class FigureWindow(QtGui.QMainWindow):
-       def __init__(self):
-           super(FigureWindow, self).__init__()
-       def closeEvent(self, event):
-           super(FigureWindow, self).closeEvent(event)
-           self.emit(Qt.SIGNAL('destroyed()'))
-else:
-    FigureWindow = QtGui.QMainWindow
-# /end pyqt hackish bugfix
-
 class FigureManagerQT( FigureManagerBase ):
     """
     Public attributes
@@ -292,7 +281,7 @@ class FigureManagerQT( FigureManagerBase ):
         if DEBUG: print 'FigureManagerQT.%s' % fn_name()
         FigureManagerBase.__init__( self, canvas, num )
         self.canvas = canvas
-        self.window = FigureWindow()
+        self.window = QtGui.QMainWindow()
         self.window.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
         self.window.setWindowTitle("Figure %d" % num)
@@ -311,7 +300,7 @@ class FigureManagerQT( FigureManagerBase ):
         if self.toolbar is not None:
             self.window.addToolBar(self.toolbar)
             QtCore.QObject.connect(self.toolbar, QtCore.SIGNAL("message"),
-                                   self.window.statusBar().showMessage)
+                                   self._show_message)
             tbs_height = self.toolbar.sizeHint().height()
         else:
             tbs_height = 0
@@ -335,6 +324,11 @@ class FigureManagerQT( FigureManagerBase ):
            if self.toolbar is not None:
                self.toolbar.update()
         self.canvas.figure.add_axobserver( notify_axes_change )
+
+    @QtCore.Slot()
+    def _show_message(self,s):
+        # Fixes a PySide segfault.
+        self.window.statusBar().showMessage(s)
 
     def _widgetclosed( self ):
         if self.window._destroying: return
@@ -392,27 +386,28 @@ class NavigationToolbar2QT( NavigationToolbar2, QtGui.QToolBar ):
     def _init_toolbar(self):
         self.basedir = os.path.join(matplotlib.rcParams[ 'datapath' ],'images')
 
-        a = self.addAction(self._icon('home.svg'), 'Home', self.home)
+        a = self.addAction(self._icon('home.png'), 'Home', self.home)
         a.setToolTip('Reset original view')
-        a = self.addAction(self._icon('back.svg'), 'Back', self.back)
+        a = self.addAction(self._icon('back.png'), 'Back', self.back)
         a.setToolTip('Back to previous view')
-        a = self.addAction(self._icon('forward.svg'), 'Forward', self.forward)
+        a = self.addAction(self._icon('forward.png'), 'Forward', self.forward)
         a.setToolTip('Forward to next view')
         self.addSeparator()
-        a = self.addAction(self._icon('move.svg'), 'Pan', self.pan)
+        a = self.addAction(self._icon('move.png'), 'Pan', self.pan)
         a.setToolTip('Pan axes with left mouse, zoom with right')
-        a = self.addAction(self._icon('zoom_to_rect.svg'), 'Zoom', self.zoom)
+        a = self.addAction(self._icon('zoom_to_rect.png'), 'Zoom', self.zoom)
         a.setToolTip('Zoom to rectangle')
         self.addSeparator()
         a = self.addAction(self._icon('subplots.png'), 'Subplots',
                 self.configure_subplots)
         a.setToolTip('Configure subplots')
 
-        a = self.addAction(self._icon("qt4_editor_options.svg"),
-                           'Customize', self.edit_parameters)
-        a.setToolTip('Edit curves line and axes parameters')
+        if figureoptions is not None:
+            a = self.addAction(self._icon("qt4_editor_options.png"),
+                               'Customize', self.edit_parameters)
+            a.setToolTip('Edit curves line and axes parameters')
 
-        a = self.addAction(self._icon('filesave.svg'), 'Save',
+        a = self.addAction(self._icon('filesave.png'), 'Save',
                 self.save_figure)
         a.setToolTip('Save the figure')
 
@@ -435,34 +430,37 @@ class NavigationToolbar2QT( NavigationToolbar2, QtGui.QToolBar ):
         # reference holder for subplots_adjust window
         self.adj_window = None
 
-    def edit_parameters(self):
-        allaxes = self.canvas.figure.get_axes()
-        if len(allaxes) == 1:
-            axes = allaxes[0]
-        else:
-            titles = []
-            for axes in allaxes:
-                title = axes.get_title()
-                ylabel = axes.get_ylabel()
-                if title:
-                    text = title
-                    if ylabel:
-                        text += ": "+ylabel
-                    text += " (%s)"
-                elif ylabel:
-                    text = "%%s (%s)" % ylabel
-                else:
-                    text = "%s"
-                titles.append(text % repr(axes))
-            item, ok = QtGui.QInputDialog.getItem(self, 'Customize',
-                                                  'Select axes:', titles,
-                                                  0, False)
-            if ok:
-                axes = allaxes[titles.index(unicode(item))]
+    if figureoptions is not None:
+        def edit_parameters(self):
+            allaxes = self.canvas.figure.get_axes()
+            if len(allaxes) == 1:
+                axes = allaxes[0]
             else:
-                return
+                titles = []
+                for axes in allaxes:
+                    title = axes.get_title()
+                    ylabel = axes.get_ylabel()
+                    if title:
+                        fmt = "%(title)s"
+                        if ylabel:
+                            fmt += ": %(ylabel)s"
+                        fmt += " (%(axes_repr)s)"
+                    elif ylabel:
+                        fmt = "%(axes_repr)s (%(ylabel)s)"
+                    else:
+                        fmt = "%(axes_repr)s"
+                    titles.append(fmt % dict(title = title,
+                                         ylabel = ylabel,
+                                         axes_repr = repr(axes)))
+                item, ok = QtGui.QInputDialog.getItem(self, 'Customize',
+                                                      'Select axes:', titles,
+                                                      0, False)
+                if ok:
+                    axes = allaxes[titles.index(unicode(item))]
+                else:
+                    return
 
-        figureoptions.figure_edit(axes, self)
+            figureoptions.figure_edit(axes, self)
 
 
     def dynamic_update( self ):
@@ -524,8 +522,8 @@ class NavigationToolbar2QT( NavigationToolbar2, QtGui.QToolBar ):
             filters.append(filter)
         filters = ';;'.join(filters)
 
-        fname = QtGui.QFileDialog.getSaveFileName(
-            self, "Choose a filename to save to", start, filters, selectedFilter)
+        fname = _getSaveFileName(self, "Choose a filename to save to",
+                                        start, filters, selectedFilter)
         if fname:
             try:
                 self.canvas.print_figure( unicode(fname) )

@@ -3,7 +3,7 @@ Axislines includes modified implementation of the Axes class. The
 biggest difference is that the artists responsible to draw axis line,
 ticks, ticklabel and axis labels are separated out from the mpl's Axis
 class, which are much more than artists in the original
-mpl. Originally, this change was motivated to support curvlinear
+mpl. Originally, this change was motivated to support curvilinear
 grid. Here are a few reasons that I came up with new axes class.
 
 
@@ -11,7 +11,7 @@ grid. Here are a few reasons that I came up with new axes class.
    different ticks (tick locations and labels). This is not possible
    with the current mpl, although some twin axes trick can help.
 
- * Curvelinear grid.
+ * Curvilinear grid.
 
  * angled ticks.
 
@@ -109,7 +109,7 @@ class AxisArtistHelper(object):
             return trans
 
         def get_tick_iterators(self, axes):
-            # iter : iteratoable object that yields (c, angle, l) where
+            # iter : iteratable object that yields (c, angle, l) where
             # c, angle, l is position, tick angle, and label
 
             return iter_major, iter_minor
@@ -378,7 +378,7 @@ class AxisArtistHelperRectlinear:
                 angle_normal, angle_tangent = 90, 0
             else:
                 angle_normal, angle_tangent = 0, 90
-                
+
             #angle = 90 - 90 * self.nth_coord
 
             major = self.axis.major
@@ -459,7 +459,7 @@ class GridHelperRectlinear(GridHelperBase):
                        offset=None,
                        axes=None,
                        ):
- 
+
         if axes is None:
             warnings.warn("'new_fixed_axis' explicitly requires the axes keyword.")
             axes = self.axes
@@ -639,7 +639,7 @@ class Axes(maxes.Axes):
 
         self.axes._set_artist_props(gridlines)
         # gridlines.set_clip_path(self.axes.patch)
-        # set_clip_path need to be defered after Axes.cla is completed.
+        # set_clip_path need to be deferred after Axes.cla is completed.
         # It is done inside the cla.
 
         self.gridlines = gridlines
@@ -660,9 +660,9 @@ class Axes(maxes.Axes):
         return self._grid_helper
 
 
-    def grid(self, b=None, which='major', **kwargs):
+    def grid(self, b=None, which='major', axis="both", **kwargs):
         """
-        Toggel the gridlines, and optionally set the properties of the lines.
+        Toggle the gridlines, and optionally set the properties of the lines.
         """
         # their are some discrepancy between the behavior of grid in
         # axes_grid and the original mpl's grid, because axes_grid
@@ -733,9 +733,9 @@ class Axes(maxes.Axes):
         self.artists = orig_artists
 
 
-    def get_tightbbox(self, renderer):
+    def get_tightbbox(self, renderer, call_axes_locator=True):
 
-        bb0 = super(Axes, self).get_tightbbox(renderer)
+        bb0 = super(Axes, self).get_tightbbox(renderer, call_axes_locator)
 
         if not self._axisline_on:
             return bb0
@@ -746,24 +746,58 @@ class Axes(maxes.Axes):
             if not axisline.get_visible():
                 continue
 
-            if axisline.label.get_visible():
-                bb.append(axisline.label.get_window_extent(renderer))
+            bb.append(axisline.get_tightbbox(renderer))
+            # if axisline.label.get_visible():
+            #     bb.append(axisline.label.get_window_extent(renderer))
 
 
-            if axisline.major_ticklabels.get_visible():
-                bb.extend(axisline.major_ticklabels.get_window_extents(renderer))
-            if axisline.minor_ticklabels.get_visible():
-                bb.extend(axisline.minor_ticklabels.get_window_extents(renderer))
-            if axisline.major_ticklabels.get_visible() or \
-               axisline.minor_ticklabels.get_visible():
-                bb.append(axisline.offsetText.get_window_extent(renderer))
+            # if axisline.major_ticklabels.get_visible():
+            #     bb.extend(axisline.major_ticklabels.get_window_extents(renderer))
+            # if axisline.minor_ticklabels.get_visible():
+            #     bb.extend(axisline.minor_ticklabels.get_window_extents(renderer))
+            # if axisline.major_ticklabels.get_visible() or \
+            #    axisline.minor_ticklabels.get_visible():
+            #     bb.append(axisline.offsetText.get_window_extent(renderer))
 
         #bb.extend([c.get_window_extent(renderer) for c in artists \
         #           if c.get_visible()])
 
-        _bbox = Bbox.union([b for b in bb if b.width!=0 or b.height!=0])
+        _bbox = Bbox.union([b for b in bb if b and (b.width!=0 or b.height!=0)])
 
         return _bbox
+
+
+    def set_xlim(self, left=None, right=None, emit=True, auto=False,
+                 swap_axis=True, **kw):
+
+        x1o, x2o = self.get_xlim()
+
+        maxes.Axes.set_xlim(self, left, right, emit, auto, **kw)
+        x1, x2 = self.get_xlim()
+
+        if not swap_axis:
+            return
+
+        if (x1o > x2o and x1 < x2) or (x1o < x2o and x1 > x2):
+            self.axis["right"], self.axis["left"] = self.axis["left"], self.axis["right"]
+
+            self.axis["left"].set_axis_direction("left")
+            self.axis["right"].set_axis_direction("right")
+
+
+    def set_ylim(self, bottom=None, top=None, emit=True, auto=False,
+                 swap_axis=True, **kw):
+
+        y1o, y2o = self.get_ylim()
+
+        maxes.Axes.set_ylim(self, bottom, top, emit, auto, **kw)
+        y1, y2 = self.get_ylim()
+
+        if y1o > y2o and y1 < y2 or (y1o < y2o and y1 > y2):
+            self.axis["top"], self.axis["bottom"] = self.axis["bottom"], self.axis["top"]
+
+            self.axis["top"].set_axis_direction("top")
+            self.axis["bottom"].set_axis_direction("bottom")
 
 
 

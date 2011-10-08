@@ -1,11 +1,11 @@
 Description: minor glitch in draw_markers() description
 Author: Jakub Wilk <jwilk@debian.org>
 
-Index: matplotlib-1.0.1/doc/api/api_changes.rst
+Index: matplotlib-1.1.0~rc1/doc/api/api_changes.rst
 ===================================================================
---- matplotlib-1.0.1.orig/doc/api/api_changes.rst	2011-01-12 23:54:37.130685365 +0100
-+++ matplotlib-1.0.1/doc/api/api_changes.rst	2011-01-12 23:54:54.886682489 +0100
-@@ -540,7 +540,7 @@
+--- matplotlib-1.1.0~rc1.orig/doc/api/api_changes.rst	2011-09-24 17:08:26.000000000 +0200
++++ matplotlib-1.1.0~rc1/doc/api/api_changes.rst	2011-09-26 23:46:20.508264962 +0200
+@@ -569,7 +569,7 @@
  
    * :meth:`draw_markers(self, gc, marker_path, marker_trans, path,
      trans, rgbFace)

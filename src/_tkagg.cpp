@@ -1,6 +1,8 @@
+/* -*- mode: c++; c-basic-offset: 4 -*- */
+
 /*
  * The Python Imaging Library.
- * $Id: _tkagg.cpp 8460 2010-06-24 13:06:03Z mdboom $
+ * $Id$
  *
  */
 

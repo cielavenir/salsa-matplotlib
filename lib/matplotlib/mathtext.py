@@ -329,10 +329,9 @@ class MathtextBackendSvg(MathtextBackend):
 
     def render_glyph(self, ox, oy, info):
         oy = self.height - oy + info.offset
-        thetext = unichr_safe(info.num)
 
         self.svg_glyphs.append(
-            (info.font, info.fontsize, thetext, ox, oy, info.metrics))
+            (info.font, info.fontsize, info.num, ox, oy, info.metrics))
 
     def render_rect_filled(self, x1, y1, x2, y2):
         self.svg_rects.append(
@@ -350,8 +349,8 @@ class MathtextBackendSvg(MathtextBackend):
 
 class MathtextBackendPath(MathtextBackend):
     """
-    Store information to write a mathtext rendering to the Cairo
-    backend.
+    Store information to write a mathtext rendering to the text path
+    machinery.
     """
 
     def __init__(self):
@@ -360,7 +359,7 @@ class MathtextBackendPath(MathtextBackend):
 
     def render_glyph(self, ox, oy, info):
         oy = self.height - oy + info.offset
-        thetext = unichr_safe(info.num)
+        thetext = info.num
         self.glyphs.append(
             (info.font, info.fontsize, thetext, ox, oy))
 
@@ -606,7 +605,7 @@ class TruetypeFonts(Fonts):
 
     def _get_offset(self, cached_font, glyph, fontsize, dpi):
         if cached_font.font.postscript_name == 'Cmex10':
-            return glyph.height/64.0/2.0 + 256.0/64.0 * dpi/72.0
+            return ((glyph.height/64.0/2.0) + (fontsize/3.0 * dpi/72.0))
         return 0.
 
     def _get_info(self, fontname, font_class, sym, fontsize, dpi):
@@ -1802,6 +1801,9 @@ class Kern(Node):
     when its *width* denotes additional spacing in the vertical
     direction.
     """
+    height = 0
+    depth = 0
+
     def __init__(self, width):
         Node.__init__(self)
         self.width = width
@@ -2176,7 +2178,7 @@ class Parser(object):
                      ).setParseAction(self.customspace).setName('customspace')
 
         unicode_range = u"\U00000080-\U0001ffff"
-        symbol       =(Regex(UR"([a-zA-Z0-9 +\-*/<>=:,.;!'@()\[\]|%s])|(\\[%%${}\[\]_|])" % unicode_range)
+        symbol       =(Regex(UR"([a-zA-Z0-9 +\-*/<>=:,.;!\?&'@()\[\]|%s])|(\\[%%${}\[\]_|])" % unicode_range)
                      | (Combine(
                          bslash
                        + oneOf(tex2uni.keys())
@@ -2251,7 +2253,6 @@ class Parser(object):
                         | Error(r"Expected \genfrac{ldelim}{rdelim}{rulesize}{style}{num}{den}"))
                      ).setParseAction(self.genfrac).setName("genfrac")
 
-
         sqrt         = Group(
                        Suppress(Literal(r"\sqrt"))
                      + Optional(
@@ -2263,6 +2264,11 @@ class Parser(object):
                      + (group | Error("Expected \sqrt{value}"))
                      ).setParseAction(self.sqrt).setName("sqrt")
 
+        overline    = Group(
+                      Suppress(Literal(r"\overline"))
+                    + (group | Error("Expected \overline{value}"))
+                    ).setParseAction(self.overline).setName("overline")
+
         placeable   <<(function
                      ^ (c_over_c | symbol)
                      ^ accent
@@ -2272,6 +2278,7 @@ class Parser(object):
                      ^ binom
                      ^ genfrac
                      ^ sqrt
+                     ^ overline
                      )
 
         simple      <<(space
@@ -2456,6 +2463,8 @@ class Parser(object):
     def symbol(self, s, loc, toks):
         # print "symbol", toks
         c = toks[0]
+        if c == "'":
+            c = '\prime'
         try:
             char = Char(c, self.get_state())
         except ValueError:
@@ -2845,6 +2854,31 @@ class Parser(object):
                        rightside])               # Body
         return [hlist]
 
+    def overline(self, s, loc, toks):
+        assert(len(toks)==1)
+        assert(len(toks[0])==1)
+
+        body = toks[0][0]
+
+        state = self.get_state()
+        thickness = state.font_output.get_underline_thickness(
+            state.font, state.fontsize, state.dpi)
+
+        height = body.height - body.shift_amount + thickness * 3.0
+        depth = body.depth + body.shift_amount
+
+        # Place overline above body
+        rightside = Vlist([Hrule(state),
+                           Fill(),
+                           Hlist([body])])
+
+        # Stretch the glue between the hrule and the body
+        rightside.vpack(height + (state.fontsize * state.dpi) / (100.0 * 12.0),
+                        depth, 'exactly')
+
+        hlist = Hlist([rightside])
+        return [hlist]
+
     def _auto_sized_delimiter(self, front, middle, back):
         state = self.get_state()
         height = max([x.height for x in middle])
@@ -2880,7 +2914,7 @@ class MathTextParser(object):
         'ps'    : MathtextBackendPs,
         'pdf'   : MathtextBackendPdf,
         'svg'   : MathtextBackendSvg,
-        'path'   : MathtextBackendPath,
+        'path'  : MathtextBackendPath,
         'cairo' : MathtextBackendCairo,
         'macosx': MathtextBackendAgg,
         }
@@ -3057,3 +3091,45 @@ class MathTextParser(object):
         prop = FontProperties(size=fontsize)
         ftimage, depth = self.parse(texstr, dpi=dpi, prop=prop)
         return depth
+
+def math_to_image(s, filename_or_obj, prop=None, dpi=None, format=None):
+    """
+    Given a math expression, renders it in a closely-clipped bounding
+    box to an image file.
+
+    *s*
+       A math expression.  The math portion should be enclosed in
+       dollar signs.
+
+    *filename_or_obj*
+       A filepath or writable file-like object to write the image data
+       to.
+
+    *prop*
+       If provided, a FontProperties() object describing the size and
+       style of the text.
+
+    *dpi*
+       Override the output dpi, otherwise use the default associated
+       with the output format.
+
+    *format*
+       The output format, eg. 'svg', 'pdf', 'ps' or 'png'.  If not
+       provided, will be deduced from the filename.
+    """
+    from matplotlib import figure
+    # backend_agg supports all of the core output formats
+    from matplotlib.backends import backend_agg
+
+    if prop is None:
+        prop = FontProperties()
+
+    parser = MathTextParser('path')
+    width, height, depth, _, _ = parser.parse(s, dpi=72, prop=prop)
+
+    fig = figure.Figure(figsize=(width / 72.0, height / 72.0))
+    fig.text(0, depth/height, s, fontproperties=prop)
+    backend_agg.FigureCanvasAgg(fig)
+    fig.savefig(filename_or_obj, dpi=dpi, format=format)
+
+    return depth

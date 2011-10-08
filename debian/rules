@@ -96,6 +96,9 @@ install-%-stamp: build-%-stamp
 	find debian/$(pdbg) ! -type d ! -name '*.so' | xargs rm -f
 	find debian/$(pdbg) -depth -empty -exec rmdir {} \;
 
+	# don't install baseline_images, needed for tests only, but huge
+	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/*-packages/matplotlib/tests/baseline_images/
+
 	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/mpl-data/
 	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/backends/Matplotlib.nib/
 
@@ -144,7 +147,7 @@ binary-arch: build-arch install-arch
 	dh_testdir -a
 	dh_testroot -a
 	dh_installchangelogs -a CHANGELOG
-	dh_installdocs -p$(p) -a README.txt TODO KNOWN_BUGS INTERACTIVE
+	dh_installdocs -p$(p) -a README.txt TODO
 	# make python scripts starting with '#!' executable
 	for i in `find debian -mindepth 2 -type f ! -perm 755`; do \
 		if head -1 $$i | grep -q '^#!'; then \
@@ -156,6 +159,8 @@ binary-arch: build-arch install-arch
 	dh_link -a
 	dh_lintian -a
 	dh_strip -a --dbg-package=$(pdbg)
+	# fix python-debug-in-wrong-location lintian warning
+	cd debian/*-dbg/usr/lib/debug/usr/lib && mv pyshared pymodules
 	dh_compress -a
 	dh_fixperms -a
 	dh_installdeb -a
