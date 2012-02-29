@@ -1,5 +1,5 @@
 """
-An experimental support for curvelinear grid.
+An experimental support for curvilinear grid.
 """
 
 
@@ -9,13 +9,13 @@ def curvelinear_test2(fig):
     """
     global ax1
     import numpy as np
-    import  mpl_toolkits.axes_grid.angle_helper as angle_helper
+    import  mpl_toolkits.axisartist.angle_helper as angle_helper
     from matplotlib.projections import PolarAxes
     from matplotlib.transforms import Affine2D
 
-    from mpl_toolkits.axes_grid.parasite_axes import SubplotHost
+    from mpl_toolkits.axisartist import SubplotHost
 
-    from mpl_toolkits.axes_grid.grid_helper_curvelinear import GridHelperCurveLinear
+    from mpl_toolkits.axisartist import GridHelperCurveLinear
 
     # see demo_curvelinear_grid.py for details
     tr = Affine2D().scale(np.pi/180., 1.) + PolarAxes.PolarTransform()
@@ -60,14 +60,12 @@ def curvelinear_test2(fig):
 
     ax1.grid(True)
 
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    fig = plt.figure(1, figsize=(5, 5))
-    fig.clf()
+import matplotlib.pyplot as plt
+fig = plt.figure(1, figsize=(5, 5))
+fig.clf()
 
-    curvelinear_test2(fig)
+curvelinear_test2(fig)
 
-    plt.draw()
-    plt.show()
+plt.show()
 
 

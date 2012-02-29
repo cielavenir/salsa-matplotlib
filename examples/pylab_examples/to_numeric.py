@@ -8,7 +8,7 @@ rendering
 from pylab import *
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 try:
-    import Image
+    from PIL import Image
 except ImportError, exc:
     raise SystemExit("PIL must be installed to run this example")
 
@@ -29,5 +29,5 @@ X = fromstring(s, uint8)
 X.shape = h, w, 3
 
 im = Image.fromstring( "RGB", (w,h), s)
-im.show()
+# im.show()
 

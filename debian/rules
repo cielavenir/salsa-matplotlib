@@ -1,20 +1,23 @@
 #!/usr/bin/make -f
 
-include /usr/share/quilt/quilt.make
-
 PYVERS := $(shell pyversions -v -r debian/control)
 DEFPY := $(shell pyversions -v -d)
 PY_PLATFORM := $(shell python -c 'from distutils.util import get_platform; print get_platform()')
 pd := python-matplotlib-doc
 p := python-matplotlib
 pdata := python-matplotlib-data
+pdbg := python-matplotlib-dbg
 
 # build
-build: patch build-arch build-indep
+build: build-arch build-indep
 
 build-indep: build-indep-stamp
 build-indep-stamp: $(DEFPY:%=build-%-stamp)
 	dh_testdir
+
+	# add information to use local copy of 'sampledata' and bypass downloading
+	echo "examples.download : False" >> $(CURDIR)/doc/matplotlibrc
+	echo "examples.directory : $(CURDIR)/sampledata" >> $(CURDIR)/doc/matplotlibrc
 
 	# build the doc
 	-( cd doc ; MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
@@ -29,22 +32,30 @@ build-%-stamp:
 
 	cp -f debian/setup.cfg setup.cfg
 	python$* ./setup.py build $(PY_BUILD_FLAGS)
+	python$*-dbg ./setup.py build $(PY_BUILD_FLAGS)
+
+#ifeq (,$(findstring notest,$(DEB_BUILD_OPTIONS)))
+#	LIB=$$(python$$* -c "from distutils.command.build import build ; from distutils.core import Distribution ; b = build(Distribution()) ; b.finalize_options() ; print b.build_purelib")
+#	PYTHONPATH=$$LIB python$* -c "import matplotlib as m ; m.test(verbosity=1)"
+#	LIB=$$(python$$*-dbg -c "from distutils.command.build import build ; from distutils.core import Distribution ; b = build(Distribution()) ; b.finalize_options() ; print b.build_purelib")
+#	PYTHONPATH=$$LIB python$*-dbg -c "import matplotlib as m ; m.test(verbosity=1)"
+#endif
 
 	touch $@
 
 
 # clean
-clean: clean-patched unpatch
-clean-patched: patch
+clean:
 	dh_testdir
 	dh_testroot
 	
 	for i in $(PYVERS); do \
 		python$(i) ./setup.py clean --all; \
+		python$(i)-dbg ./setup.py clean --all; \
 	done
 
 	# clean the doc
-	( cd doc ; ./make.py clean )
+	-( cd doc ; ./make.py clean )
 
 	# workaround for cleaning the doc ("doc/make.py clean" only runs useless svn-clean)
 	rm -rf doc/build doc/examples
@@ -63,6 +74,8 @@ clean-patched: patch
 	rm -rf build
 	rm -rf lib/matplotlib.egg-info
 
+	# restore "pristine" doc/matplotlibrc
+	sed -i '/^examples\./d' $(CURDIR)/doc/matplotlibrc
 
 # install
 install-arch: build-arch $(PYVERS:%=install-%-stamp)
@@ -77,9 +90,20 @@ install-%-stamp: build-%-stamp
 		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/ --no-compile
 	python$* ./setupegg.py install_egg_info \
 		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/
+	python$*-dbg ./setup.py install_lib \
+		-d $(CURDIR)/debian/$(pdbg)/usr/lib/python$*/site-packages/ --no-compile
+
+	find debian/$(pdbg) ! -type d ! -name '*.so' | xargs rm -f
+	find debian/$(pdbg) -depth -empty -exec rmdir {} \;
+
+	# don't install baseline_images, needed for tests only, but huge
+	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/*-packages/matplotlib/tests/baseline_images/
 
 	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/mpl-data/
 	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/backends/Matplotlib.nib/
+
+	rm -rf $(CURDIR)/debian/$(pdbg)/usr/lib/python$*/site-packages/matplotlib/mpl-data/
+	rm -rf $(CURDIR)/debian/$(pdbg)/usr/lib/python$*/site-packages/matplotlib/backends/Matplotlib.nib/
 
 	touch $@
 
@@ -104,11 +128,12 @@ binary-indep: build-indep install-indep
 	dh_testdir -i
 	dh_testroot -i
 	dh_installchangelogs -i CHANGELOG
-	dh_installdocs -p$(pd) -i doc/build/html/
+	dh_installdocs -p$(pd) -i doc/build/html/ doc/build/latex/Matplotlib.pdf
+	# remove pyc file from doc
+	find $(CURDIR)/debian/$(pd)/ -type f -name '*.pyc' | xargs rm -f
 	dh_installexamples -p$(pd) -i examples/*
-	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js
-	-mkdir -p $(CURDIR)/debian/$(pd)/usr/share/doc/python-matplotlib-doc/html/_static
-	-ln -sf /usr/share/javascript/jquery/jquery.js \
+	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js -Xobjects.inv
+	ln -sf /usr/share/javascript/jquery/jquery.js \
 		$(CURDIR)/debian/$(pd)/usr/share/doc/python-matplotlib-doc/html/_static/jquery.js
 	dh_link -i
 	dh_lintian -i
@@ -122,7 +147,7 @@ binary-arch: build-arch install-arch
 	dh_testdir -a
 	dh_testroot -a
 	dh_installchangelogs -a CHANGELOG
-	dh_installdocs -p$(p) -a README.txt TODO KNOWN_BUGS INTERACTIVE
+	dh_installdocs -p$(p) -a README.txt TODO
 	# make python scripts starting with '#!' executable
 	for i in `find debian -mindepth 2 -type f ! -perm 755`; do \
 		if head -1 $$i | grep -q '^#!'; then \
@@ -133,7 +158,9 @@ binary-arch: build-arch install-arch
 	dh_pysupport -a
 	dh_link -a
 	dh_lintian -a
-	dh_strip -a
+	dh_strip -a --dbg-package=$(pdbg)
+	# fix python-debug-in-wrong-location lintian warning
+	cd debian/*-dbg/usr/lib/debug/usr/lib && mv pyshared pymodules
 	dh_compress -a
 	dh_fixperms -a
 	dh_installdeb -a

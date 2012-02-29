@@ -33,35 +33,33 @@ if major==2 and minor1<4 or major<2:
 
 import glob
 from distutils.core import setup
-from setupext import build_agg, build_gtkagg, build_tkagg, build_wxagg,\
+from setupext import build_agg, build_gtkagg, build_tkagg,\
      build_macosx, build_ft2font, build_image, build_windowing, build_path, \
      build_contour, build_delaunay, build_nxutils, build_gdk, \
      build_ttconv, print_line, print_status, print_message, \
      print_raw, check_for_freetype, check_for_libpng, check_for_gtk, \
-     check_for_tk, check_for_wx, check_for_macosx, check_for_numpy, \
+     check_for_tk, check_for_macosx, check_for_numpy, \
      check_for_qt, check_for_qt4, check_for_cairo, \
      check_provide_pytz, check_provide_dateutil,\
      check_for_dvipng, check_for_ghostscript, check_for_latex, \
-     check_for_pdftops, check_for_datetime, options, build_png
-#import distutils.sysconfig
+     check_for_pdftops, check_for_datetime, options, build_png, build_tri
 
 # jdh
 packages = [
     'matplotlib',
     'matplotlib.backends',
+    'matplotlib.backends.qt4_editor',
     'matplotlib.projections',
-#   'matplotlib.toolkits',
+    'matplotlib.testing',
+    'matplotlib.testing.jpl_units',
+    'matplotlib.tests',
     'mpl_toolkits',
     'mpl_toolkits.mplot3d',
     'mpl_toolkits.axes_grid',
+    'mpl_toolkits.axes_grid1',
+    'mpl_toolkits.axisartist',
     'matplotlib.sphinxext',
-    # The following are deprecated and will be removed.
-    'matplotlib.numerix',
-    'matplotlib.numerix.mlab',
-    'matplotlib.numerix.ma',
-    'matplotlib.numerix.linear_algebra',
-    'matplotlib.numerix.random_array',
-    'matplotlib.numerix.fft',
+    'matplotlib.tri',
 
     ]
 
@@ -69,7 +67,7 @@ py_modules = ['pylab']
 
 ext_modules = []
 
-for line in file('lib/matplotlib/__init__.py').readlines():
+for line in open('lib/matplotlib/__init__.py').readlines():
     if (line.startswith('__version__')):
         exec(line.strip())
 
@@ -88,6 +86,10 @@ package_data = {'matplotlib':['mpl-data/fonts/afm/*.afm',
                               'mpl-data/fonts/pdfcorefonts/*.afm',
                               'mpl-data/fonts/pdfcorefonts/*.txt',
                               'mpl-data/fonts/ttf/*.ttf',
+                              'mpl-data/fonts/ttf/LICENSE_STIX',
+                              'mpl-data/fonts/ttf/COPYRIGHT.TXT',
+                              'mpl-data/fonts/ttf/README.TXT',
+                              'mpl-data/fonts/ttf/RELEASENOTES.TXT',
                               'mpl-data/images/*.xpm',
                               'mpl-data/images/*.svg',
                               'mpl-data/images/*.png',
@@ -98,6 +100,18 @@ package_data = {'matplotlib':['mpl-data/fonts/afm/*.afm',
                               'mpl-data/*.glade',
                               'backends/Matplotlib.nib/*',
                               ]}
+
+if 1:
+    # TODO: exclude these when making release?
+    baseline_images = glob.glob(os.path.join('lib','matplotlib','tests',
+                                             'baseline_images','*','*'))
+    def chop_package(fname):
+        badstr = os.path.join('lib','matplotlib','')
+        assert fname.startswith(badstr)
+        result = fname[ len(badstr): ]
+        return result
+    baseline_images = [chop_package(f) for f in baseline_images]
+    package_data['matplotlib'].extend(baseline_images)
 
 if not check_for_numpy():
     sys.exit(1)
@@ -111,6 +125,7 @@ build_contour(ext_modules, packages)
 build_delaunay(ext_modules, packages)
 build_nxutils(ext_modules, packages)
 build_path(ext_modules, packages)
+build_tri(ext_modules, packages)
 
 print_raw("")
 print_raw("OPTIONAL BACKEND DEPENDENCIES")
@@ -139,17 +154,6 @@ if options['build_tkagg']:
         options['build_agg'] = 1
         build_tkagg(ext_modules, packages)
         rc['backend'] = 'TkAgg'
-
-if options['build_wxagg']:
-    if check_for_wx() or (options['build_wxagg'] is True):
-        options['build_agg'] = 1
-        import wx
-        if getattr(wx, '__version__', '0.0')[0:3] < '2.8' :
-            build_wxagg(ext_modules, packages)
-            wxagg_backend_status = "yes"
-        else:
-            print_message("WxAgg extension not required for wxPython >= 2.8")
-        rc['backend'] = 'WXAgg'
 
 hasgtk = check_for_gtk()
 if options['build_gtk']:
@@ -185,9 +189,10 @@ if hasdatetime: # dates require python23 datetime
         packages.append('pytz')
 
         resources = ['zone.tab', 'locales/pytz.pot']
-        for dirpath, dirnames, filenames in os.walk(os.path.join('lib', 'pytz', 'zoneinfo')):
+        for dirpath, dirnames, filenames in os.walk(
+            os.path.join('lib', 'pytz', 'zoneinfo')
+            ):
 
-            if '.svn' in dirpath: continue
             # remove the 'pytz' part of the path
             basepath = os.path.join(*dirpath.split(os.path.sep)[2:])
             #print dirpath, basepath
@@ -200,7 +205,7 @@ if hasdatetime: # dates require python23 datetime
 
     def add_dateutil():
         packages.append('dateutil')
-        packages.append('dateutil/zoneinfo')
+        packages.append('dateutil.zoneinfo')
         package_data['dateutil'] = ['zoneinfo/zoneinfo*.tar.*']
 
     if sys.platform=='win32':
@@ -211,7 +216,7 @@ if hasdatetime: # dates require python23 datetime
         # only add them if we need them
         if provide_pytz:
             add_pytz()
-            print 'adding pytz'
+            print_raw("adding pytz")
         if provide_dateutil: add_dateutil()
 
 print_raw("")
@@ -227,14 +232,14 @@ print_line()
 
 # Write the default matplotlibrc file
 if options['backend']: rc['backend'] = options['backend']
-template = file('matplotlibrc.template').read()
-file('lib/matplotlib/mpl-data/matplotlibrc', 'w').write(template%rc)
+template = open('matplotlibrc.template').read()
+open('lib/matplotlib/mpl-data/matplotlibrc', 'w').write(template%rc)
 
 # Write the default matplotlib.conf file
-template = file('lib/matplotlib/mpl-data/matplotlib.conf.template').read()
+template = open('lib/matplotlib/mpl-data/matplotlib.conf.template').read()
 template = template.replace("datapath = ", "#datapath = ")
 template = template.replace("    use = 'Agg'", "    use = '%s'"%rc['backend'])
-file('lib/matplotlib/mpl-data/matplotlib.conf', 'w').write(template)
+open('lib/matplotlib/mpl-data/matplotlib.conf', 'w').write(template)
 
 try: additional_params # has setupegg.py provided
 except NameError: additional_params = {}
@@ -243,8 +248,8 @@ for mod in ext_modules:
     if options['verbose']:
         mod.extra_compile_args.append('-DVERBOSE')
 
-print 'pymods', py_modules
-print 'packages', packages
+print_raw("pymods %s" % py_modules)
+print_raw("packages %s" % packages)
 distrib = setup(name="matplotlib",
       version= __version__,
       description = "Python plotting package",

@@ -1,3 +1,5 @@
+/* -*- mode: c++; c-basic-offset: 4 -*- */
+
 #ifndef __PATH_CONVERTERS_H__
 #define __PATH_CONVERTERS_H__
 
@@ -26,7 +28,7 @@
       Agg where coordinates can not be larger than 24-bit signed
       integers.
 
-   4. PathQuantizer: Rounds the path to the nearest center-pixels.
+   4. PathSnapper: Rounds the path to the nearest center-pixels.
       This makes rectilinear curves look much better.
 
    5. PathSimplifier: Removes line segments from highly dense paths
@@ -46,7 +48,7 @@
 template<int QueueSize>
 class EmbeddedQueue
 {
- protected:
+protected:
     EmbeddedQueue() :
         m_queue_read(0), m_queue_write(0)
     {
@@ -55,8 +57,13 @@ class EmbeddedQueue
 
     struct item
     {
-        item() {}
-        inline void set(const unsigned cmd_, const double& x_, const double& y_)
+        item()
+        {
+
+        }
+
+        inline void
+        set(const unsigned cmd_, const double& x_, const double& y_)
         {
             cmd = cmd_;
             x = x_;
@@ -70,17 +77,20 @@ class EmbeddedQueue
     int  m_queue_write;
     item m_queue[QueueSize];
 
-    inline void queue_push(const unsigned cmd, const double& x, const double& y)
+    inline void
+    queue_push(const unsigned cmd, const double& x, const double& y)
     {
         m_queue[m_queue_write++].set(cmd, x, y);
     }
 
-    inline bool queue_nonempty()
+    inline bool
+    queue_nonempty()
     {
         return m_queue_read < m_queue_write;
     }
 
-    inline bool queue_flush(unsigned *cmd, double *x, double *y)
+    inline bool
+    queue_pop(unsigned *cmd, double *x, double *y)
     {
         if (queue_nonempty())
         {
@@ -98,7 +108,8 @@ class EmbeddedQueue
         return false;
     }
 
-    inline void queue_clear()
+    inline void
+    queue_clear()
     {
         m_queue_read = 0;
         m_queue_write = 0;
@@ -112,13 +123,14 @@ class EmbeddedQueue
   value, the entire curve segment will be skipped.
  */
 template<class VertexSource>
-class PathNanRemover : protected EmbeddedQueue<4> {
+class PathNanRemover : protected EmbeddedQueue<4>
+{
     VertexSource* m_source;
     bool m_remove_nans;
     bool m_has_curves;
     static const unsigned char num_extra_points_map[16];
 
- public:
+public:
     /* has_curves should be true if the path contains bezier curve
        segments, as this requires a slower algorithm to remove the
        NaNs.  When in doubt, set to true.
@@ -129,35 +141,41 @@ class PathNanRemover : protected EmbeddedQueue<4> {
         // empty
     }
 
-    inline void rewind(unsigned path_id)
+    inline void
+    rewind(unsigned path_id)
     {
         queue_clear();
         m_source->rewind(path_id);
     }
 
-    inline unsigned vertex(double* x, double *y) {
+    inline unsigned
+    vertex(double* x, double *y)
+    {
         unsigned code;
 
-        if (!m_remove_nans) {
+        if (!m_remove_nans)
+        {
             return m_source->vertex(x, y);
         }
 
-        if (m_has_curves) {
+        if (m_has_curves)
+        {
             /* This is the slow method for when there might be curves. */
-            if (queue_flush(&code, x, y))
+            if (queue_pop(&code, x, y))
             {
                 return code;
             }
 
             bool needs_move_to = false;
-            while (true) {
+            while (true)
+            {
                 /* The approach here is to push each full curve
                    segment into the queue.  If any non-finite values
                    are found along the way, the queue is emptied, and
                    the next curve segment is handled. */
                 code = m_source->vertex(x, y);
                 if (code == agg::path_cmd_stop ||
-                    code == (agg::path_cmd_end_poly | agg::path_flags_close))
+                        code == (agg::path_cmd_end_poly | agg::path_flags_close))
                 {
                     return code;
                 }
@@ -200,7 +218,7 @@ class PathNanRemover : protected EmbeddedQueue<4> {
                 }
             }
 
-            if (queue_flush(&code, x, y))
+            if (queue_pop(&code, x, y))
             {
                 return code;
             }
@@ -230,12 +248,13 @@ class PathNanRemover : protected EmbeddedQueue<4> {
                     {
                         return code;
                     }
-                } while (MPL_notisfinite64(*x) || MPL_notisfinite64(*y));
+                }
+                while (MPL_notisfinite64(*x) || MPL_notisfinite64(*y));
                 return agg::path_cmd_move_to;
             }
-        }
 
-        return code;
+            return code;
+        }
     }
 };
 
@@ -245,7 +264,8 @@ const unsigned char PathNanRemover<VertexSource>::num_extra_points_map[] =
     {0, 0, 0, 1,
      2, 0, 0, 0,
      0, 0, 0, 0,
-     0, 0, 0, 0};
+     0, 0, 0, 0
+    };
 
 /************************************************************
  PathClipper uses the Liang-Barsky line clipping algorithm (as
@@ -266,11 +286,11 @@ class PathClipper
     double                 m_nextY;
     bool                   m_has_next;
 
- public:
+public:
     PathClipper(VertexSource& source, bool do_clipping,
                 double width, double height) :
         m_source(&source), m_do_clipping(do_clipping),
-        m_cliprect(0.0, 0.0, width, height), m_moveto(true),
+        m_cliprect(-1.0, -1.0, width + 1.0, height + 1.0), m_moveto(true),
         m_has_next(false)
     {
         // empty
@@ -281,31 +301,39 @@ class PathClipper
         m_source(&source), m_do_clipping(do_clipping),
         m_cliprect(rect), m_moveto(true), m_has_next(false)
     {
-        // empty
+        m_cliprect.x1 -= 1.0;
+        m_cliprect.y1 -= 1.0;
+        m_cliprect.x2 += 1.0;
+        m_cliprect.y2 += 1.0;
     }
 
-    inline void rewind(unsigned path_id)
+    inline void
+    rewind(unsigned path_id)
     {
         m_has_next = false;
         m_moveto = true;
         m_source->rewind(path_id);
     }
 
-    unsigned vertex(double* x, double* y)
+    unsigned
+    vertex(double* x, double* y)
     {
         unsigned code;
 
-        if (m_do_clipping) {
+        if (m_do_clipping)
+        {
             /* This is the slow path where we actually do clipping */
 
-            if (m_has_next) {
+            if (m_has_next)
+            {
                 m_has_next = false;
                 *x = m_nextX;
                 *y = m_nextY;
                 return agg::path_cmd_line_to;
             }
 
-            while ((code = m_source->vertex(x, y)) != agg::path_cmd_stop) {
+            while ((code = m_source->vertex(x, y)) != agg::path_cmd_stop)
+            {
                 if (m_moveto)
                 {
                     m_moveto = false;
@@ -361,35 +389,38 @@ class PathClipper
 };
 
 /************************************************************
- PathQuantizer rounds vertices to their nearest center-pixels.  This
+ PathSnapper rounds vertices to their nearest center-pixels.  This
  makes rectilinear paths (rectangles, horizontal and vertical lines
  etc.) look much cleaner.
 */
-enum e_quantize_mode
+enum e_snap_mode
 {
-    QUANTIZE_AUTO,
-    QUANTIZE_FALSE,
-    QUANTIZE_TRUE
+    SNAP_AUTO,
+    SNAP_FALSE,
+    SNAP_TRUE
 };
 
 template<class VertexSource>
-class PathQuantizer
+class PathSnapper
 {
- private:
+private:
     VertexSource* m_source;
-    bool          m_quantize;
+    bool          m_snap;
+    double        m_snap_value;
 
-    static bool should_quantize(VertexSource& path,
-                                e_quantize_mode quantize_mode,
-                                unsigned total_vertices) {
+    static bool
+    should_snap(VertexSource& path,
+                e_snap_mode snap_mode,
+                unsigned total_vertices)
+    {
         // If this contains only straight horizontal or vertical lines, it should be
-        // quantized to the nearest pixels
+        // snapped to the nearest pixels
         double x0, y0, x1, y1;
         unsigned code;
 
-        switch (quantize_mode)
+        switch (snap_mode)
         {
-        case QUANTIZE_AUTO:
+        case SNAP_AUTO:
             if (total_vertices > 1024)
             {
                 return false;
@@ -419,50 +450,60 @@ class PathQuantizer
             }
 
             return true;
-        case QUANTIZE_FALSE:
+        case SNAP_FALSE:
             return false;
-        case QUANTIZE_TRUE:
+        case SNAP_TRUE:
             return true;
         }
 
         return false;
     }
 
- public:
+public:
     /*
-      quantize_mode should be one of:
-        - QUANTIZE_AUTO: Examine the path to determine if it should be quantized
-        - QUANTIZE_TRUE: Force quantization
-        - QUANTIZE_FALSE: No quantization
+      snap_mode should be one of:
+        - SNAP_AUTO: Examine the path to determine if it should be snapped
+        - SNAP_TRUE: Force snapping
+        - SNAP_FALSE: No snapping
     */
-    PathQuantizer(VertexSource& source, e_quantize_mode quantize_mode,
-                  unsigned total_vertices=15) :
+    PathSnapper(VertexSource& source, e_snap_mode snap_mode,
+                unsigned total_vertices = 15, double stroke_width = 0.0) :
         m_source(&source)
     {
-        m_quantize = should_quantize(source, quantize_mode, total_vertices);
+        m_snap = should_snap(source, snap_mode, total_vertices);
+
+        if (m_snap)
+        {
+            int is_odd = (int)mpl_round(stroke_width) % 2;
+            m_snap_value = (is_odd) ? 0.5 : 0.0;
+        }
+
         source.rewind(0);
     }
 
-    inline void rewind(unsigned path_id)
+    inline void
+    rewind(unsigned path_id)
     {
         m_source->rewind(path_id);
     }
 
-    inline unsigned vertex(double* x, double* y)
+    inline unsigned
+    vertex(double* x, double* y)
     {
         unsigned code;
         code = m_source->vertex(x, y);
-        if (m_quantize && agg::is_vertex(code))
+        if (m_snap && agg::is_vertex(code))
         {
-            *x = mpl_round(*x) + 0.5;
-            *y = mpl_round(*y) + 0.5;
+            *x = mpl_round(*x) + m_snap_value;
+            *y = mpl_round(*y) + m_snap_value;
         }
         return code;
     }
 
-    inline bool is_quantizing()
+    inline bool
+    is_snapping()
     {
-        return m_quantize;
+        return m_snap;
     }
 };
 
@@ -477,25 +518,27 @@ public:
     /* Set simplify to true to perform simplification */
     PathSimplifier(VertexSource& source, bool do_simplify, double simplify_threshold) :
         m_source(&source), m_simplify(do_simplify),
-        m_simplify_threshold(simplify_threshold),
+        m_simplify_threshold(simplify_threshold*simplify_threshold),
         m_moveto(true), m_after_moveto(false),
         m_lastx(0.0), m_lasty(0.0), m_clipped(false),
         m_origdx(0.0), m_origdy(0.0),
-        m_origdNorm2(0.0), m_dnorm2Max(0.0), m_dnorm2Min(0.0),
+        m_origdNorm2(0.0), m_dnorm2Max(0.0),
         m_lastMax(false), m_nextX(0.0), m_nextY(0.0),
         m_lastWrittenX(0.0), m_lastWrittenY(0.0)
     {
         // empty
     }
 
-    inline void rewind(unsigned path_id)
+    inline void
+    rewind(unsigned path_id)
     {
         queue_clear();
         m_moveto = true;
         m_source->rewind(path_id);
     }
 
-    unsigned vertex(double* x, double* y)
+    unsigned
+    vertex(double* x, double* y)
     {
         unsigned cmd;
 
@@ -526,7 +569,8 @@ public:
            the queue before proceeding to the main loop below.
            -- Michael Droettboom */
 
-        if (queue_flush(&cmd, x, y)) {
+        if (queue_pop(&cmd, x, y))
+        {
             return cmd;
         }
 
@@ -551,7 +595,7 @@ public:
                     /* m_origdNorm2 is nonzero only if we have a
                        vector; the m_after_moveto check ensures we
                        push this vector to the queue only once. */
-                    _push(x,y);
+                    _push(x, y);
                 }
                 m_after_moveto = true;
                 m_lastx = *x;
@@ -568,11 +612,15 @@ public:
             }
             m_after_moveto = false;
 
+            /* NOTE: We used to skip this very short segments, but if
+               you have a lot of them cumulatively, you can miss
+               maxima or minima in the data. */
+
             /* Don't render line segments less than one pixel long */
-            if (fabs(*x - m_lastx) < 1.0 && fabs(*y - m_lasty) < 1.0)
-            {
-                continue;
-            }
+            /* if (fabs(*x - m_lastx) < 1.0 && fabs(*y - m_lasty) < 1.0) */
+            /* { */
+            /*     continue; */
+            /* } */
 
             /* if we have no orig vector, set it to this vector and
                continue.  this orig vector is the reference vector we
@@ -587,11 +635,10 @@ public:
 
                 m_origdx = *x - m_lastx;
                 m_origdy = *y - m_lasty;
-                m_origdNorm2 = m_origdx*m_origdx + m_origdy*m_origdy;
+                m_origdNorm2 = m_origdx * m_origdx + m_origdy * m_origdy;
 
                 //set all the variables to reflect this new orig vector
                 m_dnorm2Max = m_origdNorm2;
-                m_dnorm2Min = 0.0;
                 m_lastMax = true;
 
                 m_nextX = m_lastWrittenX = m_lastx = *x;
@@ -613,16 +660,16 @@ public:
             /* get the v vector */
             double totdx = *x - m_lastWrittenX;
             double totdy = *y - m_lastWrittenY;
-            double totdot = m_origdx*totdx + m_origdy*totdy;
+            double totdot = m_origdx * totdx + m_origdy * totdy;
 
             /* get the para vector ( = (o.v)o/(o.o)) */
-            double paradx = totdot*m_origdx/m_origdNorm2;
-            double parady = totdot*m_origdy/m_origdNorm2;
+            double paradx = totdot * m_origdx / m_origdNorm2;
+            double parady = totdot * m_origdy / m_origdNorm2;
 
             /* get the perp vector ( = v - para) */
             double perpdx = totdx - paradx;
             double perpdy = totdy - parady;
-            double perpdNorm2 = perpdx*perpdx + perpdy*perpdy;
+            double perpdNorm2 = perpdx * perpdx + perpdy * perpdy;
 
             /* If the perp vector is less than some number of (squared)
                pixels in size, then merge the current vector */
@@ -631,13 +678,11 @@ public:
                 /* check if the current vector is parallel or
                    anti-parallel to the orig vector. If it is
                    parallel, test if it is the longest of the vectors
-                   we are merging in that direction. If anti-p, test
-                   if it is the longest in the opposite direction (the
-                   min of our final line) */
-                double paradNorm2 = paradx*paradx + parady*parady;
+                   we are merging in that direction. */
+                double paradNorm2 = paradx * paradx + parady * parady;
 
                 m_lastMax = false;
-                if (totdot >= 0.0)
+                if (totdot > 0.0)
                 {
                     if (paradNorm2 > m_dnorm2Max)
                     {
@@ -649,12 +694,9 @@ public:
                 }
                 else
                 {
-                    if (paradNorm2 > m_dnorm2Min)
-                    {
-                        m_dnorm2Min = paradNorm2;
-                        m_nextX = *x;
-                        m_nextY = *y;
-                    }
+                    _push(&m_lastx, &m_lasty);
+                    _push(x, y);
+                    break;
                 }
 
                 m_lastx = *x;
@@ -680,15 +722,22 @@ public:
         {
             if (m_origdNorm2 != 0.0)
             {
-                queue_push(agg::path_cmd_line_to, m_nextX, m_nextY);
+                queue_push((m_moveto || m_after_moveto) ?
+                           agg::path_cmd_move_to : agg::path_cmd_line_to,
+                           m_nextX, m_nextY);
+                m_moveto = false;
             }
-            queue_push(agg::path_cmd_line_to, m_lastx, m_lasty);
+            queue_push((m_moveto || m_after_moveto) ?
+                       agg::path_cmd_move_to : agg::path_cmd_line_to,
+                       m_lastx, m_lasty);
+            m_moveto = false;
             queue_push(agg::path_cmd_stop, 0.0, 0.0);
         }
 
         /* Return the first item in the queue, if any, otherwise
            indicate that we're done. */
-        if (queue_flush(&cmd, x, y)) {
+        if (queue_pop(&cmd, x, y))
+        {
             return cmd;
         }
         else
@@ -711,14 +760,14 @@ private:
     double m_origdy;
     double m_origdNorm2;
     double m_dnorm2Max;
-    double m_dnorm2Min;
     bool   m_lastMax;
     double m_nextX;
     double m_nextY;
     double m_lastWrittenX;
     double m_lastWrittenY;
 
-    inline void _push(double* x, double* y)
+    inline void
+    _push(double* x, double* y)
     {
         queue_push(agg::path_cmd_line_to, m_nextX, m_nextY);
 
@@ -742,10 +791,9 @@ private:
         /* Now reset all the variables to get ready for the next line */
         m_origdx = *x - m_lastx;
         m_origdy = *y - m_lasty;
-        m_origdNorm2 = m_origdx*m_origdx + m_origdy*m_origdy;
+        m_origdNorm2 = m_origdx * m_origdx + m_origdy * m_origdy;
 
         m_dnorm2Max = m_origdNorm2;
-        m_dnorm2Min = 0.0;
         m_lastMax = true;
         m_lastWrittenX = m_queue[m_queue_write-1].x;
         m_lastWrittenY = m_queue[m_queue_write-1].y;
@@ -754,7 +802,6 @@ private:
 
         m_clipped = false;
     }
-
 };
 
 #endif // __PATH_CONVERTERS_H__

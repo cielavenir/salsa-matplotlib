@@ -8,7 +8,13 @@ import time, datetime
 import warnings
 import numpy as np
 import numpy.ma as ma
-from weakref import ref
+from weakref import ref, WeakKeyDictionary
+import cPickle
+import os.path
+import random
+import new
+
+import matplotlib
 
 major, minor1, minor2, s, tmp = sys.version_info
 
@@ -16,11 +22,18 @@ major, minor1, minor2, s, tmp = sys.version_info
 # On some systems, locale.getpreferredencoding returns None,
 # which can break unicode; and the sage project reports that
 # some systems have incorrect locale specifications, e.g.,
-# an encoding instead of a valid locale name.
+# an encoding instead of a valid locale name.  Another
+# pathological case that has been reported is an empty string.
+
+# On some systems, getpreferredencoding sets the locale, which has
+# side effects.  Passing False eliminates those side effects.
 
 try:
-    preferredencoding = locale.getpreferredencoding()
-except (ValueError, ImportError):
+    preferredencoding = locale.getpreferredencoding(
+        matplotlib.rcParams['axes.formatter.use_locale']).strip()
+    if not preferredencoding:
+        preferredencoding = None
+except (ValueError, ImportError, AttributeError):
     preferredencoding = None
 
 def unicode_safe(s):
@@ -97,15 +110,13 @@ class CallbackRegistry:
     Handle registering and disconnecting for a set of signals and
     callbacks::
 
-       signals = 'eat', 'drink', 'be merry'
-
        def oneat(x):
            print 'eat', x
 
        def ondrink(x):
            print 'drink', x
 
-       callbacks = CallbackRegistry(signals)
+       callbacks = CallbackRegistry()
 
        ideat = callbacks.connect('eat', oneat)
        iddrink = callbacks.connect('drink', ondrink)
@@ -118,30 +129,105 @@ class CallbackRegistry:
        callbacks.disconnect(ideat)        # disconnect oneat
        callbacks.process('eat', 456)      # nothing will be called
 
+    In practice, one should always disconnect all callbacks when they
+    are no longer needed to avoid dangling references (and thus memory
+    leaks).  However, real code in matplotlib rarely does so, and due
+    to its design, it is rather difficult to place this kind of code.
+    To get around this, and prevent this class of memory leaks, we
+    instead store weak references to bound methods only, so when the
+    destination object needs to die, the CallbackRegistry won't keep
+    it alive.  The Python stdlib weakref module can not create weak
+    references to bound methods directly, so we need to create a proxy
+    object to handle weak references to bound methods (or regular free
+    functions).  This technique was shared by Peter Parente on his
+    `"Mindtrove" blog
+    <http://mindtrove.info/articles/python-weak-references/>`_.
     """
-    def __init__(self, signals):
-        '*signals* is a sequence of valid signals'
-        self.signals = set(signals)
-        # callbacks is a dict mapping the signal to a dictionary
-        # mapping callback id to the callback function
-        self.callbacks = dict([(s, dict()) for s in signals])
-        self._cid = 0
+    class BoundMethodProxy(object):
+        '''
+        Our own proxy object which enables weak references to bound and unbound
+        methods and arbitrary callables. Pulls information about the function,
+        class, and instance out of a bound method. Stores a weak reference to the
+        instance to support garbage collection.
 
-    def _check_signal(self, s):
-        'make sure *s* is a valid signal or raise a ValueError'
-        if s not in self.signals:
-            signals = list(self.signals)
-            signals.sort()
-            raise ValueError('Unknown signal "%s"; valid signals are %s'%(s, signals))
+        @organization: IBM Corporation
+        @copyright: Copyright (c) 2005, 2006 IBM Corporation
+        @license: The BSD License
+
+        Minor bugfixes by Michael Droettboom
+        '''
+        def __init__(self, cb):
+            try:
+                try:
+                    self.inst = ref(cb.im_self)
+                except TypeError:
+                    self.inst = None
+                self.func = cb.im_func
+                self.klass = cb.im_class
+            except AttributeError:
+                self.inst = None
+                self.func = cb
+                self.klass = None
+
+        def __call__(self, *args, **kwargs):
+            '''
+            Proxy for a call to the weak referenced object. Take
+            arbitrary params to pass to the callable.
+
+            Raises `ReferenceError`: When the weak reference refers to
+            a dead object
+            '''
+            if self.inst is not None and self.inst() is None:
+                raise ReferenceError
+            elif self.inst is not None:
+                # build a new instance method with a strong reference to the instance
+                mtd = new.instancemethod(self.func, self.inst(), self.klass)
+            else:
+                # not a bound method, just return the func
+                mtd = self.func
+            # invoke the callable and return the result
+            return mtd(*args, **kwargs)
+
+        def __eq__(self, other):
+            '''
+            Compare the held function and instance with that held by
+            another proxy.
+            '''
+            try:
+                if self.inst is None:
+                    return self.func == other.func and other.inst is None
+                else:
+                    return self.func == other.func and self.inst() == other.inst()
+            except Exception:
+                return False
+
+        def __ne__(self, other):
+            '''
+            Inverse of __eq__.
+            '''
+            return not self.__eq__(other)
+
+    def __init__(self, *args):
+        if len(args):
+            warnings.warn(
+                'CallbackRegistry no longer requires a list of callback types.  Ignoring arguments',
+                DeprecationWarning)
+        self.callbacks = dict()
+        self._cid = 0
+        self._func_cid_map = WeakKeyDictionary()
 
     def connect(self, s, func):
         """
         register *func* to be called when a signal *s* is generated
         func will be called
         """
-        self._check_signal(s)
-        self._cid +=1
-        self.callbacks[s][self._cid] = func
+        if func in self._func_cid_map:
+            return self._func_cid_map[func]
+        proxy = self.BoundMethodProxy(func)
+        self._cid += 1
+        self.callbacks.setdefault(s, dict())
+        self.callbacks[s][self._cid] = proxy
+        self._func_cid_map[func] = self._cid
         return self._cid
 
     def disconnect(self, cid):
@@ -149,18 +235,25 @@ class CallbackRegistry:
         disconnect the callback registered with callback id *cid*
         """
         for eventname, callbackd in self.callbacks.items():
-            try: del callbackd[cid]
-            except KeyError: continue
-            else: return
+            try:
+                del callbackd[cid]
+            except KeyError:
+                continue
+            else:
+                return
 
     def process(self, s, *args, **kwargs):
         """
         process signal *s*.  All of the functions registered to receive
         callbacks on *s* will be called with *\*args* and *\*\*kwargs*
         """
-        self._check_signal(s)
-        for func in self.callbacks[s].values():
-            func(*args, **kwargs)
+        if s in self.callbacks:
+            for cid, proxy in self.callbacks[s].items():
+                # Clean out dead references
+                if proxy.inst is not None and proxy.inst() is None:
+                    del self.callbacks[s][cid]
+                else:
+                    proxy(*args, **kwargs)
 
 
 class Scheduler(threading.Thread):
@@ -272,8 +365,10 @@ def unique(x):
 
 def iterable(obj):
     'return true if *obj* is iterable'
-    try: len(obj)
-    except: return False
+    try:
+        iter(obj)
+    except TypeError:
+        return False
     return True
 
 
@@ -311,7 +406,7 @@ def is_scalar(obj):
 def is_numlike(obj):
     'return true if *obj* looks like a number'
     try: obj+1
-    except TypeError: return False
+    except: return False
     else: return True
 
 def to_filehandle(fname, flag='rU', return_opened=False):
@@ -345,6 +440,259 @@ def to_filehandle(fname, flag='rU', return_opened=False):
 
 def is_scalar_or_string(val):
     return is_string_like(val) or not iterable(val)
+
+def _get_data_server(cache_dir, baseurl):
+    import urllib2
+    class ViewVCCachedServer(urllib2.HTTPSHandler):
+        """
+        Urllib2 handler that takes care of caching files.
+        The file cache.pck holds the directory of files that have been cached.
+        """
+        def __init__(self, cache_dir, baseurl):
+            urllib2.HTTPSHandler.__init__(self)
+            self.cache_dir = cache_dir
+            self.baseurl = baseurl
+            self.read_cache()
+            self.remove_stale_files()
+            self.opener = urllib2.build_opener(self)
+
+        def in_cache_dir(self, fn):
+            # make sure the datadir exists
+            reldir, filename = os.path.split(fn)
+            datadir = os.path.join(self.cache_dir, reldir)
+            if not os.path.exists(datadir):
+                os.makedirs(datadir)
+
+            return os.path.join(datadir, filename)
+
+        def read_cache(self):
+            """
+            Read the cache file from the cache directory.
+            """
+            fn = self.in_cache_dir('cache.pck')
+            if not os.path.exists(fn):
+                self.cache = {}
+                return
+
+            f = open(fn, 'rb')
+            cache = cPickle.load(f)
+            f.close()
+
+            # Earlier versions did not have the full paths in cache.pck
+            for url, (fn, x, y) in cache.items():
+                if not os.path.isabs(fn):
+                    cache[url] = (self.in_cache_dir(fn), x, y)
+
+            # If any files are deleted, drop them from the cache
+            for url, (fn, _, _) in cache.items():
+                if not os.path.exists(fn):
+                    del cache[url]
+
+            self.cache = cache
+
+        def remove_stale_files(self):
+            """
+            Remove files from the cache directory that are not listed in
+            cache.pck.
+            """
+            # TODO: remove empty subdirectories
+            listed = set(fn for (_, (fn, _, _)) in self.cache.items())
+            existing = reduce(set.union,
+                (set(os.path.join(dirpath, fn) for fn in filenames)
+                    for (dirpath, _, filenames) in os.walk(self.cache_dir)))
+            matplotlib.verbose.report(
+                'ViewVCCachedServer: files listed in cache.pck: %s' % listed,
+                'debug')
+            matplotlib.verbose.report(
+                'ViewVCCachedServer: files in cache directory: %s' % existing,
+                'debug')
+
+            for path in existing - listed - \
+                    set([self.in_cache_dir('cache.pck')]):
+                matplotlib.verbose.report(
+                    'ViewVCCachedServer:remove_stale_files: removing %s'%path,
+                    level='debug')
+                os.remove(path)
+
+        def write_cache(self):
+            """
+            Write the cache data structure into the cache directory.
+            """
+            fn = self.in_cache_dir('cache.pck')
+            f = open(fn, 'wb')
+            cPickle.dump(self.cache, f, -1)
+            f.close()
+
+        def cache_file(self, url, data, headers):
+            """
+            Store a received file in the cache directory.
+            """
+            # Pick a filename
+            fn = url[len(self.baseurl):]
+            fullpath = self.in_cache_dir(fn)
+
+            f = open(fullpath, 'wb')
+            f.write(data)
+            f.close()
+
+            # Update the cache
+            self.cache[url] = (fullpath, headers.get('ETag'),
+                               headers.get('Last-Modified'))
+            self.write_cache()
+
+        # These urllib2 entry points are used:
+        # http_request for preprocessing requests
+        # http_error_304 for handling 304 Not Modified responses
+        # http_response for postprocessing requests
+
+        def https_request(self, req):
+            """
+            Make the request conditional if we have a cached file.
+            """
+            url = req.get_full_url()
+            if url in self.cache:
+                _, etag, lastmod = self.cache[url]
+                if etag is not None:
+                    req.add_header("If-None-Match", etag)
+                if lastmod is not None:
+                    req.add_header("If-Modified-Since", lastmod)
+            matplotlib.verbose.report(
+                "ViewVCCachedServer: request headers %s" % req.header_items(),
+                "debug")
+            return req
+
+        def https_error_304(self, req, fp, code, msg, hdrs):
+            """
+            Read the file from the cache since the server has no newer version.
+            """
+            url = req.get_full_url()
+            fn, _, _ = self.cache[url]
+            matplotlib.verbose.report(
+                'ViewVCCachedServer: reading data file from cache file "%s"'
+                %fn, 'debug')
+            file = open(fn, 'rb')
+            handle = urllib2.addinfourl(file, hdrs, url)
+            handle.code = 304
+            return handle
+
+        def https_response(self, req, response):
+            """
+            Update the cache with the returned file.
+            """
+            matplotlib.verbose.report(
+                'ViewVCCachedServer: received response %d: %s'
+                % (response.code, response.msg), 'debug')
+            if response.code != 200:
+                return response
+            else:
+                data = response.read()
+                self.cache_file(req.get_full_url(), data, response.headers)
+                result = urllib2.addinfourl(StringIO.StringIO(data),
+                                            response.headers,
+                                            req.get_full_url())
+                result.code = response.code
+                result.msg = response.msg
+                return result
+
+        def get_sample_data(self, fname, asfileobj=True):
+            """
+            Check the cachedirectory for a sample_data file.  If it does
+            not exist, fetch it with urllib from the git repo and
+            store it in the cachedir.
+
+            If asfileobj is True, a file object will be returned.  Else the
+            path to the file as a string will be returned.
+            """
+            # TODO: time out if the connection takes forever
+            # (may not be possible with urllib2 only - spawn a helper process?)
+
+            # quote is not in python2.4, so check for it and get it from
+            # urllib if it is not available
+            quote = getattr(urllib2, 'quote', None)
+            if quote is None:
+                import urllib
+                quote = urllib.quote
+
+            # retrieve the URL for the side effect of refreshing the cache
+            url = self.baseurl + quote(fname)
+            error = 'unknown error'
+            matplotlib.verbose.report('ViewVCCachedServer: retrieving %s'
+                                      % url, 'debug')
+            try:
+                response = self.opener.open(url)
+            except urllib2.URLError, e:
+                # could be a missing network connection
+                error = str(e)
+
+            cached = self.cache.get(url)
+            if cached is None:
+                msg = 'file %s not in cache; received %s when trying to '\
+                      'retrieve' % (fname, error)
+                raise KeyError(msg)
+
+            fname = cached[0]
+
+            if asfileobj:
+                if (os.path.splitext(fname)[-1].lower() in
+                       ('.csv', '.xrc', '.txt')):
+                    mode = 'r'
+                else:
+                    mode = 'rb'
+                return open(fname, mode)
+            else:
+                return fname
+
+    return ViewVCCachedServer(cache_dir, baseurl)
+
+
+def get_sample_data(fname, asfileobj=True):
+    """
+    Check the cachedirectory ~/.matplotlib/sample_data for a sample_data
+    file.  If it does not exist, fetch it with urllib from the mpl git repo
+
+      https://raw.github.com/matplotlib/sample_data/master
+
+    and store it in the cachedir.
+
+    If asfileobj is True, a file object will be returned.  Else the
+    path to the file as a string will be returned
+
+    To add a datafile to this directory, you need to check out
+    sample_data from matplotlib git::
+
+      git clone git@github.com:matplotlib/sample_data
+
+    and git add the data file you want to support.  This is primarily
+    intended for use in mpl examples that need custom data.
+
+    To bypass all downloading, set the rc parameter examples.download to False
+    and examples.directory to the directory where we should look.
+    """
+
+    if not matplotlib.rcParams['examples.download']:
+        directory = matplotlib.rcParams['examples.directory']
+        f = os.path.join(directory, fname)
+        if asfileobj:
+            return open(f, 'rb')
+        else:
+            return f
+
+    myserver = get_sample_data.myserver
+    if myserver is None:
+        configdir = matplotlib.get_configdir()
+        cachedir = os.path.join(configdir, 'sample_data')
+        baseurl = 'https://raw.github.com/matplotlib/sample_data/master/'
+        try:
+            myserver = _get_data_server(cachedir, baseurl)
+            get_sample_data.myserver = myserver
+        except ImportError:
+            raise ImportError(
+                'Python must be built with SSL support to fetch sample data '
+                'from the matplotlib repository')
+
+    return myserver.get_sample_data(fname, asfileobj=asfileobj)
+
+get_sample_data.myserver = None
 
 def flatten(seq, scalarp=is_scalar_or_string):
     """
@@ -691,7 +1039,7 @@ def listFiles(root, patterns='*', recurse=1, return_folders=0):
 
 def get_recursive_filelist(args):
     """
-    Recurs all the files and dirs in *args* ignoring symbolic links
+    Recurse all the files and dirs in *args* ignoring symbolic links
     and return the files as a list of strings
     """
     files = []
@@ -789,7 +1137,7 @@ class maxdict(dict):
 
 
 
-class Stack:
+class Stack(object):
     """
     Implement a stack where elements can be pushed on and you can move
     back and forth.  But no pop.  Should mimic home / back / forward
@@ -804,6 +1152,12 @@ class Stack:
         'return the current element, or None'
         if not len(self._elements): return self._default
         else: return self._elements[self._pos]
+
+    def __len__(self):
+        return self._elements.__len__()
+
+    def __getitem__(self, ind):
+        return self._elements.__getitem__(ind)
 
     def forward(self):
         'move the position forward and return the current element'
@@ -888,6 +1242,12 @@ def reverse_dict(d):
     'reverse the dictionary -- may lose data if values are not unique!'
     return dict([(v,k) for k,v in d.items()])
 
+def restrict_dict(d, keys):
+    """
+    Return a dictionary that contains those keys that appear in both
+    d and keys, with values from d.
+    """
+    return dict([(k,v) for (k,v) in d.iteritems() if k in keys])
 
 def report_memory(i=0):  # argument may go away
     'return the memory consumed by process'
@@ -905,7 +1265,18 @@ def report_memory(i=0):  # argument may go away
         a2 = Popen('ps -p %d -o rss,vsz' % pid, shell=True,
             stdout=PIPE).stdout.readlines()
         mem = int(a2[1].split()[0])
-
+    elif sys.platform.startswith('win'):
+        try:
+            a2 = Popen(["tasklist", "/nh", "/fi", "pid eq %d" % pid],
+                stdout=PIPE).stdout.read()
+        except OSError:
+            raise NotImplementedError(
+                "report_memory works on Windows only if "
+                "the 'tasklist' program is found")
+        mem = int(a2.strip().split()[-2].replace(',',''))
+    else:
+        raise NotImplementedError(
+                "We don't have a memory monitor for %s" % sys.platform)
     return mem
 
 _safezip_msg = 'In safezip, len(args[0])=%d but len(args[%d])=%d'
@@ -1062,21 +1433,28 @@ class Grouper(object):
     using :meth:`joined`, and all disjoint sets can be retreived by
     using the object as an iterator.
 
-    The objects being joined must be hashable.
+    The objects being joined must be hashable and weak-referenceable.
 
     For example:
 
-    >>> g = grouper.Grouper()
-    >>> g.join('a', 'b')
-    >>> g.join('b', 'c')
-    >>> g.join('d', 'e')
+    >>> class Foo:
+    ...     def __init__(self, s):
+    ...             self.s = s
+    ...     def __repr__(self):
+    ...             return self.s
+    ...
+    >>> a, b, c, d, e, f = [Foo(x) for x in 'abcdef']
+    >>> g = Grouper()
+    >>> g.join(a, b)
+    >>> g.join(b, c)
+    >>> g.join(d, e)
     >>> list(g)
-    [['a', 'b', 'c'], ['d', 'e']]
-    >>> g.joined('a', 'b')
+    [[d, e], [a, b, c]]
+    >>> g.joined(a, b)
     True
-    >>> g.joined('a', 'c')
+    >>> g.joined(a, c)
     True
-    >>> g.joined('a', 'd')
+    >>> g.joined(a, d)
     False
     """
     def __init__(self, init=[]):
@@ -1401,6 +1779,79 @@ def quad2cubic(q0x, q0y, q1x, q1y, q2x, q2y):
     warnings.warn('quad2cubic has been moved to matplotlib.mlab -- please import it from there', DeprecationWarning)
     import matplotlib.mlab as mlab
     return mlab.quad2cubic(q0x, q0y, q1x, q1y, q2x, q2y)
+
+def align_iterators(func, *iterables):
+    """
+    This generator takes a bunch of iterables that are ordered by func
+    It sends out ordered tuples:
+
+      (func(row), [rows from all iterators matching func(row)])
+
+    It is used by :func:`matplotlib.mlab.recs_join` to join record arrays
+    """
+    class myiter:
+        def __init__(self, it):
+            self.it = it
+            self.key = self.value = None
+            self.iternext()
+
+        def iternext(self):
+            try:
+                self.value = self.it.next()
+                self.key = func(self.value)
+            except StopIteration:
+                self.value = self.key = None
+
+        def __call__(self, key):
+            retval = None
+            if key == self.key:
+                retval = self.value
+                self.iternext()
+            elif self.key and key > self.key:
+                raise ValueError, "Iterator has been left behind"
+            return retval
+
+    # This can be made more efficient by not computing the minimum key for each iteration
+    iters = [myiter(it) for it in iterables]
+    minvals = minkey = True
+    while 1:
+        minvals = (filter(None, [it.key for it in iters]))
+        if minvals:
+            minkey = min(minvals)
+            yield (minkey, [it(minkey) for it in iters])
+        else:
+            break
+
+def is_math_text(s):
+    # Did we find an even number of non-escaped dollar signs?
+    # If so, treat is as math text.
+    try:
+        s = unicode(s)
+    except UnicodeDecodeError:
+        raise ValueError(
+            "matplotlib display text must have all code points < 128 or use Unicode strings")
+
+    dollar_count = s.count(r'$') - s.count(r'\$')
+    even_dollars = (dollar_count > 0 and dollar_count % 2 == 0)
+
+    return even_dollars
+
+# Numpy > 1.6.x deprecates putmask in favor of the new copyto.
+# So long as we support versions 1.6.x and less, we need the
+# following local version of putmask.  We choose to make a
+# local version of putmask rather than of copyto because the
+# latter includes more functionality than the former. Therefore
+# it is easy to make a local version that gives full putmask
+# behavior, but duplicating the full copyto behavior would be
+# more difficult.
+
+try:
+    np.copyto
+except AttributeError:
+    _putmask = np.putmask
+else:
+    def _putmask(a, mask, values):
+        return np.copyto(a, values, where=mask)
 
 
 if __name__=='__main__':

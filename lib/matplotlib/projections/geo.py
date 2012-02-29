@@ -5,7 +5,6 @@ import numpy.ma as ma
 
 import matplotlib
 rcParams = matplotlib.rcParams
-from matplotlib.artist import kwdocd
 from matplotlib.axes import Axes
 from matplotlib import cbook
 from matplotlib.patches import Circle
@@ -56,6 +55,9 @@ class GeoAxes(Axes):
         self.yaxis.set_minor_locator(NullLocator())
         self.xaxis.set_ticks_position('none')
         self.yaxis.set_ticks_position('none')
+        self.yaxis.set_tick_params(label1On=True)
+        # Why do we need to turn on yaxis tick labels, but
+        # xaxis tick labels are already on?
 
         self.grid(rcParams['axes.grid'])
 
@@ -216,7 +218,17 @@ class GeoAxes(Axes):
 
     def can_zoom(self):
         """
-        Return True if this axes support the zoom box
+        Return *True* if this axes supports the zoom box button functionality.
+
+        This axes object does not support interactive zoom box.
+        """
+        return False
+
+    def can_pan(self) :
+        """
+        Return *True* if this axes supports the pan/zoom button functionality.
+
+        This axes object does not support interactive pan/zoom.
         """
         return False
 
@@ -259,16 +271,16 @@ class AitoffAxes(GeoAxes):
             cos_latitude = np.cos(latitude)
 
             alpha = np.arccos(cos_latitude * np.cos(half_long))
-            # Mask this array, or we'll get divide-by-zero errors
+            # Mask this array or we'll get divide-by-zero errors
             alpha = ma.masked_where(alpha == 0.0, alpha)
+            # The numerators also need to be masked so that masked
+            # division will be invoked.
             # We want unnormalized sinc.  numpy.sinc gives us normalized
             sinc_alpha = ma.sin(alpha) / alpha
 
-            x = (cos_latitude * np.sin(half_long)) / sinc_alpha
-            y = (np.sin(latitude) / sinc_alpha)
-            x.set_fill_value(0.0)
-            y.set_fill_value(0.0)
-            return np.concatenate((x.filled(), y.filled()), 1)
+            x = (cos_latitude * ma.sin(half_long)) / sinc_alpha
+            y = (ma.sin(latitude) / sinc_alpha)
+            return np.concatenate((x.filled(0), y.filled(0)), 1)
         transform.__doc__ = Transform.transform.__doc__
 
         transform_non_affine = transform
@@ -344,7 +356,7 @@ class HammerAxes(GeoAxes):
             cos_latitude = np.cos(latitude)
             sqrt2 = np.sqrt(2.0)
 
-            alpha = 1.0 + cos_latitude * np.cos(half_long)
+            alpha = np.sqrt(1.0 + cos_latitude * np.cos(half_long))
             x = (2.0 * sqrt2) * (cos_latitude * np.sin(half_long)) / alpha
             y = (sqrt2 * np.sin(latitude)) / alpha
             return np.concatenate((x, y), 1)
@@ -424,23 +436,35 @@ class MollweideAxes(GeoAxes):
         def transform(self, ll):
             def d(theta):
                 delta = -(theta + np.sin(theta) - pi_sin_l) / (1 + np.cos(theta))
-                return delta, abs(delta) > 0.001
+                return delta, np.abs(delta) > 0.001
 
-            longitude = ll[:, 0:1]
-            latitude  = ll[:, 1:2]
+            longitude = ll[:, 0]
+            latitude  = ll[:, 1]
 
-            pi_sin_l = np.pi * np.sin(latitude)
-            theta = 2.0 * latitude
-            delta, large_delta = d(theta)
-            while np.any(large_delta):
-                theta += np.where(large_delta, delta, 0)
+            clat = np.pi/2 - np.abs(latitude)
+            ihigh = clat < 0.087 # within 5 degrees of the poles
+            ilow = ~ihigh
+            aux = np.empty(latitude.shape, dtype=np.float)
+
+            if ilow.any():  # Newton-Raphson iteration
+                pi_sin_l = np.pi * np.sin(latitude[ilow])
+                theta = 2.0 * latitude[ilow]
                 delta, large_delta = d(theta)
-            aux = theta / 2
+                while np.any(large_delta):
+                    theta[large_delta] += delta[large_delta]
+                    delta, large_delta = d(theta)
+                aux[ilow] = theta / 2
 
-            x = (2.0 * np.sqrt(2.0) * longitude * np.cos(aux)) / np.pi
-            y = (np.sqrt(2.0) * np.sin(aux))
+            if ihigh.any(): # Taylor series-based approx. solution
+                e = clat[ihigh]
+                d = 0.5 * (3 * np.pi * e**2) ** (1.0/3)
+                aux[ihigh] = (np.pi/2 - d) * np.sign(latitude[ihigh])
 
-            return np.concatenate((x, y), 1)
+            xy = np.empty(ll.shape, dtype=np.float)
+            xy[:,0] = (2.0 * np.sqrt(2.0) / np.pi) * longitude * np.cos(aux)
+            xy[:,1] = np.sqrt(2.0) * np.sin(aux)
+
+            return xy
         transform.__doc__ = Transform.transform.__doc__
 
         transform_non_affine = transform

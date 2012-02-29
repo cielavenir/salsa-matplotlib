@@ -5,6 +5,7 @@ Author: Jouni K Seppänen <jks@iki.fi>
 """
 from __future__ import division
 
+import codecs
 import os
 import re
 import sys
@@ -12,7 +13,7 @@ import time
 import warnings
 import zlib
 
-import numpy as npy
+import numpy as np
 
 from cStringIO import StringIO
 from datetime import datetime
@@ -135,14 +136,29 @@ def pdfRepr(obj):
     # need to use %f with some precision.  Perhaps the precision
     # should adapt to the magnitude of the number?
     elif isinstance(obj, float):
-        if not npy.isfinite(obj):
+        if not np.isfinite(obj):
             raise ValueError, "Can only output finite numbers in PDF"
         r = "%.10f" % obj
         return r.rstrip('0').rstrip('.')
 
+    # Booleans. Needs to be tested before integers since
+    # isinstance(True, int) is true.
+    elif isinstance(obj, bool):
+        return ['false', 'true'][obj]
+
     # Integers are written as such.
     elif isinstance(obj, (int, long)):
         return "%d" % obj
+
+    # Unicode strings are encoded in UTF-16BE with byte-order mark.
+    elif isinstance(obj, unicode):
+        try:
+            # But maybe it's really ASCII?
+            s = obj.encode('ASCII')
+            return pdfRepr(s)
+        except UnicodeEncodeError:
+            s = codecs.BOM_UTF16_BE + obj.encode('UTF-16BE')
+            return pdfRepr(s)
 
     # Strings are written in parentheses, with backslashes and parens
     # escaped. Actually balanced parens are allowed, but it is
@@ -168,10 +184,6 @@ def pdfRepr(obj):
         r.extend([pdfRepr(val) for val in obj])
         r.append("]")
         return fill(r)
-
-    # Booleans.
-    elif isinstance(obj, bool):
-        return ['false', 'true'][obj]
 
     # The null keyword.
     elif obj is None:
@@ -268,7 +280,7 @@ _pdfops = dict(close_fill_stroke='b', fill_stroke='B', fill='f',
                gsave='q', grestore='Q',
                textpos='Td', selectfont='Tf', textmatrix='Tm',
                show='Tj', showkern='TJ',
-               setlinewidth='w', clip='W')
+               setlinewidth='w', clip='W', shading='sh')
 
 Op = Bunch(**dict([(name, Operator(value))
                    for name, value in _pdfops.items()]))
@@ -348,7 +360,7 @@ class Stream(object):
             self.compressobj = None
 
 class PdfFile(object):
-    """PDF file with one page."""
+    """PDF file object."""
 
     def __init__(self, filename):
         self.nextObject = 1     # next free object id
@@ -362,6 +374,8 @@ class PdfFile(object):
         else:
             raise ValueError("filename must be a path or a file-like object")
 
+        self._core14fontdir = os.path.join(
+            rcParams['datapath'], 'fonts', 'pdfcorefonts')
         self.fh = fh
         self.currentstream = None # stream object to write to, if any
         fh.write("%PDF-1.4\n")    # 1.4 is the first version to have alpha
@@ -371,12 +385,12 @@ class PdfFile(object):
         fh.write("%\254\334 \253\272\n")
 
         self.rootObject = self.reserveObject('root')
-        self.infoObject = self.reserveObject('info')
         self.pagesObject = self.reserveObject('pages')
         self.pageList = []
         self.fontObject = self.reserveObject('fonts')
         self.alphaStateObject = self.reserveObject('extended graphics states')
         self.hatchObject = self.reserveObject('tiling patterns')
+        self.gouraudObject = self.reserveObject('Gouraud triangles')
         self.XObjectObject = self.reserveObject('external objects')
         self.resourceObject = self.reserveObject('resources')
 
@@ -384,13 +398,12 @@ class PdfFile(object):
                  'Pages': self.pagesObject }
         self.writeObject(self.rootObject, root)
 
-        info = { 'Creator': 'matplotlib ' + __version__ \
-                 + ', http://matplotlib.sf.net',
-                 'Producer': 'matplotlib pdf backend',
-                 'CreationDate': datetime.today() }
-
-        # Possible TODO: Title, Author, Subject, Keywords
-        self.writeObject(self.infoObject, info)
+        revision = ''
+        self.infoDict = {
+            'Creator': 'matplotlib %s, http://matplotlib.sf.net' % __version__,
+            'Producer': 'matplotlib pdf backend%s' % revision,
+            'CreationDate': datetime.today()
+            }
 
         self.fontNames = {}     # maps filenames to internal font names
         self.nextFont = 1       # next free internal font name
@@ -403,6 +416,7 @@ class PdfFile(object):
         self.nextAlphaState = 1
         self.hatchPatterns = {}
         self.nextHatch = 1
+        self.gouraudTriangles = []
 
         self.images = {}
         self.nextImage = 1
@@ -421,6 +435,7 @@ class PdfFile(object):
                       'XObject': self.XObjectObject,
                       'ExtGState': self.alphaStateObject,
                       'Pattern': self.hatchObject,
+                      'Shading': self.gouraudObject,
                       'ProcSet': procsets }
         self.writeObject(self.resourceObject, resources)
 
@@ -452,6 +467,7 @@ class PdfFile(object):
                          dict([(val[0], val[1])
                                for val in self.alphaStates.values()]))
         self.writeHatches()
+        self.writeGouraudTriangles()
         xobjects = dict(self.images.values())
         for tup in self.markers.values():
             xobjects[tup[0]] = tup[1]
@@ -464,6 +480,7 @@ class PdfFile(object):
                          { 'Type': Name('Pages'),
                            'Kids': self.pageList,
                            'Count': len(self.pageList) })
+        self.writeInfoDict()
 
         # Finalize the file
         self.writeXref()
@@ -502,7 +519,11 @@ class PdfFile(object):
         if is_string_like(fontprop):
             filename = fontprop
         elif rcParams['pdf.use14corefonts']:
-            filename = findfont(fontprop, fontext='afm')
+            filename = findfont(
+                fontprop, fontext='afm', directory=self._core14fontdir)
+            if filename is None:
+                filename = findfont(
+                    "Helvetica", fontext='afm', directory=self._core14fontdir)
         else:
             filename = findfont(fontprop)
 
@@ -629,7 +650,7 @@ class PdfFile(object):
         if 0:             flags |= 1 << 17 # TODO: small caps
         if 0:             flags |= 1 << 18 # TODO: force bold
 
-        ft2font = FT2Font(fontfile)
+        ft2font = FT2Font(str(fontfile))
 
         descriptor = {
             'Type':        Name('FontDescriptor'),
@@ -1043,11 +1064,55 @@ end"""
             # an API change
             self.output(*self.pathOperations(
                     Path.hatch(hatch_style[2]),
-                    Affine2D().scale(sidelen)))
+                    Affine2D().scale(sidelen),
+                    simplify=False))
             self.output(Op.stroke)
 
             self.endStream()
         self.writeObject(self.hatchObject, hatchDict)
+
+    def addGouraudTriangles(self, points, colors):
+        name = Name('GT%d' % len(self.gouraudTriangles))
+        self.gouraudTriangles.append((name, points, colors))
+        return name
+
+    def writeGouraudTriangles(self):
+        gouraudDict = dict()
+        for name, points, colors in self.gouraudTriangles:
+            ob = self.reserveObject('Gouraud triangle')
+            gouraudDict[name] = ob
+            shape = points.shape
+            flat_points = points.reshape((shape[0] * shape[1], 2))
+            flat_colors = colors.reshape((shape[0] * shape[1], 4))
+            points_min = np.min(flat_points, axis=0) - (1 << 8)
+            points_max = np.max(flat_points, axis=0) + (1 << 8)
+            factor = float(0xffffffff) / (points_max - points_min)
+
+            self.beginStream(
+                ob.id, None,
+                { 'ShadingType': 4,
+                  'BitsPerCoordinate': 32,
+                  'BitsPerComponent': 8,
+                  'BitsPerFlag': 8,
+                  'ColorSpace': Name('DeviceRGB'),
+                  'AntiAlias': True,
+                  'Decode': [points_min[0], points_max[0],
+                             points_min[1], points_max[1],
+                             0, 1, 0, 1, 0, 1]
+                  })
+
+            streamarr = np.empty(
+                (shape[0] * shape[1],),
+                dtype=[('flags', 'u1'),
+                       ('points', '>u4', (2,)),
+                       ('colors', 'u1', (3,))])
+            streamarr['flags'] = 0
+            streamarr['points'] = (flat_points - points_min) * factor
+            streamarr['colors'] = flat_colors[:, :3] * 255.0
+
+            self.write(streamarr.tostring())
+            self.endStream()
+        self.writeObject(self.gouraudObject, gouraudDict)
 
     def imageObject(self, image):
         """Return name of an image XObject representing the given image."""
@@ -1068,7 +1133,7 @@ end"""
     def _rgb(self, im):
         h,w,s = im.as_rgba_str()
 
-        rgba = npy.fromstring(s, npy.uint8)
+        rgba = np.fromstring(s, np.uint8)
         rgba.shape = (h, w, 4)
         rgb = rgba[:,:,:3]
         a = rgba[:,:,3:]
@@ -1076,13 +1141,13 @@ end"""
 
     def _gray(self, im, rc=0.3, gc=0.59, bc=0.11):
         rgbat = im.as_rgba_str()
-        rgba = npy.fromstring(rgbat[2], npy.uint8)
+        rgba = np.fromstring(rgbat[2], np.uint8)
         rgba.shape = (rgbat[0], rgbat[1], 4)
-        rgba_f = rgba.astype(npy.float32)
+        rgba_f = rgba.astype(np.float32)
         r = rgba_f[:,:,0]
         g = rgba_f[:,:,1]
         b = rgba_f[:,:,2]
-        gray = (r*rc + g*gc + b*bc).astype(npy.uint8)
+        gray = (r*rc + g*gc + b*bc).astype(np.uint8)
         return rgbat[0], rgbat[1], gray.tostring()
 
     def writeImages(self):
@@ -1124,7 +1189,7 @@ end"""
 
     def markerObject(self, path, trans, fillp, lw):
         """Return name of a marker XObject representing the given path."""
-        pathops = self.pathOperations(path, trans)
+        pathops = self.pathOperations(path, trans, simplify=False)
         key = (tuple(pathops), bool(fillp))
         result = self.markers.get(key)
         if result is None:
@@ -1153,13 +1218,18 @@ end"""
             self.endStream()
 
     @staticmethod
-    def pathOperations(path, transform, clip=None):
+    def pathOperations(path, transform, clip=None, simplify=None):
         cmds = []
         last_points = None
-        for points, code in path.iter_segments(transform, clip=clip):
+        for points, code in path.iter_segments(transform, clip=clip,
+                                               simplify=simplify):
             if code == Path.MOVETO:
+                # This is allowed anywhere in the path
                 cmds.extend(points)
                 cmds.append(Op.moveto)
+            elif last_points is None:
+                # The other operations require a previous point
+                raise ValueError, 'Path lacks initial MOVETO'
             elif code == Path.LINETO:
                 cmds.extend(points)
                 cmds.append(Op.lineto)
@@ -1178,9 +1248,11 @@ end"""
     def writePath(self, path, transform, clip=False):
         if clip:
             clip = (0.0, 0.0, self.width * 72, self.height * 72)
+            simplify = path.should_simplify
         else:
             clip = None
-        cmds = self.pathOperations(path, transform, clip)
+            simplify = False
+        cmds = self.pathOperations(path, transform, clip, simplify=simplify)
         self.output(*cmds)
 
     def reserveObject(self, name=''):
@@ -1221,6 +1293,31 @@ end"""
             i += 1
         if borken:
             raise AssertionError, 'Indirect object does not exist'
+
+    def writeInfoDict(self):
+        """Write out the info dictionary, checking it for good form"""
+
+        is_date = lambda x: isinstance(x, datetime)
+        check_trapped = lambda x: isinstance(x, Name) and x.name in \
+                                         ('True', 'False', 'Unknown')
+        keywords = {'Title': is_string_like,
+                    'Author': is_string_like,
+                    'Subject': is_string_like,
+                    'Keywords': is_string_like,
+                    'Creator': is_string_like,
+                    'Producer': is_string_like,
+                    'CreationDate': is_date,
+                    'ModDate': is_date,
+                    'Trapped': check_trapped}
+        for k in self.infoDict.keys():
+            if k not in keywords:
+                warnings.warn('Unknown infodict keyword: %s' % k)
+            else:
+                if not keywords[k](self.infoDict[k]):
+                    warnings.warn('Bad value for infodict keyword %s' % k)
+
+        self.infoObject = self.reserveObject('info')
+        self.writeObject(self.infoObject, self.infoDict)
 
     def writeTrailer(self):
         """Write out the PDF trailer."""
@@ -1285,24 +1382,47 @@ class RendererPdf(RendererBase):
     def get_image_magnification(self):
         return self.image_dpi/72.0
 
-    def draw_image(self, x, y, im, bbox, clippath=None, clippath_trans=None):
-        gc = self.new_gc()
-        if bbox is not None:
-            gc.set_clip_rectangle(bbox)
-        if clippath is not None:
-            clippath = TransformedPath(clippath, clippath_trans)
-            gc.set_clip_path(clippath)
+    def option_scale_image(self):
+        """
+        pdf backend support arbitrary scaling of image.
+        """
+        return True
+
+    def draw_image(self, gc, x, y, im, dx=None, dy=None, transform=None):
         self.check_gc(gc)
 
         h, w = im.get_size_out()
-        h, w = 72.0*h/self.image_dpi, 72.0*w/self.image_dpi
+
+        if dx is None:
+            w = 72.0*w/self.image_dpi
+        else:
+            w = dx
+
+        if dy is None:
+            h = 72.0*h/self.image_dpi
+        else:
+            h = dy
+        
         imob = self.file.imageObject(im)
-        self.file.output(Op.gsave, w, 0, 0, h, x, y, Op.concat_matrix,
-                         imob, Op.use_xobject, Op.grestore)
+
+        if transform is None:
+            self.file.output(Op.gsave,
+                             w, 0, 0, h, x, y, Op.concat_matrix,
+                             imob, Op.use_xobject, Op.grestore)
+        else:
+            tr1, tr2, tr3, tr4, tr5, tr6 = transform.to_values()
+
+            self.file.output(Op.gsave,
+                             tr1, tr2, tr3, tr4, tr5, tr6, Op.concat_matrix,
+                             w, 0, 0, h, x, y, Op.concat_matrix,
+                             imob, Op.use_xobject, Op.grestore)
+        
 
     def draw_path(self, gc, path, transform, rgbFace=None):
         self.check_gc(gc, rgbFace)
-        self.file.writePath(path, transform, rgbFace is None)
+        self.file.writePath(
+            path, transform,
+            rgbFace is None and gc.get_hatch_path() is None)
         self.file.output(self.gc.paint())
 
     def draw_markers(self, gc, marker_path, marker_trans, path, trans, rgbFace=None):
@@ -1330,6 +1450,27 @@ class RendererPdf(RendererBase):
                        marker, Op.use_xobject)
                 lastx, lasty = x, y
         output(Op.grestore)
+
+    def draw_gouraud_triangle(self, gc, points, colors, trans):
+        self.draw_gouraud_triangles(gc, points.reshape((1, 3, 2)),
+                                    colors.reshape((1, 3, 4)), trans)
+
+    def draw_gouraud_triangles(self, gc, points, colors, trans):
+        assert len(points) == len(colors)
+        assert points.ndim == 3
+        assert points.shape[1] == 3
+        assert points.shape[2] == 2
+        assert colors.ndim == 3
+        assert colors.shape[1] == 3
+        assert colors.shape[2] == 4
+
+        shape = points.shape
+        points = points.reshape((shape[0] * shape[1], 2))
+        tpoints = trans.transform(points)
+        tpoints = tpoints.reshape(shape)
+        name = self.file.addGouraudTriangles(tpoints, colors)
+        self.check_gc(gc)
+        self.file.output(name, Op.shading)
 
     def _setup_textpos(self, x, y, descent, angle, oldx=0, oldy=0, olddescent=0, oldangle=0):
         if angle == oldangle == 0:
@@ -1674,7 +1815,12 @@ class RendererPdf(RendererBase):
         key = hash(prop)
         font = self.afm_font_cache.get(key)
         if font is None:
-            filename = findfont(prop, fontext='afm')
+            filename = findfont(
+                prop, fontext='afm', directory=self.file._core14fontdir)
+            if filename is None:
+                filename = findfont(
+                    "Helvetica", fontext='afm',
+                    directory=self.file._core14fontdir)
             font = self.afm_font_cache.get(filename)
             if font is None:
                 fh = file(filename)
@@ -1850,7 +1996,7 @@ class GraphicsContextPdf(GraphicsContextBase):
             if self._clippath != clippath:
                 path, affine = clippath.get_transformed_path_and_affine()
                 cmds.extend(
-                    PdfFile.pathOperations(path, affine) +
+                    PdfFile.pathOperations(path, affine, simplify=False) +
                     [Op.clip, Op.endpath])
         return cmds
 
@@ -1882,9 +2028,9 @@ class GraphicsContextPdf(GraphicsContextBase):
                 try:
                     different = bool(ours != theirs)
                 except ValueError:
-                    ours = npy.asarray(ours)
-                    theirs = npy.asarray(theirs)
-                    different = ours.shape != theirs.shape or npy.any(ours != theirs)
+                    ours = np.asarray(ours)
+                    theirs = np.asarray(theirs)
+                    different = ours.shape != theirs.shape or np.any(ours != theirs)
                 if different:
                     break
 
@@ -1937,18 +2083,18 @@ class PdfPages(object):
     """
     A multi-page PDF file.
 
-    Use like this:
+    Use like this::
 
-      # Initialize:
-      pdf_pages = PdfPages('foo.pdf')
+        # Initialize:
+        pp = PdfPages('foo.pdf')
 
-      # As many times as you like, create a figure fig, then either:
-      fig.savefig(pdf_pages, format='pdf') # note the format argument!
-      # or:
-      pdf_pages.savefig(fig)
+        # As many times as you like, create a figure fig, then either:
+        fig.savefig(pp, format='pdf') # note the format argument!
+        # or:
+        pp.savefig(fig)
 
-      # Once you are done, remember to close the object:
-      pdf_pages.close()
+        # Once you are done, remember to close the object:
+        pp.close()
 
     (In reality PdfPages is a thin wrapper around PdfFile, in order to
     avoid confusion when using savefig and forgetting the format
@@ -1971,6 +2117,14 @@ class PdfPages(object):
         """
         self._file.close()
         self._file = None
+
+    def infodict(self):
+        """
+        Return a modifiable information dictionary object
+        (see PDF reference section 10.2.1 'Document Information
+        Dictionary').
+        """
+        return self._file.infoDict
 
     def savefig(self, figure=None, **kwargs):
         """

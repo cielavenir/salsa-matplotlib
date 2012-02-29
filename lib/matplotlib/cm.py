@@ -13,34 +13,78 @@ import matplotlib as mpl
 import matplotlib.colors as colors
 import matplotlib.cbook as cbook
 from matplotlib._cm import datad
-
+from matplotlib._cm import cubehelix
 
 cmap_d = dict()
 
 # reverse all the colormaps.
 # reversed colormaps have '_r' appended to the name.
 
+def _reverser(f):
+    def freversed(x):
+        return f(1-x)
+    return freversed
+
 def revcmap(data):
+    """Can only handle specification *data* in dictionary format."""
     data_r = {}
     for key, val in data.iteritems():
-        valnew = [(1.0-a, b, c) for a, b, c in reversed(val)]
+        if callable(val):
+            valnew = _reverser(val)
+                # This doesn't work: lambda x: val(1-x)
+                # The same "val" (the first one) is used
+                # each time, so the colors are identical
+                # and the result is shades of gray.
+        else:
+            # Flip x and exchange the y values facing x = 0 and x = 1.
+            valnew = [(1.0 - x, y1, y0) for x, y0, y1 in reversed(val)]
         data_r[key] = valnew
     return data_r
+
+def _reverse_cmap_spec(spec):
+    """Reverses cmap specification *spec*, can handle both dict and tuple
+    type specs."""
+
+    if 'red' in spec:
+        return revcmap(spec)
+    else:
+        revspec = list(reversed(spec))
+        if len(revspec[0]) == 2:    # e.g., (1, (1.0, 0.0, 1.0))
+            revspec = [(1.0 - a, b) for a, b in revspec]
+        return revspec
+
+def _generate_cmap(name, lutsize):
+    """Generates the requested cmap from it's name *name*.  The lut size is
+    *lutsize*."""
+
+    spec = datad[name]
+
+    # Generate the colormap object.
+    if 'red' in spec:
+        return colors.LinearSegmentedColormap(name, spec, lutsize)
+    else:
+        return colors.LinearSegmentedColormap.from_list(spec, spec, lutsize)
 
 LUTSIZE = mpl.rcParams['image.lut']
 
 _cmapnames = datad.keys()  # need this list because datad is changed in loop
 
+# Generate the reversed specifications ...
+
 for cmapname in _cmapnames:
-    cmapname_r = cmapname+'_r'
-    cmapdat_r = revcmap(datad[cmapname])
-    datad[cmapname_r] = cmapdat_r
-    cmap_d[cmapname] = colors.LinearSegmentedColormap(
-                            cmapname, datad[cmapname], LUTSIZE)
-    cmap_d[cmapname_r] = colors.LinearSegmentedColormap(
-                            cmapname_r, cmapdat_r, LUTSIZE)
+    spec = datad[cmapname]
+    spec_reversed = _reverse_cmap_spec(spec)
+    datad[cmapname + '_r'] = spec_reversed
+
+# Precache the cmaps with ``lutsize = LUTSIZE`` ...
+
+# Use datad.keys() to also add the reversed ones added in the section above:
+for cmapname in datad.keys():
+    cmap_d[cmapname] = _generate_cmap(cmapname, LUTSIZE)
 
 locals().update(cmap_d)
+
+# Continue with definitions ...
 
 def register_cmap(name=None, cmap=None, data=None, lut=None):
     """
@@ -105,7 +149,7 @@ def get_cmap(name=None, lut=None):
         if lut is None:
             return cmap_d[name]
         elif name in datad:
-            return colors.LinearSegmentedColormap(name,  datad[name], lut)
+            return _generate_cmap(name, lut)
         else:
             raise ValueError("Colormap %s is not recognized" % name)
 
@@ -122,8 +166,7 @@ class ScalarMappable:
         :mod:`cm` colormap instance, for example :data:`cm.jet`
         """
 
-        self.callbacksSM = cbook.CallbackRegistry((
-                'changed',))
+        self.callbacksSM = cbook.CallbackRegistry()
 
         if cmap is None: cmap = get_cmap()
         if norm is None: norm = colors.Normalize()
@@ -138,21 +181,25 @@ class ScalarMappable:
         'set the colorbar image and axes associated with mappable'
         self.colorbar = im, ax
 
-    def to_rgba(self, x, alpha=1.0, bytes=False):
+    def to_rgba(self, x, alpha=None, bytes=False):
         '''Return a normalized rgba array corresponding to *x*. If *x*
         is already an rgb array, insert *alpha*; if it is already
         rgba, return it unchanged. If *bytes* is True, return rgba as
         4 uint8s instead of 4 floats.
         '''
+        if alpha is None:
+            _alpha = 1.0
+        else:
+            _alpha = alpha
         try:
             if x.ndim == 3:
                 if x.shape[2] == 3:
                     if x.dtype == np.uint8:
-                        alpha = np.array(alpha*255, np.uint8)
+                        _alpha = np.array(_alpha*255, np.uint8)
                     m, n = x.shape[:2]
                     xx = np.empty(shape=(m,n,4), dtype = x.dtype)
                     xx[:,:,:3] = x
-                    xx[:,:,3] = alpha
+                    xx[:,:,3] = _alpha
                 elif x.shape[2] == 4:
                     xx = x
                 else:

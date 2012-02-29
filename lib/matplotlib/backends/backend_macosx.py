@@ -5,7 +5,9 @@ import numpy
 
 from matplotlib._pylab_helpers import Gcf
 from matplotlib.backend_bases import RendererBase, GraphicsContextBase,\
-     FigureManagerBase, FigureCanvasBase, NavigationToolbar2
+     FigureManagerBase, FigureCanvasBase, NavigationToolbar2, TimerBase
+from matplotlib.backend_bases import ShowBase
+
 from matplotlib.cbook import maxdict
 from matplotlib.figure import Figure
 from matplotlib.path import Path
@@ -13,25 +15,21 @@ from matplotlib.mathtext import MathTextParser
 from matplotlib.colors import colorConverter
 
 
-
 from matplotlib.widgets import SubplotTool
 
 import matplotlib
 from matplotlib.backends import _macosx
 
-def show():
-    """Show all the figures and enter the Cocoa mainloop.
-    This function will not return until all windows are closed or
-    the interpreter exits."""
-    # Having a Python-level function "show" wrapping the built-in
-    # function "show" in the _macosx extension module allows us to
-    # to add attributes to "show". This is something ipython does.
-    _macosx.show()
+class Show(ShowBase):
+    def mainloop(self):
+        _macosx.show()
+
+show = Show()
 
 class RendererMac(RendererBase):
     """
     The renderer handles drawing/rendering operations. Most of the renderer's
-    methods forwards the command to the renderer's graphics context. The
+    methods forward the command to the renderer's graphics context. The
     renderer does not wrap a C object and is written in pure Python.
     """
 
@@ -50,34 +48,74 @@ class RendererMac(RendererBase):
 
     def draw_path(self, gc, path, transform, rgbFace=None):
         if rgbFace is not None:
-            rgbFace = tuple(rgbFace)
-        gc.draw_path(path, transform, rgbFace)
+            rgbFace = tuple(rgbFace[:3])
+        linewidth = gc.get_linewidth()
+        gc.draw_path(path, transform, linewidth, rgbFace)
 
     def draw_markers(self, gc, marker_path, marker_trans, path, trans, rgbFace=None):
         if rgbFace is not None:
-            rgbFace = tuple(rgbFace)
-        gc.draw_markers(marker_path, marker_trans, path, trans, rgbFace)
+            rgbFace = tuple(rgbFace[:3])
+        linewidth = gc.get_linewidth()
+        gc.draw_markers(marker_path, marker_trans, path, trans, linewidth, rgbFace)
 
-    def draw_path_collection(self, *args):
-        gc = self.gc
-        args = args[:13]
-        gc.draw_path_collection(*args)
+    def draw_path_collection(self, gc, master_transform, paths, all_transforms,
+                             offsets, offsetTrans, facecolors, edgecolors,
+                             linewidths, linestyles, antialiaseds, urls):
+        cliprect = gc.get_clip_rectangle()
+        clippath, clippath_transform = gc.get_clip_path()
+        if all_transforms:
+            transforms = [numpy.dot(master_transform, t) for t in all_transforms]
+        else:
+            transforms = [master_transform]
+        gc.draw_path_collection(cliprect,
+                                clippath,
+                                clippath_transform,
+                                paths,
+                                transforms,
+                                offsets,
+                                offsetTrans,
+                                facecolors,
+                                edgecolors,
+                                linewidths,
+                                linestyles,
+                                antialiaseds)
 
-    def draw_quad_mesh(self, *args):
-        gc = self.gc
-        gc.draw_quad_mesh(*args)
+    def draw_quad_mesh(self, gc, master_transform, meshWidth, meshHeight,
+                       coordinates, offsets, offsetTrans, facecolors,
+                       antialiased, showedges):
+        cliprect = gc.get_clip_rectangle()
+        clippath, clippath_transform = gc.get_clip_path()
+        gc.draw_quad_mesh(master_transform,
+                          cliprect,
+                          clippath,
+                          clippath_transform,
+                          meshWidth,
+                          meshHeight,
+                          coordinates,
+                          offsets,
+                          offsetTrans,
+                          facecolors,
+                          antialiased,
+                          showedges)
 
     def new_gc(self):
         self.gc.save()
         self.gc.set_hatch(None)
+        self.gc._alpha = 1.0
+        self.gc._forced_alpha = False # if True, _alpha overrides A from RGBA
         return self.gc
 
-    def draw_image(self, x, y, im, bbox, clippath=None, clippath_trans=None):
+    def draw_gouraud_triangle(self, gc, points, colors, transform):
+        points = transform.transform(points)
+        gc.draw_gouraud_triangle(points, colors)
+
+    def draw_image(self, gc, x, y, im):
         im.flipud_out()
         nrows, ncols, data = im.as_rgba_str()
-        self.gc.draw_image(x, y, nrows, ncols, data, bbox, clippath, clippath_trans)
+        gc.draw_image(x, y, nrows, ncols, data, gc.get_clip_rectangle(),
+                      *gc.get_clip_path())
         im.flipud_out()
-    
+
     def draw_tex(self, gc, x, y, s, prop, angle):
         # todo, handle props, angle, origins
         size = prop.get_size_in_points()
@@ -128,7 +166,7 @@ class RendererMac(RendererBase):
 
     def flipy(self):
         return False
-    
+
     def points_to_pixels(self, points):
         return points/72.0 * self.dpi
 
@@ -146,6 +184,11 @@ class GraphicsContextMac(_macosx.GraphicsContext, GraphicsContextBase):
     def __init__(self):
         GraphicsContextBase.__init__(self)
         _macosx.GraphicsContext.__init__(self)
+
+    def set_alpha(self, alpha):
+        GraphicsContextBase.set_alpha(self, alpha)
+        _alpha = self.get_alpha()
+        _macosx.GraphicsContext.set_alpha(self, _alpha)
 
     def set_foreground(self, fg, isRGB=False):
         GraphicsContextBase.set_foreground(self, fg, isRGB)
@@ -168,7 +211,7 @@ class GraphicsContextMac(_macosx.GraphicsContext, GraphicsContextBase):
         _macosx.GraphicsContext.set_clip_path(self, path)
 
 ########################################################################
-#    
+#
 # The following functions and classes are for pylab and implement
 # window/figure managers, etc...
 #
@@ -181,20 +224,43 @@ def draw_if_interactive():
     it will be redrawn as soon as the event loop resumes via PyOS_InputHook.
     This function should be called after each draw event, even if
     matplotlib is not running interactively.
-    """
-    figManager =  Gcf.get_active()
-    if figManager is not None:
-        figManager.canvas.invalidate()
+	"""
+    if matplotlib.is_interactive():
+        figManager =  Gcf.get_active()
+        if figManager is not None:
+            figManager.canvas.invalidate()
+
 
 def new_figure_manager(num, *args, **kwargs):
     """
     Create a new figure manager instance
     """
+    if not _macosx.verify_main_display():
+        import warnings
+        warnings.warn("Python is not installed as a framework. The MacOSX backend may not work correctly if Python is not installed as a framework. Please see the Python documentation for more information on installing Python as a framework on Mac OS X")
     FigureClass = kwargs.pop('FigureClass', Figure)
     figure = FigureClass(*args, **kwargs)
     canvas = FigureCanvasMac(figure)
     manager = FigureManagerMac(canvas, num)
     return manager
+
+class TimerMac(_macosx.Timer, TimerBase):
+    '''
+    Subclass of :class:`backend_bases.TimerBase` that uses CoreFoundation
+    run loops for timer events.
+
+    Attributes:
+    * interval: The time between timer events in milliseconds. Default
+        is 1000 ms.
+    * single_shot: Boolean flag indicating whether this timer should
+        operate as single shot (run once and then stop). Defaults to False.
+    * callbacks: Stores list of (func, args) tuples that will be called
+        upon timer events. This list can be manipulated directly, or the
+        functions add_callback and remove_callback can be used.
+    '''
+    # completely implemented at the C-level (in _macosx.Timer)
+
+
 
 class FigureCanvasMac(_macosx.FigureCanvas, FigureCanvasBase):
     """
@@ -266,6 +332,21 @@ class FigureCanvasMac(_macosx.FigureCanvas, FigureCanvasBase):
     def get_default_filetype(self):
         return 'png'
 
+    def new_timer(self, *args, **kwargs):
+        """
+        Creates a new backend-specific subclass of :class:`backend_bases.Timer`.
+        This is useful for getting periodic events through the backend's native
+        event loop. Implemented only for backends with GUIs.
+
+        optional arguments:
+
+        *interval*
+          Timer interval in milliseconds
+        *callbacks*
+          Sequence of (func, args, kwargs) where func(*args, **kwargs) will
+          be executed by the timer every *interval*.
+        """
+        return TimerMac(*args, **kwargs)
 
 class FigureManagerMac(_macosx.FigureManager, FigureManagerBase):
     """
@@ -281,7 +362,7 @@ class FigureManagerMac(_macosx.FigureManager, FigureManagerBase):
             self.toolbar = NavigationToolbar2Mac(canvas)
         else:
             self.toolbar = None
-        if self.toolbar is not None: 
+        if self.toolbar is not None:
             self.toolbar.update()
 
         def notify_axes_change(fig):
@@ -292,15 +373,14 @@ class FigureManagerMac(_macosx.FigureManager, FigureManagerBase):
         # This is ugly, but this is what tkagg and gtk are doing.
         # It is needed to get ginput() working.
         self.canvas.figure.show = lambda *args: self.show()
-
-    def show(self):
-        self.canvas.draw()
+        if matplotlib.is_interactive():
+            self.show()
 
     def close(self):
         Gcf.destroy(self.num)
 
 class NavigationToolbarMac(_macosx.NavigationToolbar):
- 
+
     def __init__(self, canvas):
         self.canvas = canvas
         basedir = os.path.join(matplotlib.rcParams['datapath'], "images")
@@ -331,7 +411,7 @@ class NavigationToolbarMac(_macosx.NavigationToolbar):
         assert magic=="P6"
         assert len(imagedata)==width*height*3 # 3 colors in RGB
         return (width, height, imagedata)
-        
+
     def panx(self, direction):
         axes = self.canvas.figure.axes
         selected = self.get_active()
@@ -360,7 +440,7 @@ class NavigationToolbarMac(_macosx.NavigationToolbar):
             axes[i].yaxis.zoom(direction)
         self.canvas.invalidate()
 
-    def save_figure(self):
+    def save_figure(self, *args):
         filename = _macosx.choose_save_file('Save the figure')
         if filename is None: # Cancel
             return
@@ -376,7 +456,7 @@ class NavigationToolbar2Mac(_macosx.NavigationToolbar2, NavigationToolbar2):
         _macosx.NavigationToolbar2.__init__(self, basedir)
 
     def draw_rubberband(self, event, x0, y0, x1, y1):
-        self.canvas.set_rubberband(x0, y0, x1, y1)
+        self.canvas.set_rubberband(int(x0), int(y0), int(x1), int(y1))
 
     def release(self, event):
         self.canvas.remove_rubberband()
@@ -384,7 +464,7 @@ class NavigationToolbar2Mac(_macosx.NavigationToolbar2, NavigationToolbar2):
     def set_cursor(self, cursor):
         _macosx.set_cursor(cursor)
 
-    def save_figure(self):
+    def save_figure(self, *args):
         filename = _macosx.choose_save_file('Save the figure')
         if filename is None: # Cancel
             return
@@ -401,9 +481,9 @@ class NavigationToolbar2Mac(_macosx.NavigationToolbar2, NavigationToolbar2):
         _macosx.NavigationToolbar2.set_message(self, message.encode('utf-8'))
 
 ########################################################################
-#    
+#
 # Now just provide the standard names that backend.__init__ is expecting
-# 
+#
 ########################################################################
 
 

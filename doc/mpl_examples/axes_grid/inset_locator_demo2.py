@@ -1,11 +1,17 @@
 import matplotlib.pyplot as plt
 
-from mpl_toolkits.axes_grid.inset_locator import zoomed_inset_axes
-from mpl_toolkits.axes_grid.inset_locator import mark_inset
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 
 import numpy as np
 
-from demo_image import get_demo_image
+def get_demo_image():
+    from matplotlib.cbook import get_sample_data
+    import numpy as np
+    f = get_sample_data("axes_grid/bivariate_normal.npy", asfileobj=False)
+    z = np.load(f)
+    # z is a numpy array of 15x15
+    return z, (-3,4,-4,3)
 
 
 fig = plt.figure(1, [5,4])

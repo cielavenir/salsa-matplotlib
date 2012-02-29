@@ -1,8 +1,12 @@
 """
 This is an object-orient plotting library.
 
-A procedural interface is provided by the companion pylab module,
+A procedural interface is provided by the companion pyplot module,
 which may be imported directly, e.g::
+
+    from matplotlib.pyplot import *
+
+To include numpy functions too, use::
 
     from pylab import *
 
@@ -11,9 +15,11 @@ or using ipython::
     ipython -pylab
 
 For the most part, direct use of the object-oriented library is
-encouraged when programming rather than working interactively.  The
-exceptions are the pylab commands :func:`~matplotlib.pyplot.figure`,
+encouraged when programming; pyplot is primarily for working
+interactively.  The
+exceptions are the pyplot commands :func:`~matplotlib.pyplot.figure`,
 :func:`~matplotlib.pyplot.subplot`,
+:func:`~matplotlib.pyplot.subplots`,
 :func:`~matplotlib.backends.backend_qt4agg.show`, and
 :func:`~pyplot.savefig`, which can greatly simplify scripting.
 
@@ -84,22 +90,20 @@ The base matplotlib namespace includes:
         for the first time.  In particular, it must be called
         **before** importing pylab (if pylab is imported).
 
-matplotlib is written by John D. Hunter (jdh2358 at gmail.com) and a
-host of others.
+matplotlib was initially written by John D. Hunter (jdh2358 at
+gmail.com) and is now developed and maintained by a host of others.
+
+Occasionally the internal documentation (python docstrings) will refer
+to MATLAB&reg;, a registered trademark of The MathWorks, Inc.
+
 """
 from __future__ import generators
 
-__version__  = '0.99.1.1'
-__revision__ = '$Revision: 7813 $'
-__date__     = '$Date: 2009-09-21 12:12:47 -0500 (Mon, 21 Sep 2009) $'
+__version__  = '1.1.0'
 
 import os, re, shutil, subprocess, sys, warnings
 import distutils.sysconfig
 import distutils.version
-
-
-NEWCONFIG = False
-
 
 # Needed for toolkit setuptools support
 if 0:
@@ -126,8 +130,10 @@ The default file location is given in the following order
 
 import sys, os, tempfile
 
-from rcsetup import defaultParams, validate_backend, validate_toolbar
-from rcsetup import validate_cairo_format
+from matplotlib.rcsetup import (defaultParams,
+                                validate_backend,
+                                validate_toolbar,
+                                validate_cairo_format)
 
 major, minor1, minor2, s, tmp = sys.version_info
 _python24 = major>=2 and minor1>=4
@@ -145,8 +151,8 @@ if not _python24:
     raise ImportError('matplotlib requires Python 2.4 or later')
 
 import numpy
-nn = numpy.__version__.split('.')
-if not (int(nn[0]) >= 1 and int(nn[1]) >= 1):
+nmajor, nminor = [int(n) for n in numpy.__version__.split('.')[:2]]
+if not (nmajor > 1 or (nmajor == 1 and nminor >= 1)):
     raise ImportError(
             'numpy 1.1 or later is required; you have %s' % numpy.__version__)
 
@@ -301,6 +307,30 @@ def checkdep_pdftops():
     except (IndexError, ValueError, UnboundLocalError, OSError):
         return None
 
+def checkdep_inkscape():
+    try:
+        s = subprocess.Popen(['inkscape','-V'], stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        for line in s.stdout:
+            if 'Inkscape' in line:
+                v = line.split()[1]
+                break
+        return v
+    except (IndexError, ValueError, UnboundLocalError, OSError):
+        return None
+
+def checkdep_xmllint():
+    try:
+        s = subprocess.Popen(['xmllint','--version'], stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        for line in s.stderr:
+            if 'version' in line:
+                v = line.split()[-1]
+                break
+        return v
+    except (IndexError, ValueError, UnboundLocalError, OSError):
+        return None
+
 def compare_versions(a, b):
     "return True if a is greater than or equal to b"
     if a:
@@ -424,6 +454,8 @@ def _get_configdir():
 
     configdir = os.environ.get('MPLCONFIGDIR')
     if configdir is not None:
+        if not os.path.exists(configdir):
+            os.makedirs(configdir)
         if not _is_writable_dir(configdir):
             raise RuntimeError('Could not write to MPLCONFIGDIR="%s"'%configdir)
         return configdir
@@ -454,27 +486,32 @@ def _get_data_path():
         return path
 
     path = os.sep.join([os.path.dirname(__file__), 'mpl-data'])
-    if os.path.isdir(path): return path
+    if os.path.isdir(path):
+        return path
 
     # setuptools' namespace_packages may highjack this init file
     # so need to try something known to be in matplotlib, not basemap
     import matplotlib.afm
     path = os.sep.join([os.path.dirname(matplotlib.afm.__file__), 'mpl-data'])
-    if os.path.isdir(path): return path
+    if os.path.isdir(path):
+        return path
 
     # py2exe zips pure python, so still need special check
     if getattr(sys,'frozen',None):
-        path = os.path.join(os.path.split(sys.path[0])[0], 'mpl-data')
-        if os.path.isdir(path): return path
-        else:
-            # Try again assuming we need to step up one more directory
-            path = os.path.join(os.path.split(os.path.split(sys.path[0])[0])[0],
-                                'mpl-data')
-        if os.path.isdir(path): return path
-        else:
-            # Try again assuming sys.path[0] is a dir not a exe
-            path = os.path.join(sys.path[0], 'mpl-data')
-            if os.path.isdir(path): return path
+        exe_path = os.path.dirname(sys.executable)
+        path = os.path.join(exe_path, 'mpl-data')
+        if os.path.isdir(path):
+            return path
+
+        # Try again assuming we need to step up one more directory
+        path = os.path.join(os.path.split(exe_path)[0], 'mpl-data')
+        if os.path.isdir(path):
+            return path
+
+        # Try again assuming sys.path[0] is a dir not a exe
+        path = os.path.join(sys.path[0], 'mpl-data')
+        if os.path.isdir(path):
+            return path
 
     raise RuntimeError('Could not find the matplotlib data files')
 
@@ -487,19 +524,12 @@ get_data_path = verbose.wrap('matplotlib data path %s', _get_data_path_cached,
                              always=False)
 
 
+
 def get_example_data(fname):
     """
-    return a filehandle to one of the example files in mpl-data/example
-
-    *fname*
-        the name of one of the files in mpl-data/example
+    get_example_data is deprecated -- use matplotlib.cbook.get_sample_data instead
     """
-    datadir = os.path.join(get_data_path(), 'example')
-    fullpath = os.path.join(datadir, fname)
-    if not os.path.exists(fullpath):
-        raise IOError('could not find matplotlib example file "%s" in data directory "%s"'%(
-            fname, datadir))
-    return file(fullpath, 'rb')
+    raise NotImplementedError('get_example_data is deprecated -- use matplotlib.cbook.get_sample_data instead')
 
 
 def get_py2exe_datafiles():
@@ -580,6 +610,7 @@ _deprecated_map = {
     'text.fontweight':  'font.weight',
     'text.fontsize':    'font.size',
     'tick.size' :       'tick.major.size',
+    'svg.embed_char_paths' : 'svg.fonttype'
     }
 
 _deprecated_ignore_map = {
@@ -602,24 +633,49 @@ class RcParams(dict):
 
     validate = dict([ (key, converter) for key, (default, converter) in \
                      defaultParams.iteritems() ])
+    msg_depr = "%s is deprecated and replaced with %s; please use the latter."
+    msg_depr_ignore = "%s is deprecated and ignored. Use %s"
 
     def __setitem__(self, key, val):
         try:
-            if key in _deprecated_map.keys():
+            if key in _deprecated_map:
                 alt = _deprecated_map[key]
-                warnings.warn('%s is deprecated in matplotlibrc. Use %s \
-instead.'% (key, alt))
+                warnings.warn(self.msg_depr % (key, alt))
                 key = alt
             elif key in _deprecated_ignore_map:
                 alt = _deprecated_ignore_map[key]
-                warnings.warn('%s is deprecated. Use %s instead.'% (key, alt))
+                warnings.warn(self.msg_depr_ignore % (key, alt))
                 return
             cval = self.validate[key](val)
             dict.__setitem__(self, key, cval)
         except KeyError:
             raise KeyError('%s is not a valid rc parameter.\
-See rcParams.keys() for a list of valid parameters.'%key)
+See rcParams.keys() for a list of valid parameters.' % (key,))
 
+    def __getitem__(self, key):
+        if key in _deprecated_map:
+            alt = _deprecated_map[key]
+            warnings.warn(self.msg_depr % (key, alt))
+            key = alt
+        elif key in _deprecated_ignore_map:
+            alt = _deprecated_ignore_map[key]
+            warnings.warn(self.msg_depr_ignore % (key, alt))
+            key = alt
+        return dict.__getitem__(self, key)
+
+    def keys(self):
+        """
+        Return sorted list of keys.
+        """
+        k = dict.keys(self)
+        k.sort()
+        return k
+
+    def values(self):
+        """
+        Return values in order of sorted keys.
+        """
+        return [self[k] for k in self.keys()]
 
 def rc_params(fail_on_error=False):
     'Return the default params updated from the values in the rc file'
@@ -708,11 +764,31 @@ Please do not ask for support with these customizations active.
 # this is the instance used by the matplotlib classes
 rcParams = rc_params()
 
+if rcParams['examples.directory']:
+    # paths that are intended to be relative to matplotlib_fname()
+    # are allowed for the examples.directory parameter.
+    # However, we will need to fully qualify the path because
+    # Sphinx requires absolute paths.
+    if not os.path.isabs(rcParams['examples.directory']):
+        _basedir, _fname = os.path.split(matplotlib_fname())
+        # Sometimes matplotlib_fname() can return relative paths,
+        # Also, using realpath() guarentees that Sphinx will use
+        # the same path that matplotlib sees (in case of weird symlinks).
+        _basedir = os.path.realpath(_basedir)
+        _fullpath = os.path.join(_basedir, rcParams['examples.directory'])
+        rcParams['examples.directory'] = _fullpath
+
+rcParamsOrig = rcParams.copy()
+
 rcParamsDefault = RcParams([ (key, default) for key, (default, converter) in \
                     defaultParams.iteritems() ])
 
 rcParams['ps.usedistiller'] = checkdep_ps_distiller(rcParams['ps.usedistiller'])
 rcParams['text.usetex'] = checkdep_usetex(rcParams['text.usetex'])
+
+if rcParams['axes.formatter.use_locale']:
+    import locale
+    locale.setlocale(locale.LC_ALL, '')
 
 def rc(group, **kwargs):
     """
@@ -780,27 +856,26 @@ def rc(group, **kwargs):
         for k,v in kwargs.items():
             name = aliases.get(k) or k
             key = '%s.%s' % (g, name)
-            if key not in rcParams:
+            try:
+                rcParams[key] = v
+            except KeyError:
                 raise KeyError('Unrecognized key "%s" for group "%s" and name "%s"' %
                                (key, g, name))
 
-            rcParams[key] = v
-
 def rcdefaults():
     """
-    Restore the default rc params - the ones that were created at
-    matplotlib load time.
+    Restore the default rc params - these are not the params loaded by
+    the rc file, but mpl's internal params.  See rc_file_defaults for
+    reloading the default params from the rc file
     """
     rcParams.update(rcParamsDefault)
 
-if NEWCONFIG:
-    #print "importing from reorganized config system!"
-    try:
-        from config import rcParams, rcdefaults, mplConfig, save_config
-        verbose.set_level(rcParams['verbose.level'])
-        verbose.set_fileo(rcParams['verbose.fileo'])
-    except:
-        from config import rcParams, rcdefaults
+def rc_file_defaults():
+    """
+    Restore the default rc params from the original matplotlib rc that
+    was loaded
+    """
+    rcParams.update(rcParamsOrig)
 
 _use_error_msg = """ This call to matplotlib.use() has no effect
 because the the backend has already been chosen;
@@ -832,10 +907,11 @@ def use(arg, warn=True):
     if 'matplotlib.backends' in sys.modules:
         if warn: warnings.warn(_use_error_msg)
         return
-    arg = arg.lower()
     if arg.startswith('module://'):
         name = arg
     else:
+        # Lowercase only non-module backend names (modules are case-sensitive)
+        arg = arg.lower()
         be_parts = arg.split('.')
         name = validate_backend(be_parts[0])
         if len(be_parts) > 1:
@@ -872,7 +948,7 @@ def tk_window_focus():
 
 # Now allow command line to override
 
-# Allow command line access to the backend with -d (matlab compatible
+# Allow command line access to the backend with -d (MATLAB compatible
 # flag)
 
 for s in sys.argv[1:]:
@@ -883,10 +959,49 @@ for s in sys.argv[1:]:
             pass
         # we don't want to assume all -d flags are backends, eg -debug
 
+default_test_modules = [
+    'matplotlib.tests.test_agg',
+    'matplotlib.tests.test_backend_svg',
+    'matplotlib.tests.test_basic',
+    'matplotlib.tests.test_cbook',
+    'matplotlib.tests.test_mlab',
+    'matplotlib.tests.test_transforms',
+    'matplotlib.tests.test_axes',
+    'matplotlib.tests.test_figure',
+    'matplotlib.tests.test_dates',
+    'matplotlib.tests.test_spines',
+    'matplotlib.tests.test_image',
+    'matplotlib.tests.test_simplification',
+    'matplotlib.tests.test_mathtext',
+    'matplotlib.tests.test_text',
+    'matplotlib.tests.test_tightlayout'
+    ]
+
+def test(verbosity=0):
+    """run the matplotlib test suite"""
+    import nose
+    import nose.plugins.builtin
+    from testing.noseclasses import KnownFailure
+    from nose.plugins.manager import PluginManager
+
+    # store the old values before overriding
+    plugins = []
+    plugins.append( KnownFailure() )
+    plugins.extend( [plugin() for plugin in nose.plugins.builtin.plugins] )
+
+    manager = PluginManager(plugins=plugins)
+    config = nose.config.Config(verbosity=verbosity, plugins=manager)
+
+    success = nose.run( defaultTest=default_test_modules,
+                        config=config,
+                        )
+
+    return success
+
+test.__test__ = False # nose: this function is not a test
 
 verbose.report('matplotlib version %s'%__version__)
 verbose.report('verbose.level %s'%verbose.level)
 verbose.report('interactive is %s'%rcParams['interactive'])
-verbose.report('units is %s'%rcParams['units'])
 verbose.report('platform is %s'%sys.platform)
 verbose.report('loaded modules: %s'%sys.modules.keys(), 'debug')

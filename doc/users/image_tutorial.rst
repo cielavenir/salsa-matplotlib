@@ -40,8 +40,7 @@ examples, if you use the -pylab method, you can skip the "mpimg." and
 Importing image data into Numpy arrays
 ===============================================
 
-Plotting image data is supported by the Python Image Library (`PIL
-<http://www.pythonware.com/products/pil/>`_), .  Natively, matplotlib
+Plotting image data is supported by the Python Image Library (`PIL <http://www.pythonware.com/products/pil/>`_), .  Natively, matplotlib
 only supports PNG images.  The commands shown below fall back on PIL
 if the native read fails.
 
@@ -122,8 +121,7 @@ reading/writing for any format other than PNG is limited to uint8
 data.  Why 8 bits? Most displays can only render 8 bits per channel
 worth of color gradation.  Why can they only render 8 bits/channel?
 Because that's about all the human eye can see.  More here (from a
-photography standpoint): `Luminous Landscape bit depth tutorial
-<http://www.luminous-landscape.com/tutorials/bit-depth.shtml>`_.
+photography standpoint): `Luminous Landscape bit depth tutorial <http://www.luminous-landscape.com/tutorials/bit-depth.shtml>`_.
 
 Each inner list represents a pixel.  Here, with an RGB image, there
 are 3 values.  Since it's a black and white image, R, G, and B are all
@@ -154,7 +152,7 @@ plot from the prompt.
         import matplotlib.pyplot as plt
         import matplotlib.image as mpimg
         import numpy as np
-        img = mpimg.imread('_static/stinkbug.png')
+        img = mpimg.imread('../_static/stinkbug.png')
         imgplot = plt.imshow(img)
 
 You can also plot any numpy array - just remember that the datatype
@@ -179,8 +177,7 @@ channel of our data:
 
     In [6]: lum_img = img[:,:,0]
 
-This is array slicing.  You can read more in the `Numpy tutorial
-<http://www.scipy.org/Tentative_NumPy_Tutorial>`_.
+This is array slicing.  You can read more in the `Numpy tutorial <http://www.scipy.org/Tentative_NumPy_Tutorial>`_.
 
 .. sourcecode:: ipython
 
@@ -191,7 +188,7 @@ This is array slicing.  You can read more in the `Numpy tutorial
     import matplotlib.pyplot as plt
     import matplotlib.image as mpimg
     import numpy as np
-    img = mpimg.imread('_static/stinkbug.png')
+    img = mpimg.imread('../_static/stinkbug.png')
     lum_img = img[:,:,0]
     plt.imshow(lum_img)
 
@@ -210,7 +207,7 @@ object:
         import matplotlib.pyplot as plt
         import matplotlib.image as mpimg
         import numpy as np
-        img = mpimg.imread('_static/stinkbug.png')
+        img = mpimg.imread('../_static/stinkbug.png')
         lum_img = img[:,:,0]
         imgplot = plt.imshow(lum_img)
         imgplot.set_cmap('hot')
@@ -224,16 +221,14 @@ object:
         import matplotlib.pyplot as plt
         import matplotlib.image as mpimg
         import numpy as np
-        img = mpimg.imread('_static/stinkbug.png')
+        img = mpimg.imread('../_static/stinkbug.png')
         lum_img = img[:,:,0]
         imgplot = plt.imshow(lum_img)
         imgplot.set_cmap('spectral')
 
-There are many other colormap schemes available.  See the `list and
-images of the colormaps
-<http://matplotlib.sourceforge.net/examples/pylab_examples/show_colormaps.html>`_.
+There are many other colormap schemes available.  See the `list and images of the colormaps <http://matplotlib.sourceforge.net/examples/pylab_examples/show_colormaps.html>`_.
 
-.. _Color Bars
+.. _`Color Bars`:
 
 Color scale reference
 ------------------------
@@ -250,7 +245,7 @@ do that by adding color bars.  It's as easy as one line:
             import matplotlib.pyplot as plt
             import matplotlib.image as mpimg
             import numpy as np
-            img = mpimg.imread('_static/stinkbug.png')
+            img = mpimg.imread('../_static/stinkbug.png')
             lum_img = img[:,:,0]
             imgplot = plt.imshow(lum_img)
             imgplot.set_cmap('spectral')
@@ -261,7 +256,7 @@ automatically change if you change you switch to a different
 colormap - you have to re-create your plot, and add in the colorbar
 again.
 
-.. _Data ranges
+.. _`Data ranges`:
 
 Examining a specific data range
 ---------------------------------
@@ -274,16 +269,16 @@ image data, we use the :func:`~matplotlib.pyplot.hist` function.
 
 .. sourcecode:: ipython
 
-    In[10]: plt.hist(lum_img)
+    In[10]: plt.hist(lum_img.flatten(), 256, range=(0.0,1.0), fc='k', ec='k')
 
 .. plot::
 
     import matplotlib.pyplot as plt
     import matplotlib.image as mpimg
     import numpy as np
-    img = mpimg.imread('_static/stinkbug.png')
+    img = mpimg.imread('../_static/stinkbug.png')
     lum_img = img[:,:,0]
-    plt.hist(lum_img, range=(0.0,1.0))
+    plt.hist(lum_img.flatten(), 256, range=(0.0,1.0), fc='black', ec='black')
 
 Most often, the "interesting" part of the image is around the peak,
 and you can get extra contrast by clipping the regions above and/or
@@ -305,7 +300,7 @@ object.
     import numpy as np
     fig = plt.figure()
     a=fig.add_subplot(1,2,1)
-    img = mpimg.imread('_static/stinkbug.png')
+    img = mpimg.imread('../_static/stinkbug.png')
     lum_img = img[:,:,0]
     imgplot = plt.imshow(lum_img)
     a.set_title('Before')
@@ -348,7 +343,7 @@ and the computer has to draw in pixels to fill that space.
     import matplotlib.image as mpimg
     import numpy as np
     import Image
-    img = Image.open('_static/stinkbug.png')  # opens the file using PIL - it's not an array yet
+    img = Image.open('../_static/stinkbug.png')  # opens the file using PIL - it's not an array yet
     rsize = img.resize((img.size[0]/10,img.size[1]/10))  # resize the image
     rsizeArr = np.asarray(rsize)
     lum_img = rsizeArr[:,:,0]
@@ -369,7 +364,7 @@ Let's try some others:
         import matplotlib.image as mpimg
         import numpy as np
         import Image
-        img = Image.open('_static/stinkbug.png')  # opens the file using PIL - it's not an array yet
+        img = Image.open('../_static/stinkbug.png')  # opens the file using PIL - it's not an array yet
         rsize = img.resize((img.size[0]/10,img.size[1]/10))  # resize the image
         rsizeArr = np.asarray(rsize)
         lum_img = rsizeArr[:,:,0]
@@ -386,7 +381,7 @@ Let's try some others:
         import matplotlib.image as mpimg
         import numpy as np
         import Image
-        img = Image.open('_static/stinkbug.png')  # opens the file using PIL - it's not an array yet
+        img = Image.open('../_static/stinkbug.png')  # opens the file using PIL - it's not an array yet
         rsize = img.resize((img.size[0]/10,img.size[1]/10))  # resize the image
         rsizeArr = np.asarray(rsize)
         lum_img = rsizeArr[:,:,0]

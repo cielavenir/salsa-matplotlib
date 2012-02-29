@@ -5,16 +5,17 @@ polygons.
 
 The classes are not meant to be as flexible as their single element
 counterparts (e.g. you may not be able to select all line styles) but
-they are meant to be fast for common use cases (e.g. a bunch of solid
+they are meant to be fast for common use cases (e.g. a large set of solid
 line segemnts)
 """
-import copy, math, warnings
+import warnings
 import numpy as np
-from numpy import ma
+import numpy.ma as ma
 import matplotlib as mpl
 import matplotlib.cbook as cbook
-import matplotlib.colors as _colors # avoid conflict with kwarg
+import matplotlib.colors as mcolors
 import matplotlib.cm as cm
+from matplotlib import docstring
 import matplotlib.transforms as transforms
 import matplotlib.artist as artist
 from matplotlib.artist import allow_rasterization
@@ -58,6 +59,8 @@ class Collection(artist.Artist, cm.ScalarMappable):
     scalar mappable will be made to set the face colors.
     """
     _offsets = np.array([], np.float_)
+    # _offsets must be a Nx2 array!
+    _offsets.shape = (0, 2)
     _transOffset = transforms.IdentityTransform()
     _transforms = []
 
@@ -89,48 +92,55 @@ class Collection(artist.Artist, cm.ScalarMappable):
         self.set_linewidth(linewidths)
         self.set_linestyle(linestyles)
         self.set_antialiased(antialiaseds)
+        self.set_pickradius(pickradius)
         self.set_urls(urls)
 
 
         self._uniform_offsets = None
         self._offsets = np.array([], np.float_)
+        # Force _offsets to be Nx2
+        self._offsets.shape = (0, 2)
         if offsets is not None:
-            offsets = np.asarray(offsets)
-            if len(offsets.shape) == 1:
-                offsets = offsets[np.newaxis,:]  # Make it Nx2.
+            offsets = np.asanyarray(offsets)
+            offsets.shape = (-1, 2)             # Make it Nx2
             if transOffset is not None:
                 self._offsets = offsets
                 self._transOffset = transOffset
             else:
                 self._uniform_offsets = offsets
 
-        self._pickradius = pickradius
         self.update(kwargs)
+        self._paths = None
 
-
-    def _get_value(self, val):
-        try: return (float(val), )
+    @staticmethod
+    def _get_value(val):
+        try:
+            return (float(val), )
         except TypeError:
             if cbook.iterable(val) and len(val):
-                try: float(val[0])
-                except TypeError: pass # raise below
-                except ValueError: pass
-                else: return val
+                try:
+                    float(val[0])
+                except (TypeError, ValueError):
+                    pass # raise below
+                else:
+                    return val
 
         raise TypeError('val must be a float or nonzero sequence of floats')
 
-    def _get_bool(self, val):
-        try: return (bool(val), )
-        except TypeError:
-            if cbook.iterable(val) and len(val):
-                try: bool(val[0])
-                except TypeError: pass # raise below
-                else: return val
-
-        raise TypeError('val must be a bool or nonzero sequence of them')
-
+    @staticmethod
+    def _get_bool(val):
+        if not cbook.iterable(val):
+            val = (val,)
+        try:
+            bool(val[0])
+        except (TypeError, IndexError):
+            raise TypeError('val must be a bool or nonzero sequence of them')
+        return val
 
     def get_paths(self):
+        return self._paths
+
+    def set_paths(self):
         raise NotImplementedError
 
     def get_transforms(self):
@@ -141,13 +151,20 @@ class Collection(artist.Artist, cm.ScalarMappable):
         transOffset = self._transOffset
         offsets = self._offsets
         paths = self.get_paths()
+
+
         if not transform.is_affine:
             paths = [transform.transform_path_non_affine(p) for p in paths]
             transform = transform.get_affine()
         if not transOffset.is_affine:
             offsets = transOffset.transform_non_affine(offsets)
             transOffset = transOffset.get_affine()
-        offsets = np.asarray(offsets, np.float_)
+
+        offsets = np.asanyarray(offsets, np.float_)
+        if np.ma.isMaskedArray(offsets):
+            offsets = offsets.filled(np.nan)
+            # get_path_collection_extents handles nan but not masked arrays
+        offsets.shape = (-1, 2)                     # Make it Nx2
 
         result = mpath.get_path_collection_extents(
             transform.frozen(), paths, self.get_transforms(),
@@ -169,6 +186,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         offsets = self._offsets
         paths = self.get_paths()
 
+
         if self.have_units():
             paths = []
             for path in self.get_paths():
@@ -177,19 +195,27 @@ class Collection(artist.Artist, cm.ScalarMappable):
                 xs = self.convert_xunits(xs)
                 ys = self.convert_yunits(ys)
                 paths.append(mpath.Path(zip(xs, ys), path.codes))
-            if len(self._offsets):
-                xs = self.convert_xunits(self._offsets[:,0])
-                ys = self.convert_yunits(self._offsets[:,1])
+
+            if offsets.size > 0:
+                xs = self.convert_xunits(offsets[:,0])
+                ys = self.convert_yunits(offsets[:,1])
                 offsets = zip(xs, ys)
 
-        offsets = np.asarray(offsets, np.float_)
+        offsets = np.asanyarray(offsets, np.float_)
+        offsets.shape = (-1, 2)             # Make it Nx2
 
         if not transform.is_affine:
             paths = [transform.transform_path_non_affine(path) for path in paths]
             transform = transform.get_affine()
-        if not transOffset.is_affine:
+        if not transOffset.is_affine :
             offsets = transOffset.transform_non_affine(offsets)
+            # This might have changed an ndarray into a masked array.
             transOffset = transOffset.get_affine()
+
+        if np.ma.isMaskedArray(offsets):
+            offsets = offsets.filled(np.nan)
+            # Changing from a masked array to nan-filled ndarray
+            # is probably most efficient at this point.
 
         return transform, transOffset, offsets, paths
 
@@ -200,19 +226,25 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
         self.update_scalarmappable()
 
-        clippath, clippath_trans = self.get_transformed_clip_path_and_affine()
-        if clippath_trans is not None:
-            clippath_trans = clippath_trans.frozen()
-
         transform, transOffset, offsets, paths = self._prepare_points()
 
+        gc = renderer.new_gc()
+        self._set_gc_clip(gc)
+        gc.set_snap(self.get_snap())
+
         renderer.draw_path_collection(
-            transform.frozen(), self.clipbox, clippath, clippath_trans,
-            paths, self.get_transforms(),
-            offsets, transOffset,
-            self.get_facecolor(), self.get_edgecolor(), self._linewidths,
-            self._linestyles, self._antialiaseds, self._urls)
+            gc, transform.frozen(), paths, self.get_transforms(),
+            offsets, transOffset, self.get_facecolor(), self.get_edgecolor(),
+            self._linewidths, self._linestyles, self._antialiaseds, self._urls)
+
+        gc.restore()
         renderer.close_group(self.__class__.__name__)
+
+    def set_pickradius(self, pr):
+        self._pickradius = pr
+
+    def get_pickradius(self):
+        return self._pickradius
 
     def contains(self, mouseevent):
         """
@@ -221,19 +253,35 @@ class Collection(artist.Artist, cm.ScalarMappable):
         Returns True | False, ``dict(ind=itemlist)``, where every
         item in itemlist contains the event.
         """
-        if callable(self._contains): return self._contains(self,mouseevent)
-        if not self.get_visible(): return False,{}
+        if callable(self._contains):
+            return self._contains(self,mouseevent)
+
+        if not self.get_visible():
+            return False, {}
+
+        if self._picker is True:  # the Boolean constant, not just nonzero or 1
+            pickradius = self._pickradius
+        else:
+            try:
+                pickradius = float(self._picker)
+            except TypeError:
+                # This should not happen if "contains" is called via
+                # pick, the normal route; the check is here in case
+                # it is called through some unanticipated route.
+                warnings.warn(
+                    "Collection picker %s could not be converted to float"
+                                        % self._picker)
+                pickradius = self._pickradius
 
         transform, transOffset, offsets, paths = self._prepare_points()
 
         ind = mpath.point_in_path_collection(
-            mouseevent.x, mouseevent.y, self._pickradius,
+            mouseevent.x, mouseevent.y, pickradius,
             transform.frozen(), paths, self.get_transforms(),
-            offsets, transOffset, len(self._facecolors)>0)
-        return len(ind)>0,dict(ind=ind)
+            offsets, transOffset, pickradius <= 0)
 
-    def set_pickradius(self,pickradius): self.pickradius = 5
-    def get_pickradius(self): return self.pickradius
+        return len(ind)>0, dict(ind=ind)
+
 
     def set_urls(self, urls):
         if urls is None:
@@ -250,9 +298,8 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
         ACCEPTS: float or sequence of floats
         """
-        offsets = np.asarray(offsets, np.float_)
-        if len(offsets.shape) == 1:
-            offsets = offsets[np.newaxis,:]  # Make it Nx2.
+        offsets = np.asanyarray(offsets, np.float_)
+        offsets.shape = (-1, 2)             # Make it Nx2
         #This decision is based on how they are initialized above
         if self._uniform_offsets is None:
             self._offsets = offsets
@@ -385,7 +432,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
             pass
         if c is None: c = mpl.rcParams['patch.facecolor']
         self._facecolors_original = c
-        self._facecolors = _colors.colorConverter.to_rgba_array(c, self._alpha)
+        self._facecolors = mcolors.colorConverter.to_rgba_array(c, self._alpha)
 
     def set_facecolors(self, c):
         """alias for set_facecolor"""
@@ -421,13 +468,17 @@ class Collection(artist.Artist, cm.ScalarMappable):
                 self._is_stroked = False
         except AttributeError:
             pass
-        if c == 'face':
-            self._edgecolors = 'face'
-            self._edgecolors_original = 'face'
-        else:
-            if c is None: c = mpl.rcParams['patch.edgecolor']
-            self._edgecolors_original = c
-            self._edgecolors = _colors.colorConverter.to_rgba_array(c, self._alpha)
+        try:
+            if c.lower() == 'face':
+                self._edgecolors = 'face'
+                self._edgecolors_original = 'face'
+                return
+        except AttributeError:
+            pass
+        if c is None:
+            c = mpl.rcParams['patch.edgecolor']
+        self._edgecolors_original = c
+        self._edgecolors = mcolors.colorConverter.to_rgba_array(c, self._alpha)
 
 
     def set_edgecolors(self, c):
@@ -437,25 +488,27 @@ class Collection(artist.Artist, cm.ScalarMappable):
     def set_alpha(self, alpha):
         """
         Set the alpha tranparencies of the collection.  *alpha* must be
-        a float.
+        a float or *None*.
 
-        ACCEPTS: float
+        ACCEPTS: float or None
         """
-        try: float(alpha)
-        except TypeError: raise TypeError('alpha must be a float')
-        else:
-            artist.Artist.set_alpha(self, alpha)
+        if alpha is not None:
             try:
-                self._facecolors = _colors.colorConverter.to_rgba_array(
-                    self._facecolors_original, self._alpha)
-            except (AttributeError, TypeError, IndexError):
-                pass
-            try:
-                if self._edgecolors_original != 'face':
-                    self._edgecolors = _colors.colorConverter.to_rgba_array(
-                        self._edgecolors_original, self._alpha)
-            except (AttributeError, TypeError, IndexError):
-                pass
+                float(alpha)
+            except TypeError:
+                raise TypeError('alpha must be a float or None')
+        artist.Artist.set_alpha(self, alpha)
+        try:
+            self._facecolors = mcolors.colorConverter.to_rgba_array(
+                self._facecolors_original, self._alpha)
+        except (AttributeError, TypeError, IndexError):
+            pass
+        try:
+            if self._edgecolors_original != 'face':
+                self._edgecolors = mcolors.colorConverter.to_rgba_array(
+                    self._edgecolors_original, self._alpha)
+        except (AttributeError, TypeError, IndexError):
+            pass
 
     def get_linewidths(self):
         return self._linewidths
@@ -470,9 +523,12 @@ class Collection(artist.Artist, cm.ScalarMappable):
         If the scalar mappable array is not none, update colors
         from scalar data
         """
-        if self._A is None: return
+        if self._A is None:
+            return
         if self._A.ndim > 1:
             raise ValueError('Collections can only map rank 1 arrays')
+        if not self.check_update("array"):
+            return
         if self._is_filled:
             self._facecolors = self.to_rgba(self._A, self._alpha)
         elif self._is_stroked:
@@ -491,10 +547,16 @@ class Collection(artist.Artist, cm.ScalarMappable):
         self._linestyles = other._linestyles
         self._pickradius = other._pickradius
 
+        # update_from for scalarmappable
+        self._A = other._A
+        self.norm = other.norm
+        self.cmap = other.cmap
+        # self.update_dict = other.update_dict # do we need to copy this? -JJL
+
 # these are not available for the object inspector until after the
 # class is built so we define an initial set here for the init
 # function and they will be overridden after object defn
-artist.kwdocd['Collection'] = """\
+docstring.interpd.update(Collection = """\
     Valid Collection keyword arguments:
 
         * *edgecolors*: None
@@ -514,136 +576,45 @@ artist.kwdocd['Collection'] = """\
     If any of *edgecolors*, *facecolors*, *linewidths*, *antialiaseds*
     are None, they default to their :data:`matplotlib.rcParams` patch
     setting, in sequence form.
-"""
+""")
 
-class QuadMesh(Collection):
+class PathCollection(Collection):
     """
-    Class for the efficient drawing of a quadrilateral mesh.
-
-    A quadrilateral mesh consists of a grid of vertices. The
-    dimensions of this array are (*meshWidth* + 1, *meshHeight* +
-    1). Each vertex in the mesh has a different set of "mesh
-    coordinates" representing its position in the topology of the
-    mesh. For any values (*m*, *n*) such that 0 <= *m* <= *meshWidth*
-    and 0 <= *n* <= *meshHeight*, the vertices at mesh coordinates
-    (*m*, *n*), (*m*, *n* + 1), (*m* + 1, *n* + 1), and (*m* + 1, *n*)
-    form one of the quadrilaterals in the mesh. There are thus
-    (*meshWidth* * *meshHeight*) quadrilaterals in the mesh.  The mesh
-    need not be regular and the polygons need not be convex.
-
-    A quadrilateral mesh is represented by a (2 x ((*meshWidth* + 1) *
-    (*meshHeight* + 1))) numpy array *coordinates*, where each row is
-    the *x* and *y* coordinates of one of the vertices.  To define the
-    function that maps from a data point to its corresponding color,
-    use the :meth:`set_cmap` method.  Each of these arrays is indexed in
-    row-major order by the mesh coordinates of the vertex (or the mesh
-    coordinates of the lower left vertex, in the case of the
-    colors).
-
-    For example, the first entry in *coordinates* is the
-    coordinates of the vertex at mesh coordinates (0, 0), then the one
-    at (0, 1), then at (0, 2) .. (0, meshWidth), (1, 0), (1, 1), and
-    so on.
+    This is the most basic :class:`Collection` subclass.
     """
-    def __init__(self, meshWidth, meshHeight, coordinates, showedges, antialiased=True):
-        Collection.__init__(self)
-        self._meshWidth = meshWidth
-        self._meshHeight = meshHeight
-        self._coordinates = coordinates
-        self._showedges = showedges
-        self._antialiased = antialiased
+    @docstring.dedent_interpd
+    def __init__(self, paths, sizes=None, **kwargs):
+        """
+        *paths* is a sequence of :class:`matplotlib.path.Path`
+        instances.
 
-        self._paths = None
+        %(Collection)s
+        """
 
-        self._bbox = transforms.Bbox.unit()
-        self._bbox.update_from_data_xy(coordinates.reshape(
-                ((meshWidth + 1) * (meshHeight + 1), 2)))
+        Collection.__init__(self, **kwargs)
+        self.set_paths(paths)
+        self._sizes = sizes
 
-        # By converting to floats now, we can avoid that on every draw.
-        self._coordinates = self._coordinates.reshape((meshHeight + 1, meshWidth + 1, 2))
-        self._coordinates = np.array(self._coordinates, np.float_)
+    def set_paths(self, paths):
+        self._paths = paths
 
-    def get_paths(self, dataTrans=None):
-        if self._paths is None:
-            self._paths = self.convert_mesh_to_paths(
-                self._meshWidth, self._meshHeight, self._coordinates)
+    def get_paths(self):
         return self._paths
 
-    @staticmethod
-    def convert_mesh_to_paths(meshWidth, meshHeight, coordinates):
-        """
-        Converts a given mesh into a sequence of
-        :class:`matplotlib.path.Path` objects for easier rendering by
-        backends that do not directly support quadmeshes.
-
-        This function is primarily of use to backend implementers.
-        """
-        Path = mpath.Path
-
-        if ma.isMaskedArray(coordinates):
-            c = coordinates.data
-        else:
-            c = coordinates
-
-        points = np.concatenate((
-                    c[0:-1, 0:-1],
-                    c[0:-1, 1:  ],
-                    c[1:  , 1:  ],
-                    c[1:  , 0:-1],
-                    c[0:-1, 0:-1]
-                    ), axis=2)
-        points = points.reshape((meshWidth * meshHeight, 5, 2))
-        return [Path(x) for x in points]
-
-    def get_datalim(self, transData):
-        return self._bbox
+    def get_sizes(self):
+        return self._sizes
 
     @allow_rasterization
     def draw(self, renderer):
-        if not self.get_visible(): return
-        renderer.open_group(self.__class__.__name__)
-        transform = self.get_transform()
-        transOffset = self._transOffset
-        offsets = self._offsets
-
-        if self.have_units():
-            if len(self._offsets):
-                xs = self.convert_xunits(self._offsets[:0])
-                ys = self.convert_yunits(self._offsets[:1])
-                offsets = zip(xs, ys)
-
-        offsets = np.asarray(offsets, np.float_)
-
-        if self.check_update('array'):
-            self.update_scalarmappable()
-
-        clippath, clippath_trans = self.get_transformed_clip_path_and_affine()
-        if clippath_trans is not None:
-            clippath_trans = clippath_trans.frozen()
-
-        if not transform.is_affine:
-            coordinates = self._coordinates.reshape(
-                (self._coordinates.shape[0] *
-                 self._coordinates.shape[1],
-                 2))
-            coordinates = transform.transform(coordinates)
-            coordinates = coordinates.reshape(self._coordinates.shape)
-            transform = transforms.IdentityTransform()
-        else:
-            coordinates = self._coordinates
-
-        if not transOffset.is_affine:
-            offsets = transOffset.transform_non_affine(offsets)
-            transOffset = transOffset.get_affine()
-
-        renderer.draw_quad_mesh(
-            transform.frozen(), self.clipbox, clippath, clippath_trans,
-            self._meshWidth, self._meshHeight, coordinates,
-            offsets, transOffset, self.get_facecolor(), self._antialiased,
-            self._showedges)
-        renderer.close_group(self.__class__.__name__)
+        if self._sizes is not None:
+            self._transforms = [
+                transforms.Affine2D().scale(
+                    (np.sqrt(x) * self.figure.dpi / 72.0))
+                for x in self._sizes]
+        return Collection.draw(self, renderer)
 
 class PolyCollection(Collection):
+    @docstring.dedent_interpd
     def __init__(self, verts, sizes = None, closed = True, **kwargs):
         """
         *verts* is a sequence of ( *verts0*, *verts1*, ...) where
@@ -666,7 +637,6 @@ class PolyCollection(Collection):
         Collection.__init__(self,**kwargs)
         self._sizes = sizes
         self.set_verts(verts, closed)
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def set_verts(self, verts, closed=True):
         '''This allows one to delay initialization of the vertices.'''
@@ -676,20 +646,25 @@ class PolyCollection(Collection):
         if closed:
             self._paths = []
             for xy in verts:
-                if np.ma.isMaskedArray(xy):
-                    if len(xy) and (xy[0] != xy[-1]).any():
-                        xy = np.ma.concatenate([xy, [xy[0]]])
+                if len(xy):
+                    if np.ma.isMaskedArray(xy):
+                        xy = np.ma.concatenate([xy, np.zeros((1,2))])
+                    else:
+                        xy = np.asarray(xy)
+                        xy = np.concatenate([xy, np.zeros((1,2))])
+                    codes = np.empty(xy.shape[0], dtype=mpath.Path.code_type)
+                    codes[:] = mpath.Path.LINETO
+                    codes[0] = mpath.Path.MOVETO
+                    codes[-1] = mpath.Path.CLOSEPOLY
+                    self._paths.append(mpath.Path(xy, codes))
                 else:
-                    xy = np.asarray(xy)
-                    if len(xy) and (xy[0] != xy[-1]).any():
-                        xy = np.concatenate([xy, [xy[0]]])
-                self._paths.append(mpath.Path(xy))
+                    self._paths.append(mpath.Path(xy))
         else:
             self._paths = [mpath.Path(xy) for xy in verts]
 
-    def get_paths(self):
-        return self._paths
+    set_paths = set_verts
 
+    @allow_rasterization
     def draw(self, renderer):
         if self._sizes is not None:
             self._transforms = [
@@ -704,6 +679,7 @@ class BrokenBarHCollection(PolyCollection):
     A collection of horizontal bars spanning *yrange* with a sequence of
     *xranges*.
     """
+    @docstring.dedent_interpd
     def __init__(self, xranges, yrange, **kwargs):
         """
         *xranges*
@@ -718,7 +694,6 @@ class BrokenBarHCollection(PolyCollection):
         ymax = ymin + ywidth
         verts = [ [(xmin, ymin), (xmin, ymax), (xmin+xwidth, ymax), (xmin+xwidth, ymin), (xmin, ymin)] for xmin, xwidth in xranges]
         PolyCollection.__init__(self, verts, **kwargs)
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
 
     @staticmethod
@@ -745,6 +720,7 @@ class RegularPolyCollection(Collection):
     """Draw a collection of regular polygons with *numsides*."""
     _path_generator = mpath.Path.unit_regular_polygon
 
+    @docstring.dedent_interpd
     def __init__(self,
                  numsides,
                  rotation = 0 ,
@@ -787,8 +763,6 @@ class RegularPolyCollection(Collection):
         self._rotation = rotation
         self.set_transform(transforms.IdentityTransform())
 
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
-
     @allow_rasterization
     def draw(self, renderer):
         self._transforms = [
@@ -796,9 +770,6 @@ class RegularPolyCollection(Collection):
                 (np.sqrt(x) * self.figure.dpi / 72.0) / np.sqrt(np.pi))
             for x in self._sizes]
         return Collection.draw(self, renderer)
-
-    def get_paths(self):
-        return self._paths
 
     def get_numsides(self):
         return self._numsides
@@ -897,7 +868,7 @@ class LineCollection(Collection):
         The default is 5 pt.
 
         The use of :class:`~matplotlib.cm.ScalarMappable` is optional.
-        If the :class:`~matplotlib.cm.ScalarMappable` matrix
+        If the :class:`~matplotlib.cm.ScalarMappable` array
         :attr:`~matplotlib.cm.ScalarMappable._A` is not None (ie a call to
         :meth:`~matplotlib.cm.ScalarMappable.set_array` has been made), at
         draw time a call to scalar mappable will be made to set the colors.
@@ -907,7 +878,7 @@ class LineCollection(Collection):
         if antialiaseds is None: antialiaseds = (mpl.rcParams['lines.antialiased'],)
         self.set_linestyles(linestyles)
 
-        colors = _colors.colorConverter.to_rgba_array(colors)
+        colors = mcolors.colorConverter.to_rgba_array(colors)
 
         Collection.__init__(
             self,
@@ -925,9 +896,6 @@ class LineCollection(Collection):
 
         self.set_segments(segments)
 
-    def get_paths(self):
-        return self._paths
-
     def set_segments(self, segments):
         if segments is None: return
         _segments = []
@@ -942,6 +910,7 @@ class LineCollection(Collection):
         self._paths = [mpath.Path(seg) for seg in _segments]
 
     set_verts = set_segments # for compatibility with PolyCollection
+    set_paths = set_segments
 
     def _add_offsets(self, segs):
         offsets = self._uniform_offsets
@@ -965,7 +934,7 @@ class LineCollection(Collection):
 
         ACCEPTS: matplotlib color arg or sequence of rgba tuples
         """
-        self._edgecolors = _colors.colorConverter.to_rgba_array(c)
+        self.set_edgecolor(c)
 
     def color(self, c):
         """
@@ -987,6 +956,7 @@ class CircleCollection(Collection):
     """
     A collection of circles, drawn using splines.
     """
+    @docstring.dedent_interpd
     def __init__(self, sizes, **kwargs):
         """
         *sizes*
@@ -998,12 +968,12 @@ class CircleCollection(Collection):
         self._sizes = sizes
         self.set_transform(transforms.IdentityTransform())
         self._paths = [mpath.Path.unit_circle()]
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def get_sizes(self):
         "return sizes of circles"
         return self._sizes
 
+    @allow_rasterization
     def draw(self, renderer):
         # sizes is the area of the circle circumscribing the polygon
         # in points^2
@@ -1013,92 +983,89 @@ class CircleCollection(Collection):
             for x in self._sizes]
         return Collection.draw(self, renderer)
 
-    def get_paths(self):
-        return self._paths
 
 class EllipseCollection(Collection):
     """
     A collection of ellipses, drawn using splines.
     """
+    @docstring.dedent_interpd
     def __init__(self, widths, heights, angles, units='points', **kwargs):
         """
         *widths*: sequence
-            half-lengths of first axes (e.g., semi-major axis lengths)
+            lengths of first axes (e.g., major axis lengths)
 
         *heights*: sequence
-            half-lengths of second axes
+            lengths of second axes
 
         *angles*: sequence
             angles of first axes, degrees CCW from the X-axis
 
-        *units*: ['points' | 'inches' | 'dots' | 'width' | 'height' | 'x' | 'y']
-            units in which majors and minors are given; 'width' and 'height'
-            refer to the dimensions of the axes, while 'x' and 'y'
-            refer to the *offsets* data units.
+        *units*: ['points' | 'inches' | 'dots' | 'width' | 'height'
+        | 'x' | 'y' | 'xy']
+
+            units in which majors and minors are given; 'width' and
+            'height' refer to the dimensions of the axes, while 'x'
+            and 'y' refer to the *offsets* data units. 'xy' differs
+            from all others in that the angle as plotted varies with
+            the aspect ratio, and equals the specified angle only when
+            the aspect ratio is unity.  Hence it behaves the same as
+            the :class:`~matplotlib.patches.Ellipse` with
+            axes.transData as its transform.
 
         Additional kwargs inherited from the base :class:`Collection`:
 
         %(Collection)s
         """
         Collection.__init__(self,**kwargs)
-        self._widths = np.asarray(widths).ravel()
-        self._heights = np.asarray(heights).ravel()
+        self._widths = 0.5 * np.asarray(widths).ravel()
+        self._heights = 0.5 * np.asarray(heights).ravel()
         self._angles = np.asarray(angles).ravel() *(np.pi/180.0)
         self._units = units
         self.set_transform(transforms.IdentityTransform())
         self._transforms = []
         self._paths = [mpath.Path.unit_circle()]
-        self._initialized = False
 
-
-    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
-
-    def _init(self):
-        def on_dpi_change(fig):
-            self._transforms = []
-        self.figure.callbacks.connect('dpi_changed', on_dpi_change)
-        self._initialized = True
-
-    def set_transforms(self):
-        if not self._initialized:
-            self._init()
+    def _set_transforms(self):
+        """
+        Calculate transforms immediately before drawing.
+        """
         self._transforms = []
         ax = self.axes
         fig = self.figure
-        if self._units in ('x', 'y'):
-            if self._units == 'x':
-                dx0 = ax.viewLim.width
-                dx1 = ax.bbox.width
-            else:
-                dx0 = ax.viewLim.height
-                dx1 = ax.bbox.height
-            sc = dx1/dx0
+
+        if self._units == 'xy':
+            sc = 1
+        elif self._units == 'x':
+            sc = ax.bbox.width / ax.viewLim.width
+        elif self._units == 'y':
+            sc = ax.bbox.height / ax.viewLim.height
+        elif self._units == 'inches':
+            sc = fig.dpi
+        elif self._units == 'points':
+            sc = fig.dpi / 72.0
+        elif self._units == 'width':
+            sc = ax.bbox.width
+        elif self._units == 'height':
+            sc = ax.bbox.height
+        elif self._units == 'dots':
+            sc = 1.0
         else:
-            if self._units == 'inches':
-                sc = fig.dpi
-            elif self._units == 'points':
-                sc = fig.dpi / 72.0
-            elif self._units == 'width':
-                sc = ax.bbox.width
-            elif self._units == 'height':
-                sc = ax.bbox.height
-            elif self._units == 'dots':
-                sc = 1.0
-            else:
-                raise ValueError('unrecognized units: %s' % self._units)
+            raise ValueError('unrecognized units: %s' % self._units)
 
         _affine = transforms.Affine2D
         for x, y, a in zip(self._widths, self._heights, self._angles):
             trans = _affine().scale(x * sc, y * sc).rotate(a)
             self._transforms.append(trans)
 
-    def draw(self, renderer):
-        if True: ###not self._transforms:
-            self.set_transforms()
-        return Collection.draw(self, renderer)
+        if self._units == 'xy':
+            m = ax.transData.get_affine().get_matrix().copy()
+            m[:2, 2:] = 0
+            self.set_transform(_affine(m))
 
-    def get_paths(self):
-        return self._paths
+    @allow_rasterization
+    def draw(self, renderer):
+        self._set_transforms()
+        Collection.draw(self, renderer)
 
 class PatchCollection(Collection):
     """
@@ -1135,13 +1102,14 @@ class PatchCollection(Collection):
 
         if match_original:
             def determine_facecolor(patch):
-                if patch.fill:
+                if patch.get_fill():
                     return patch.get_facecolor()
                 return [0, 0, 0, 0]
 
             facecolors   = [determine_facecolor(p) for p in patches]
             edgecolors   = [p.get_edgecolor() for p in patches]
             linewidths   = [p.get_linewidth() for p in patches]
+            linestyles   = [p.get_linestyle() for p in patches]
             antialiaseds = [p.get_antialiased() for p in patches]
 
             Collection.__init__(
@@ -1149,22 +1117,207 @@ class PatchCollection(Collection):
                 edgecolors=edgecolors,
                 facecolors=facecolors,
                 linewidths=linewidths,
-                linestyles='solid',
+                linestyles=linestyles,
                 antialiaseds = antialiaseds)
         else:
             Collection.__init__(self, **kwargs)
 
-        paths        = [p.get_transform().transform_path(p.get_path())
-                        for p in patches]
+        self.set_paths(patches)
 
+    def set_paths(self, patches):
+        paths = [p.get_transform().transform_path(p.get_path())
+                        for p in patches]
         self._paths = paths
 
+
+class QuadMesh(Collection):
+    """
+    Class for the efficient drawing of a quadrilateral mesh.
+
+    A quadrilateral mesh consists of a grid of vertices. The
+    dimensions of this array are (*meshWidth* + 1, *meshHeight* +
+    1). Each vertex in the mesh has a different set of "mesh
+    coordinates" representing its position in the topology of the
+    mesh. For any values (*m*, *n*) such that 0 <= *m* <= *meshWidth*
+    and 0 <= *n* <= *meshHeight*, the vertices at mesh coordinates
+    (*m*, *n*), (*m*, *n* + 1), (*m* + 1, *n* + 1), and (*m* + 1, *n*)
+    form one of the quadrilaterals in the mesh. There are thus
+    (*meshWidth* * *meshHeight*) quadrilaterals in the mesh.  The mesh
+    need not be regular and the polygons need not be convex.
+
+    A quadrilateral mesh is represented by a (2 x ((*meshWidth* + 1) *
+    (*meshHeight* + 1))) numpy array *coordinates*, where each row is
+    the *x* and *y* coordinates of one of the vertices.  To define the
+    function that maps from a data point to its corresponding color,
+    use the :meth:`set_cmap` method.  Each of these arrays is indexed in
+    row-major order by the mesh coordinates of the vertex (or the mesh
+    coordinates of the lower left vertex, in the case of the
+    colors).
+
+    For example, the first entry in *coordinates* is the
+    coordinates of the vertex at mesh coordinates (0, 0), then the one
+    at (0, 1), then at (0, 2) .. (0, meshWidth), (1, 0), (1, 1), and
+    so on.
+
+    *shading* may be 'flat', 'faceted' or 'gouraud'
+    """
+    def __init__(self, meshWidth, meshHeight, coordinates, showedges,
+                 antialiased=True, shading='flat', **kwargs):
+        Collection.__init__(self, **kwargs)
+        self._meshWidth = meshWidth
+        self._meshHeight = meshHeight
+        self._coordinates = coordinates
+        self._showedges = showedges
+        self._antialiased = antialiased
+        self._shading = shading
+
+        self._bbox = transforms.Bbox.unit()
+        self._bbox.update_from_data_xy(coordinates.reshape(
+                ((meshWidth + 1) * (meshHeight + 1), 2)))
+
+        # By converting to floats now, we can avoid that on every draw.
+        self._coordinates = self._coordinates.reshape((meshHeight + 1, meshWidth + 1, 2))
+        self._coordinates = np.array(self._coordinates, np.float_)
+
     def get_paths(self):
+        if self._paths is None:
+            self.set_paths()
         return self._paths
 
+    def set_paths(self):
+        self._paths = self.convert_mesh_to_paths(
+            self._meshWidth, self._meshHeight, self._coordinates)
 
-artist.kwdocd['Collection'] = patchstr = artist.kwdoc(Collection)
-for k in ('QuadMesh', 'PolyCollection', 'BrokenBarHCollection', 'RegularPolyCollection',
-          'StarPolygonCollection', 'PatchCollection', 'CircleCollection'):
-    artist.kwdocd[k] = patchstr
-artist.kwdocd['LineCollection'] = artist.kwdoc(LineCollection)
+    @staticmethod
+    def convert_mesh_to_paths(meshWidth, meshHeight, coordinates):
+        """
+        Converts a given mesh into a sequence of
+        :class:`matplotlib.path.Path` objects for easier rendering by
+        backends that do not directly support quadmeshes.
+
+        This function is primarily of use to backend implementers.
+        """
+        Path = mpath.Path
+
+        if ma.isMaskedArray(coordinates):
+            c = coordinates.data
+        else:
+            c = coordinates
+
+        points = np.concatenate((
+                    c[0:-1, 0:-1],
+                    c[0:-1, 1:  ],
+                    c[1:  , 1:  ],
+                    c[1:  , 0:-1],
+                    c[0:-1, 0:-1]
+                    ), axis=2)
+        points = points.reshape((meshWidth * meshHeight, 5, 2))
+        return [Path(x) for x in points]
+
+    def convert_mesh_to_triangles(self, meshWidth, meshHeight, coordinates):
+        """
+        Converts a given mesh into a sequence of triangles, each point
+        with its own color.  This is useful for experiments using
+        `draw_qouraud_triangle`.
+        """
+        Path = mpath.Path
+
+        if ma.isMaskedArray(coordinates):
+            p = coordinates.data
+        else:
+            p = coordinates
+
+        p_a = p[0:-1, 0:-1]
+        p_b = p[0:-1, 1:  ]
+        p_c = p[1:  , 1:  ]
+        p_d = p[1:  , 0:-1]
+        p_center = (p_a + p_b + p_c + p_d) / 4.0
+
+        triangles = np.concatenate((
+                p_a, p_b, p_center,
+                p_b, p_c, p_center,
+                p_c, p_d, p_center,
+                p_d, p_a, p_center,
+                ), axis=2)
+        triangles = triangles.reshape((meshWidth * meshHeight * 4, 3, 2))
+
+        c = self.get_facecolor().reshape((meshHeight + 1, meshWidth + 1, 4))
+        c_a = c[0:-1, 0:-1]
+        c_b = c[0:-1, 1:  ]
+        c_c = c[1:  , 1:  ]
+        c_d = c[1:  , 0:-1]
+        c_center = (c_a + c_b + c_c + c_d) / 4.0
+
+        colors = np.concatenate((
+                c_a, c_b, c_center,
+                c_b, c_c, c_center,
+                c_c, c_d, c_center,
+                c_d, c_a, c_center,
+                ), axis=2)
+        colors = colors.reshape((meshWidth * meshHeight * 4, 3, 4))
+
+        return triangles, colors
+
+    def get_datalim(self, transData):
+        return self._bbox
+
+    @allow_rasterization
+    def draw(self, renderer):
+        if not self.get_visible(): return
+        renderer.open_group(self.__class__.__name__)
+        transform = self.get_transform()
+        transOffset = self._transOffset
+        offsets = self._offsets
+
+        if self.have_units():
+            if len(self._offsets):
+                xs = self.convert_xunits(self._offsets[:0])
+                ys = self.convert_yunits(self._offsets[:1])
+                offsets = zip(xs, ys)
+
+        offsets = np.asarray(offsets, np.float_)
+        offsets.shape = (-1, 2)                 # Make it Nx2
+
+        self.update_scalarmappable()
+
+        if not transform.is_affine:
+            coordinates = self._coordinates.reshape(
+                (self._coordinates.shape[0] *
+                 self._coordinates.shape[1],
+                 2))
+            coordinates = transform.transform(coordinates)
+            coordinates = coordinates.reshape(self._coordinates.shape)
+            transform = transforms.IdentityTransform()
+        else:
+            coordinates = self._coordinates
+
+        if not transOffset.is_affine:
+            offsets = transOffset.transform_non_affine(offsets)
+            transOffset = transOffset.get_affine()
+
+        gc = renderer.new_gc()
+        self._set_gc_clip(gc)
+        gc.set_linewidth(self.get_linewidth()[0])
+
+        if self._shading == 'gouraud':
+            triangles, colors = self.convert_mesh_to_triangles(
+                self._meshWidth, self._meshHeight, coordinates)
+            renderer.draw_gouraud_triangles(gc, triangles, colors, transform.frozen())
+        else:
+            renderer.draw_quad_mesh(
+                gc, transform.frozen(), self._meshWidth, self._meshHeight,
+                coordinates, offsets, transOffset, self.get_facecolor(),
+                self._antialiased, self._showedges)
+        gc.restore()
+        renderer.close_group(self.__class__.__name__)
+
+
+
+
+patchstr = artist.kwdoc(Collection)
+for k in ('QuadMesh', 'PolyCollection', 'BrokenBarHCollection',
+           'RegularPolyCollection', 'PathCollection',
+          'StarPolygonCollection', 'PatchCollection',
+          'CircleCollection', 'Collection',):
+    docstring.interpd.update({k:patchstr})
+docstring.interpd.update(LineCollection = artist.kwdoc(LineCollection))

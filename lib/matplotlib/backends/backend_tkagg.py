@@ -3,22 +3,26 @@
 from __future__ import division
 
 import os, sys, math
+import os.path
 
 import Tkinter as Tk, FileDialog
-import tkagg                 # Paint image to Tk photo blitter extension
-from backend_agg import FigureCanvasAgg
 
-import os.path
+# Paint image to Tk photo blitter extension
+import matplotlib.backends.tkagg as tkagg
+
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+import matplotlib.backends.windowing as windowing
 
 import matplotlib
 from matplotlib.cbook import is_string_like
-from matplotlib.backend_bases import RendererBase, GraphicsContextBase, \
-     FigureManagerBase, FigureCanvasBase, NavigationToolbar2, cursors
-
-from matplotlib.figure import Figure
+from matplotlib.backend_bases import RendererBase, GraphicsContextBase
+from matplotlib.backend_bases import FigureManagerBase, FigureCanvasBase
+from matplotlib.backend_bases import NavigationToolbar2, cursors, TimerBase
+from matplotlib.backend_bases import ShowBase
 from matplotlib._pylab_helpers import Gcf
 
-import matplotlib.windowing as windowing
+from matplotlib.figure import Figure
+
 from matplotlib.widgets import SubplotTool
 
 import matplotlib.cbook as cbook
@@ -60,25 +64,11 @@ def draw_if_interactive():
         if figManager is not None:
             figManager.show()
 
-
-def show():
-    """
-    Show all the figures and enter the gtk mainloop
-
-    This should be the last line of your script.  This function sets
-    interactive mode to True, as detailed on
-    http://matplotlib.sf.net/interactive.html
-    """
-    for manager in Gcf.get_all_fig_managers():
-        manager.show()
-    import matplotlib
-    matplotlib.interactive(True)
-    if rcParams['tk.pythoninspect']:
-        os.environ['PYTHONINSPECT'] = '1'
-    if show._needmain:
+class Show(ShowBase):
+    def mainloop(self):
         Tk.mainloop()
-        show._needmain = False
-show._needmain = True
+
+show = Show()
 
 def new_figure_manager(num, *args, **kwargs):
     """
@@ -93,6 +83,44 @@ def new_figure_manager(num, *args, **kwargs):
     if matplotlib.is_interactive():
         figManager.show()
     return figManager
+
+
+class TimerTk(TimerBase):
+    '''
+    Subclass of :class:`backend_bases.TimerBase` that uses Tk's timer events.
+
+    Attributes:
+    * interval: The time between timer events in milliseconds. Default
+        is 1000 ms.
+    * single_shot: Boolean flag indicating whether this timer should
+        operate as single shot (run once and then stop). Defaults to False.
+    * callbacks: Stores list of (func, args) tuples that will be called
+        upon timer events. This list can be manipulated directly, or the
+        functions add_callback and remove_callback can be used.
+    '''
+    def __init__(self, parent, *args, **kwargs):
+        TimerBase.__init__(self, *args, **kwargs)
+        self.parent = parent
+        self._timer = None
+
+    def _timer_start(self):
+        self._timer_stop()
+        self._timer = self.parent.after(self._interval, self._on_timer)
+
+    def _timer_stop(self):
+        if self._timer is not None:
+            self.parent.after_cancel(self._timer)
+        self._timer = None
+
+    def _on_timer(self):
+        TimerBase._on_timer(self)
+
+        # Tk after() is only a single shot, so we need to add code here to
+        # reset the timer if we're not operating in single shot mode.
+        if not self._single and len(self.callbacks) > 0:
+            self._timer = self.parent.after(self._interval, self._on_timer)
+        else:
+            self._timer = None
 
 
 class FigureCanvasTkAgg(FigureCanvasAgg):
@@ -150,6 +178,7 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
     def __init__(self, figure, master=None, resize_callback=None):
         FigureCanvasAgg.__init__(self, figure)
         self._idle = True
+        self._idle_callback = None
         t1,t2,w,h = self.figure.bbox.bounds
         w, h = int(w), int(h)
         self._tkcanvas = Tk.Canvas(
@@ -177,20 +206,15 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
         root = self._tkcanvas.winfo_toplevel()
         root.bind("<MouseWheel>", self.scroll_event_windows)
 
+        # Can't get destroy events by binding to _tkcanvas. Therefore, bind
+        # to the window and filter.
+        def filter_destroy(evt):
+            if evt.widget is self._tkcanvas:
+                self.close_event()
+        root.bind("<Destroy>", filter_destroy)
+
         self._master = master
         self._tkcanvas.focus_set()
-
-        # a dict from func-> cbook.Scheduler threads
-        self.sourced = dict()
-
-        # call the idle handler
-        def on_idle(*ignore):
-            self.idle_event()
-            return True
-
-        # disable until you figure out how to handle threads and interrupts
-        #t = cbook.Idle(on_idle)
-        #self._tkcanvas.after_idle(lambda *ignore: t.start())
 
     def resize(self, event):
         width, height = event.width, event.height
@@ -198,7 +222,7 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
             self._resize_callback(event)
 
         # compute desired figure size in inches
-	dpival = self.figure.dpi
+        dpival = self.figure.dpi
         winch = width/dpival
         hinch = height/dpival
         self.figure.set_size_inches(winch, hinch)
@@ -206,8 +230,8 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
 
         self._tkcanvas.delete(self._tkphoto)
         self._tkphoto = Tk.PhotoImage(
-            master=self._tkcanvas, width=width, height=height)
-        self._tkcanvas.create_image(width/2,height/2,image=self._tkphoto)
+            master=self._tkcanvas, width=int(width), height=int(height))
+        self._tkcanvas.create_image(int(width/2),int(height/2),image=self._tkphoto)
         self.resize_event()
         self.show()
 
@@ -230,7 +254,8 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
             self.draw()
             self._idle = True
 
-        if d: self._tkcanvas.after_idle(idle_draw)
+        if d:
+            self._idle_callback = self._tkcanvas.after_idle(idle_draw)
 
     def get_tk_widget(self):
         """returns the Tk widget used to implement FigureCanvasTkAgg.
@@ -279,8 +304,8 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
         x = event.x
         y = self.figure.bbox.height - event.y
         num = getattr(event, 'num', None)
-        if   num==4: step = -1
-        elif num==5: step = +1
+        if   num==4: step = +1
+        elif num==5: step = -1
         else:        step =  0
 
         FigureCanvasBase.scroll_event(self, x, y, step, guiEvent=event)
@@ -314,6 +339,22 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
     def key_release(self, event):
         key = self._get_key(event)
         FigureCanvasBase.key_release_event(self, key, guiEvent=event)
+
+    def new_timer(self, *args, **kwargs):
+        """
+        Creates a new backend-specific subclass of :class:`backend_bases.Timer`.
+        This is useful for getting periodic events through the backend's native
+        event loop. Implemented only for backends with GUIs.
+
+        optional arguments:
+
+        *interval*
+          Timer interval in milliseconds
+        *callbacks*
+          Sequence of (func, args, kwargs) where func(*args, **kwargs) will
+          be executed by the timer every *interval*.
+        """
+        return TimerTk(self._tkcanvas, *args, **kwargs)
 
     def flush_events(self):
         self._master.update()
@@ -367,9 +408,22 @@ class FigureManagerTkAgg(FigureManagerBase):
         self.canvas.figure.show = lambda *args: self.show()
 
 
-    def resize(self, event):
-        width, height = event.width, event.height
-        self.toolbar.configure(width=width) # , height=height)
+    def resize(self, width, height=None):
+        # before 09-12-22, the resize method takes a single *event*
+        # parameter. On the other hand, the resize method of other
+        # FigureManager class takes *width* and *height* parameter,
+        # which is used to change the size of the window. For the
+        # Figure.set_size_inches with forward=True work with Tk
+        # backend, I changed the function signature but tried to keep
+        # it backward compatible. -JJL
+
+        # when a single parameter is given, consider it as a event
+        if height is None:
+            width = width.width
+        else:
+            self.canvas._tkcanvas.master.geometry("%dx%d" % (width, height))
+
+        self.toolbar.configure(width=width)
 
 
     def show(self):
@@ -377,31 +431,29 @@ class FigureManagerTkAgg(FigureManagerBase):
         this function doesn't segfault but causes the
         PyEval_RestoreThread: NULL state bug on win32
         """
-
-        def destroy(*args):
-            self.window = None
-            Gcf.destroy(self._num)
-
-        if not self._shown: self.canvas._tkcanvas.bind("<Destroy>", destroy)
         _focus = windowing.FocusManager()
         if not self._shown:
+            def destroy(*args):
+                self.window = None
+                Gcf.destroy(self._num)
+            self.canvas._tkcanvas.bind("<Destroy>", destroy)
             self.window.deiconify()
             # anim.py requires this
-            if sys.platform=='win32' : self.window.update()
+            self.window.update()
         else:
             self.canvas.draw_idle()
         self._shown = True
 
 
     def destroy(self, *args):
-        if Gcf.get_num_fig_managers()==0 and not matplotlib.is_interactive():
-            if self.window is not None:
-                self.window.quit()
         if self.window is not None:
             #self.toolbar.destroy()
+            if self.canvas._idle_callback:
+                self.canvas._tkcanvas.after_cancel(self.canvas._idle_callback)
             self.window.destroy()
-
-            pass
+        if Gcf.get_num_fig_managers()==0:
+            if self.window is not None:
+                self.window.quit()
         self.window = None
 
     def set_window_title(self, title):
@@ -493,7 +545,7 @@ class NavigationToolbar(Tk.Frame):
         xmin, xmax = canvas.figure.bbox.intervalx
         height, width = 50, xmax-xmin
         Tk.Frame.__init__(self, master=self.window,
-                          width=width, height=height,
+                          width=int(width), height=int(height),
                           borderwidth=2)
 
         self.update()  # Make axes menu
@@ -563,7 +615,7 @@ class NavigationToolbar(Tk.Frame):
             a.yaxis.zoom(direction)
         self.canvas.draw()
 
-    def save_figure(self):
+    def save_figure(self, *args):
         fs = FileDialog.SaveFileDialog(master=self.window,
                                        title='Save the figure')
         try:
@@ -649,7 +701,7 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
         xmin, xmax = self.canvas.figure.bbox.intervalx
         height, width = 50, xmax-xmin
         Tk.Frame.__init__(self, master=self.window,
-                          width=width, height=height,
+                          width=int(width), height=int(height),
                           borderwidth=2)
 
         self.update()  # Make axes menu
@@ -690,7 +742,7 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
         canvas.show()
         canvas.get_tk_widget().pack(side=Tk.TOP, fill=Tk.BOTH, expand=1)
 
-    def save_figure(self):
+    def save_figure(self, *args):
         from tkFileDialog import asksaveasfilename
         from tkMessageBox import showerror
         filetypes = self.canvas.get_supported_filetypes().copy()
@@ -752,4 +804,3 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
 
 
 FigureManager = FigureManagerTkAgg
-

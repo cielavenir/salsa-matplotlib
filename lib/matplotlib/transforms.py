@@ -711,7 +711,10 @@ class Bbox(BboxBase):
         self._points = np.asarray(points, np.float_)
         self._minpos = np.array([0.0000001, 0.0000001])
         self._ignore = True
-
+        # it is helpful in some contexts to know if the bbox is a
+        # default or has been mutated; we store the orig points to
+        # support the mutated methods
+        self._points_orig = self._points.copy()
     if DEBUG:
         ___init__ = __init__
         def __init__(self, points):
@@ -939,6 +942,21 @@ class Bbox(BboxBase):
             self._points = other.get_points()
             self.invalidate()
 
+    def mutated(self):
+        'return whether the bbox has changed since init'
+        return self.mutatedx() or self.mutatedy()
+
+    def mutatedx(self):
+        'return whether the x-limits have changed since init'
+        return (self._points[0,0]!=self._points_orig[0,0] or
+                self._points[1,0]!=self._points_orig[1,0])
+    def mutatedy(self):
+        'return whether the y-limits have changed since init'
+        return (self._points[0,1]!=self._points_orig[0,1] or
+                self._points[1,1]!=self._points_orig[1,1])
+
+
+
 
 class TransformedBbox(BboxBase):
     """
@@ -1048,7 +1066,7 @@ class Transform(TransformNode):
         """
         Used by C/C++ -based backends to get at the array matrix data.
         """
-        return self.frozen().__array__()
+        raise NotImplementedError
 
     def transform(self, values):
         """
@@ -1488,6 +1506,7 @@ class Affine2D(Affine2DBase):
           a c e
           b d f
           0 0 1
+
         """
         self._invalid = 0
         return self._mtx
@@ -2089,6 +2108,31 @@ class BboxTransformTo(Affine2DBase):
     get_matrix.__doc__ = Affine2DBase.get_matrix.__doc__
 
 
+class BboxTransformToMaxOnly(BboxTransformTo):
+    """
+    :class:`BboxTransformTo` is a transformation that linearly
+    transforms points from the unit bounding box to a given
+    :class:`Bbox` with a fixed upper left of (0, 0).
+    """
+    def __repr__(self):
+        return "BboxTransformToMaxOnly(%s)" % (self._boxout)
+    __str__ = __repr__
+
+    def get_matrix(self):
+        if self._invalid:
+            xmax, ymax = self._boxout.max
+            if DEBUG and (xmax == 0 or ymax == 0):
+                raise ValueError("Transforming to a singular bounding box.")
+            self._mtx = np.array([[xmax,  0.0, 0.0],
+                                  [ 0.0, ymax, 0.0],
+                                  [ 0.0,  0.0, 1.0]],
+                                 np.float_)
+            self._inverted = None
+            self._invalid = 0
+        return self._mtx
+    get_matrix.__doc__ = Affine2DBase.get_matrix.__doc__
+
+
 class BboxTransformFrom(Affine2DBase):
     """
     :class:`BboxTransformFrom` linearly transforms points from a given
@@ -2248,6 +2292,7 @@ def nonsingular(vmin, vmax, expander=0.001, tiny=1e-15, increasing=True):
         else:
             vmin -= expander*abs(vmin)
             vmax += expander*abs(vmax)
+
     if swapped and not increasing:
         vmin, vmax = vmax, vmin
     return vmin, vmax
@@ -2265,7 +2310,7 @@ def interval_contains_open(interval, val):
         ((a < b) and (a < val and b > val))
         or (b < val and a > val))
 
-def offset_copy(trans, fig, x=0.0, y=0.0, units='inches'):
+def offset_copy(trans, fig=None, x=0.0, y=0.0, units='inches'):
     '''
     Return a new transform with an added offset.
       args:

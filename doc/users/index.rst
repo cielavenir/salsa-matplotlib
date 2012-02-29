@@ -21,12 +21,14 @@ User's Guide
     index_text.rst
     image_tutorial.rst
     artists.rst
+    gridspec.rst
+    tight_layout_guide.rst
     legend_guide.rst
     event_handling.rst
     transforms_tutorial.rst
     path_tutorial.rst
     annotations_guide.rst
-    toolkits.rst
+    recipes.rst
     screenshots.rst
     whats_new.rst
     license.rst

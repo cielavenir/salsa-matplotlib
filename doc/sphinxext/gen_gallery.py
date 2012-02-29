@@ -18,6 +18,13 @@ import matplotlib.image as image
 
 multiimage = re.compile('(.*)_\d\d')
 
+def make_thumbnail(args):
+    image.thumbnail(args[0], args[1], 0.3)
+
+def out_of_date(original, derived):
+    return (not os.path.exists(derived) or
+            os.stat(derived).st_mtime < os.stat(original).st_mtime)
+
 def gen_gallery(app, doctree):
     if app.builder.name != 'html':
         return
@@ -35,15 +42,14 @@ def gen_gallery(app, doctree):
         'matplotlib_icon',
         ])
 
-    print
-    print "generating gallery: ",
     data = []
+    thumbnails = {}
+
     for subdir in ('api', 'pylab_examples', 'mplot3d', 'widgets', 'axes_grid' ):
         origdir = os.path.join('build', rootdir, subdir)
         thumbdir = os.path.join(outdir, rootdir, subdir, 'thumbnails')
         if not os.path.exists(thumbdir):
             os.makedirs(thumbdir)
-        print subdir,
 
         for filename in sorted(glob.glob(os.path.join(origdir, '*.png'))):
             if filename.endswith("hires.png"):
@@ -52,16 +58,14 @@ def gen_gallery(app, doctree):
             path, filename = os.path.split(filename)
             basename, ext = os.path.splitext(filename)
             if basename in skips:
-                sys.stdout.write('[skipping %s]' % basename)
-                sys.stdout.flush()
                 continue
 
             # Create thumbnails based on images in tmpdir, and place
             # them within the build tree
-            image.thumbnail(
-                str(os.path.join(origdir, filename)),
-                str(os.path.join(thumbdir, filename)),
-                scale=0.3)
+            orig_path = str(os.path.join(origdir, filename))
+            thumb_path = str(os.path.join(thumbdir, filename))
+            if out_of_date(orig_path, thumb_path) or True:
+                thumbnails[orig_path] = thumb_path
 
             m = multiimage.match(basename)
             if m is None:
@@ -72,10 +76,6 @@ def gen_gallery(app, doctree):
 
             data.append((subdir, basename,
                          os.path.join(rootdir, subdir, 'thumbnails', filename)))
-
-            sys.stdout.write(".")
-            sys.stdout.flush()
-        print
 
     link_template = """\
     <a href="%s"><img src="%s" border="0" alt="%s"/></a>
@@ -90,10 +90,25 @@ def gen_gallery(app, doctree):
             link = 'examples/%s/%s.html'%(subdir, basename)
             rows.append(link_template%(link, thumbfile, basename))
 
-    fh = file(os.path.join(app.builder.srcdir, '_templates', 'gallery.html'),
-              'w')
-    fh.write(template%'\n'.join(rows))
-    fh.close()
+    # Only write out the file if the contents have actually changed.
+    # Otherwise, this triggers a full rebuild of the docs
+    content = template%'\n'.join(rows)
+    gallery_path = os.path.join(app.builder.srcdir, '_templates', 'gallery.html')
+    if os.path.exists(gallery_path):
+        fh = file(gallery_path, 'r')
+        regenerate = fh.read() != content
+        fh.close()
+    else:
+        regenerate = True
+    if regenerate:
+        fh = file(gallery_path, 'w')
+        fh.write(content)
+        fh.close()
+
+    for key in app.builder.status_iterator(
+        thumbnails.iterkeys(), "generating thumbnails... ",
+        length=len(thumbnails)):
+        image.thumbnail(key, thumbnails[key], 0.3)
 
 def setup(app):
     app.connect('env-updated', gen_gallery)

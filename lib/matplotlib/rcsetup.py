@@ -106,17 +106,7 @@ def validate_backend(s):
     if s.startswith('module://'): return s
     else: return _validate_standard_backends(s)
 
-
-def validate_numerix(v):
-    # 2009/02/24: start warning; later, remove all traces
-    try:
-        if v == 'obsolete':
-            return v
-    except ValueError:
-        pass
-    warnings.warn('rcParams key "numerix" is obsolete and has no effect;\n'
-                  ' please delete it from your matplotlibrc file')
-
+validate_qt4 = ValidateInStrings('backend.qt4', ['PyQt4', 'PySide'])
 
 validate_toolbar = ValidateInStrings('toolbar',[
     'None','classic','toolbar2',
@@ -207,6 +197,14 @@ def validate_color(s):
 
     raise ValueError('%s does not look like a color arg%s'%(s, msg))
 
+def validate_colorlist(s):
+    'return a list of colorspecs'
+    if type(s) is str:
+        return [validate_color(c.strip()) for c in s.split(',')]
+    else:
+        assert type(s) in [list, tuple]
+        return [validate_color(c) for c in s]
+
 def validate_stringlist(s):
     'return a list'
     if type(s) is str:
@@ -289,6 +287,11 @@ def validate_negative_linestyle_legacy(s):
         warnings.warn("Deprecated negative_linestyle specification; use 'solid' or 'dashed'")
         return (0, dashes)  # (offset, (solid, blank))
 
+def validate_tkpythoninspect(s):
+    # Introduced 2010/07/05
+    warnings.warn("tk.pythoninspect is obsolete, and has no effect")
+    return validate_bool(s)
+
 validate_legend_loc = ValidateInStrings('legend_loc',[
   'best',
   'upper right',
@@ -302,6 +305,11 @@ validate_legend_loc = ValidateInStrings('legend_loc',[
   'upper center',
   'center',
 ], ignorecase=True)
+
+def deprecate_svg_embed_char_paths(value):
+    warnings.warn("svg.embed_char_paths is deprecated.  Use svg.fonttype instead.")
+
+validate_svg_fonttype = ValidateInStrings('fonttype', ['none', 'path', 'svgfont'])
 
 class ValidateInterval:
     """
@@ -334,11 +342,9 @@ class ValidateInterval:
 defaultParams = {
     'backend'           : ['Agg', validate_backend], # agg is certainly present
     'backend_fallback'  : [True, validate_bool], # agg is certainly present
-    'numerix'           : ['obsolete', validate_numerix],
-    'maskedarray'       : ['obsolete', validate_maskedarray], #to be removed
+    'backend.qt4'       : ['PyQt4', validate_qt4],
     'toolbar'           : ['toolbar2', validate_toolbar],
     'datapath'          : [None, validate_path_exists],   # handled by _get_data_path_cached
-    'units'             : [False, validate_bool],
     'interactive'       : [False, validate_bool],
     'timezone'          : ['UTC', str],
 
@@ -372,7 +378,7 @@ defaultParams = {
     'font.variant'      : ['normal', str],           #
     'font.stretch'      : ['normal', str],           #
     'font.weight'       : ['normal', str],           #
-    'font.size'         : [12.0, validate_float], #
+    'font.size'         : [12, validate_float],      # Base font size in points
     'font.serif'        : [['Bitstream Vera Serif', 'DejaVu Serif',
                             'New Century Schoolbook', 'Century Schoolbook L',
                             'Utopia', 'ITC Bookman', 'Bookman',
@@ -399,11 +405,15 @@ defaultParams = {
     'text.latex.preamble' : [[''], validate_stringlist],
     'text.latex.preview' : [False, validate_bool],
     'text.dvipnghack'     : [None, validate_bool_maybe_none],
-    'text.fontstyle'      : ['normal', str],
-    'text.fontangle'      : ['normal', str],
-    'text.fontvariant'    : ['normal', str],
-    'text.fontweight'     : ['normal', str],
-    'text.fontsize'       : ['medium', validate_fontsize],
+    'text.hinting'        : [True, validate_bool],
+
+    # The following are deprecated and replaced by, e.g., 'font.style'
+    #'text.fontstyle'      : ['normal', str],
+    #'text.fontangle'      : ['normal', str],
+    #'text.fontvariant'    : ['normal', str],
+    #'text.fontweight'     : ['normal', str],
+    #'text.fontsize'       : ['medium', validate_fontsize],
+
 
     'mathtext.cal'        : ['cursive', validate_font_properties],
     'mathtext.rm'         : ['serif', validate_font_properties],
@@ -433,12 +443,17 @@ defaultParams = {
     'axes.titlesize'        : ['large', validate_fontsize], # fontsize of the axes title
     'axes.grid'             : [False, validate_bool],   # display grid or not
     'axes.labelsize'        : ['medium', validate_fontsize], # fontsize of the x any y labels
+    'axes.labelweight'      : ['normal', str], # fontsize of the x any y labels
     'axes.labelcolor'       : ['k', validate_color],    # color of axis label
     'axes.formatter.limits' : [[-7, 7], validate_nseq_int(2)],
                                # use scientific notation if log10
                                # of the axis range is smaller than the
                                # first or larger than the second
+    'axes.formatter.use_locale' : [False, validate_bool], # Use the current locale to format ticks
     'axes.unicode_minus'        : [True, validate_bool],
+    'axes.color_cycle'      : [['b','g','r','c','m','y','k'],
+                                    validate_colorlist], # cycle of plot
+                                                         # line colors
 
     'polaraxes.grid'        : [True, validate_bool],   # display polar grid or not
     'axes3d.grid'           : [True, validate_bool],   # display 3d grid
@@ -451,12 +466,14 @@ defaultParams = {
     'legend.fontsize'    : ['large', validate_fontsize],
     'legend.markerscale' : [1.0, validate_float], # the relative size of legend markers vs. original
     'legend.shadow'        : [False, validate_bool],
+    'legend.frameon'     : [True, validate_bool], # whether or not to draw a frame around legend
 
 
     # the following dimensions are in fraction of the font size
     'legend.borderpad'   : [0.4, validate_float], # units are fontsize
     'legend.labelspacing'      : [0.5, validate_float], # the vertical space between the legend entries
     'legend.handlelength'     : [2., validate_float], # the length of the legend lines
+    'legend.handleheight'     : [0.7, validate_float], # the length of the legend lines
     'legend.handletextpad' : [.8, validate_float], # the space between the legend line and legend text
     'legend.borderaxespad'       : [0.5, validate_float], # the border between the axes and legend edge
     'legend.columnspacing'       : [2., validate_float], # the border between the axes and legend edge
@@ -465,9 +482,6 @@ defaultParams = {
     'legend.markerscale' : [1.0, validate_float], # the relative size of legend markers vs. original
 
     'legend.shadow'        : [False, validate_bool],
-
-
-
 
     # tick properties
     'xtick.major.size' : [4, validate_float],      # major xtick size in points
@@ -510,10 +524,11 @@ defaultParams = {
     'savefig.facecolor'   : ['w', validate_color],  # facecolor; white
     'savefig.edgecolor'   : ['w', validate_color],  # edgecolor; white
     'savefig.orientation' : ['portrait', validate_orientation],  # edgecolor; white
+    'savefig.extension'   : ['auto', str],          # what to add to extensionless filenames
 
     'cairo.format'       : ['png', validate_cairo_format],
     'tk.window_focus'    : [False, validate_bool],  # Maintain shell focus for TkAgg
-    'tk.pythoninspect'   : [False, validate_bool],  # Set PYTHONINSPECT
+    'tk.pythoninspect'   : [False, validate_tkpythoninspect],  # obsolete
     'ps.papersize'       : ['letter', validate_ps_papersize], # Set the papersize/type
     'ps.useafm'          : [False, validate_bool],  # Set PYTHONINSPECT
     'ps.usedistiller'    : [False, validate_ps_distiller], # use ghostscript or xpdf to distill ps output
@@ -526,16 +541,35 @@ defaultParams = {
     'pdf.fonttype'      : [3, validate_fonttype],  # 3 (Type3) or 42 (Truetype)
     'svg.image_inline'  : [True, validate_bool],    # write raster image data directly into the svg file
     'svg.image_noscale' : [False, validate_bool],  # suppress scaling of raster data embedded in SVG
-    'svg.embed_char_paths' : [True, validate_bool],  # True to save all characters as paths in the SVG
+    'svg.embed_char_paths' : [True, deprecate_svg_embed_char_paths],  # True to save all characters as paths in the SVG
+    'svg.fonttype' : ['path', validate_svg_fonttype],
 
     'docstring.hardcopy' : [False, validate_bool],  # set this when you want to generate hardcopy docstring
     'plugins.directory' : ['.matplotlib_plugins', str], # where plugin directory is locate
 
     'path.simplify' : [True, validate_bool],
     'path.simplify_threshold' : [1.0 / 9.0, ValidateInterval(0.0, 1.0)],
-    'agg.path.chunksize' : [0, validate_int]       # 0 to disable chunking;
-                                                   # recommend about 20000 to
-                                                   # enable. Experimental.
+    'path.snap' : [True, validate_bool],
+    'agg.path.chunksize' : [0, validate_int],       # 0 to disable chunking;
+                                                    # recommend about 20000 to
+                                                    # enable. Experimental.
+    # key-mappings
+    'keymap.fullscreen' : ['f', validate_stringlist],
+    'keymap.home' : [['h', 'r', 'home'], validate_stringlist],
+    'keymap.back' : [['left', 'c', 'backspace'], validate_stringlist],
+    'keymap.forward' : [['right', 'v'], validate_stringlist],
+    'keymap.pan' : ['p', validate_stringlist],
+    'keymap.zoom' : ['o', validate_stringlist],
+    'keymap.save' : ['s', validate_stringlist],
+    'keymap.grid' : ['g', validate_stringlist],
+    'keymap.yscale' : ['l', validate_stringlist],
+    'keymap.xscale' : [['k', 'L'], validate_stringlist],
+    'keymap.all_axes' : ['a', validate_stringlist],
+
+    # sample data
+    'examples.download' : [True, validate_bool],
+    'examples.directory' : ['', str],
+
 }
 
 if __name__ == '__main__':

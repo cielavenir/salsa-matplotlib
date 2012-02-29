@@ -1,8 +1,10 @@
 """
 Some helper functions for building the C extensions
 
-you may need to edit basedir to point to the default location of your
-required libs, eg, png, z, freetype
+You may need to use the "basedirlist" option in setup.cfg to point
+to the location of your required libs, eg, png, z, freetype,
+overriding the settings hard-coded in the "basedir" directory
+below.
 
 DARWIN
 
@@ -44,10 +46,16 @@ WIN32 - VISUAL STUDIO 7.1 (2003)
 import os
 import re
 import subprocess
+from distutils import sysconfig
 
 basedir = {
     'win32'  : ['win32_static',],
+    'linux2-alpha' : ['/usr/local', '/usr'],
+    'linux2-hppa' : ['/usr/local', '/usr'],
+    'linux2-mips' : ['/usr/local', '/usr'],
+    'linux2-sparc' : ['/usr/local', '/usr'],
     'linux2' : ['/usr/local', '/usr'],
+    'linux3' : ['/usr/local', '/usr'],
     'linux'  : ['/usr/local', '/usr',],
     'cygwin' : ['/usr/local', '/usr',],
     '_darwin' : ['/sw/lib/freetype2', '/sw/lib/freetype219', '/usr/local',
@@ -65,17 +73,28 @@ basedir = {
     'sunos5' : [os.getenv('MPLIB_BASE') or '/usr/local',],
     'gnukfreebsd5' : ['/usr/local', '/usr'],
     'gnukfreebsd6' : ['/usr/local', '/usr'],
+    'gnukfreebsd7' : ['/usr/local', '/usr'],
+    'gnukfreebsd8' : ['/usr/local', '/usr'],
+    'gnu0' : ['/usr'],
     'aix5' : ['/usr/local'],
 }
 
 import sys, os, stat
-if sys.platform != 'win32':
-    import commands
+
 from textwrap import fill
 from distutils.core import Extension
 import glob
-import ConfigParser
-import cStringIO
+
+if sys.version_info[0] < 3:
+    import ConfigParser as configparser
+    from cStringIO import StringIO
+    if sys.platform != 'win32':
+        from commands import getstatusoutput
+else:
+    import configparser
+    from io import StringIO
+    if sys.platform != 'win32':
+        from subprocess import getstatusoutput
 
 BUILT_PNG       = False
 BUILT_AGG       = False
@@ -85,7 +104,6 @@ BUILT_GTKAGG    = False
 BUILT_IMAGE     = False
 BUILT_MACOSX    = False
 BUILT_TKAGG     = False
-BUILT_WXAGG     = False
 BUILT_WINDOWING = False
 BUILT_CONTOUR   = False
 BUILT_DELAUNAY  = False
@@ -93,6 +111,7 @@ BUILT_NXUTILS   = False
 BUILT_CONTOUR   = False
 BUILT_GDK       = False
 BUILT_PATH      = False
+BUILT_TRI       = False
 
 AGG_VERSION = 'agg24'
 TCL_TK_CACHE = None
@@ -109,16 +128,21 @@ options = {'display_status': True,
            'build_gtk': 'auto',
            'build_gtkagg': 'auto',
            'build_tkagg': 'auto',
-           'build_wxagg': 'auto',
            'build_macosx': 'auto',
            'build_image': True,
            'build_windowing': True,
-           'backend': None}
+           'backend': None,
+           'basedirlist': None}
 
+defines = [
+        ('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API'),
+        ('PYCXX_ISO_CPP_LIB', '1')]
+
+setup_cfg = os.environ.get('MPLSETUPCFG', 'setup.cfg')
 # Based on the contents of setup.cfg, determine the build options
-if os.path.exists("setup.cfg"):
-    config = ConfigParser.SafeConfigParser()
-    config.read("setup.cfg")
+if os.path.exists(setup_cfg):
+    config = configparser.SafeConfigParser()
+    config.read(setup_cfg)
 
     try: options['display_status'] = not config.getboolean("status", "suppress")
     except: pass
@@ -142,39 +166,59 @@ if os.path.exists("setup.cfg"):
     try: options['build_tkagg'] = config.getboolean("gui_support", "tkagg")
     except: options['build_tkagg'] = 'auto'
 
-    try: options['build_wxagg'] = config.getboolean("gui_support", "wxagg")
-    except: options['build_wxagg'] = 'auto'
-
     try: options['build_macosx'] = config.getboolean("gui_support", "macosx")
     except: options['build_macosx'] = 'auto'
 
     try: options['backend'] = config.get("rc_options", "backend")
     except: pass
 
+    try: options['basedirlist'] = config.get("directories", "basedirlist")
+    except: pass
+
+# For get_base_flags:
+if options['basedirlist']:
+    basedirlist = options['basedirlist'].split()
+else:
+    basedirlist = basedir[sys.platform]
+print("basedirlist is: %s" % basedirlist)
 
 if options['display_status']:
     def print_line(char='='):
-        print char * 76
+        print(char * 76)
 
     def print_status(package, status):
         initial_indent = "%22s: " % package
         indent = ' ' * 24
-        print fill(str(status), width=76,
+        print(fill(str(status), width=76,
                    initial_indent=initial_indent,
-                   subsequent_indent=indent)
+                   subsequent_indent=indent))
 
     def print_message(message):
         indent = ' ' * 24 + "* "
-        print fill(str(message), width=76,
+        print(fill(str(message), width=76,
                    initial_indent=indent,
-                   subsequent_indent=indent)
+                   subsequent_indent=indent))
 
     def print_raw(section):
-        print section
+        print(section)
 else:
     def print_line(*args, **kwargs):
         pass
     print_status = print_message = print_raw = print_line
+
+# Remove the -Wstrict-prototypesoption, is it's not valid for C++
+customize_compiler = sysconfig.customize_compiler
+def my_customize_compiler(compiler):
+    retval = customize_compiler(compiler)
+    try:
+        compiler.compiler_so.remove('-Wstrict-prototypes')
+    except (ValueError, AttributeError):
+        pass
+    return retval
+
+sysconfig.customize_compiler = my_customize_compiler
+
+
 
 def run_child_process(cmd):
     p = subprocess.Popen(cmd, shell=True,
@@ -224,7 +268,7 @@ def has_pkgconfig():
         has_pkgconfig.cache = False
     else:
         #print 'environ',  os.environ['PKG_CONFIG_PATH']
-        status, output = commands.getstatusoutput("pkg-config --help")
+        status, output = getstatusoutput("pkg-config --help")
         has_pkgconfig.cache = (status == 0)
     return has_pkgconfig.cache
 has_pkgconfig.cache = None
@@ -246,7 +290,7 @@ def get_pkgconfig(module,
               '-U': 'undef_macros'}
 
     cmd = "%s %s %s" % (pkg_config_exec, flags, packages)
-    status, output = commands.getstatusoutput(cmd)
+    status, output = getstatusoutput(cmd)
     if status == 0:
         for token in output.split():
             attr = _flags.get(token[:2], None)
@@ -274,7 +318,7 @@ def get_pkgconfig_version(package):
     if not has_pkgconfig():
         return default
 
-    status, output = commands.getstatusoutput(
+    status, output = getstatusoutput(
         "pkg-config %s --modversion" % (package))
     if status == 0:
         return output
@@ -321,10 +365,10 @@ def check_for_libpng():
 
 def add_base_flags(module):
     incdirs = filter(os.path.exists,
-                     [os.path.join(p, 'include') for p in basedir[sys.platform] ])
+                     [os.path.join(p, 'include') for p in basedirlist ])
     libdirs = filter(os.path.exists,
-                     [os.path.join(p, 'lib')     for p in basedir[sys.platform] ]+
-                     [os.path.join(p, 'lib64')     for p in basedir[sys.platform] ] )
+                     [os.path.join(p, 'lib')     for p in basedirlist ]+
+                     [os.path.join(p, 'lib64')     for p in basedirlist ] )
 
     module.include_dirs.extend(incdirs)
     module.include_dirs.append('.')
@@ -442,7 +486,7 @@ def check_provide_dateutil(hasdatetime=True):
 def check_for_dvipng():
     try:
         stdin, stdout = run_child_process('dvipng -version')
-        print_status("dvipng", stdout.readlines()[1].split()[-1])
+        print_status("dvipng", stdout.readlines()[1].decode().split()[-1])
         return True
     except (IndexError, ValueError):
         print_status("dvipng", "no")
@@ -455,7 +499,7 @@ def check_for_ghostscript():
         else:
             command = 'gs --version'
         stdin, stdout = run_child_process(command)
-        print_status("ghostscript", stdout.read()[:-1])
+        print_status("ghostscript", stdout.read().decode()[:-1])
         return True
     except (IndexError, ValueError):
         print_status("ghostscript", "no")
@@ -464,7 +508,7 @@ def check_for_ghostscript():
 def check_for_latex():
     try:
         stdin, stdout = run_child_process('latex -version')
-        line = stdout.readlines()[0]
+        line = stdout.readlines()[0].decode()
         pattern = '(3\.1\d+)|(MiKTeX \d+.\d+)'
         match = re.search(pattern, line)
         print_status("latex", match.group(0))
@@ -477,6 +521,7 @@ def check_for_pdftops():
     try:
         stdin, stdout = run_child_process('pdftops -v')
         for line in stdout.readlines():
+            line = line.decode()
             if 'version' in line:
                 print_status("pdftops", line.split()[-1])
                 return True
@@ -493,9 +538,11 @@ def check_for_numpy():
         return False
     nn = numpy.__version__.split('.')
     if not (int(nn[0]) >= 1 and int(nn[1]) >= 1):
-        print_message(
-           'numpy 1.1 or later is required; you have %s' % numpy.__version__)
-        return False
+        if not (int(nn[0]) >= 2):
+            print_message(
+               'numpy 1.1 or later is required; you have %s' %
+               numpy.__version__)
+            return False
     module = Extension('test', [])
     add_numpy_flags(module)
     add_base_flags(module)
@@ -674,101 +721,9 @@ def add_pygtk_flags(module):
     if sys.platform == 'win32' and win32_compiler == 'msvc' and 'm' in module.libraries:
         module.libraries.remove('m')
 
-
-def check_for_wx():
-    gotit = False
-    explanation = None
-    try:
-        import wx
-    except ImportError:
-        explanation = 'wxPython not found'
-    else:
-        if getattr(wx, '__version__', '0.0')[0:3] >= '2.8':
-            print_status("wxPython", wx.__version__)
-            return True
-        elif sys.platform == 'win32' and win32_compiler == 'mingw32':
-            explanation = "The wxAgg extension can not be built using the mingw32 compiler on Windows, since the default wxPython binary is built using MS Visual Studio"
-        else:
-            wxconfig = find_wx_config()
-            if wxconfig is None:
-                explanation = """
-WXAgg's accelerator requires `wx-config'.
-
-The `wx-config\' executable could not be located in any directory of the
-PATH environment variable. If you want to build WXAgg, and wx-config is
-in some other location or has some other name, set the WX_CONFIG
-environment variable to the full path of the executable like so:
-
-export WX_CONFIG=/usr/lib/wxPython-2.6.1.0-gtk2-unicode/bin/wx-config
-"""
-            elif not check_wxpython_broken_macosx104_version(wxconfig):
-                explanation = 'WXAgg\'s accelerator not building because a broken wxPython (installed by Apple\'s Mac OS X) was found.'
-            else:
-                gotit = True
-
-    if gotit:
-        module = Extension("test", [])
-        add_wx_flags(module, wxconfig)
-        if not find_include_file(
-            module.include_dirs,
-            os.path.join("wx", "wxPython", "wxPython.h")):
-            explanation = ("Could not find wxPython headers in any of %s" %
-                               ", ".join(["'%s'" % x for x in module.include_dirs]))
-
-    if gotit:
-        print_status("wxPython", wx.__version__)
-    else:
-        print_status("wxPython", "no")
-    if explanation is not None:
-        print_message(explanation)
-    return gotit
-
-def find_wx_config():
-    """If the WX_CONFIG environment variable has been set, returns it value.
-    Otherwise, search for `wx-config' in the PATH directories and return the
-    first match found.  Failing that, return None.
-    """
-
-    wxconfig = os.getenv('WX_CONFIG')
-    if wxconfig is not None:
-        return wxconfig
-
-    path = os.getenv('PATH') or ''
-    for dir in path.split(':'):
-        wxconfig = os.path.join(dir, 'wx-config')
-        if os.path.exists(wxconfig):
-            return wxconfig
-
-    return None
-
-def check_wxpython_broken_macosx104_version(wxconfig):
-    """Determines if we're using a broken wxPython installed by Mac OS X 10.4"""
-    if sys.platform == 'darwin':
-        if wxconfig == '/usr/bin/wx-config':
-            version_full = getoutput(wxconfig + ' --version-full')
-            if version_full == '2.5.3.1':
-                return False
-    return True
-
-def add_wx_flags(module, wxconfig):
-    """
-    Add the module flags to build extensions which use wxPython.
-    """
-
-    if sys.platform == 'win32': # just added manually
-        wxlibs = ['wxexpath', 'wxjpegh', 'wxmsw26uh',
-                  'wxmsw26uh_animate', 'wxmsw26uh_gizmos', 'wxmsw26uh_gizmos_xrc',
-                  'wxmsw26uh_gl', 'wxmsw26uh_stc', 'wxpngh', 'wxregexuh', 'wxtiffh', 'wxzlibh']
-        module.libraries.extend(wxlibs)
-        module.libraries.extend(wxlibs)
-        return
-
-    get_pkgconfig(module, '', flags='--cppflags --libs', pkg_config_exec='wx-config')
-
 # Make sure you use the Tk version given by Tkinter.TkVersion
 # or else you'll build for a wrong version of the Tcl
 # interpreter (leading to nasty segfaults).
-
 def check_for_tk():
     gotit = False
     explanation = None
@@ -788,9 +743,15 @@ def check_for_tk():
         module = Extension('test', [])
         try:
             explanation = add_tk_flags(module)
-        except RuntimeError, e:
-            explanation = str(e)
+        except RuntimeError:
+            # This deals with the change in exception handling syntax in
+            # python 3. If we only need to support >= 2.6, we can just use the
+            # commented out lines below.
+            exc_type,exc,tb = sys.exc_info()
+            explanation = str(exc)
             gotit = False
+#        except RuntimeError, e:
+#            explanation = str(e)
         else:
             if not find_include_file(module.include_dirs, "tk.h"):
                 message = 'Tkinter present, but header files are not found. ' + \
@@ -802,8 +763,13 @@ def check_for_tk():
                 gotit = False
 
     if gotit:
+        try:
+            tk_v = Tkinter.__version__.split()[-2]
+        except (AttributeError, IndexError):
+            # Tkinter.__version__ has been removed in python 3
+            tk_v = 'version not identified'
         print_status("Tkinter", "Tkinter: %s, Tk: %s, Tcl: %s" %
-                     (Tkinter.__version__.split()[-2], Tkinter.TkVersion, Tkinter.TclVersion))
+                     (tk_v, Tkinter.TkVersion, Tkinter.TclVersion))
     else:
         print_status("Tkinter", "no")
     if explanation is not None:
@@ -850,7 +816,11 @@ def query_tcltk():
         else:
             tcl_lib_dir = str(tcl.getvar('tcl_library'))
             # Guess Tk location based on Tcl location
-            tk_lib_dir = tcl_lib_dir.replace('Tcl', 'Tk').replace('tcl', 'tk')
+            (head, tail) = os.path.split(tcl_lib_dir)
+            tail = tail.replace('Tcl', 'Tk').replace('tcl', 'tk')
+            tk_lib_dir = os.path.join(head, tail)
+            if not os.path.exists(tk_lib_dir):
+                tk_lib_dir = tcl_lib_dir.replace('Tcl', 'Tk').replace('tcl', 'tk')
     else:
         # Obtain Tcl and Tk locations from Tk widget
         tk.withdraw()
@@ -863,62 +833,48 @@ def query_tcltk():
     return TCL_TK_CACHE
 
 def parse_tcl_config(tcl_lib_dir, tk_lib_dir):
-    # This is where they live on Ubuntu Hardy (at least)
-    tcl_config = os.path.join(tcl_lib_dir, "tclConfig.sh")
-    tk_config = os.path.join(tk_lib_dir, "tkConfig.sh")
+    import Tkinter
+    tcl_poss = [tcl_lib_dir,
+                os.path.normpath(os.path.join(tcl_lib_dir, '..')),
+                "/usr/lib/tcl"+str(Tkinter.TclVersion),
+                "/usr/lib"]
+    tk_poss = [tk_lib_dir,
+                os.path.normpath(os.path.join(tk_lib_dir, '..')),
+               "/usr/lib/tk"+str(Tkinter.TkVersion),
+               "/usr/lib"]
+    for ptcl, ptk in zip(tcl_poss, tk_poss):
+        tcl_config = os.path.join(ptcl, "tclConfig.sh")
+        tk_config = os.path.join(ptk, "tkConfig.sh")
+        if (os.path.exists(tcl_config) and os.path.exists(tk_config)):
+            break
     if not (os.path.exists(tcl_config) and os.path.exists(tk_config)):
-        # This is where they live on RHEL4 (at least)
-        tcl_config = "/usr/lib/tclConfig.sh"
-        tk_config = "/usr/lib/tkConfig.sh"
-        if not (os.path.exists(tcl_config) and os.path.exists(tk_config)):
-            return None
-
-    # These files are shell scripts that set a bunch of
-    # environment variables.  To actually get at the
-    # values, we use ConfigParser, which supports almost
-    # the same format, but requires at least one section.
-    # So, we push a "[default]" section to a copy of the
-    # file in a StringIO object.
-    try:
-        tcl_vars_str = cStringIO.StringIO(
-            "[default]\n" + open(tcl_config, "r").read())
-        tk_vars_str = cStringIO.StringIO(
-            "[default]\n" + open(tk_config, "r").read())
-    except IOError:
-        # if we can't read the file, that's ok, we'll try
-        # to guess instead
         return None
 
-    tcl_vars_str.seek(0)
-    tcl_vars = ConfigParser.RawConfigParser()
-    tk_vars_str.seek(0)
-    tk_vars = ConfigParser.RawConfigParser()
-    try:
-        tcl_vars.readfp(tcl_vars_str)
-        tk_vars.readfp(tk_vars_str)
-    except ConfigParser.ParsingError:
-        # if we can't read the file, that's ok, we'll try
-        # to guess instead
+    def get_var(file, varname):
+        p = subprocess.Popen(
+            '. %s ; eval echo ${%s}' % (file, varname),
+            shell=True,
+            executable="/bin/sh",
+            stdout=subprocess.PIPE)
+        result = p.communicate()[0]
+        return result
+
+    tcl_lib_dir = get_var(tcl_config, 'TCL_LIB_SPEC').split()[0][2:].strip()
+    tcl_inc_dir = get_var(tcl_config, 'TCL_INCLUDE_SPEC')[2:].strip()
+    tcl_lib = get_var(tcl_config, 'TCL_LIB_FLAG')[2:].strip()
+
+    tk_lib_dir = get_var(tk_config, 'TK_LIB_SPEC').split()[0][2:].strip()
+    tk_inc_dir = get_var(tk_config, 'TK_INCLUDE_SPEC').strip()
+    if tk_inc_dir == '':
+        tk_inc_dir = tcl_inc_dir
+    else:
+        tk_inc_dir = tk_inc_dir[2:]
+    tk_lib = get_var(tk_config, 'TK_LIB_FLAG')[2:].strip()
+
+    if not os.path.exists(os.path.join(tk_inc_dir, 'tk.h')):
         return None
 
-    try:
-        tcl_lib = tcl_vars.get("default", "TCL_LIB_SPEC")[1:-1].split()[0][2:]
-        tcl_inc = tcl_vars.get("default", "TCL_INCLUDE_SPEC")[3:-1]
-
-        tk_lib = tk_vars.get("default", "TK_LIB_SPEC")[1:-1].split()[0][2:]
-        if tk_vars.has_option("default", "TK_INCLUDE_SPEC"):
-            # On Ubuntu 8.04
-            tk_inc = tk_vars.get("default", "TK_INCLUDE_SPEC")[3:-1]
-        else:
-            # On RHEL4
-            tk_inc = tcl_inc
-    except (ConfigParser.NoSectionError, ConfigParser.NoOptionError):
-        return None
-
-    if not os.path.exists(os.path.join(tk_inc, 'tk.h')):
-        return None
-
-    return tcl_lib, tcl_inc, tk_lib, tk_inc
+    return tcl_lib_dir, tcl_inc_dir, tcl_lib, tk_lib_dir, tk_inc_dir, tk_lib
 
 def guess_tcl_config(tcl_lib_dir, tk_lib_dir, tk_ver):
     if not (os.path.exists(tcl_lib_dir) and os.path.exists(tk_lib_dir)):
@@ -953,21 +909,21 @@ def guess_tcl_config(tcl_lib_dir, tk_lib_dir, tk_ver):
     if not os.path.exists(os.path.join(tk_inc, 'tk.h')):
         return None
 
-    return tcl_lib, tcl_inc, tk_lib, tk_inc
+    return tcl_lib, tcl_inc, 'tcl' + tk_ver, tk_lib, tk_inc, 'tk' + tk_ver
 
 def hardcoded_tcl_config():
     tcl_inc = "/usr/local/include"
     tk_inc = "/usr/local/include"
     tcl_lib = "/usr/local/lib"
     tk_lib = "/usr/local/lib"
-    return tcl_lib, tcl_inc, tk_lib, tk_inc
+    return tcl_lib, tcl_inc, 'tcl', tk_lib, tk_inc, 'tk'
 
 def add_tk_flags(module):
     'Add the module flags to build extensions which use tk'
     message = None
     if sys.platform == 'win32':
         major, minor1, minor2, s, tmp = sys.version_info
-        if major == 2 and minor1 == 6:
+        if major == 2 and minor1 in [6, 7]:
             module.include_dirs.extend(['win32_static/include/tcl85'])
             module.libraries.extend(['tk85', 'tcl85'])
         elif major == 2 and minor1 in [3, 4, 5]:
@@ -1013,8 +969,8 @@ def add_tk_flags(module):
             #
             tk_include_dirs = [
                 join(F, fw + '.framework', H)
-                for fw in 'Tcl', 'Tk'
-                for H in 'Headers', 'Versions/Current/PrivateHeaders'
+                for fw in ('Tcl', 'Tk')
+                for H in ('Headers', 'Versions/Current/PrivateHeaders')
             ]
 
             # For 8.4a2, the X11 headers are not included. Rather than include a
@@ -1061,10 +1017,10 @@ so that setup can determine where your libraries are located."""
                     result = hardcoded_tcl_config()
 
         # Add final versions of directories and libraries to module lists
-        tcl_lib, tcl_inc, tk_lib, tk_inc = result
-        module.include_dirs.extend([tcl_inc, tk_inc])
-        module.library_dirs.extend([tcl_lib, tk_lib])
-        module.libraries.extend(['tk' + tk_ver, 'tcl' + tk_ver])
+        tcl_lib_dir, tcl_inc_dir, tcl_lib, tk_lib_dir, tk_inc_dir, tk_lib = result
+        module.include_dirs.extend([tcl_inc_dir, tk_inc_dir])
+        module.library_dirs.extend([tcl_lib_dir, tk_lib_dir])
+        module.libraries.extend([tcl_lib, tk_lib])
 
     return message
 
@@ -1095,7 +1051,7 @@ def build_ft2font(ext_modules, packages):
     deps.extend(glob.glob('CXX/*.c'))
 
     module = Extension('matplotlib.ft2font', deps,
-                       define_macros=[('PY_ARRAYAUNIQUE_SYMBOL', 'MPL_ARRAY_API')])
+                       define_macros=defines)
     add_ft2font_flags(module)
     ext_modules.append(module)
     BUILT_FT2FONT = True
@@ -1108,7 +1064,8 @@ def build_ttconv(ext_modules, packages):
             'ttconv/pprdrv_tt2.cpp',
             'ttconv/ttutil.cpp']
 
-    module = Extension('matplotlib.ttconv', deps)
+    module = Extension('matplotlib.ttconv', deps,
+                       define_macros=defines)
     add_base_flags(module)
     ext_modules.append(module)
     BUILT_TTCONV = True
@@ -1122,7 +1079,7 @@ def build_gtkagg(ext_modules, packages):
 
     module = Extension('matplotlib.backends._gtkagg',
                        deps,
-                       define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+                       define_macros=defines
                        )
 
     # add agg flags before pygtk because agg only supports freetype1
@@ -1145,7 +1102,7 @@ def build_tkagg(ext_modules, packages):
 
     module = Extension('matplotlib.backends._tkagg',
                        deps,
-                       define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+                       define_macros=defines
                        )
 
     add_tk_flags(module) # do this first
@@ -1155,25 +1112,6 @@ def build_tkagg(ext_modules, packages):
     ext_modules.append(module)
     BUILT_TKAGG = True
 
-
-def build_wxagg(ext_modules, packages):
-     global BUILT_WXAGG
-     if BUILT_WXAGG:
-         return
-
-     deps = ['src/_wxagg.cpp', 'src/mplutils.cpp']
-     deps.extend(glob.glob('CXX/*.cxx'))
-     deps.extend(glob.glob('CXX/*.c'))
-
-     module = Extension('matplotlib.backends._wxagg', deps)
-
-     add_agg_flags(module)
-     add_ft2font_flags(module)
-     wxconfig = find_wx_config()
-     add_wx_flags(module, wxconfig)
-
-     ext_modules.append(module)
-     BUILT_WXAGG = True
 
 def build_macosx(ext_modules, packages):
     global BUILT_MACOSX
@@ -1188,7 +1126,7 @@ def build_macosx(ext_modules, packages):
     module = Extension('matplotlib.backends._macosx',
                        deps,
                        extra_link_args = ['-framework','Cocoa'],
-                       define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+                       define_macros=defines
                       )
     add_numpy_flags(module)
     add_agg_flags(module)
@@ -1207,7 +1145,7 @@ def build_png(ext_modules, packages):
         'matplotlib._png',
         deps,
         include_dirs=numpy_inc_dirs,
-        define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+        define_macros=defines
         )
 
     add_png_flags(module)
@@ -1239,7 +1177,7 @@ def build_agg(ext_modules, packages):
         'matplotlib.backends._backend_agg',
         deps,
         include_dirs=numpy_inc_dirs,
-        define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+        define_macros=defines
         )
 
     add_numpy_flags(module)
@@ -1254,6 +1192,7 @@ def build_path(ext_modules, packages):
     if BUILT_PATH: return # only build it if you you haven't already
 
     agg = (
+           'agg_vcgen_contour.cpp',
            'agg_curves.cpp',
            'agg_bezier_arc.cpp',
            'agg_trans_affine.cpp',
@@ -1272,7 +1211,7 @@ def build_path(ext_modules, packages):
         'matplotlib._path',
         deps,
         include_dirs=numpy_inc_dirs,
-        define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+        define_macros=defines
         )
 
     add_numpy_flags(module)
@@ -1301,7 +1240,7 @@ def build_image(ext_modules, packages):
         'matplotlib._image',
         deps,
         include_dirs=numpy_inc_dirs,
-        define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+        define_macros=defines
         )
 
     add_numpy_flags(module)
@@ -1322,7 +1261,7 @@ def build_delaunay(ext_modules, packages):
     sourcefiles = [os.path.join('lib/matplotlib/delaunay',s) for s in sourcefiles]
     delaunay = Extension('matplotlib._delaunay',sourcefiles,
                          include_dirs=numpy_inc_dirs,
-                         define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+                         define_macros=defines
                          )
     add_numpy_flags(delaunay)
     add_base_flags(delaunay)
@@ -1339,7 +1278,7 @@ def build_contour(ext_modules, packages):
         'matplotlib._cntr',
         [ 'src/cntr.c'],
         include_dirs=numpy_inc_dirs,
-        define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+        define_macros=defines
         )
     add_numpy_flags(module)
     add_base_flags(module)
@@ -1355,7 +1294,7 @@ def build_nxutils(ext_modules, packages):
         'matplotlib.nxutils',
         [ 'src/nxutils.c'],
         include_dirs=numpy_inc_dirs,
-        define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+        define_macros=defines
         )
     add_numpy_flags(module)
     add_base_flags(module)
@@ -1374,7 +1313,7 @@ def build_gdk(ext_modules, packages):
         ['src/backend_gdk.c'],
         libraries = [],
         include_dirs=numpy_inc_dirs,
-        define_macros=[('PY_ARRAY_UNIQUE_SYMBOL', 'MPL_ARRAY_API')]
+        define_macros=defines
         )
 
     add_numpy_flags(module)
@@ -1384,3 +1323,18 @@ def build_gdk(ext_modules, packages):
 
     BUILT_GDK = True
 
+
+def build_tri(ext_modules, packages):
+    global BUILT_TRI
+    if BUILT_TRI: return # only build it if you you haven't already
+
+    deps = ['lib/matplotlib/tri/_tri.cpp', 'src/mplutils.cpp']
+    deps.extend(glob.glob('CXX/*.cxx'))
+    deps.extend(glob.glob('CXX/*.c'))
+
+    module = Extension('matplotlib._tri', deps,
+                       define_macros=defines)
+    add_numpy_flags(module)
+    add_base_flags(module)
+    ext_modules.append(module)
+    BUILT_TRI = True

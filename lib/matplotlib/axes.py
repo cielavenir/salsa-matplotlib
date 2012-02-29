@@ -1,5 +1,7 @@
 from __future__ import division, generators
 import math, sys, warnings, datetime, new
+from operator import itemgetter
+import itertools
 
 import numpy as np
 from numpy import ma
@@ -15,11 +17,14 @@ import matplotlib.collections as mcoll
 import matplotlib.colors as mcolors
 import matplotlib.contour as mcontour
 import matplotlib.dates as mdates
+from matplotlib import docstring
 import matplotlib.font_manager as font_manager
 import matplotlib.image as mimage
 import matplotlib.legend as mlegend
 import matplotlib.lines as mlines
+import matplotlib.markers as mmarkers
 import matplotlib.mlab as mlab
+import matplotlib.path as mpath
 import matplotlib.patches as mpatches
 import matplotlib.spines as mspines
 import matplotlib.quiver as mquiver
@@ -28,15 +33,26 @@ import matplotlib.table as mtable
 import matplotlib.text as mtext
 import matplotlib.ticker as mticker
 import matplotlib.transforms as mtransforms
+import matplotlib.tri as mtri
+
+from matplotlib.container import BarContainer, ErrorbarContainer, StemContainer
 
 iterable = cbook.iterable
 is_string_like = cbook.is_string_like
 is_sequence_of_strings = cbook.is_sequence_of_strings
 
+def _string_to_bool(s):
+    if not is_string_like(s):
+        return s
+    if s == 'on':
+        return True
+    if s == 'off':
+        return False
+    raise ValueError("string argument must be either 'on' or 'off'")
 
 def _process_plot_format(fmt):
     """
-    Process a matlab(TM) style color/line style format string.  Return a
+    Process a MATLAB style color/line style format string.  Return a
     (*linestyle*, *color*) tuple as a result of the processing.  Default
     values are ('-', 'b').  Example format strings include:
 
@@ -58,9 +74,21 @@ def _process_plot_format(fmt):
     # Is fmt just a colorspec?
     try:
         color = mcolors.colorConverter.to_rgb(fmt)
-        return linestyle, marker, color     # Yes.
+
+        # We need to differentiate grayscale '1.0' from tri_down marker '1'
+        try:
+            fmtint = str(int(fmt))
+        except ValueError:
+            return linestyle, marker, color         # Yes
+        else:
+            if fmt != fmtint:
+                # user definitely doesn't want tri_down marker
+                return linestyle, marker, color     # Yes
+            else:
+                # ignore converted color
+                color = None
     except ValueError:
-        pass                                # No, not just a color.
+        pass                                        # No, not just a color.
 
     # handle the multi char special cases and strip them from the
     # string
@@ -112,11 +140,18 @@ def set_default_color_cycle(clist):
     :class:`Axes` to which it will apply; it will
     apply to all future axes.
 
-    *clist* is a sequence of mpl color specifiers
+    *clist* is a sequence of mpl color specifiers.
+
+    See also: :meth:`~matplotlib.axes.Axes.set_color_cycle`.
+
+    .. Note:: Deprecated 2010/01/03.
+              Set rcParams['axes.color_cycle'] directly.
 
     """
-    _process_plot_var_args.defaultColors = clist[:]
-    rcParams['lines.color'] = clist[0]
+    rcParams['axes.color_cycle'] = clist
+    warnings.warn("Set rcParams['axes.color_cycle'] directly",
+                                                    DeprecationWarning)
+
 
 class _process_plot_var_args:
     """
@@ -131,48 +166,25 @@ class _process_plot_var_args:
 
     an arbitrary number of *x*, *y*, *fmt* are allowed
     """
-
-    defaultColors = ['b','g','r','c','m','y','k']
     def __init__(self, axes, command='plot'):
         self.axes = axes
         self.command = command
-        self._clear_color_cycle()
+        self.set_color_cycle()
 
-    def _clear_color_cycle(self):
-        self.colors = _process_plot_var_args.defaultColors[:]
-        # if the default line color is a color format string, move it up
-        # in the que
-        try:
-            ind = self.colors.index(rcParams['lines.color'])
-        except ValueError:
-            self.firstColor = rcParams['lines.color']
-        else:
-            self.colors[0], self.colors[ind] = self.colors[ind], self.colors[0]
-            self.firstColor = self.colors[0]
-
-        self.Ncolors = len(self.colors)
-
-        self.count = 0
-
-    def set_color_cycle(self, clist):
-        self.colors = clist[:]
-        self.firstColor = self.colors[0]
-        self.Ncolors = len(self.colors)
-        self.count = 0
-
-    def _get_next_cycle_color(self):
-        if self.count==0:
-            color = self.firstColor
-        else:
-            color = self.colors[int(self.count % self.Ncolors)]
-        self.count += 1
-        return color
+    def set_color_cycle(self, clist=None):
+        if clist is None:
+            clist = rcParams['axes.color_cycle']
+        self.color_cycle = itertools.cycle(clist)
 
     def __call__(self, *args, **kwargs):
 
         if self.axes.xaxis is not None and self.axes.yaxis is not None:
             xunits = kwargs.pop( 'xunits', self.axes.xaxis.units)
+            if self.axes.name == 'polar':
+                xunits = kwargs.pop( 'thetaunits', xunits )
             yunits = kwargs.pop( 'yunits', self.axes.yaxis.units)
+            if self.axes.name == 'polar':
+                yunits = kwargs.pop( 'runits', yunits )
             if xunits!=self.axes.xaxis.units:
                 self.axes.xaxis.set_units(xunits)
             if yunits!=self.axes.yaxis.units:
@@ -237,8 +249,8 @@ class _process_plot_var_args:
 
     def _makeline(self, x, y, kw, kwargs):
         kw = kw.copy() # Don't modify the original kw.
-        if not 'color' in kw:
-            kw['color'] = self._get_next_cycle_color()
+        if not 'color' in kw and not 'color' in kwargs.keys():
+            kw['color'] = self.color_cycle.next()
             # (can't use setdefault because it always evaluates
             # its second argument)
         seg = mlines.Line2D(x, y,
@@ -252,7 +264,7 @@ class _process_plot_var_args:
         try:
             facecolor = kw['color']
         except KeyError:
-            facecolor = self._get_next_cycle_color()
+            facecolor = self.color_cycle.next()
         seg = mpatches.Polygon(np.hstack(
                                 (x[:,np.newaxis],y[:,np.newaxis])),
                       facecolor = facecolor,
@@ -365,8 +377,8 @@ class Axes(martist.Artist):
           ================   =========================================
           Keyword            Description
           ================   =========================================
-          *adjustable*       [ 'box' | 'datalim' ]
-          *alpha*            float: the alpha transparency
+          *adjustable*       [ 'box' | 'datalim' | 'box-forced']
+          *alpha*            float: the alpha transparency (can be None)
           *anchor*           [ 'C', 'SW', 'S', 'SE', 'E', 'NE', 'N',
                                'NW', 'W' ]
           *aspect*           [ 'auto' | 'equal' | aspect_ratio ]
@@ -815,8 +827,7 @@ class Axes(martist.Artist):
             spine.cla()
 
         self.ignore_existing_data_limits = True
-        self.callbacks = cbook.CallbackRegistry(('xlim_changed',
-                                                 'ylim_changed'))
+        self.callbacks = cbook.CallbackRegistry()
 
         if self._sharex is not None:
             # major and minor are class instances with
@@ -824,7 +835,7 @@ class Axes(martist.Artist):
             self.xaxis.major = self._sharex.xaxis.major
             self.xaxis.minor = self._sharex.xaxis.minor
             x0, x1 = self._sharex.get_xlim()
-            self.set_xlim(x0, x1, emit=False)
+            self.set_xlim(x0, x1, emit=False, auto=None)
             self.xaxis.set_scale(self._sharex.xaxis.get_scale())
         else:
             self.xaxis.set_scale('linear')
@@ -833,13 +844,16 @@ class Axes(martist.Artist):
             self.yaxis.major = self._sharey.yaxis.major
             self.yaxis.minor = self._sharey.yaxis.minor
             y0, y1 = self._sharey.get_ylim()
-            self.set_ylim(y0, y1, emit=False)
+            self.set_ylim(y0, y1, emit=False, auto=None)
             self.yaxis.set_scale(self._sharey.yaxis.get_scale())
         else:
             self.yaxis.set_scale('linear')
 
         self._autoscaleXon = True
         self._autoscaleYon = True
+        self._xmargin = 0
+        self._ymargin = 0
+        self._tight = False
         self._update_transScale()         # needed?
 
         self._get_lines = _process_plot_var_args(self)
@@ -852,8 +866,10 @@ class Axes(martist.Artist):
         self.tables = []
         self.artists = []
         self.images = []
+        self._current_image = None # strictly for pyplot via _sci, _gci
         self.legend_ = None
         self.collections = []  # collection.Collection instances
+        self.containers = []  #
 
         self.grid(self._gridOn)
         props = font_manager.FontProperties(size=rcParams['axes.titlesize'])
@@ -864,7 +880,7 @@ class Axes(martist.Artist):
         self.title =  mtext.Text(
             x=0.5, y=1.0, text='',
             fontproperties=props,
-            verticalalignment='bottom',
+            verticalalignment='baseline',
             horizontalalignment='center',
             )
         self.title.set_transform(self.transAxes + self.titleOffsetTrans)
@@ -903,9 +919,10 @@ class Axes(martist.Artist):
         """
         Set the color cycle for any future plot commands on this Axes.
 
-        clist is a list of mpl color specifiers.
+        *clist* is a list of mpl color specifiers.
         """
         self._get_lines.set_color_cycle(clist)
+        self._get_patches_for_fill.set_color_cycle(clist)
 
 
     def ishold(self):
@@ -961,12 +978,17 @@ class Axes(martist.Artist):
 
         *adjustable*
 
-          =========   ============================
-          value       description
-          =========   ============================
-          'box'       change physical size of axes
-          'datalim'   change xlim or ylim
-          =========   ============================
+          ============   =====================================
+          value          description
+          ============   =====================================
+          'box'          change physical size of axes
+          'datalim'      change xlim or ylim
+          'box-forced'   same as 'box', but axes can be shared
+          ============   =====================================
+
+        'box' does not allow axes sharing, as this can cause
+        unintended side effect. For cases when sharing axes is
+        fine, use 'box-forced'.
 
         *anchor*
 
@@ -998,9 +1020,9 @@ class Axes(martist.Artist):
 
     def set_adjustable(self, adjustable):
         """
-        ACCEPTS: [ 'box' | 'datalim' ]
+        ACCEPTS: [ 'box' | 'datalim' | 'box-forced']
         """
-        if adjustable in ('box', 'datalim'):
+        if adjustable in ('box', 'datalim', 'box-forced'):
             if self in self._shared_x_axes or self in self._shared_y_axes:
                 if adjustable == 'box':
                     raise ValueError(
@@ -1078,20 +1100,23 @@ class Axes(martist.Artist):
 
         aspect = self.get_aspect()
 
-        xscale, yscale = self.get_xscale(), self.get_yscale()
-        if xscale == "linear" and yscale == "linear":
+        if self.name != 'polar':
+            xscale, yscale = self.get_xscale(), self.get_yscale()
+            if xscale == "linear" and yscale == "linear":
+                aspect_scale_mode = "linear"
+            elif xscale == "log" and yscale == "log":
+                aspect_scale_mode = "log"
+            elif (xscale == "linear" and yscale == "log") or \
+                    (xscale == "log" and yscale == "linear"):
+                if aspect is not "auto":
+                    warnings.warn(
+                        'aspect is not supported for Axes with xscale=%s, yscale=%s' \
+                        % (xscale, yscale))
+                    aspect = "auto"
+            else: # some custom projections have their own scales.
+                pass
+        else:
             aspect_scale_mode = "linear"
-        elif xscale == "log" and yscale == "log":
-            aspect_scale_mode = "log"
-        elif (xscale == "linear" and yscale == "log") or \
-                 (xscale == "log" and yscale == "linear"):
-            if aspect is not "auto":
-                warnings.warn(
-                    'aspect is not supported for Axes with xscale=%s, yscale=%s' \
-                    % (xscale, yscale))
-                aspect = "auto"
-        else: # some custom projections have their own scales.
-            pass
 
         if aspect == 'auto':
             self.set_position( position , which='active')
@@ -1112,7 +1137,7 @@ class Axes(martist.Artist):
 
         figW,figH = self.get_figure().get_size_inches()
         fig_aspect = figH/figW
-        if self._adjustable == 'box':
+        if self._adjustable in ['box', 'box-forced']:
             if aspect_scale_mode == "log":
                 box_aspect = A * self.get_data_ratio_log()
             else:
@@ -1214,11 +1239,17 @@ class Axes(martist.Artist):
     def axis(self, *v, **kwargs):
         '''
         Convenience method for manipulating the x and y view limits
-        and the aspect ratio of the plot.
+        and the aspect ratio of the plot. For details, see
+        :func:`~matplotlib.pyplot.axis`.
 
         *kwargs* are passed on to :meth:`set_xlim` and
         :meth:`set_ylim`
         '''
+        if len(v) == 0 and len(kwargs) == 0:
+            xmin, xmax = self.get_xlim()
+            ymin, ymax = self.get_ylim()
+            return xmin, xmax, ymin, ymax
+
         if len(v)==1 and is_string_like(v[0]):
             s = v[0].lower()
             if s=='on': self.set_axis_on()
@@ -1226,7 +1257,7 @@ class Axes(martist.Artist):
             elif s in ('equal', 'tight', 'scaled', 'normal', 'auto', 'image'):
                 self.set_autoscale_on(True)
                 self.set_aspect('auto')
-                self.autoscale_view()
+                self.autoscale_view(tight=False)
                 # self.apply_aspect()
                 if s=='equal':
                     self.set_aspect('equal', adjustable='datalim')
@@ -1248,25 +1279,31 @@ class Axes(martist.Artist):
             ymin, ymax = self.get_ylim()
             return xmin, xmax, ymin, ymax
 
-        try: v[0]
+        emit = kwargs.get('emit', True)
+        try:
+            v[0]
         except IndexError:
-            emit = kwargs.get('emit', True)
             xmin = kwargs.get('xmin', None)
             xmax = kwargs.get('xmax', None)
+            auto = False # turn off autoscaling, unless...
+            if xmin is None and xmax is None:
+                auto = None # leave autoscaling state alone
+            xmin, xmax = self.set_xlim(xmin, xmax, emit=emit, auto=auto)
 
-            xmin, xmax = self.set_xlim(xmin, xmax, emit)
             ymin = kwargs.get('ymin', None)
             ymax = kwargs.get('ymax', None)
-            ymin, ymax = self.set_ylim(ymin, ymax, emit)
+            auto = False # turn off autoscaling, unless...
+            if ymin is None and ymax is None:
+                auto = None # leave autoscaling state alone
+            ymin, ymax = self.set_ylim(ymin, ymax, emit=emit, auto=auto)
             return xmin, xmax, ymin, ymax
 
         v = v[0]
         if len(v) != 4:
             raise ValueError('v must contain [xmin xmax ymin ymax]')
 
-
-        self.set_xlim([v[0], v[1]])
-        self.set_ylim([v[2], v[3]])
+        self.set_xlim([v[0], v[1]], emit=emit, auto=False)
+        self.set_ylim([v[2], v[3]], emit=emit, auto=False)
 
         return v
 
@@ -1323,6 +1360,27 @@ class Axes(martist.Artist):
 
     #### Adding and tracking artists
 
+    def _sci(self, im):
+        """
+        helper for :func:`~matplotlib.pyplot.sci`;
+        do not use elsewhere.
+        """
+        if isinstance(im, matplotlib.contour.ContourSet):
+            if im.collections[0] not in self.collections:
+                raise ValueError(
+                    "ContourSet must be in current Axes")
+        elif im not in self.images and im not in self.collections:
+            raise ValueError(
+            "Argument must be an image, collection, or ContourSet in this Axes")
+        self._current_image = im
+
+    def _gci(self):
+        """
+        helper for :func:`~matplotlib.pyplot.gci`;
+        do not use elsewhere.
+        """
+        return self._current_image
+
     def has_data(self):
         '''Return *True* if any artists have been added to axes.
 
@@ -1358,7 +1416,7 @@ class Axes(martist.Artist):
         '''
         label = collection.get_label()
         if not label:
-            collection.set_label('collection%d'%len(self.collections))
+            collection.set_label('_collection%d'%len(self.collections))
         self.collections.append(collection)
         self._set_artist_props(collection)
 
@@ -1422,8 +1480,9 @@ class Axes(martist.Artist):
         # scaling.  We'll ignore rects with zero height or width in
         # the auto-scaling
 
+        # cannot check for '==0' since unitized data may not compare to zero
         if (isinstance(patch, mpatches.Rectangle) and
-                    (patch.get_width()==0 or patch.get_height()==0)):
+                    ((not patch.get_width()) or (not patch.get_height()))):
             return
         vertices = patch.get_path().vertices
         if vertices.size > 0:
@@ -1449,8 +1508,28 @@ class Axes(martist.Artist):
         tab._remove_method = lambda h: self.tables.remove(h)
         return tab
 
+    def add_container(self, container):
+        '''
+        Add a :class:`~matplotlib.container.Container` instance
+        to the axes.
+
+        Returns the collection.
+        '''
+        label = container.get_label()
+        if not label:
+            container.set_label('_container%d'%len(self.containers))
+        self.containers.append(container)
+        container.set_remove_method(lambda h: self.containers.remove(container))
+        return container
+
+
     def relim(self):
-        'recompute the data limits based on current artists'
+        """
+        Recompute the data limits based on current artists.
+
+        At present, :class:`~matplotlib.collections.Collection`
+        instances are not supported.
+        """
         # Collections are deliberately not supported (yet); see
         # the TODO note in artists.py.
         self.dataLim.ignore(True)
@@ -1513,6 +1592,8 @@ class Axes(martist.Artist):
         # process kwargs 2nd since these will override default units
         if kwargs is not None:
             xunits = kwargs.pop( 'xunits', self.xaxis.units)
+            if self.name == 'polar':
+                xunits = kwargs.pop( 'thetaunits', xunits )
             if xunits!=self.xaxis.units:
                 #print '\tkw setting xunits', xunits
                 self.xaxis.set_units(xunits)
@@ -1522,6 +1603,8 @@ class Axes(martist.Artist):
                     self.xaxis.update_units(xdata)
 
             yunits = kwargs.pop('yunits', self.yaxis.units)
+            if self.name == 'polar':
+                yunits = kwargs.pop( 'runits', yunits )
             if yunits!=self.yaxis.units:
                 #print '\tkw setting yunits', yunits
                 self.yaxis.set_units(yunits)
@@ -1580,6 +1663,91 @@ class Axes(martist.Artist):
         """
         self._autoscaleYon = b
 
+    def set_xmargin(self, m):
+        """
+        Set padding of X data limits prior to autoscaling.
+
+        *m* times the data interval will be added to each
+        end of that interval before it is used in autoscaling.
+
+        accepts: float in range 0 to 1
+        """
+        if m < 0 or m > 1:
+            raise ValueError("margin must be in range 0 to 1")
+        self._xmargin = m
+
+    def set_ymargin(self, m):
+        """
+        Set padding of Y data limits prior to autoscaling.
+
+        *m* times the data interval will be added to each
+        end of that interval before it is used in autoscaling.
+
+        accepts: float in range 0 to 1
+        """
+        if m < 0 or m > 1:
+            raise ValueError("margin must be in range 0 to 1")
+        self._ymargin = m
+
+
+    def margins(self, *args, **kw):
+        """
+        Convenience method to set or retrieve autoscaling margins.
+
+        signatures::
+
+            margins()
+
+        returns xmargin, ymargin
+
+        ::
+
+            margins(margin)
+
+            margins(xmargin, ymargin)
+
+            margins(x=xmargin, y=ymargin)
+
+            margins(..., tight=False)
+
+        All three forms above set the xmargin and ymargin parameters.
+        All keyword parameters are optional.  A single argument
+        specifies both xmargin and ymargin.  The *tight* parameter
+        is passed to :meth:`autoscale_view`, which is executed after
+        a margin is changed; the default here is *True*, on the
+        assumption that when margins are specified, no additional
+        padding to match tick marks is usually desired.  Setting
+        *tight* to *None* will preserve the previous setting.
+
+        Specifying any margin changes only the autoscaling; for example,
+        if *xmargin* is not None, then *xmargin* times the X data
+        interval will be added to each end of that interval before
+        it is used in autoscaling.
+
+        """
+        if not args and not kw:
+            return self._xmargin, self._ymargin
+
+        tight = kw.pop('tight', True)
+        mx = kw.pop('x', None)
+        my = kw.pop('y', None)
+        if len(args) == 1:
+            mx = my = args[0]
+        elif len(args) == 2:
+            mx, my = args
+        else:
+            raise ValueError("more than two arguments were supplied")
+        if mx is not None:
+            self.set_xmargin(mx)
+        if my is not None:
+            self.set_ymargin(my)
+
+        scalex = (mx is not None)
+        scaley = (my is not None)
+
+        self.autoscale_view(tight=tight, scalex=scalex, scaley=scaley)
+
+
     def set_rasterization_zorder(self, z):
         """
         Set zorder value below which artists will be rasterized
@@ -1592,40 +1760,106 @@ class Axes(martist.Artist):
         """
         return self._rasterization_zorder
 
-
-    def autoscale_view(self, tight=False, scalex=True, scaley=True):
+    def autoscale(self, enable=True, axis='both', tight=None):
         """
-        autoscale the view limits using the data limits. You can
+        Convenience method for simple axis view autoscaling.
+        It turns autoscaling on or off, and then,
+        if autoscaling for either axis is on, it performs
+        the autoscaling on the specified axis or axes.
+
+        *enable*: [True | False | None]
+            True (default) turns autoscaling on, False turns it off.
+            None leaves the autoscaling state unchanged.
+
+        *axis*: ['x' | 'y' | 'both']
+            which axis to operate on; default is 'both'
+
+        *tight*: [True | False | None]
+            If True, set view limits to data limits;
+            if False, let the locator and margins expand the view limits;
+            if None, use tight scaling if the only artist is an image,
+            otherwise treat *tight* as False.
+            The *tight* setting is retained for future autoscaling
+            until it is explicitly changed.
+
+
+        Returns None.
+        """
+        if enable is None:
+            scalex = True
+            scaley = True
+        else:
+            scalex = False
+            scaley = False
+            if axis in ['x', 'both']:
+                self._autoscaleXon = bool(enable)
+                scalex = self._autoscaleXon
+            if axis in ['y', 'both']:
+                self._autoscaleYon = bool(enable)
+                scaley = self._autoscaleYon
+        self.autoscale_view(tight=tight, scalex=scalex, scaley=scaley)
+
+
+    def autoscale_view(self, tight=None, scalex=True, scaley=True):
+        """
+        Autoscale the view limits using the data limits. You can
         selectively autoscale only a single axis, eg, the xaxis by
         setting *scaley* to *False*.  The autoscaling preserves any
         axis direction reversal that has already been done.
+
+        The data limits are not updated automatically when artist
+        data are changed after the artist has been added to an
+        Axes instance.  In that case, use
+        :meth:`matplotlib.axes.Axes.relim`
+        prior to calling autoscale_view.
         """
-        # if image data only just use the datalim
+        if tight is None:
+            # if image data only just use the datalim
+            _tight = self._tight or (len(self.images)>0 and
+                                     len(self.lines)==0 and
+                                     len(self.patches)==0)
+        else:
+            _tight = self._tight = bool(tight)
+
         if scalex and self._autoscaleXon:
             xshared = self._shared_x_axes.get_siblings(self)
             dl = [ax.dataLim for ax in xshared]
             bb = mtransforms.BboxBase.union(dl)
             x0, x1 = bb.intervalx
+            xlocator = self.xaxis.get_major_locator()
+            try:
+                # e.g. DateLocator has its own nonsingular()
+                x0, x1 = xlocator.nonsingular(x0, x1)
+            except AttributeError:
+                # Default nonsingular for, e.g., MaxNLocator
+                x0, x1 = mtransforms.nonsingular(x0, x1, increasing=False,
+                                                         expander=0.05)
+            if self._xmargin > 0:
+                delta = (x1 - x0) * self._xmargin
+                x0 -= delta
+                x1 += delta
+            if not _tight:
+                x0, x1 = xlocator.view_limits(x0, x1)
+            self.set_xbound(x0, x1)
+
         if scaley and self._autoscaleYon:
             yshared = self._shared_y_axes.get_siblings(self)
             dl = [ax.dataLim for ax in yshared]
             bb = mtransforms.BboxBase.union(dl)
             y0, y1 = bb.intervaly
-        if (tight or (len(self.images)>0 and
-                      len(self.lines)==0 and
-                      len(self.patches)==0)):
-            if scalex and self._autoscaleXon:
-                self.set_xbound(x0, x1)
-            if scaley and self._autoscaleYon:
-                self.set_ybound(y0, y1)
-            return
-
-        if scalex and self._autoscaleXon:
-            XL = self.xaxis.get_major_locator().view_limits(x0, x1)
-            self.set_xbound(XL)
-        if scaley and self._autoscaleYon:
-            YL = self.yaxis.get_major_locator().view_limits(y0, y1)
-            self.set_ybound(YL)
+            ylocator = self.yaxis.get_major_locator()
+            try:
+                y0, y1 = ylocator.nonsingular(y0, y1)
+            except AttributeError:
+                y0, y1 = mtransforms.nonsingular(y0, y1, increasing=False,
+                                                         expander=0.05)
+            if self._ymargin > 0:
+                delta = (y1 - y0) * self._ymargin
+                y0 -= delta
+                y1 += delta
+            if not _tight:
+                y0, y1 = ylocator.view_limits(y0, y1)
+            self.set_ybound(y0, y1)
 
     #### Drawing
 
@@ -1675,12 +1909,23 @@ class Axes(martist.Artist):
             artists.extend(self.spines.itervalues())
 
 
-        dsu = [ (a.zorder, i, a) for i, a in enumerate(artists)
+
+        dsu = [ (a.zorder, a) for a in artists
                 if not a.get_animated() ]
-        dsu.sort()
 
 
-        # rasterze artists with negative zorder
+        # add images to dsu if the backend support compositing.
+        # otherwise, does the manaul compositing  without adding images to dsu.
+        if len(self.images)<=1 or renderer.option_image_nocomposite():
+            dsu.extend([(im.zorder, im) for im in self.images])
+            _do_composite = False
+        else:
+            _do_composite = True
+
+
+        dsu.sort(key=itemgetter(0))
+
+        # rasterize artists with negative zorder
         # if the minimum zorder is negative, start rasterization
         rasterization_zorder = self._rasterization_zorder
         if len(dsu) > 0 and dsu[0][0] < rasterization_zorder:
@@ -1696,16 +1941,16 @@ class Axes(martist.Artist):
         if self.axison and self._frameon:
             self.patch.draw(renderer)
 
-        if len(self.images)<=1 or renderer.option_image_nocomposite():
-            for im in self.images:
-                im.draw(renderer)
-        else:
+        if _do_composite:
             # make a composite image blending alpha
             # list of (mimage.Image, ox, oy)
 
+            zorder_images = [(im.zorder, im) for im in self.images \
+                             if im.get_visible()]
+            zorder_images.sort(key=lambda x: x[0])
+
             mag = renderer.get_image_magnification()
-            ims = [(im.make_image(mag),0,0)
-                   for im in self.images if im.get_visible()]
+            ims = [(im.make_image(mag),0,0) for z,im in zorder_images]
 
 
             l, b, r, t = self.bbox.extents
@@ -1719,19 +1964,22 @@ class Axes(martist.Artist):
             l, b, w, h = self.bbox.bounds
             # composite images need special args so they will not
             # respect z-order for now
-            renderer.draw_image(
-                round(l), round(b), im, self.bbox,
-                self.patch.get_path(),
-                self.patch.get_transform())
 
+            gc = renderer.new_gc()
+            gc.set_clip_rectangle(self.bbox)
+            gc.set_clip_path(mtransforms.TransformedPath(
+                    self.patch.get_path(),
+                    self.patch.get_transform()))
 
+            renderer.draw_image(gc, round(l), round(b), im)
+            gc.restore()
 
         if dsu_rasterized:
-            for zorder, i, a in dsu_rasterized:
+            for zorder, a in dsu_rasterized:
                 a.draw(renderer)
             renderer.stop_rasterizing()
 
-        for zorder, i, a in dsu:
+        for zorder, a in dsu:
             a.draw(renderer)
 
         renderer.close_group('axes')
@@ -1763,7 +2011,7 @@ class Axes(martist.Artist):
         if self._lastRenderer is None:
             raise RuntimeError('You must first call ax.draw()')
         dsu = [(a.zorder, a) for a in self.animated.keys()]
-        dsu.sort()
+        dsu.sort(key=lambda x: x[0])
         renderer = self._lastRenderer
         renderer.blit()
         for tmp, a in dsu:
@@ -1799,30 +2047,43 @@ class Axes(martist.Artist):
         """
         self._axisbelow = b
 
-    def grid(self, b=None, **kwargs):
+    @docstring.dedent_interpd
+    def grid(self, b=None, which='major', axis='both', **kwargs):
         """
         call signature::
 
-          grid(self, b=None, **kwargs)
+           grid(self, b=None, which='major', axis='both', **kwargs)
 
-        Set the axes grids on or off; *b* is a boolean
+        Set the axes grids on or off; *b* is a boolean.  (For MATLAB
+        compatibility, *b* may also be a string, 'on' or 'off'.)
 
         If *b* is *None* and ``len(kwargs)==0``, toggle the grid state.  If
         *kwargs* are supplied, it is assumed that you want a grid and *b*
-        is thus set to *True*
+        is thus set to *True*.
 
-        *kawrgs* are used to set the grid line properties, eg::
+        *which* can be 'major' (default), 'minor', or 'both' to control
+        whether major tick grids, minor tick grids, or both are affected.
 
-          ax.grid(color='r', linestyle='-', linewidth=2)
+        *axis* can be 'both' (default), 'x', or 'y' to control which
+        set of gridlines are drawn.
+
+        *kwargs* are used to set the grid line properties, eg::
+
+           ax.grid(color='r', linestyle='-', linewidth=2)
 
         Valid :class:`~matplotlib.lines.Line2D` kwargs are
 
         %(Line2D)s
+
         """
-        if len(kwargs): b = True
-        self.xaxis.grid(b, **kwargs)
-        self.yaxis.grid(b, **kwargs)
-    grid.__doc__ = cbook.dedent(grid.__doc__) % martist.kwdocd
+        if len(kwargs):
+            b = True
+        b = _string_to_bool(b)
+
+        if axis == 'x' or  axis == 'both':
+          self.xaxis.grid(b, which=which, **kwargs)
+        if axis == 'y' or  axis == 'both':
+          self.yaxis.grid(b, which=which, **kwargs)
 
     def ticklabel_format(self, **kwargs):
         """
@@ -1831,9 +2092,9 @@ class Axes(martist.Artist):
 
         Optional keyword arguments:
 
-          ============   =====================================
+          ============   =========================================
           Keyword        Description
-          ============   =====================================
+          ============   =========================================
           *style*        [ 'sci' (or 'scientific') | 'plain' ]
                          plain turns off scientific notation
           *scilimits*    (m, n), pair of integers; if *style*
@@ -1841,8 +2102,20 @@ class Axes(martist.Artist):
                          be used for numbers outside the range
                          10`-m`:sup: to 10`n`:sup:.
                          Use (0,0) to include all numbers.
+          *useOffset*    [True | False | offset]; if True,
+                         the offset will be calculated as needed;
+                         if False, no offset will be used; if a
+                         numeric offset is specified, it will be
+                         used.
           *axis*         [ 'x' | 'y' | 'both' ]
-          ============   =====================================
+          *useLocale*    If True, format the number according to
+                         the current locale.  This affects things
+                         such as the character used for the
+                         decimal separator.  If False, use
+                         C-style (English) formatting.  The
+                         default setting is controlled by the
+                         axes.formatter.use_locale rcparam.
+          ============   =========================================
 
         Only the major ticks are affected.
         If the method is called when the
@@ -1853,13 +2126,15 @@ class Axes(martist.Artist):
         """
         style = kwargs.pop('style', '').lower()
         scilimits = kwargs.pop('scilimits', None)
+        useOffset = kwargs.pop('useOffset', None)
+        useLocale = kwargs.pop('useLocale', None)
+        axis = kwargs.pop('axis', 'both').lower()
         if scilimits is not None:
             try:
                 m, n = scilimits
                 m+n+1  # check that both are numbers
             except (ValueError, TypeError):
                 raise ValueError("scilimits must be a sequence of 2 integers")
-        axis = kwargs.pop('axis', 'both').lower()
         if style[:3] == 'sci':
             sb = True
         elif style in ['plain', 'comma']:
@@ -1884,9 +2159,138 @@ class Axes(martist.Artist):
                     self.xaxis.major.formatter.set_powerlimits(scilimits)
                 if axis == 'both' or axis == 'y':
                     self.yaxis.major.formatter.set_powerlimits(scilimits)
+            if useOffset is not None:
+                if axis == 'both' or axis == 'x':
+                    self.xaxis.major.formatter.set_useOffset(useOffset)
+                if axis == 'both' or axis == 'y':
+                    self.yaxis.major.formatter.set_useOffset(useOffset)
+            if useLocale is not None:
+                if axis == 'both' or axis == 'x':
+                    self.xaxis.major.formatter.set_useLocale(useLocale)
+                if axis == 'both' or axis == 'y':
+                    self.yaxis.major.formatter.set_useLocale(useLocale)
         except AttributeError:
             raise AttributeError(
                 "This method only works with the ScalarFormatter.")
+
+    def locator_params(self, axis='both', tight=None, **kwargs):
+        """
+        Convenience method for controlling tick locators.
+
+        Keyword arguments:
+
+        *axis*
+            ['x' | 'y' | 'both']  Axis on which to operate;
+            default is 'both'.
+
+        *tight*
+            [True | False | None] Parameter passed to :meth:`autoscale_view`.
+            Default is None, for no change.
+
+        Remaining keyword arguments are passed to directly to the
+        :meth:`~matplotlib.ticker.MaxNLocator.set_params` method.
+
+        Typically one might want to reduce the maximum number
+        of ticks and use tight bounds when plotting small
+        subplots, for example::
+
+            ax.locator_params(tight=True, nbins=4)
+
+        Because the locator is involved in autoscaling,
+        :meth:`autoscale_view` is called automatically after
+        the parameters are changed.
+
+        This presently works only for the
+        :class:`~matplotlib.ticker.MaxNLocator` used
+        by default on linear axes, but it may be generalized.
+        """
+        _x = axis in ['x', 'both']
+        _y = axis in ['y', 'both']
+        if _x:
+            self.xaxis.get_major_locator().set_params(**kwargs)
+        if _y:
+            self.yaxis.get_major_locator().set_params(**kwargs)
+        self.autoscale_view(tight=tight, scalex=_x, scaley=_y)
+
+    def tick_params(self, axis='both', **kwargs):
+        """
+        Convenience method for changing the appearance of ticks and
+        tick labels.
+
+        Keyword arguments:
+
+        *axis*
+            ['x' | 'y' | 'both']  Axis on which to operate;
+            default is 'both'.
+
+        *reset*
+            [True | False] If *True*, set all parameters to defaults
+            before processing other keyword arguments.  Default is
+            *False*.
+
+        *which*
+            ['major' | 'minor' | 'both'] Default is 'major': apply
+            arguments to major ticks only.
+
+        *direction*
+            ['in' | 'out'] Puts ticks inside or outside the axes.
+
+        *length*
+            Tick length in points.
+
+        *width*
+            Tick width in points.
+
+        *color*
+            Tick color; accepts any mpl color spec.
+
+        *pad*
+            Distance in points between tick and label.
+
+        *labelsize*
+            Tick label font size in points or as a string (e.g. 'large').
+
+        *labelcolor*
+            Tick label color; mpl color spec.
+
+        *colors*
+            Changes the tick color and the label color to the same value:
+            mpl color spec.
+
+        *zorder*
+            Tick and label zorder.
+
+        *bottom*, *top*, *left*, *right*
+            Boolean or ['on' | 'off'], controls whether to draw the
+            respective ticks.
+
+        *labelbottom*, *labeltop*, *labelleft*, *labelright*
+            Boolean or ['on' | 'off'], controls whether to draw the
+            respective tick labels.
+
+        Example::
+
+            ax.tick_params(direction='out', length=6, width=2, colors='r')
+
+        This will make all major ticks be red, pointing out of the box,
+        and with dimensions 6 points by 2 points.  Tick labels will
+        also be red.
+
+        """
+        if axis in ['x', 'both']:
+            xkw = dict(kwargs)
+            xkw.pop('left', None)
+            xkw.pop('right', None)
+            xkw.pop('labelleft', None)
+            xkw.pop('labelright', None)
+            self.xaxis.set_tick_params(**xkw)
+        if axis in ['y', 'both']:
+            ykw = dict(kwargs)
+            ykw.pop('top', None)
+            ykw.pop('bottom', None)
+            ykw.pop('labeltop', None)
+            ykw.pop('labelbottom', None)
+            self.yaxis.set_tick_params(**ykw)
 
     def set_axis_off(self):
         """turn off the axis"""
@@ -1940,6 +2344,7 @@ class Axes(martist.Artist):
         """
         Set the lower and upper numerical bounds of the x-axis.
         This method will honor axes inversion regardless of parameter order.
+        It will not change the _autoscaleXon attribute.
         """
         if upper is None and iterable(lower):
             lower,upper = lower
@@ -1951,85 +2356,112 @@ class Axes(martist.Artist):
 
         if self.xaxis_inverted():
             if lower < upper:
-                self.set_xlim(upper, lower)
+                self.set_xlim(upper, lower, auto=None)
             else:
-                self.set_xlim(lower, upper)
+                self.set_xlim(lower, upper, auto=None)
         else:
             if lower < upper:
-                self.set_xlim(lower, upper)
+                self.set_xlim(lower, upper, auto=None)
             else:
-                self.set_xlim(upper, lower)
+                self.set_xlim(upper, lower, auto=None)
 
     def get_xlim(self):
         """
-        Get the x-axis range [*xmin*, *xmax*]
+        Get the x-axis range [*left*, *right*]
         """
         return tuple(self.viewLim.intervalx)
 
-    def set_xlim(self, xmin=None, xmax=None, emit=True, **kwargs):
+    def set_xlim(self, left=None, right=None, emit=True, auto=False, **kw):
         """
         call signature::
 
-          set_xlim(self, *args, **kwargs)
+          set_xlim(self, *args, **kwargs):
 
-        Set the limits for the xaxis
-
-        Returns the current xlimits as a length 2 tuple: [*xmin*, *xmax*]
+        Set the data limits for the xaxis
 
         Examples::
 
-          set_xlim((valmin, valmax))
-          set_xlim(valmin, valmax)
-          set_xlim(xmin=1) # xmax unchanged
-          set_xlim(xmax=1) # xmin unchanged
+          set_xlim((left, right))
+          set_xlim(left, right)
+          set_xlim(left=1) # right unchanged
+          set_xlim(right=1) # left unchanged
 
         Keyword arguments:
 
-          *ymin*: scalar
-            the min of the ylim
-          *ymax*: scalar
-            the max of the ylim
+          *left*: scalar
+            the left xlim; *xmin*, the previous name, may still be used
+          *right*: scalar
+            the right xlim; *xmax*, the previous name, may still be used
           *emit*: [ True | False ]
             notify observers of lim change
+          *auto*: [ True | False | None ]
+            turn *x* autoscaling on (True), off (False; default),
+            or leave unchanged (None)
+
+        Note: the *left* (formerly *xmin*) value may be greater than
+        the *right* (formerly *xmax*).
+        For example, suppose *x* is years before present.
+        Then one might use::
+
+          set_ylim(5000, 0)
+
+        so 5000 years ago is on the left of the plot and the
+        present is on the right.
+
+        Returns the current xlimits as a length 2 tuple
 
         ACCEPTS: len(2) sequence of floats
         """
-        if xmax is None and iterable(xmin):
-            xmin,xmax = xmin
+        if 'xmin' in kw:
+            left = kw.pop('xmin')
+        if 'xmax' in kw:
+            right = kw.pop('xmax')
+        if kw:
+            raise ValueError("unrecognized kwargs: %s" % kw.keys())
 
+        if right is None and iterable(left):
+            left,right = left
 
-        self._process_unit_info(xdata=(xmin, xmax))
-        if xmin is not None:
-            xmin = self.convert_xunits(xmin)
-        if xmax is not None:
-            xmax = self.convert_xunits(xmax)
+        self._process_unit_info(xdata=(left, right))
+        if left is not None:
+            left = self.convert_xunits(left)
+        if right is not None:
+            right = self.convert_xunits(right)
 
-        old_xmin,old_xmax = self.get_xlim()
-        if xmin is None: xmin = old_xmin
-        if xmax is None: xmax = old_xmax
+        old_left, old_right = self.get_xlim()
+        if left is None: left = old_left
+        if right is None: right = old_right
 
-        xmin, xmax = mtransforms.nonsingular(xmin, xmax, increasing=False)
-        xmin, xmax = self.xaxis.limit_range_for_scale(xmin, xmax)
+        if left==right:
+            warnings.warn(('Attempting to set identical left==right results\n'
+                   + 'in singular transformations; automatically expanding.\n'
+                   + 'left=%s, right=%s') % (left, right))
+        left, right = mtransforms.nonsingular(left, right, increasing=False)
+        left, right = self.xaxis.limit_range_for_scale(left, right)
 
-        self.viewLim.intervalx = (xmin, xmax)
+        self.viewLim.intervalx = (left, right)
+        if auto is not None:
+            self._autoscaleXon = bool(auto)
 
         if emit:
             self.callbacks.process('xlim_changed', self)
             # Call all of the other x-axes that are shared with this one
             for other in self._shared_x_axes.get_siblings(self):
                 if other is not self:
-                    other.set_xlim(self.viewLim.intervalx, emit=False)
+                    other.set_xlim(self.viewLim.intervalx,
+                                            emit=False, auto=auto)
                     if (other.figure != self.figure and
                         other.figure.canvas is not None):
                         other.figure.canvas.draw_idle()
 
-        return xmin, xmax
+        return left, right
 
     def get_xscale(self):
         'return the xaxis scale string: %s' % (
             ", ".join(mscale.get_scale_names()))
         return self.xaxis.get_scale()
 
+    @docstring.dedent_interpd
     def set_xscale(self, value, **kwargs):
         """
         call signature::
@@ -2044,12 +2476,8 @@ class Axes(martist.Artist):
         %(scale_docs)s
         """
         self.xaxis.set_scale(value, **kwargs)
-        self.autoscale_view()
+        self.autoscale_view(scaley=False)
         self._update_transScale()
-
-    set_xscale.__doc__ = cbook.dedent(set_xscale.__doc__) % {
-        'scale': ' | '.join([repr(x) for x in mscale.get_scale_names()]),
-        'scale_docs': mscale.get_scale_docs().strip()}
 
     def get_xticks(self, minor=False):
         'Return the x ticks as a list of locations'
@@ -2078,6 +2506,7 @@ class Axes(martist.Artist):
         return cbook.silent_list('Text xticklabel',
                                  self.xaxis.get_ticklabels(minor=minor))
 
+    @docstring.dedent_interpd
     def set_xticklabels(self, labels, fontdict=None, minor=False, **kwargs):
         """
         call signature::
@@ -2095,30 +2524,29 @@ class Axes(martist.Artist):
         """
         return self.xaxis.set_ticklabels(labels, fontdict,
                                          minor=minor, **kwargs)
-    set_xticklabels.__doc__ = cbook.dedent(
-        set_xticklabels.__doc__) % martist.kwdocd
 
     def invert_yaxis(self):
         "Invert the y-axis."
-        left, right = self.get_ylim()
-        self.set_ylim(right, left)
+        bottom, top = self.get_ylim()
+        self.set_ylim(top, bottom)
 
     def yaxis_inverted(self):
         'Returns True if the y-axis is inverted.'
-        left, right = self.get_ylim()
-        return right < left
+        bottom, top = self.get_ylim()
+        return top < bottom
 
     def get_ybound(self):
         "Return y-axis numerical bounds in the form of lowerBound < upperBound"
-        left, right = self.get_ylim()
-        if left < right:
-            return left, right
+        bottom, top = self.get_ylim()
+        if bottom < top:
+            return bottom, top
         else:
-            return right, left
+            return top, bottom
 
     def set_ybound(self, lower=None, upper=None):
         """Set the lower and upper numerical bounds of the y-axis.
            This method will honor axes inversion regardless of parameter order.
+           It will not change the _autoscaleYon attribute.
         """
         if upper is None and iterable(lower):
             lower,upper = lower
@@ -2130,80 +2558,113 @@ class Axes(martist.Artist):
 
         if self.yaxis_inverted():
             if lower < upper:
-                self.set_ylim(upper, lower)
+                self.set_ylim(upper, lower, auto=None)
             else:
-                self.set_ylim(lower, upper)
+                self.set_ylim(lower, upper, auto=None)
         else:
             if lower < upper:
-                self.set_ylim(lower, upper)
+                self.set_ylim(lower, upper, auto=None)
             else:
-                self.set_ylim(upper, lower)
+                self.set_ylim(upper, lower, auto=None)
 
     def get_ylim(self):
         """
-        Get the y-axis range [*ymin*, *ymax*]
+        Get the y-axis range [*bottom*, *top*]
         """
         return tuple(self.viewLim.intervaly)
 
-    def set_ylim(self, ymin=None, ymax=None, emit=True, **kwargs):
+    def set_ylim(self, bottom=None, top=None, emit=True, auto=False, **kw):
         """
         call signature::
 
           set_ylim(self, *args, **kwargs):
 
-        Set the limits for the yaxis; v = [ymin, ymax]::
+        Set the data limits for the yaxis
 
-          set_ylim((valmin, valmax))
-          set_ylim(valmin, valmax)
-          set_ylim(ymin=1) # ymax unchanged
-          set_ylim(ymax=1) # ymin unchanged
+        Examples::
+
+          set_ylim((bottom, top))
+          set_ylim(bottom, top)
+          set_ylim(bottom=1) # top unchanged
+          set_ylim(top=1) # bottom unchanged
 
         Keyword arguments:
 
-          *ymin*: scalar
-            the min of the ylim
-          *ymax*: scalar
-            the max of the ylim
+          *bottom*: scalar
+            the bottom ylim; the previous name, *ymin*, may still be used
+          *top*: scalar
+            the top ylim; the previous name, *ymax*, may still be used
           *emit*: [ True | False ]
             notify observers of lim change
+          *auto*: [ True | False | None ]
+            turn *y* autoscaling on (True), off (False; default),
+            or leave unchanged (None)
+
+        Note: the *bottom* (formerly *ymin*) value may be greater than
+        the *top* (formerly *ymax*).
+        For example, suppose *y* is depth in the ocean.
+        Then one might use::
+
+          set_ylim(5000, 0)
+
+        so 5000 m depth is at the bottom of the plot and the
+        surface, 0 m, is at the top.
 
         Returns the current ylimits as a length 2 tuple
 
         ACCEPTS: len(2) sequence of floats
         """
-        if ymax is None and iterable(ymin):
-            ymin,ymax = ymin
+        if 'ymin' in kw:
+            bottom = kw.pop('ymin')
+        if 'ymax' in kw:
+            top = kw.pop('ymax')
+        if kw:
+            raise ValueError("unrecognized kwargs: %s" % kw.keys())
 
-        if ymin is not None:
-            ymin = self.convert_yunits(ymin)
-        if ymax is not None:
-            ymax = self.convert_yunits(ymax)
+        if top is None and iterable(bottom):
+            bottom,top = bottom
 
-        old_ymin,old_ymax = self.get_ylim()
+        if bottom is not None:
+            bottom = self.convert_yunits(bottom)
+        if top is not None:
+            top = self.convert_yunits(top)
 
-        if ymin is None: ymin = old_ymin
-        if ymax is None: ymax = old_ymax
+        old_bottom, old_top = self.get_ylim()
 
-        ymin, ymax = mtransforms.nonsingular(ymin, ymax, increasing=False)
-        ymin, ymax = self.yaxis.limit_range_for_scale(ymin, ymax)
-        self.viewLim.intervaly = (ymin, ymax)
+        if bottom is None: bottom = old_bottom
+        if top is None: top = old_top
+
+        if bottom==top:
+            warnings.warn(('Attempting to set identical bottom==top results\n'
+                   + 'in singular transformations; automatically expanding.\n'
+                   + 'bottom=%s, top=%s') % (bottom, top))
+
+        bottom, top = mtransforms.nonsingular(bottom, top, increasing=False)
+        bottom, top = self.yaxis.limit_range_for_scale(bottom, top)
+
+        self.viewLim.intervaly = (bottom, top)
+        if auto is not None:
+            self._autoscaleYon = bool(auto)
 
         if emit:
             self.callbacks.process('ylim_changed', self)
             # Call all of the other y-axes that are shared with this one
             for other in self._shared_y_axes.get_siblings(self):
                 if other is not self:
-                    other.set_ylim(self.viewLim.intervaly, emit=False)
+                    other.set_ylim(self.viewLim.intervaly,
+                                            emit=False, auto=auto)
                     if (other.figure != self.figure and
                         other.figure.canvas is not None):
                         other.figure.canvas.draw_idle()
-        return ymin, ymax
+
+        return bottom, top
 
     def get_yscale(self):
         'return the xaxis scale string: %s' % (
                 ", ".join(mscale.get_scale_names()))
         return self.yaxis.get_scale()
 
+    @docstring.dedent_interpd
     def set_yscale(self, value, **kwargs):
         """
         call signature::
@@ -2218,12 +2679,8 @@ class Axes(martist.Artist):
         %(scale_docs)s
         """
         self.yaxis.set_scale(value, **kwargs)
-        self.autoscale_view()
+        self.autoscale_view(scalex=False)
         self._update_transScale()
-
-    set_yscale.__doc__ = cbook.dedent(set_yscale.__doc__) % {
-        'scale': ' | '.join([repr(x) for x in mscale.get_scale_names()]),
-        'scale_docs': mscale.get_scale_docs().strip()}
 
     def get_yticks(self, minor=False):
         'Return the y ticks as a list of locations'
@@ -2257,6 +2714,7 @@ class Axes(martist.Artist):
         return cbook.silent_list('Text yticklabel',
                                  self.yaxis.get_ticklabels(minor=minor))
 
+    @docstring.dedent_interpd
     def set_yticklabels(self, labels, fontdict=None, minor=False, **kwargs):
         """
         call signature::
@@ -2274,81 +2732,24 @@ class Axes(martist.Artist):
         """
         return self.yaxis.set_ticklabels(labels, fontdict,
                                          minor=minor, **kwargs)
-    set_yticklabels.__doc__ = cbook.dedent(
-        set_yticklabels.__doc__) % martist.kwdocd
 
     def xaxis_date(self, tz=None):
         """Sets up x-axis ticks and labels that treat the x data as dates.
 
-        *tz* is the time zone to use in labeling dates.  Defaults to rc value.
+        *tz* is a timezone string or :class:`tzinfo` instance.
+        Defaults to rc value.
         """
-
-        xmin, xmax = self.dataLim.intervalx
-        if xmin==0.:
-            # no data has been added - let's set the default datalim.
-            # We should probably use a better proxy for the datalim
-            # have been updated than the ignore setting
-            dmax = today = datetime.date.today()
-            dmin = today-datetime.timedelta(days=10)
-            self._process_unit_info(xdata=(dmin, dmax))
-            dmin, dmax = self.convert_xunits([dmin, dmax])
-            self.viewLim.intervalx = dmin, dmax
-            self.dataLim.intervalx = dmin, dmax
-
-        locator = self.xaxis.get_major_locator()
-        if not isinstance(locator, mdates.DateLocator):
-            locator = mdates.AutoDateLocator(tz)
-            self.xaxis.set_major_locator(locator)
-
-        # the autolocator uses the viewlim to pick the right date
-        # locator, but it may not have correct viewlim before an
-        # autoscale.  If the viewlim is still zero..1, set it to the
-        # datalim and the autoscaler will update it on request
-        if self.viewLim.intervalx[0]==0.:
-            self.viewLim.intervalx = tuple(self.dataLim.intervalx)
-        locator.refresh()
-
-        formatter = self.xaxis.get_major_formatter()
-        if not isinstance(formatter, mdates.DateFormatter):
-            formatter = mdates.AutoDateFormatter(locator, tz)
-            self.xaxis.set_major_formatter(formatter)
+        # should be enough to inform the unit conversion interface
+        # dates are coming in
+        self.xaxis.axis_date(tz)
 
     def yaxis_date(self, tz=None):
         """Sets up y-axis ticks and labels that treat the y data as dates.
 
-        *tz* is the time zone to use in labeling dates.  Defaults to rc value.
+        *tz* is a timezone string or :class:`tzinfo` instance.
+        Defaults to rc value.
         """
-        ymin, ymax = self.dataLim.intervaly
-        if ymin==0.:
-            # no data has been added - let's set the default datalim.
-            # We should probably use a better proxy for the datalim
-            # have been updated than the ignore setting
-            dmax = today = datetime.date.today()
-            dmin = today-datetime.timedelta(days=10)
-            self._process_unit_info(ydata=(dmin, dmax))
-
-            dmin, dmax = self.convert_yunits([dmin, dmax])
-            self.viewLim.intervaly = dmin, dmax
-            self.dataLim.intervaly = dmin, dmax
-
-
-        locator = self.yaxis.get_major_locator()
-        if not isinstance(locator, mdates.DateLocator):
-            locator = mdates.AutoDateLocator(tz)
-            self.yaxis.set_major_locator(locator)
-
-        # the autolocator uses the viewlim to pick the right date
-        # locator, but it may not have correct viewlim before an
-        # autoscale.  If the viewlim is still zero..1, set it to the
-        # datalim and the autoscaler will update it on request
-        if self.viewLim.intervaly[0]==0.:
-            self.viewLim.intervaly = tuple(self.dataLim.intervaly)
-        locator.refresh()
-
-        formatter = self.xaxis.get_major_formatter()
-        if not isinstance(formatter, mdates.DateFormatter):
-            formatter = mdates.AutoDateFormatter(locator, tz)
-            self.yaxis.set_major_formatter(formatter)
+        self.yaxis.axis_date(tz)
 
     def format_xdata(self, x):
         """
@@ -2390,7 +2791,13 @@ class Axes(martist.Artist):
 
     def can_zoom(self):
         """
-        Return *True* if this axes support the zoom box
+        Return *True* if this axes supports the zoom box button functionality.
+        """
+        return True
+
+    def can_pan(self) :
+        """
+        Return *True* if this axes supports any pan/zoom button functionality.
         """
         return True
 
@@ -2614,7 +3021,7 @@ class Axes(martist.Artist):
         required.
 
         """
-        return self.patch.contains_point(point)
+        return self.patch.contains_point(point, radius=1.0)
 
     def pick(self, *args):
         """
@@ -2705,6 +3112,7 @@ class Axes(martist.Artist):
         """
         return self.title.get_text()
 
+    @docstring.dedent_interpd
     def set_title(self, label, fontdict=None, **kwargs):
         """
         call signature::
@@ -2725,7 +3133,7 @@ class Axes(martist.Artist):
         """
         default = {
             'fontsize':rcParams['axes.titlesize'],
-            'verticalalignment' : 'bottom',
+            'verticalalignment' : 'baseline',
             'horizontalalignment' : 'center'
             }
 
@@ -2734,7 +3142,6 @@ class Axes(martist.Artist):
         if fontdict is not None: self.title.update(fontdict)
         self.title.update(kwargs)
         return self.title
-    set_title.__doc__ = cbook.dedent(set_title.__doc__) % martist.kwdocd
 
     def get_xlabel(self):
         """
@@ -2743,6 +3150,7 @@ class Axes(martist.Artist):
         label = self.xaxis.get_label()
         return label.get_text()
 
+    @docstring.dedent_interpd
     def set_xlabel(self, xlabel, fontdict=None, labelpad=None, **kwargs):
         """
         call signature::
@@ -2764,7 +3172,6 @@ class Axes(martist.Artist):
         """
         if labelpad is not None: self.xaxis.labelpad = labelpad
         return self.xaxis.set_label_text(xlabel, fontdict, **kwargs)
-    set_xlabel.__doc__ = cbook.dedent(set_xlabel.__doc__) % martist.kwdocd
 
     def get_ylabel(self):
         """
@@ -2773,6 +3180,7 @@ class Axes(martist.Artist):
         label = self.yaxis.get_label()
         return label.get_text()
 
+    @docstring.dedent_interpd
     def set_ylabel(self, ylabel, fontdict=None, labelpad=None, **kwargs):
         """
         call signature::
@@ -2794,8 +3202,8 @@ class Axes(martist.Artist):
         """
         if labelpad is not None: self.yaxis.labelpad = labelpad
         return self.yaxis.set_label_text(ylabel, fontdict, **kwargs)
-    set_ylabel.__doc__ = cbook.dedent(set_ylabel.__doc__) % martist.kwdocd
 
+    @docstring.dedent_interpd
     def text(self, x, y, s, fontdict=None,
              withdash=False, **kwargs):
         """
@@ -2844,9 +3252,8 @@ class Axes(martist.Artist):
        %(Text)s
         """
         default = {
-            'verticalalignment' : 'bottom',
+            'verticalalignment' : 'baseline',
             'horizontalalignment' : 'left',
-            #'verticalalignment' : 'top',
             'transform' : self.transData,
             }
 
@@ -2876,8 +3283,8 @@ class Axes(martist.Artist):
         #if t.get_clip_on():  t.set_clip_box(self.bbox)
         if 'clip_on' in kwargs:  t.set_clip_box(self.bbox)
         return t
-    text.__doc__ = cbook.dedent(text.__doc__) % martist.kwdocd
 
+    @docstring.dedent_interpd
     def annotate(self, *args, **kwargs):
         """
         call signature::
@@ -2896,11 +3303,12 @@ class Axes(martist.Artist):
         self._set_artist_props(a)
         if kwargs.has_key('clip_on'):  a.set_clip_path(self.patch)
         self.texts.append(a)
+        a._remove_method = lambda h: self.texts.remove(h)
         return a
-    annotate.__doc__ = cbook.dedent(annotate.__doc__) % martist.kwdocd
 
     #### Lines and spans
 
+    @docstring.dedent_interpd
     def axhline(self, y=0, xmin=0, xmax=1, **kwargs):
         """
         call signature::
@@ -2934,7 +3342,8 @@ class Axes(martist.Artist):
 
             >>> axhline(y=.5, xmin=0.25, xmax=0.75)
 
-        Valid kwargs are :class:`~matplotlib.lines.Line2D` properties:
+        Valid kwargs are :class:`~matplotlib.lines.Line2D` properties,
+        with the exception of 'transform':
 
         %(Line2D)s
 
@@ -2944,6 +3353,10 @@ class Axes(martist.Artist):
                 for example plot and source code
         """
 
+        if "transform" in kwargs:
+            raise ValueError(
+                "'transform' is not allowed as a kwarg;"
+                + "axhline generates its own transform.")
         ymin, ymax = self.get_ybound()
 
         # We need to strip away the units for comparison with
@@ -2960,8 +3373,7 @@ class Axes(martist.Artist):
         self.autoscale_view(scalex=False, scaley=scaley)
         return l
 
-    axhline.__doc__ = cbook.dedent(axhline.__doc__) % martist.kwdocd
-
+    @docstring.dedent_interpd
     def axvline(self, x=0, ymin=0, ymax=1, **kwargs):
         """
         call signature::
@@ -2995,7 +3407,8 @@ class Axes(martist.Artist):
 
             >>> axvline(x=.5, ymin=0.25, ymax=0.75)
 
-        Valid kwargs are :class:`~matplotlib.lines.Line2D` properties:
+        Valid kwargs are :class:`~matplotlib.lines.Line2D` properties,
+        with the exception of 'transform':
 
         %(Line2D)s
 
@@ -3005,6 +3418,10 @@ class Axes(martist.Artist):
                 for example plot and source code
         """
 
+        if "transform" in kwargs:
+            raise ValueError(
+                "'transform' is not allowed as a kwarg;"
+                + "axvline generates its own transform.")
         xmin, xmax = self.get_xbound()
 
         # We need to strip away the units for comparison with
@@ -3021,8 +3438,7 @@ class Axes(martist.Artist):
         self.autoscale_view(scalex=scalex, scaley=False)
         return l
 
-    axvline.__doc__ = cbook.dedent(axvline.__doc__) % martist.kwdocd
-
+    @docstring.dedent_interpd
     def axhspan(self, ymin, ymax, xmin=0, xmax=1, **kwargs):
         """
         call signature::
@@ -3078,8 +3494,8 @@ class Axes(martist.Artist):
         self.add_patch(p)
         self.autoscale_view(scalex=False)
         return p
-    axhspan.__doc__ = cbook.dedent(axhspan.__doc__) % martist.kwdocd
 
+    @docstring.dedent_interpd
     def axvspan(self, xmin, xmax, ymin=0, ymax=1, **kwargs):
         """
         call signature::
@@ -3135,9 +3551,9 @@ class Axes(martist.Artist):
         self.add_patch(p)
         self.autoscale_view(scaley=False)
         return p
-    axvspan.__doc__ = cbook.dedent(axvspan.__doc__) % martist.kwdocd
 
 
+    @docstring.dedent
     def hlines(self, y, xmin, xmax, colors='k', linestyles='solid',
                      label='', **kwargs):
         """
@@ -3222,8 +3638,8 @@ class Axes(martist.Artist):
 
 
         return coll
-    hlines.__doc__ = cbook.dedent(hlines.__doc__)
 
+    @docstring.dedent_interpd
     def vlines(self, x, ymin, ymax, colors='k', linestyles='solid',
                      label='', **kwargs):
         """
@@ -3302,9 +3718,9 @@ class Axes(martist.Artist):
         self.autoscale_view()
 
         return coll
-    vlines.__doc__ = cbook.dedent(vlines.__doc__) % martist.kwdocd
 
     #### Basic plotting
+    @docstring.dedent_interpd
     def plot(self, *args, **kwargs):
         """
         Plot lines and/or markers to the
@@ -3437,14 +3853,13 @@ class Axes(martist.Artist):
         self.autoscale_view(scalex=scalex, scaley=scaley)
         return lines
 
-    plot.__doc__ = cbook.dedent(plot.__doc__) % martist.kwdocd
-
+    @docstring.dedent_interpd
     def plot_date(self, x, y, fmt='bo', tz=None, xdate=True, ydate=False,
                   **kwargs):
         """
         call signature::
 
-          plot_date(x, y, fmt='bo', tz=None, xdate=True, ydate=False, **kwargs)
+           plot_date(x, y, fmt='bo', tz=None, xdate=True, ydate=False, **kwargs)
 
         Similar to the :func:`~matplotlib.pyplot.plot` command, except
         the *x* or *y* (or both) data is considered to be dates, and the
@@ -3455,18 +3870,18 @@ class Axes(martist.Artist):
 
         Keyword arguments:
 
-          *fmt*: string
-            The plot format string.
+        *fmt*: string
+           The plot format string.
 
-          *tz*: [ None | timezone string ]
-            The time zone to use in labeling dates. If *None*, defaults to rc
-            value.
+        *tz*: [ None | timezone string | :class:`tzinfo` instance]
+           The time zone to use in labeling dates. If *None*, defaults to rc
+           value.
 
-          *xdate*: [ True | False ]
-            If *True*, the *x*-axis will be labeled with dates.
+        *xdate*: [ True | False ]
+           If *True*, the *x*-axis will be labeled with dates.
 
-          *ydate*: [ False | True ]
-            If *True*, the *y*-axis will be labeled with dates.
+        *ydate*: [ False | True ]
+           If *True*, the *y*-axis will be labeled with dates.
 
         Note if you are using custom date tickers and formatters, it
         may be necessary to set the formatters/locators after the call
@@ -3486,14 +3901,12 @@ class Axes(martist.Artist):
 
         .. seealso::
 
-            :mod:`~matplotlib.dates`
-                for helper functions
+           :mod:`~matplotlib.dates` for helper functions
 
-            :func:`~matplotlib.dates.date2num`,
-            :func:`~matplotlib.dates.num2date` and
-            :func:`~matplotlib.dates.drange`
-                for help on creating the required floating point
-                dates.
+           :func:`~matplotlib.dates.date2num`,
+           :func:`~matplotlib.dates.num2date` and
+           :func:`~matplotlib.dates.drange` for help on creating the required
+           floating point dates.
         """
 
         if not self._hold: self.cla()
@@ -3508,9 +3921,9 @@ class Axes(martist.Artist):
         self.autoscale_view()
 
         return ret
-    plot_date.__doc__ = cbook.dedent(plot_date.__doc__) % martist.kwdocd
 
 
+    @docstring.dedent_interpd
     def loglog(self, *args, **kwargs):
         """
         call signature::
@@ -3569,8 +3982,8 @@ class Axes(martist.Artist):
         self._hold = b    # restore the hold
 
         return l
-    loglog.__doc__ = cbook.dedent(loglog.__doc__) % martist.kwdocd
 
+    @docstring.dedent_interpd
     def semilogx(self, *args, **kwargs):
         """
         call signature::
@@ -3615,14 +4028,13 @@ class Axes(martist.Artist):
              }
 
         self.set_xscale('log', **d)
-        self.set_yscale('linear')
         b =  self._hold
         self._hold = True # we've already processed the hold
         l = self.plot(*args, **kwargs)
         self._hold = b    # restore the hold
         return l
-    semilogx.__doc__ = cbook.dedent(semilogx.__doc__) % martist.kwdocd
 
+    @docstring.dedent_interpd
     def semilogy(self, *args, **kwargs):
         """
         call signature::
@@ -3666,15 +4078,14 @@ class Axes(martist.Artist):
              'nonposy': kwargs.pop('nonposy', 'mask'),
              }
         self.set_yscale('log', **d)
-        self.set_xscale('linear')
         b =  self._hold
         self._hold = True # we've already processed the hold
         l = self.plot(*args, **kwargs)
         self._hold = b    # restore the hold
 
         return l
-    semilogy.__doc__ = cbook.dedent(semilogy.__doc__) % martist.kwdocd
 
+    @docstring.dedent_interpd
     def acorr(self, x, **kwargs):
         """
         call signature::
@@ -3724,7 +4135,7 @@ class Axes(martist.Artist):
 
             :meth:`~matplotlib.axes.Axes.plot` or
             :meth:`~matplotlib.axes.Axes.vlines`
-               For documentation on valid kwargs.
+            For documentation on valid kwargs.
 
         **Example:**
 
@@ -3736,8 +4147,8 @@ class Axes(martist.Artist):
         .. plot:: mpl_examples/pylab_examples/xcorr_demo.py
         """
         return self.xcorr(x, x, **kwargs)
-    acorr.__doc__ = cbook.dedent(acorr.__doc__) % martist.kwdocd
 
+    @docstring.dedent_interpd
     def xcorr(self, x, y, normed=True, detrend=mlab.detrend_none,
               usevlines=True, maxlags=10, **kwargs):
         """
@@ -3824,23 +4235,31 @@ class Axes(martist.Artist):
             a, = self.plot(lags, c, **kwargs)
             b = None
         return lags, c, a, b
-    xcorr.__doc__ = cbook.dedent(xcorr.__doc__) % martist.kwdocd
 
 
-    def _get_legend_handles(self):
+    def _get_legend_handles(self, legend_handler_map=None):
         "return artists that will be used as handles for legend"
-        handles = self.lines[:]
-        handles.extend(self.patches)
-        handles.extend([c for c in self.collections
-                        if isinstance(c, mcoll.LineCollection)])
-        handles.extend([c for c in self.collections
-                        if isinstance(c, mcoll.RegularPolyCollection)])
-        handles.extend([c for c in self.collections
-                        if isinstance(c, mcoll.CircleCollection)])
+        handles_original = self.lines + self.patches + \
+                           self.collections + self.containers
+
+        # collections
+        handler_map = mlegend.Legend.get_default_handler_map()
+
+        if legend_handler_map is not None:
+            handler_map = handler_map.copy()
+            handler_map.update(legend_handler_map)
+
+        handles = []
+        for h in handles_original:
+            if h.get_label() == "_nolegend_": #.startswith('_'):
+                continue
+            if mlegend.Legend.get_legend_handler(handler_map, h):
+                handles.append(h)
+
         return handles
 
 
-    def get_legend_handles_labels(self):
+    def get_legend_handles_labels(self, legend_handler_map=None):
         """
         return handles and labels for legend
 
@@ -3853,10 +4272,10 @@ class Axes(martist.Artist):
 
         handles = []
         labels = []
-        for handle in self._get_legend_handles():
+        for handle in self._get_legend_handles(legend_handler_map):
             label = handle.get_label()
-            if (label is not None and
-                label != '' and not label.startswith('_')):
+            #if (label is not None and label != '' and not label.startswith('_')):
+            if label and not label.startswith('_'):
                 handles.append(handle)
                 labels.append(label)
 
@@ -3962,6 +4381,10 @@ class Axes(martist.Artist):
             The relative size of legend markers vs. original. If *None*, use rc
             settings.
 
+          *frameon*: [ True | False ]
+            if True, draw a frame around the legend.
+            The default is set by the rcParam 'legend.frameon'
+
           *fancybox*: [ None | False | True ]
             if True, draw a frame with a round fancybox.  If None, use rc
 
@@ -3984,9 +4407,11 @@ class Axes(martist.Artist):
           *title* : string
             the legend title
 
-        Padding and spacing between various elements use following keywords
-        parameters. The dimensions of these values are given as a fraction
-        of the fontsize. Values from rcParams will be used if None.
+        Padding and spacing between various elements use following
+        keywords parameters. These values are measure in font-size
+        units. E.g., a fontsize of 10 points and a handlelength=5
+        implies a handlelength of 50 points.  Values from rcParams
+        will be used if None.
 
         ================   ==================================================================
         Keyword            Description
@@ -3998,6 +4423,9 @@ class Axes(martist.Artist):
         borderaxespad      the pad between the axes and legend border
         columnspacing      the spacing between columns
         ================   ==================================================================
+
+        .. Note:: Not all kinds of artist are supported by the legend command.
+                  See LINK (FIXME) for details.
 
 
         **Example:**
@@ -4040,7 +4468,10 @@ class Axes(martist.Artist):
             raise TypeError('Invalid arguments to legend')
 
 
-        handles = cbook.flatten(handles)
+        # Why do we need to call "flatten" here? -JJL
+        # handles = cbook.flatten(handles)
+
+
         self.legend_ = mlegend.Legend(self, handles, labels, **kwargs)
         return self.legend_
 
@@ -4078,19 +4509,12 @@ class Axes(martist.Artist):
         return self.plot(x, y, *args, **kwargs)
 
 
-    def bar(self, left, height, width=0.8, bottom=None,
-            color=None, edgecolor=None, linewidth=None,
-            yerr=None, xerr=None, ecolor=None, capsize=3,
-            align='edge', orientation='vertical', log=False,
-            **kwargs
-            ):
+    @docstring.dedent_interpd
+    def bar(self, left, height, width=0.8, bottom=None, **kwargs):
         """
         call signature::
 
-          bar(left, height, width=0.8, bottom=0,
-              color=None, edgecolor=None, linewidth=None,
-              yerr=None, xerr=None, ecolor=None, capsize=3,
-              align='edge', orientation='vertical', log=False)
+          bar(left, height, width=0.8, bottom=0, **kwargs)
 
         Make a bar plot with rectangles bounded by:
 
@@ -4131,6 +4555,10 @@ class Axes(martist.Artist):
           *ecolor*          specifies the color of any errorbar
           *capsize*         (default 3) determines the length in
                             points of the error bar caps
+          *error_kw*        dictionary of kwargs to be passed to
+                            errorbar method. *ecolor* and *capsize*
+                            may be specified here rather than as
+                            independent kwargs.
           *align*           'edge' (default) | 'center'
           *orientation*     'vertical' | 'horizontal'
           *log*             [False|True] False (default) leaves the
@@ -4149,6 +4577,9 @@ class Axes(martist.Artist):
         *xerr*, and *yerr* can be either scalars or sequences of
         length equal to the number of bars.  This enables you to use
         bar as the basis for stacked bar charts, or candlestick plots.
+        Detail: *xerr* and *yerr* are passed directly to
+        :meth:`errorbar`, so they can also have shape 2xN for
+        independent specification of lower and upper errors.
 
         Other optional kwargs:
 
@@ -4159,7 +4590,24 @@ class Axes(martist.Artist):
         .. plot:: mpl_examples/pylab_examples/bar_stacked.py
         """
         if not self._hold: self.cla()
+        color = kwargs.pop('color', None)
+        edgecolor = kwargs.pop('edgecolor', None)
+        linewidth = kwargs.pop('linewidth', None)
 
+        # Because xerr and yerr will be passed to errorbar,
+        # most dimension checking and processing will be left
+        # to the errorbar method.
+        xerr = kwargs.pop('xerr', None)
+        yerr = kwargs.pop('yerr', None)
+        error_kw = kwargs.pop('error_kw', dict())
+        ecolor = kwargs.pop('ecolor', None)
+        capsize = kwargs.pop('capsize', 3)
+        error_kw.setdefault('ecolor', ecolor)
+        error_kw.setdefault('capsize', capsize)
+
+        align = kwargs.pop('align', 'edge')
+        orientation = kwargs.pop('orientation', 'vertical')
+        log = kwargs.pop('log', False)
         label = kwargs.pop('label', '')
         def make_iterable(x):
             if not iterable(x):
@@ -4220,6 +4668,8 @@ class Axes(martist.Artist):
             color = [None] * nbars
         else:
             color = list(mcolors.colorConverter.to_rgba_array(color))
+            if len(color) == 0:     # until to_rgba_array is changed
+                color = [[0,0,0,0]]
             if len(color) < nbars:
                 color *= nbars
 
@@ -4227,16 +4677,10 @@ class Axes(martist.Artist):
             edgecolor = [None] * nbars
         else:
             edgecolor = list(mcolors.colorConverter.to_rgba_array(edgecolor))
+            if len(edgecolor) == 0:     # until to_rgba_array is changed
+                edgecolor = [[0,0,0,0]]
             if len(edgecolor) < nbars:
                 edgecolor *= nbars
-
-        if yerr is not None:
-            if not iterable(yerr):
-                yerr = [yerr]*nbars
-
-        if xerr is not None:
-            if not iterable(xerr):
-                xerr = [xerr]*nbars
 
         # FIXME: convert the following to proper input validation
         # raising ValueError; don't use assert for this.
@@ -4247,13 +4691,6 @@ class Axes(martist.Artist):
                                    nbars)
         assert len(bottom)==nbars, ("incompatible sizes: argument 'bottom' must be length %d or scalar" %
                                     nbars)
-
-        if yerr is not None and len(yerr)!=nbars:
-            raise ValueError(
-                "incompatible sizes: bar() argument 'yerr' must be len(%s) or scalar" % nbars)
-        if xerr is not None and len(xerr)!=nbars:
-            raise ValueError(
-                "incompatible sizes: bar() argument 'xerr' must be len(%s) or scalar" % nbars)
 
         patches = []
 
@@ -4295,9 +4732,8 @@ class Axes(martist.Artist):
                 facecolor=c,
                 edgecolor=e,
                 linewidth=lw,
-                label=label
+                label='_nolegend_'
                 )
-            label = '_nolegend_'
             r.update(kwargs)
             r.get_path()._interpolation_steps = 100
             #print r.get_label(), label, 'label' in kwargs
@@ -4318,10 +4754,14 @@ class Axes(martist.Artist):
                 x = [l+w for l,w in zip(left, width)]
                 y = [b+0.5*h for b,h in zip(bottom, height)]
 
-            self.errorbar(
-                x, y,
-                yerr=yerr, xerr=xerr,
-                fmt=None, ecolor=ecolor, capsize=capsize)
+            if "label" not in error_kw:
+                error_kw["label"] = '_nolegend_'
+
+            errorbar = self.errorbar(x, y,
+                                     yerr=yerr, xerr=xerr,
+                                     fmt=None, **error_kw)
+        else:
+            errorbar = None
 
         self.hold(holdstate) # restore previous hold state
 
@@ -4341,9 +4781,13 @@ class Axes(martist.Artist):
             ymin = max(ymin*0.9, 1e-100)
             self.dataLim.intervaly = (ymin, ymax)
         self.autoscale_view()
-        return patches
-    bar.__doc__ = cbook.dedent(bar.__doc__) % martist.kwdocd
 
+        bar_container = BarContainer(patches, errorbar, label=label)
+        self.add_container(bar_container)
+
+        return bar_container
+
+    @docstring.dedent_interpd
     def barh(self, bottom, width, height=0.8, left=None, **kwargs):
         """
         call signature::
@@ -4414,8 +4858,7 @@ class Axes(martist.Artist):
                            orientation='horizontal', **kwargs)
         return patches
 
-    barh.__doc__ = cbook.dedent(barh.__doc__) % martist.kwdocd
-
+    @docstring.dedent_interpd
     def broken_barh(self, xranges, yrange, **kwargs):
         """
         call signature::
@@ -4458,9 +4901,8 @@ class Axes(martist.Artist):
 
         return col
 
-    broken_barh.__doc__ = cbook.dedent(broken_barh.__doc__) % martist.kwdocd
-
-    def stem(self, x, y, linefmt='b-', markerfmt='bo', basefmt='r-'):
+    def stem(self, x, y, linefmt='b-', markerfmt='bo', basefmt='r-',
+             bottom=None, label=None):
         """
         call signature::
 
@@ -4475,32 +4917,39 @@ class Axes(martist.Artist):
         *baseline*).
 
         .. seealso::
+            This `document <http://www.mathworks.com/access/helpdesk/help/techdoc/ref/stem.html>`_
+            for details.
 
-            `this document`__
-               for details
 
-            :file:`examples/pylab_examples/stem_plot.py`
-               for a demo
+        **Example:**
 
-        __ http://www.mathworks.com/access/helpdesk/help/techdoc/ref/stem.html
-
+        .. plot:: mpl_examples/pylab_examples/stem_plot.py
         """
         remember_hold=self._hold
         if not self._hold: self.cla()
         self.hold(True)
 
-        markerline, = self.plot(x, y, markerfmt)
+        markerline, = self.plot(x, y, markerfmt, label="_nolegend_")
+
+        if bottom is None:
+            bottom = 0
 
         stemlines = []
         for thisx, thisy in zip(x, y):
-            l, = self.plot([thisx,thisx], [0, thisy], linefmt)
+            l, = self.plot([thisx,thisx], [bottom, thisy], linefmt,
+                           label="_nolegend_")
             stemlines.append(l)
 
-        baseline, = self.plot([np.amin(x), np.amax(x)], [0,0], basefmt)
+        baseline, = self.plot([np.amin(x), np.amax(x)], [bottom,bottom],
+                              basefmt, label="_nolegend_")
 
         self.hold(remember_hold)
 
-        return markerline, stemlines, baseline
+        stem_container = StemContainer((markerline, stemlines, baseline),
+                                       label=label)
+        self.add_container(stem_container)
+
+        return stem_container
 
 
     def pie(self, x, explode=None, labels=None, colors=None,
@@ -4611,6 +5060,7 @@ class Axes(martist.Artist):
                               #props={'facecolor':w.get_facecolor()}
                               )
                 shad.set_zorder(0.9*w.get_zorder())
+                shad.set_label('_nolegend_')
                 self.add_patch(shad)
 
 
@@ -4653,6 +5103,7 @@ class Axes(martist.Artist):
         if autopct is None: return slices, texts
         else: return slices, texts, autotexts
 
+    @docstring.dedent_interpd
     def errorbar(self, x, y, yerr=None, xerr=None,
                  fmt='-', ecolor=None, elinewidth=None, capsize=3,
                  barsabove=False, lolims=False, uplims=False,
@@ -4678,17 +5129,17 @@ class Axes(martist.Artist):
             If a scalar number, len(N) array-like object, or an Nx1 array-like
             object, errorbars are drawn +/- value.
 
-            If a rank-1, 2xN numpy array, errorbars are drawn at -row1 and
+            If a sequence of shape 2xN, errorbars are drawn at -row1 and
             +row2
 
           *fmt*: '-'
-            The plot format symbol for *y*. If *fmt* is *None*, just plot the
-            errorbars with no line symbols.  This can be useful for creating a
-            bar plot with errorbars.
+            The plot format symbol. If *fmt* is *None*, only the
+            errorbars are plotted.  This is used for adding
+            errorbars to a bar plot, for example.
 
           *ecolor*: [ None | mpl color ]
-            a matplotlib color arg which gives the color the errorbar lines; if
-            *None*, use the marker color.
+            a matplotlib color arg which gives the color the errorbar lines;
+            if *None*, use the marker color.
 
           *elinewidth*: scalar
             the linewidth of the errorbar lines. If *None*, use the linewidth.
@@ -4707,8 +5158,7 @@ class Axes(martist.Artist):
             type as *xerr* and *yerr*.
 
         All other keyword arguments are passed on to the plot command for the
-        markers, so you can add additional key=value pairs to control the
-        errorbar markers.  For example, this code makes big red squares with
+        markers. For example, this code makes big red squares with
         thick green edges::
 
           x,y,yerr = rand(3,10)
@@ -4723,12 +5173,16 @@ class Axes(martist.Artist):
 
         %(Line2D)s
 
-        Return value is a length 3 tuple.  The first element is the
-        :class:`~matplotlib.lines.Line2D` instance for the *y* symbol
-        lines.  The second element is a list of error bar cap lines,
-        the third element is a list of
-        :class:`~matplotlib.collections.LineCollection` instances for
-        the horizontal and vertical error ranges.
+        Returns (*plotline*, *caplines*, *barlinecols*):
+
+            *plotline*: :class:`~matplotlib.lines.Line2D` instance
+                *x*, *y* plot markers and/or line
+
+            *caplines*: list of error bar cap
+                :class:`~matplotlib.lines.Line2D` instances
+            *barlinecols*: list of
+                :class:`~matplotlib.collections.LineCollection` instances for
+                the horizontal and vertical error ranges.
 
         **Example:**
 
@@ -4738,6 +5192,10 @@ class Axes(martist.Artist):
 
         self._process_unit_info(xdata=x, ydata=y, kwargs=kwargs)
         if not self._hold: self.cla()
+        holdstate = self._hold
+        self._hold = True
+
+        label = kwargs.pop("label", None)
 
         # make sure all the args are iterable; use lists not arrays to
         # preserve units
@@ -4758,7 +5216,7 @@ class Axes(martist.Artist):
         l0 = None
 
         if barsabove and fmt is not None:
-            l0, = self.plot(x,y,fmt,**kwargs)
+            l0, = self.plot(x,y,fmt,label="_nolegend_", **kwargs)
 
         barcols = []
         caplines = []
@@ -4900,7 +5358,7 @@ class Axes(martist.Artist):
 
         if ecolor is None:
             if l0 is None:
-                ecolor = self._get_lines._get_next_cycle_color()
+                ecolor = self._get_lines.color_cycle.next()
             else:
                 ecolor = l0.get_color()
 
@@ -4910,22 +5368,32 @@ class Axes(martist.Artist):
             l.set_color(ecolor)
 
         self.autoscale_view()
-        return (l0, caplines, barcols)
-    errorbar.__doc__ = cbook.dedent(errorbar.__doc__) % martist.kwdocd
+        self._hold = holdstate
+
+        errorbar_container = ErrorbarContainer((l0, tuple(caplines), tuple(barcols)),
+                                               has_xerr=(xerr is not None),
+                                               has_yerr=(yerr is not None),
+                                               label=label)
+        self.containers.append(errorbar_container)
+
+        return errorbar_container # (l0, caplines, barcols)
 
     def boxplot(self, x, notch=0, sym='b+', vert=1, whis=1.5,
-                positions=None, widths=None):
+                positions=None, widths=None, patch_artist=False,
+                bootstrap=None):
         """
         call signature::
 
           boxplot(x, notch=0, sym='+', vert=1, whis=1.5,
-                  positions=None, widths=None)
+                  positions=None, widths=None, patch_artist=False)
 
         Make a box and whisker plot for each column of *x* or each
         vector in sequence *x*.  The box extends from the lower to
         upper quartile values of the data, with a line at the median.
         The whiskers extend from the box to show the range of the
         data.  Flier points are those past the end of the whiskers.
+
+        *x* is an array or a sequence of vectors.
 
         - *notch* = 0 (default) produces a rectangular box plot.
         - *notch* = 1 will produce a notched box plot
@@ -4935,11 +5403,21 @@ class Axes(martist.Artist):
 
         - *vert* = 1 (default) makes the boxes vertical.
         - *vert* = 0 makes horizontal boxes.  This seems goofy, but
-          that's how Matlab did it.
+          that's how MATLAB did it.
 
         *whis* (default 1.5) defines the length of the whiskers as
         a function of the inner quartile range.  They extend to the
         most extreme data point within ( ``whis*(75%-25%)`` ) data range.
+
+        *bootstrap* (default None) specifies whether to bootstrap the
+        confidence intervals around the median for notched
+        boxplots. If bootstrap==None, no bootstrapping is performed,
+        and notches are calculated using a Gaussian-based asymptotic
+        approximation (see McGill, R., Tukey, J.W., and Larsen, W.A.,
+        1978, and Kendall and Stuart, 1967). Otherwise, bootstrap
+        specifies the number of times to bootstrap the median to
+        determine it's 95% confidence intervals. Values between 1000
+        and 10000 are recommended.
 
         *positions* (default 1,2,...,n) sets the horizontal positions of
         the boxes. The ticks and limits are automatically set to match
@@ -4949,7 +5427,8 @@ class Axes(martist.Artist):
         each box. The default is 0.5, or ``0.15*(distance between extreme
         positions)`` if that is smaller.
 
-        *x* is an array or a sequence of vectors.
+        - *patch_artist* = False (default) produces boxes with the Line2D artist
+        - *patch_artist* = True produces boxes with the Patch artist
 
         Returns a dictionary mapping each component of the boxplot
         to a list of the :class:`matplotlib.lines.Line2D`
@@ -5051,12 +5530,33 @@ class Axes(martist.Artist):
                 med_x = [box_x_min, box_x_max]
             # calculate 'notch' plot
             else:
-                notch_max = med + 1.57*iq/np.sqrt(row)
-                notch_min = med - 1.57*iq/np.sqrt(row)
-                if notch_max > q3:
-                    notch_max = q3
-                if notch_min < q1:
-                    notch_min = q1
+                if bootstrap is not None:
+                    # Do a bootstrap estimate of notch locations.
+                    def bootstrapMedian(data, N=5000):
+                        # determine 95% confidence intervals of the median
+                        M = len(data)
+                        percentile = [2.5,97.5]
+                        estimate = np.zeros(N)
+                        for n in range(N):
+                            bsIndex = np.random.random_integers(0,M-1,M)
+                            bsData = data[bsIndex]
+                            estimate[n] = mlab.prctile(bsData, 50)
+                        CI = mlab.prctile(estimate, percentile)
+                        return CI
+
+                    # get conf. intervals around median
+                    CI = bootstrapMedian(d, N=bootstrap)
+                    notch_max = CI[1]
+                    notch_min = CI[0]
+                else:
+                    # Estimate notch locations using Gaussian-based
+                    # asymptotic approximation.
+                    #
+                    # For discussion: McGill, R., Tukey, J.W.,
+                    # and Larsen, W.A. (1978) "Variations of
+                    # Boxplots", The American Statistician, 32:12-16.
+                    notch_max = med + 1.57*iq/np.sqrt(row)
+                    notch_min = med - 1.57*iq/np.sqrt(row)
                 # make our notched box vectors
                 box_x = [box_x_min, box_x_max, box_x_max, cap_x_max, box_x_max,
                          box_x_max, box_x_min, box_x_min, cap_x_min, box_x_min,
@@ -5067,23 +5567,55 @@ class Axes(martist.Artist):
                 med_x = [cap_x_min, cap_x_max]
                 med_y = [med, med]
 
+            def to_vc(xs,ys):
+                # convert arguments to verts and codes
+                verts = []
+                #codes = []
+                for xi,yi in zip(xs,ys):
+                    verts.append( (xi,yi) )
+                verts.append( (0,0) ) # ignored
+                codes = [mpath.Path.MOVETO] + \
+                        [mpath.Path.LINETO]*(len(verts)-2) + \
+                        [mpath.Path.CLOSEPOLY]
+                return verts,codes
+
+            def patch_list(xs,ys):
+                verts,codes = to_vc(xs,ys)
+                path = mpath.Path( verts, codes )
+                patch = mpatches.PathPatch(path)
+                self.add_artist(patch)
+                return [patch]
+
             # vertical or horizontal plot?
             if vert:
                 def doplot(*args):
                     return self.plot(*args)
+                def dopatch(xs,ys):
+                    return patch_list(xs,ys)
             else:
                 def doplot(*args):
                     shuffled = []
                     for i in xrange(0, len(args), 3):
                         shuffled.extend([args[i+1], args[i], args[i+2]])
                     return self.plot(*shuffled)
+                def dopatch(xs,ys):
+                    xs,ys = ys,xs # flip X, Y
+                    return patch_list(xs,ys)
+
+            if patch_artist:
+                median_color = 'k'
+            else:
+                median_color = 'r'
 
             whiskers.extend(doplot(wisk_x, [q1, wisk_lo], 'b--',
                                    wisk_x, [q3, wisk_hi], 'b--'))
             caps.extend(doplot(cap_x, [wisk_hi, wisk_hi], 'k-',
                                cap_x, [wisk_lo, wisk_lo], 'k-'))
-            boxes.extend(doplot(box_x, box_y, 'b-'))
-            medians.extend(doplot(med_x, med_y, 'r-'))
+            if patch_artist:
+                boxes.extend(dopatch(box_x, box_y))
+            else:
+                boxes.extend(doplot(box_x, box_y, 'b-'))
+            medians.extend(doplot(med_x, med_y, median_color+'-'))
             fliers.extend(doplot(flier_hi_x, flier_hi, sym,
                                  flier_lo_x, flier_lo, sym))
 
@@ -5103,15 +5635,16 @@ class Axes(martist.Artist):
         return dict(whiskers=whiskers, caps=caps, boxes=boxes,
                     medians=medians, fliers=fliers)
 
+    @docstring.dedent_interpd
     def scatter(self, x, y, s=20, c='b', marker='o', cmap=None, norm=None,
-                    vmin=None, vmax=None, alpha=1.0, linewidths=None,
+                    vmin=None, vmax=None, alpha=None, linewidths=None,
                     faceted=True, verts=None,
                     **kwargs):
         """
         call signatures::
 
           scatter(x, y, s=20, c='b', marker='o', cmap=None, norm=None,
-                  vmin=None, vmax=None, alpha=1.0, linewidths=None,
+                  vmin=None, vmax=None, alpha=None, linewidths=None,
                   verts=None, **kwargs)
 
         Make a scatter plot of *x* versus *y*, where *x*, *y* are
@@ -5136,48 +5669,7 @@ class Axes(martist.Artist):
           *marker*:
             can be one of:
 
-            =====   ==============
-            Value   Description
-            =====   ==============
-            's'     square
-            'o'     circle
-            '^'     triangle up
-            '>'     triangle right
-            'v'     triangle down
-            '<'     triangle left
-            'd'     diamond
-            'p'     pentagram
-            'h'     hexagon
-            '8'     octagon
-            '+'     plus
-            'x'     cross
-            =====   ==============
-
-            The marker can also be a tuple (*numsides*, *style*,
-            *angle*), which will create a custom, regular symbol.
-
-              *numsides*:
-                the number of sides
-
-              *style*:
-                the style of the regular symbol:
-
-                =====   =============================================
-                Value   Description
-                =====   =============================================
-                0       a regular polygon
-                1       a star-like symbol
-                2       an asterisk
-                3       a circle (*numsides* and *angle* is ignored)
-                =====   =============================================
-
-              *angle*:
-                the angle of rotation of the symbol
-
-            Finally, *marker* can be (*verts*, 0): *verts* is a
-            sequence of (*x*, *y*) vertices for a custom scatter
-            symbol.  Alternatively, use the kwarg combination
-            *marker* = *None*, *verts* = *verts*.
+            %(MarkerTable)s
 
         Any or all of *x*, *y*, *s*, and *c* may be masked arrays, in
         which case all masks will be combined and only unmasked points
@@ -5204,7 +5696,7 @@ class Axes(martist.Artist):
             *norm* instance, your settings for *vmin* and *vmax* will
             be ignored.
 
-          *alpha*: 0 <= scalar <= 1
+          *alpha*: 0 <= scalar <= 1  or None
             The alpha value for the patches
 
           *linewidths*: [ None | scalar | sequence ]
@@ -5218,10 +5710,10 @@ class Axes(martist.Artist):
         particular:
 
           *edgecolors*:
-            'none' to plot faces with no outlines
+            The string 'none' to plot faces with no outlines
 
           *facecolors*:
-            'none' to plot unfilled outlines
+            The string 'none' to plot unfilled outlines
 
         Here are the standard descriptions of all the
         :class:`~matplotlib.collections.Collection` kwargs:
@@ -5233,21 +5725,6 @@ class Axes(martist.Artist):
         """
 
         if not self._hold: self.cla()
-
-        syms =  { # a dict from symbol to (numsides, angle)
-            's' : (4,math.pi/4.0,0),   # square
-            'o' : (0,0,3),            # circle
-            '^' : (3,0,0),             # triangle up
-            '>' : (3,math.pi/2.0,0),   # triangle right
-            'v' : (3,math.pi,0),       # triangle down
-            '<' : (3,3*math.pi/2.0,0), # triangle left
-            'd' : (4,0,0),             # diamond
-            'p' : (5,0,0),             # pentagram
-            'h' : (6,0,0),             # hexagon
-            '8' : (8,0,0),             # octagon
-            '+' : (4,0,2),             # plus
-            'x' : (4,math.pi/4.0,2)    # cross
-            }
 
         self._process_unit_info(xdata=x, ydata=y, kwargs=kwargs)
         x = self.convert_xunits(x)
@@ -5262,7 +5739,7 @@ class Axes(martist.Artist):
 
         s = np.ma.ravel(s)  # This doesn't have to match x, y in size.
 
-        c_is_stringy = is_string_like(c) or cbook.is_sequence_of_strings(c)
+        c_is_stringy = is_string_like(c) or is_sequence_of_strings(c)
         if not c_is_stringy:
             c = np.asanyarray(c)
             if c.size == x.size:
@@ -5299,87 +5776,21 @@ class Axes(martist.Artist):
             marker = (verts, 0)
             verts = None
 
-        if is_string_like(marker):
-            # the standard way to define symbols using a string character
-            sym = syms.get(marker)
-            if sym is None and verts is None:
-                raise ValueError('Unknown marker symbol to scatter')
-            numsides, rotation, symstyle = syms[marker]
+        marker_obj = mmarkers.MarkerStyle(marker)
+        path = marker_obj.get_path().transformed(
+            marker_obj.get_transform())
+        if not marker_obj.is_filled():
+            edgecolors = 'face'
 
-        elif iterable(marker):
-            # accept marker to be:
-            #    (numsides, style, [angle])
-            # or
-            #    (verts[], style, [angle])
-
-            if len(marker)<2 or len(marker)>3:
-                raise ValueError('Cannot create markersymbol from marker')
-
-            if cbook.is_numlike(marker[0]):
-                # (numsides, style, [angle])
-
-                if len(marker)==2:
-                    numsides, rotation = marker[0], 0.
-                elif len(marker)==3:
-                    numsides, rotation = marker[0], marker[2]
-                sym = True
-
-                if marker[1] in (1,2,3):
-                    symstyle = marker[1]
-
-            else:
-                verts = np.asarray(marker[0])
-
-        if sym is not None:
-            if symstyle==0:
-                collection = mcoll.RegularPolyCollection(
-                    numsides, rotation, scales,
-                    facecolors = colors,
-                    edgecolors = edgecolors,
-                    linewidths = linewidths,
-                    offsets = zip(x,y),
-                    transOffset = self.transData,
-                    )
-            elif symstyle==1:
-                collection = mcoll.StarPolygonCollection(
-                    numsides, rotation, scales,
-                    facecolors = colors,
-                    edgecolors = edgecolors,
-                    linewidths = linewidths,
-                    offsets = zip(x,y),
-                    transOffset = self.transData,
-                    )
-            elif symstyle==2:
-                collection = mcoll.AsteriskPolygonCollection(
-                    numsides, rotation, scales,
-                    facecolors = colors,
-                    edgecolors = edgecolors,
-                    linewidths = linewidths,
-                    offsets = zip(x,y),
-                    transOffset = self.transData,
-                    )
-            elif symstyle==3:
-                collection = mcoll.CircleCollection(
-                    scales,
-                    facecolors = colors,
-                    edgecolors = edgecolors,
-                    linewidths = linewidths,
-                    offsets = zip(x,y),
-                    transOffset = self.transData,
-                    )
-        else:
-            rescale = np.sqrt(max(verts[:,0]**2+verts[:,1]**2))
-            verts /= rescale
-
-            collection = mcoll.PolyCollection(
-                (verts,), scales,
+        collection = mcoll.PathCollection(
+                (path,), scales,
                 facecolors = colors,
                 edgecolors = edgecolors,
                 linewidths = linewidths,
                 offsets = zip(x,y),
                 transOffset = self.transData,
                 )
-            collection.set_transform(mtransforms.IdentityTransform())
+        collection.set_transform(mtransforms.IdentityTransform())
         collection.set_alpha(alpha)
         collection.update(kwargs)
 
@@ -5394,47 +5805,38 @@ class Axes(martist.Artist):
             else:
                 collection.autoscale_None()
 
-        temp_x = x
-        temp_y = y
-
-        minx = np.amin(temp_x)
-        maxx = np.amax(temp_x)
-        miny = np.amin(temp_y)
-        maxy = np.amax(temp_y)
-
-        w = maxx-minx
-        h = maxy-miny
-
-        # the pad is a little hack to deal with the fact that we don't
+        # The margin adjustment is a hack to deal with the fact that we don't
         # want to transform all the symbols whose scales are in points
         # to data coords to get the exact bounding box for efficiency
-        # reasons.  It can be done right if this is deemed important
-        padx, pady = 0.05*w, 0.05*h
-        corners = (minx-padx, miny-pady), (maxx+padx, maxy+pady)
-        self.update_datalim( corners)
+        # reasons.  It can be done right if this is deemed important.
+        # Also, only bother with this padding if there is anything to draw.
+        if self._xmargin < 0.05 and x.size > 0 :
+            self.set_xmargin(0.05)
+
+        if self._ymargin < 0.05 and x.size > 0 :
+            self.set_ymargin(0.05)
+
+        self.add_collection(collection)
         self.autoscale_view()
 
-        # add the collection last
-        self.add_collection(collection)
         return collection
 
-    scatter.__doc__ = cbook.dedent(scatter.__doc__) % martist.kwdocd
-
+    @docstring.dedent_interpd
     def hexbin(self, x, y, C = None, gridsize = 100, bins = None,
                     xscale = 'linear', yscale = 'linear', extent = None,
                     cmap=None, norm=None, vmin=None, vmax=None,
-                    alpha=1.0, linewidths=None, edgecolors='none',
+                    alpha=None, linewidths=None, edgecolors='none',
                     reduce_C_function = np.mean, mincnt=None, marginals=False,
                     **kwargs):
         """
         call signature::
 
-          hexbin(x, y, C = None, gridsize = 100, bins = None,
-                 xscale = 'linear', yscale = 'linear',
-                 cmap=None, norm=None, vmin=None, vmax=None,
-                 alpha=1.0, linewidths=None, edgecolors='none'
-                 reduce_C_function = np.mean, mincnt=None, marginals=True
-                 **kwargs)
+           hexbin(x, y, C = None, gridsize = 100, bins = None,
+                  xscale = 'linear', yscale = 'linear',
+                  cmap=None, norm=None, vmin=None, vmax=None,
+                  alpha=None, linewidths=None, edgecolors='none'
+                  reduce_C_function = np.mean, mincnt=None, marginals=True
+                  **kwargs)
 
         Make a hexagonal binning plot of *x* versus *y*, where *x*,
         *y* are 1-D sequences of the same length, *N*. If *C* is None
@@ -5453,84 +5855,84 @@ class Axes(martist.Artist):
 
         Optional keyword arguments:
 
-          *gridsize*: [ 100 | integer ]
-            The number of hexagons in the *x*-direction, default is
-            100. The corresponding number of hexagons in the
-            *y*-direction is chosen such that the hexagons are
-            approximately regular. Alternatively, gridsize can be a
-            tuple with two elements specifying the number of hexagons
-            in the *x*-direction and the *y*-direction.
+        *gridsize*: [ 100 | integer ]
+           The number of hexagons in the *x*-direction, default is
+           100. The corresponding number of hexagons in the
+           *y*-direction is chosen such that the hexagons are
+           approximately regular. Alternatively, gridsize can be a
+           tuple with two elements specifying the number of hexagons
+           in the *x*-direction and the *y*-direction.
 
-          *bins*: [ None | 'log' | integer | sequence ]
-            If *None*, no binning is applied; the color of each hexagon
-            directly corresponds to its count value.
+        *bins*: [ None | 'log' | integer | sequence ]
+           If *None*, no binning is applied; the color of each hexagon
+           directly corresponds to its count value.
 
-            If 'log', use a logarithmic scale for the color
-            map. Internally, :math:`log_{10}(i+1)` is used to
-            determine the hexagon color.
+           If 'log', use a logarithmic scale for the color
+           map. Internally, :math:`log_{10}(i+1)` is used to
+           determine the hexagon color.
 
-            If an integer, divide the counts in the specified number
-            of bins, and color the hexagons accordingly.
+           If an integer, divide the counts in the specified number
+           of bins, and color the hexagons accordingly.
 
-            If a sequence of values, the values of the lower bound of
-            the bins to be used.
+           If a sequence of values, the values of the lower bound of
+           the bins to be used.
 
-          *xscale*: [ 'linear' | 'log' ]
-            Use a linear or log10 scale on the horizontal axis.
+        *xscale*: [ 'linear' | 'log' ]
+           Use a linear or log10 scale on the horizontal axis.
 
-          *scale*: [ 'linear' | 'log' ]
-            Use a linear or log10 scale on the vertical axis.
+        *scale*: [ 'linear' | 'log' ]
+           Use a linear or log10 scale on the vertical axis.
 
-          *mincnt*: None | a positive integer
-            If not None, only display cells with more than *mincnt*
-            number of points in the cell
+        *mincnt*: None | a positive integer
+           If not None, only display cells with more than *mincnt*
+           number of points in the cell
 
-          *marginals*: True|False
-            if marginals is True, plot the marginal density as
-            colormapped rectagles along the bottom of the x-axis and
-            left of the y-axis
+        *marginals*: True|False
+           if marginals is True, plot the marginal density as
+           colormapped rectagles along the bottom of the x-axis and
+           left of the y-axis
 
-          *extent*: [ None | scalars (left, right, bottom, top) ]
-            The limits of the bins. The default assigns the limits
-            based on gridsize, x, y, xscale and yscale.
+        *extent*: [ None | scalars (left, right, bottom, top) ]
+           The limits of the bins. The default assigns the limits
+           based on gridsize, x, y, xscale and yscale.
 
         Other keyword arguments controlling color mapping and normalization
         arguments:
 
-          *cmap*: [ None | Colormap ]
-            a :class:`matplotlib.cm.Colormap` instance. If *None*,
-            defaults to rc ``image.cmap``.
+        *cmap*: [ None | Colormap ]
+           a :class:`matplotlib.cm.Colormap` instance. If *None*,
+           defaults to rc ``image.cmap``.
 
-          *norm*: [ None | Normalize ]
-            :class:`matplotlib.colors.Normalize` instance is used to
-            scale luminance data to 0,1.
+        *norm*: [ None | Normalize ]
+           :class:`matplotlib.colors.Normalize` instance is used to
+           scale luminance data to 0,1.
 
-          *vmin*/*vmax*: scalar
-            *vmin* and *vmax* are used in conjunction with *norm* to normalize
-            luminance data.  If either are *None*, the min and max of the color
-            array *C* is used.  Note if you pass a norm instance, your settings
-            for *vmin* and *vmax* will be ignored.
+        *vmin*/*vmax*: scalar
+           *vmin* and *vmax* are used in conjunction with *norm* to normalize
+           luminance data.  If either are *None*, the min and max of the color
+           array *C* is used.  Note if you pass a norm instance, your settings
+           for *vmin* and *vmax* will be ignored.
 
-          *alpha*: scalar
-            the alpha value for the patches
+        *alpha*: scalar between 0 and 1, or None
+           the alpha value for the patches
 
-          *linewidths*: [ None | scalar ]
-            If *None*, defaults to rc lines.linewidth. Note that this
-            is a tuple, and if you set the linewidths argument you
-            must set it as a sequence of floats, as required by
-            :class:`~matplotlib.collections.RegularPolyCollection`.
+        *linewidths*: [ None | scalar ]
+           If *None*, defaults to rc lines.linewidth. Note that this
+           is a tuple, and if you set the linewidths argument you
+           must set it as a sequence of floats, as required by
+           :class:`~matplotlib.collections.RegularPolyCollection`.
 
         Other keyword arguments controlling the Collection properties:
 
-          *edgecolors*: [ None | mpl color | color sequence ]
-            If 'none', draws the edges in the same color as the fill color.
-            This is the default, as it avoids unsightly unpainted pixels
-            between the hexagons.
+        *edgecolors*: [ None | mpl color | color sequence ]
+           If 'none', draws the edges in the same color as the fill color.
+           This is the default, as it avoids unsightly unpainted pixels
+           between the hexagons.
 
-            If *None*, draws the outlines in the default color.
+           If *None*, draws the outlines in the default color.
 
-            If a matplotlib color arg or sequence of rgba tuples, draws the
-            outlines in the specified color.
+           If a matplotlib color arg or sequence of rgba tuples, draws the
+           outlines in the specified color.
 
         Here are the standard descriptions of all the
         :class:`~matplotlib.collections.Collection` kwargs:
@@ -5541,7 +5943,7 @@ class Axes(martist.Artist):
         :class:`~matplotlib.collections.PolyCollection` instance; use
         :meth:`~matplotlib.collection.PolyCollection.get_array` on
         this :class:`~matplotlib.collections.PolyCollection` to get
-        the counts in each hexagon..  If marginals is True, horizontal
+        the counts in each hexagon. If marginals is True, horizontal
         bar and vertical bar (both PolyCollections) will be attached
         to the return collection as attributes *hbar* and *vbar*
 
@@ -5549,6 +5951,7 @@ class Axes(martist.Artist):
         **Example:**
 
         .. plot:: mpl_examples/pylab_examples/hexbin_demo.py
+
         """
 
         if not self._hold: self.cla()
@@ -5569,8 +5972,12 @@ class Axes(martist.Artist):
         x = np.array(x, float)
         y = np.array(y, float)
         if xscale=='log':
+            if np.any(x <= 0.0):
+                raise ValueError("x contains non-positive values, so can not be log-scaled")
             x = np.log10(x)
         if yscale=='log':
+            if np.any(y <= 0.0):
+                raise ValueError("y contains non-positive values, so can not be log-scaled")
             y = np.log10(y)
         if extent is not None:
             xmin, xmax, ymin, ymax = extent
@@ -5722,6 +6129,17 @@ class Axes(martist.Artist):
             transOffset = self.transData,
             )
 
+        if isinstance(norm, mcolors.LogNorm):
+            if (accum==0).any():
+                # make sure we have not zeros
+                accum += 1
+
+        # autoscale the norm with curren accum values if it hasn't
+        # been set
+        if norm is not None:
+            if norm.vmin is None and norm.vmax is None:
+                norm.autoscale(accum)
+
         # Transform accum if needed
         if bins=='log':
             accum = np.log10(accum+1)
@@ -5747,7 +6165,7 @@ class Axes(martist.Artist):
 
         corners = ((xmin, ymin), (xmax, ymax))
         self.update_datalim( corners)
-        self.autoscale_view()
+        self.autoscale_view(tight=True)
 
         # add the collection last
         self.add_collection(collection)
@@ -5840,9 +6258,8 @@ class Axes(martist.Artist):
 
         return collection
 
-    hexbin.__doc__ = cbook.dedent(hexbin.__doc__) % martist.kwdocd
 
-
+    @docstring.dedent_interpd
     def arrow(self, x, y, dx, dy, **kwargs):
         """
         call signature::
@@ -5853,16 +6270,23 @@ class Axes(martist.Artist):
         *y* + *dy*).
 
         Optional kwargs control the arrow properties:
+
         %(FancyArrow)s
 
         **Example:**
 
         .. plot:: mpl_examples/pylab_examples/arrow_demo.py
         """
+        # Strip away units for the underlying patch since units
+        # do not make sense to most patch-like code
+        x = self.convert_xunits(x)
+        y = self.convert_yunits(y)
+        dx = self.convert_xunits(dx)
+        dy = self.convert_yunits(dy)
+
         a = mpatches.FancyArrow(x, y, dx, dy, **kwargs)
         self.add_artist(a)
         return a
-    arrow.__doc__ = cbook.dedent(arrow.__doc__) % martist.kwdocd
 
     def quiverkey(self, *args, **kw):
         qk = mquiver.QuiverKey(*args, **kw)
@@ -5879,6 +6303,7 @@ class Axes(martist.Artist):
         return q
     quiver.__doc__ = mquiver.Quiver.quiver_doc
 
+    @docstring.dedent_interpd
     def barbs(self, *args, **kw):
         """
         %(barbs_doc)s
@@ -5892,9 +6317,8 @@ class Axes(martist.Artist):
         self.update_datalim(b.get_offsets())
         self.autoscale_view()
         return b
-    barbs.__doc__ = cbook.dedent(barbs.__doc__) % {
-        'barbs_doc': mquiver.Barbs.barbs_doc}
 
+    @docstring.dedent_interpd
     def fill(self, *args, **kwargs):
         """
         call signature::
@@ -5941,9 +6365,10 @@ class Axes(martist.Artist):
             patches.append( poly )
         self.autoscale_view()
         return patches
-    fill.__doc__ = cbook.dedent(fill.__doc__) % martist.kwdocd
 
-    def fill_between(self, x, y1, y2=0, where=None, **kwargs):
+    @docstring.dedent_interpd
+    def fill_between(self, x, y1, y2=0, where=None, interpolate=False,
+                     **kwargs):
         """
         call signature::
 
@@ -5966,6 +6391,12 @@ class Axes(martist.Artist):
            if None, default to fill between everywhere.  If not None,
            it is a a N length numpy boolean array and the fill will
            only happen over the regions where ``where==True``
+
+        *interpolate*
+           If True, interpolate between the two lines to find the
+           precise point of intersection.  Otherwise, the start and
+           end points of the filled region will only occur on explicit
+           values in the *x* array.
 
         *kwargs*
           keyword args passed on to the :class:`PolyCollection`
@@ -6022,11 +6453,36 @@ class Axes(martist.Artist):
             N = len(xslice)
             X = np.zeros((2*N+2, 2), np.float)
 
-            # the purpose of the next two lines is for when y2 is a
-            # scalar like 0 and we want the fill to go all the way
-            # down to 0 even if none of the y1 sample points do
-            X[0] = xslice[0], y2slice[0]
-            X[N+1] = xslice[-1], y2slice[-1]
+            if interpolate:
+                def get_interp_point(ind):
+                    im1 = max(ind-1, 0)
+                    x_values = x[im1:ind+1]
+                    diff_values = y1[im1:ind+1] - y2[im1:ind+1]
+                    y1_values = y1[im1:ind+1]
+
+                    if len(diff_values) == 2:
+                        if np.ma.is_masked(diff_values[1]):
+                            return x[im1], y1[im1]
+                        elif np.ma.is_masked(diff_values[0]):
+                            return x[ind], y1[ind]
+
+                    diff_order = diff_values.argsort()
+                    diff_root_x = np.interp(
+                        0, diff_values[diff_order], x_values[diff_order])
+                    diff_root_y = np.interp(diff_root_x, x_values, y1_values)
+                    return diff_root_x, diff_root_y
+
+                start = get_interp_point(ind0)
+                end = get_interp_point(ind1)
+            else:
+                # the purpose of the next two lines is for when y2 is a
+                # scalar like 0 and we want the fill to go all the way
+                # down to 0 even if none of the y1 sample points do
+                start = xslice[0], y2slice[0]
+                end = xslice[-1], y2slice[-1]
+
+            X[0] = start
+            X[N+1] = end
 
             X[1:N+1,0] = xslice
             X[1:N+1,1] = y1slice
@@ -6042,14 +6498,13 @@ class Axes(martist.Artist):
         XY2 = np.array([x[where], y2[where]]).T
         self.dataLim.update_from_data_xy(XY1, self.ignore_existing_data_limits,
                                          updatex=True, updatey=True)
-
         self.dataLim.update_from_data_xy(XY2, self.ignore_existing_data_limits,
                                          updatex=False, updatey=True)
         self.add_collection(collection)
         self.autoscale_view()
         return collection
-    fill_between.__doc__ = cbook.dedent(fill_between.__doc__) % martist.kwdocd
 
+    @docstring.dedent_interpd
     def fill_betweenx(self, y, x1, x2=0, where=None, **kwargs):
         """
         call signature::
@@ -6155,19 +6610,19 @@ class Axes(martist.Artist):
         self.add_collection(collection)
         self.autoscale_view()
         return collection
-    fill_between.__doc__ = cbook.dedent(fill_between.__doc__) % martist.kwdocd
 
     #### plotting z(x,y): imshow, pcolor and relatives, contour
 
+    @docstring.dedent_interpd
     def imshow(self, X, cmap=None, norm=None, aspect=None,
-               interpolation=None, alpha=1.0, vmin=None, vmax=None,
+               interpolation=None, alpha=None, vmin=None, vmax=None,
                origin=None, extent=None, shape=None, filternorm=1,
                filterrad=4.0, imlim=None, resample=None, url=None, **kwargs):
         """
         call signature::
 
           imshow(X, cmap=None, norm=None, aspect=None, interpolation=None,
-                 alpha=1.0, vmin=None, vmax=None, origin=None, extent=None,
+                 alpha=None, vmin=None, vmax=None, origin=None, extent=None,
                  **kwargs)
 
         Display the image in *X* to current axes.  *X* may be a float
@@ -6203,15 +6658,18 @@ class Axes(martist.Artist):
 
           *interpolation*:
 
-            Acceptable values are *None*, 'nearest', 'bilinear',
-              'bicubic', 'spline16', 'spline36', 'hanning', 'hamming',
-              'hermite', 'kaiser', 'quadric', 'catrom', 'gaussian',
-              'bessel', 'mitchell', 'sinc', 'lanczos',
-
+            Acceptable values are *None*, 'none', 'nearest', 'bilinear',
+            'bicubic', 'spline16', 'spline36', 'hanning', 'hamming',
+            'hermite', 'kaiser', 'quadric', 'catrom', 'gaussian',
+            'bessel', 'mitchell', 'sinc', 'lanczos'
 
             If *interpolation* is *None*, default to rc
             ``image.interpolation``. See also the *filternorm* and
             *filterrad* parameters
+
+            If *interpolation* is 'none', then no interpolation is performed
+            on the Agg, ps and pdf backends. Other backends will fall back to
+            'nearest'.
 
           *norm*: [ None | Normalize ]
             An :class:`matplotlib.colors.Normalize` instance; if
@@ -6228,6 +6686,7 @@ class Axes(martist.Artist):
 
           *alpha*: scalar
             The alpha blending value, between 0 (transparent) and 1 (opaque)
+            or *None*
 
           *origin*: [ None | 'upper' | 'lower' ]
             Place the [0,0] index of the array in the upper left or lower left
@@ -6275,7 +6734,9 @@ class Axes(martist.Artist):
         im.set_data(X)
         im.set_alpha(alpha)
         self._set_artist_props(im)
-        im.set_clip_path(self.patch)
+        if im.get_clip_path() is None:
+            # image does not already have clipping set, clip to axes patch
+            im.set_clip_path(self.patch)
         #if norm is None and shape is None:
         #    im.set_clim(vmin, vmax)
         if vmin is not None or vmax is not None:
@@ -6284,18 +6745,14 @@ class Axes(martist.Artist):
             im.autoscale_None()
         im.set_url(url)
 
-        xmin, xmax, ymin, ymax = im.get_extent()
+        # update ax.dataLim, and, if autoscaling, set viewLim
+        # to tightly fit the image, regardless of dataLim.
+        im.set_extent(im.get_extent())
 
-        corners = (xmin, ymin), (xmax, ymax)
-        self.update_datalim(corners)
-        if self._autoscaleXon:
-            self.set_xlim((xmin, xmax))
-        if self._autoscaleYon:
-            self.set_ylim((ymin, ymax))
         self.images.append(im)
+        im._remove_method = lambda h: self.images.remove(h)
 
         return im
-    imshow.__doc__ = cbook.dedent(imshow.__doc__) % martist.kwdocd
 
 
     def _pcolorargs(self, funcname, *args):
@@ -6323,6 +6780,7 @@ class Axes(martist.Artist):
                 funcname, funcname))
         return X, Y, C
 
+    @docstring.dedent_interpd
     def pcolor(self, *args, **kwargs):
         """
         call signatures::
@@ -6380,20 +6838,20 @@ class Axes(martist.Artist):
           *shading*: [ 'flat' | 'faceted' ]
             If 'faceted', a black grid is drawn around each rectangle; if
             'flat', edges are not drawn. Default is 'flat', contrary to
-            Matlab(TM).
+            MATLAB.
 
             This kwarg is deprecated; please use 'edgecolors' instead:
-              * shading='flat' -- edgecolors='None'
+              * shading='flat' -- edgecolors='none'
               * shading='faceted  -- edgecolors='k'
 
-          *edgecolors*: [ None | 'None' | color | color sequence]
+          *edgecolors*: [ None | 'none' | color | color sequence]
             If *None*, the rc setting is used by default.
 
-            If 'None', edges will not be visible.
+            If 'none', edges will not be visible.
 
             An mpl color or sequence of colors will set the edge color
 
-          *alpha*: 0 <= scalar <= 1
+          *alpha*: 0 <= scalar <= 1   or *None*
             the alpha blending value
 
         Return value is a :class:`matplotlib.collection.Collection`
@@ -6401,7 +6859,7 @@ class Axes(martist.Artist):
 
         .. _axes-pcolor-grid-orientation:
 
-        The grid orientation follows the Matlab(TM) convention: an
+        The grid orientation follows the MATLAB convention: an
         array *C* with shape (*nrows*, *ncolumns*) is plotted with
         the column number as *X* and the row number as *Y*, increasing
         up; hence it is plotted the way the array would be printed,
@@ -6436,7 +6894,7 @@ class Axes(martist.Artist):
 
           pcolor(C.T)
 
-        Matlab :func:`pcolor` always discards the last row and column
+        MATLAB :func:`pcolor` always discards the last row and column
         of *C*, but matplotlib displays the last row and column if *X* and
         *Y* are not specified, or if *X* and *Y* have one more row and
         column than *C*.
@@ -6445,11 +6903,21 @@ class Axes(martist.Artist):
         :class:`~matplotlib.collection.PolyCollection` properties:
 
         %(PolyCollection)s
+
+        Note: the default *antialiaseds* is False if the default
+        *edgecolors*="none" is used.  This eliminates artificial lines
+        at patch boundaries, and works regardless of the value of
+        alpha.  If *edgecolors* is not "none", then the default
+        *antialiaseds* is taken from
+        rcParams['patch.antialiased'], which defaults to *True*.
+        Stroking the edges may be preferred if *alpha* is 1, but
+        will cause artifacts otherwise.
+
         """
 
         if not self._hold: self.cla()
 
-        alpha = kwargs.pop('alpha', 1.0)
+        alpha = kwargs.pop('alpha', None)
         norm = kwargs.pop('norm', None)
         cmap = kwargs.pop('cmap', None)
         vmin = kwargs.pop('vmin', None)
@@ -6490,20 +6958,30 @@ class Axes(martist.Artist):
                              axis=1)
         verts = xy.reshape((npoly, 5, 2))
 
-        #verts = zip(zip(X1,Y1),zip(X2,Y2),zip(X3,Y3),zip(X4,Y4))
-
         C = compress(ravelmask, ma.filled(C[0:Ny-1,0:Nx-1]).ravel())
 
+        linewidths = (0.25,)
+        if 'linewidth' in kwargs:
+            kwargs['linewidths'] = kwargs.pop('linewidth')
+        kwargs.setdefault('linewidths', linewidths)
 
         if shading == 'faceted':
-            edgecolors = (0,0,0,1),
-            linewidths = (0.25,)
+            edgecolors = 'k',
         else:
-            edgecolors = 'face'
-            linewidths = (1.0,)
-        kwargs.setdefault('edgecolors', edgecolors)
-        kwargs.setdefault('antialiaseds', (0,))
-        kwargs.setdefault('linewidths', linewidths)
+            edgecolors = 'none'
+        if 'edgecolor' in kwargs:
+            kwargs['edgecolors'] = kwargs.pop('edgecolor')
+        ec = kwargs.setdefault('edgecolors', edgecolors)
+
+        # aa setting will default via collections to patch.antialiased
+        # unless the boundary is not stroked, in which case the
+        # default will be False; with unstroked boundaries, aa
+        # makes artifacts that are often disturbing.
+        if 'antialiased' in kwargs:
+            kwargs['antialiaseds'] = kwargs.pop('antialiased')
+        if 'antialiaseds' not in kwargs and ec.lower() == "none":
+                kwargs['antialiaseds'] = False
+
 
         collection = mcoll.PolyCollection(verts, **kwargs)
 
@@ -6530,8 +7008,8 @@ class Axes(martist.Artist):
         self.autoscale_view()
         self.add_collection(collection)
         return collection
-    pcolor.__doc__ = cbook.dedent(pcolor.__doc__) % martist.kwdocd
 
+    @docstring.dedent_interpd
     def pcolormesh(self, *args, **kwargs):
         """
         call signatures::
@@ -6562,10 +7040,10 @@ class Axes(martist.Artist):
             and max of the color array *C* is used.  If you pass a
             *norm* instance, *vmin* and *vmax* will be ignored.
 
-          *shading*: [ 'flat' | 'faceted' ]
+          *shading*: [ 'flat' | 'faceted' | 'gouraud' ]
             If 'faceted', a black grid is drawn around each rectangle; if
             'flat', edges are not drawn. Default is 'flat', contrary to
-            Matlab(TM).
+            MATLAB.
 
             This kwarg is deprecated; please use 'edgecolors' instead:
               * shading='flat' -- edgecolors='None'
@@ -6578,7 +7056,7 @@ class Axes(martist.Artist):
 
             An mpl color or sequence of colors will set the edge color
 
-          *alpha*: 0 <= scalar <= 1
+          *alpha*: 0 <= scalar <= 1  or *None*
             the alpha blending value
 
         Return value is a :class:`matplotlib.collection.QuadMesh`
@@ -6598,12 +7076,12 @@ class Axes(martist.Artist):
         """
         if not self._hold: self.cla()
 
-        alpha = kwargs.pop('alpha', 1.0)
+        alpha = kwargs.pop('alpha', None)
         norm = kwargs.pop('norm', None)
         cmap = kwargs.pop('cmap', None)
         vmin = kwargs.pop('vmin', None)
         vmax = kwargs.pop('vmax', None)
-        shading = kwargs.pop('shading', 'flat')
+        shading = kwargs.pop('shading', 'flat').lower()
         edgecolors = kwargs.pop('edgecolors', 'None')
         antialiased = kwargs.pop('antialiased', False)
 
@@ -6611,8 +7089,11 @@ class Axes(martist.Artist):
         Ny, Nx = X.shape
 
         # convert to one dimensional arrays
-        C = ma.ravel(C[0:Ny-1, 0:Nx-1]) # data point in each cell is value at
-                                        # lower left corner
+        if shading != 'gouraud':
+            C = ma.ravel(C[0:Ny-1, 0:Nx-1]) # data point in each cell is value at
+                                            # lower left corner
+        else:
+            C = C.ravel()
         X = X.ravel()
         Y = Y.ravel()
 
@@ -6627,7 +7108,7 @@ class Axes(martist.Artist):
 
         collection = mcoll.QuadMesh(
             Nx - 1, Ny - 1, coords, showedges,
-            antialiased=antialiased)  # kwargs are not used
+            antialiased=antialiased, shading=shading, **kwargs)
         collection.set_alpha(alpha)
         collection.set_array(C)
         if norm is not None: assert(isinstance(norm, mcolors.Normalize))
@@ -6650,8 +7131,8 @@ class Axes(martist.Artist):
         self.autoscale_view()
         self.add_collection(collection)
         return collection
-    pcolormesh.__doc__ = cbook.dedent(pcolormesh.__doc__) % martist.kwdocd
 
+    @docstring.dedent_interpd
     def pcolorfast(self, *args, **kwargs):
         """
         pseudocolor plot of a 2-D array
@@ -6720,7 +7201,7 @@ class Axes(martist.Artist):
             luminance data.  If either are *None*, the min and max of the color
             array *C* is used.  If you pass a norm instance, *vmin* and *vmax*
             will be *None*.
-          *alpha*: 0 <= scalar <= 1
+          *alpha*: 0 <= scalar <= 1  or *None*
             the alpha blending value
 
         Return value is an image if a regular or rectangular grid
@@ -6731,7 +7212,7 @@ class Axes(martist.Artist):
 
         if not self._hold: self.cla()
 
-        alpha = kwargs.pop('alpha', 1.0)
+        alpha = kwargs.pop('alpha', None)
         norm = kwargs.pop('norm', None)
         cmap = kwargs.pop('cmap', None)
         vmin = kwargs.pop('vmin', None)
@@ -6832,19 +7313,20 @@ class Axes(martist.Artist):
     def contour(self, *args, **kwargs):
         if not self._hold: self.cla()
         kwargs['filled'] = False
-        return mcontour.ContourSet(self, *args, **kwargs)
-    contour.__doc__ = mcontour.ContourSet.contour_doc
+        return mcontour.QuadContourSet(self, *args, **kwargs)
+    contour.__doc__ = mcontour.QuadContourSet.contour_doc
 
     def contourf(self, *args, **kwargs):
         if not self._hold: self.cla()
         kwargs['filled'] = True
-        return mcontour.ContourSet(self, *args, **kwargs)
-    contourf.__doc__ = mcontour.ContourSet.contour_doc
+        return mcontour.QuadContourSet(self, *args, **kwargs)
+    contourf.__doc__ = mcontour.QuadContourSet.contour_doc
 
     def clabel(self, CS, *args, **kwargs):
         return CS.clabel(*args, **kwargs)
     clabel.__doc__ = mcontour.ContourSet.clabel.__doc__
 
+    @docstring.dedent_interpd
     def table(self, **kwargs):
         """
         call signature::
@@ -6869,7 +7351,6 @@ class Axes(martist.Artist):
         %(Table)s
         """
         return mtable.table(self, **kwargs)
-    table.__doc__ = cbook.dedent(table.__doc__) % martist.kwdocd
 
     def twinx(self):
         """
@@ -6887,6 +7368,7 @@ class Axes(martist.Artist):
             frameon=False)
         ax2.yaxis.tick_right()
         ax2.yaxis.set_label_position('right')
+        ax2.yaxis.set_offset_position('right')
         self.yaxis.tick_left()
         ax2.xaxis.set_visible(False)
         return ax2
@@ -6921,32 +7403,41 @@ class Axes(martist.Artist):
 
     #### Data analysis
 
+    @docstring.dedent_interpd
     def hist(self, x, bins=10, range=None, normed=False, weights=None,
              cumulative=False, bottom=None, histtype='bar', align='mid',
              orientation='vertical', rwidth=None, log=False,
+             color=None, label=None,
              **kwargs):
         """
         call signature::
 
-          hist(x, bins=10, range=None, normed=False, cumulative=False,
-               bottom=None, histtype='bar', align='mid',
-               orientation='vertical', rwidth=None, log=False, **kwargs)
+          def hist(x, bins=10, range=None, normed=False, weights=None,
+                 cumulative=False, bottom=None, histtype='bar', align='mid',
+                 orientation='vertical', rwidth=None, log=False,
+                 color=None, label=None,
+                 **kwargs):
 
         Compute and draw the histogram of *x*. The return value is a
         tuple (*n*, *bins*, *patches*) or ([*n0*, *n1*, ...], *bins*,
         [*patches0*, *patches1*,...]) if the input contains multiple
         data.
 
+        Multiple data can be provided via *x* as a list of datasets
+        of potentially different length ([*x0*, *x1*, ...]), or as
+        a 2-D ndarray in which each column is a dataset.  Note that
+        the ndarray form is transposed relative to the list form.
+
+        Masked arrays are not supported at present.
+
         Keyword arguments:
 
           *bins*:
             Either an integer number of bins or a sequence giving the
-            bins.  *x* are the data to be binned. *x* can be an array,
-            a 2D array with multiple data in its columns, or a list of
-            arrays with data of different length.  Note, if *bins*
-            is an integer input argument=numbins, *bins* + 1 bin edges
-            will be returned, compatible with the semantics of
-            :func:`numpy.histogram` with the *new* = True argument.
+            bins.  If *bins* is an integer, *bins* + 1 bin edges
+            will be returned, consistent with :func:`numpy.histogram`
+            for numpy version >= 1.3, and with the *new* = True argument
+            in earlier versions.
             Unequally spaced bins are supported if *bins* is a sequence.
 
           *range*:
@@ -6954,9 +7445,9 @@ class Axes(martist.Artist):
             are ignored. If not provided, *range* is (x.min(), x.max()).
             Range has no effect if *bins* is a sequence.
 
-            If *bins* is a sequence or *range* is specified, autoscaling is
-            set off (*autoscale_on* is set to *False*) and the xaxis limits
-            are set to encompass the full specified bin range.
+            If *bins* is a sequence or *range* is specified, autoscaling
+            is based on the specified bin range instead of the
+            range of x.
 
           *normed*:
             If *True*, the first element of the return tuple will
@@ -6967,6 +7458,12 @@ class Axes(martist.Artist):
 
               pdf, bins, patches = ax.hist(...)
               print np.sum(pdf * np.diff(bins))
+
+            .. Note:: Until numpy release 1.5, the underlying numpy
+                      histogram function was incorrect with *normed*=*True*
+                      if bin sizes were unequal.  MPL inherited that
+                      error.  It is now corrected within MPL when using
+                      earlier numpy versions
 
           *weights*
             An array of weights, of the same shape as *x*.  Each value in
@@ -7025,23 +7522,25 @@ class Axes(martist.Artist):
             be filtered out and only the non-empty (*n*, *bins*,
             *patches*) will be returned.
 
-        kwargs are used to update the properties of the hist
-        :class:`~matplotlib.patches.Rectangle` instances:
+          *color*:
+            Color spec or sequence of color specs, one per
+            dataset.  Default (*None*) uses the standard line
+            color sequence.
 
-        %(Rectangle)s
+          *label*:
+            String, or sequence of strings to match multiple
+            datasets.  Bar charts yield multiple patches per
+            dataset, but only the first gets the label, so
+            that the legend command will work as expected::
 
-        You can use labels for your histogram, and only the first
-        :class:`~matplotlib.patches.Rectangle` gets the label (the
-        others get the magic string '_nolegend_'.  This will make the
-        histograms work in the intuitive way for bar charts::
+                ax.hist(10+2*np.random.randn(1000), label='men')
+                ax.hist(12+3*np.random.randn(1000), label='women', alpha=0.5)
+                ax.legend()
 
-            ax.hist(10+2*np.random.randn(1000), label='men')
-            ax.hist(12+3*np.random.randn(1000), label='women', alpha=0.5)
-            ax.legend()
+        kwargs are used to update the properties of the
+        :class:`~matplotlib.patches.Patch` instances returned by *hist*:
 
-        label can also be a sequence of strings. If multiple data is
-        provided in *x*, the labels are asigned sequentially to the
-        histograms.
+        %(Patch)s
 
         **Example:**
 
@@ -7052,68 +7551,116 @@ class Axes(martist.Artist):
         # NOTE: the range keyword overwrites the built-in func range !!!
         #       needs to be fixed in numpy                           !!!
 
+        # Validate string inputs here so we don't have to clutter
+        # subsequent code.
+        if histtype not in ['bar', 'barstacked', 'step', 'stepfilled']:
+            raise ValueError("histtype %s is not recognized" % histtype)
+
+        if align not in ['left', 'mid', 'right']:
+            raise ValueError("align kwarg %s is not recognized" % align)
+
+        if orientation not in [ 'horizontal', 'vertical']:
+            raise ValueError(
+                "orientation kwarg %s is not recognized" % orientation)
+
+
         if kwargs.get('width') is not None:
             raise DeprecationWarning(
                 'hist now uses the rwidth to give relative width '
                 'and not absolute width')
 
-        try:
-            # make sure a copy is created: don't use asarray
-            x = np.transpose(np.array(x))
-            if len(x.shape)==1:
-                x.shape = (1,x.shape[0])
-            elif len(x.shape)==2 and x.shape[1]<x.shape[0]:
-                warnings.warn('2D hist should be nsamples x nvariables; '
-                              'this looks transposed')
-        except ValueError:
-            # multiple hist with data of different length
-            if iterable(x[0]) and not is_string_like(x[0]):
-                tx = []
-                for i in xrange(len(x)):
-                    tx.append( np.array(x[i]) )
-                x = tx
+        # Massage 'x' for processing.
+        # NOTE: Be sure any changes here is also done below to 'weights'
+        if isinstance(x, np.ndarray) or not iterable(x[0]):
+            # TODO: support masked arrays;
+            x = np.asarray(x)
+            if x.ndim == 2:
+                x = x.T # 2-D input with columns as datasets; switch to rows
+            elif x.ndim == 1:
+                x = x.reshape(1, x.shape[0])  # new view, single row
             else:
-                raise ValueError, 'Can not use provided data to create a histogram'
-
-        if weights is not None:
-            try:
-                w = np.transpose(np.array(weights))
-                if len(w.shape)==1:
-                    w.shape = (1, w.shape[0])
-            except:
-                if iterable(weights[0]) and not is_string_like(weights[0]):
-                    tw = []
-                    for i in xrange(len(weights)):
-                        tw.append( np.array(weights[i]) )
-                    w = tw
-                else:
-                    raise ValueError, 'Can not use provided weights to create a hist'
-
-            if len(x) != len(w):
-                raise ValueError, 'weights should have the same shape as x'
-            for i in xrange(len(x)):
-                if len(x[i]) != len(w[i]):
-                    raise ValueError, 'weights should have the same shape as x'
+                raise ValueError("x must be 1D or 2D")
+            if x.shape[1] < x.shape[0]:
+                warnings.warn('2D hist input should be nsamples x nvariables;\n '
+                    'this looks transposed (shape is %d x %d)' % x.shape[::-1])
         else:
-            w = [None]*len(x)
+            # multiple hist with data of different length
+            x = [np.asarray(xi) for xi in x]
+
+        nx = len(x) # number of datasets
+
+        if color is None:
+            color = [self._get_lines.color_cycle.next()
+                                            for i in xrange(nx)]
+        else:
+            color = mcolors.colorConverter.to_rgba_array(color)
+            if len(color) != nx:
+                raise ValueError("color kwarg must have one color per dataset")
+
+        # We need to do to 'weights' what was done to 'x'
+        if weights is not None:
+            if isinstance(weights, np.ndarray) or not iterable(weights[0]) :
+                w = np.array(weights)
+                if w.ndim == 2:
+                    w = w.T
+                elif w.ndim == 1:
+                    w.shape = (1, w.shape[0])
+                else:
+                    raise ValueError("weights must be 1D or 2D")
+            else:
+                w = [np.asarray(wi) for wi in weights]
+
+            if len(w) != nx:
+                raise ValueError('weights should have the same shape as x')
+            for i in xrange(nx):
+                if len(w[i]) != len(x[i]):
+                    raise ValueError(
+                        'weights should have the same shape as x')
+        else:
+            w = [None]*nx
+
+
+        # Save autoscale state for later restoration; turn autoscaling
+        # off so we can do it all a single time at the end, instead
+        # of having it done by bar or fill and then having to be redone.
+        _saved_autoscalex = self.get_autoscalex_on()
+        _saved_autoscaley = self.get_autoscaley_on()
+        self.set_autoscalex_on(False)
+        self.set_autoscaley_on(False)
+
+        # Save the datalimits for the same reason:
+        _saved_bounds = self.dataLim.bounds
 
         # Check whether bins or range are given explicitly. In that
-        # case do not autoscale axes.
+        # case use those values for autoscaling.
         binsgiven = (cbook.iterable(bins) or range != None)
 
-        # check the version of the numpy
+        # If bins are not specified either explicitly or via range,
+        # we need to figure out the range required for all datasets,
+        # and supply that to np.histogram.
+        if not binsgiven:
+            xmin = np.inf
+            xmax = -np.inf
+            for xi in x:
+                xmin = min(xmin, xi.min())
+                xmax = max(xmax, xi.max())
+            range = (xmin, xmax)
+
+        #hist_kwargs = dict(range=range, normed=bool(normed))
+        # We will handle the normed kwarg within mpl until we
+        # get to the point of requiring numpy >= 1.5.
+        hist_kwargs = dict(range=range)
         if np.__version__ < "1.3": # version 1.1 and 1.2
-            hist_kwargs = dict(range=range,
-                               normed=bool(normed), new=True)
-        else: # version 1.3 and later, drop new=True
-            hist_kwargs = dict(range=range,
-                               normed=bool(normed))
+            hist_kwargs['new'] = True
 
         n = []
-        for i in xrange(len(x)):
+        for i in xrange(nx):
             # this will automatically overwrite bins,
             # so that each histogram uses the same bins
             m, bins = np.histogram(x[i], bins, weights=w[i], **hist_kwargs)
+            if normed:
+                db = np.diff(bins)
+                m = (m.astype(float) / db) / m.sum()
             n.append(m)
 
         if cumulative:
@@ -7130,59 +7677,48 @@ class Axes(martist.Artist):
 
         if histtype.startswith('bar'):
             totwidth = np.diff(bins)
-            stacked = False
 
-            if rwidth is not None: dr = min(1., max(0., rwidth))
-            elif len(n)>1: dr = 0.8
-            else: dr = 1.0
+            if rwidth is not None:
+                dr = min(1.0, max(0.0, rwidth))
+            elif len(n)>1:
+                dr = 0.8
+            else:
+                dr = 1.0
 
             if histtype=='bar':
-                width = dr*totwidth/len(n)
+                width = dr*totwidth/nx
                 dw = width
 
-                if len(n)>1:
-                    boffset = -0.5*dr*totwidth*(1.-1./len(n))
+                if nx > 1:
+                    boffset = -0.5*dr*totwidth*(1.0-1.0/nx)
                 else:
                     boffset = 0.0
+                stacked = False
             elif histtype=='barstacked':
                 width = dr*totwidth
                 boffset, dw = 0.0, 0.0
-
                 stacked = True
-            else:
-                raise ValueError, 'invalid histtype: %s' % histtype
 
             if align == 'mid' or align == 'edge':
                 boffset += 0.5*totwidth
             elif align == 'right':
                 boffset += totwidth
-            elif align != 'left' and align != 'center':
-                raise ValueError, 'invalid align: %s' % align
 
             if orientation == 'horizontal':
-                for m in n:
-                    color = self._get_lines._get_next_cycle_color()
-                    patch = self.barh(bins[:-1]+boffset, m, height=width,
-                                      left=bottom, align='center', log=log,
-                                      color=color)
-                    patches.append(patch)
-                    if stacked:
-                        if bottom is None: bottom = 0.0
-                        bottom += m
-                    boffset += dw
-            elif orientation == 'vertical':
-                for m in n:
-                    color = self._get_lines._get_next_cycle_color()
-                    patch = self.bar(bins[:-1]+boffset, m, width=width,
-                                     bottom=bottom, align='center', log=log,
-                                     color=color)
-                    patches.append(patch)
-                    if stacked:
-                        if bottom is None: bottom = 0.0
-                        bottom += m
-                    boffset += dw
-            else:
-                raise ValueError, 'invalid orientation: %s' % orientation
+                _barfunc = self.barh
+            else:  # orientation == 'vertical'
+                _barfunc = self.bar
+
+            for m, c in zip(n, color):
+                patch = _barfunc(bins[:-1]+boffset, m, width, bottom,
+                                  align='center', log=log,
+                                  color=c)
+                patches.append(patch)
+                if stacked:
+                    if bottom is None:
+                        bottom = 0.0
+                    bottom += m
+                boffset += dw
 
         elif histtype.startswith('step'):
             x = np.zeros( 2*len(bins), np.float )
@@ -7190,91 +7726,92 @@ class Axes(martist.Artist):
 
             x[0::2], x[1::2] = bins, bins
 
+            minimum = min(bins)
+
             if align == 'left' or align == 'center':
                 x -= 0.5*(bins[1]-bins[0])
             elif align == 'right':
                 x += 0.5*(bins[1]-bins[0])
-            elif align != 'mid' and align != 'edge':
-                raise ValueError, 'invalid align: %s' % align
 
             if log:
-                y[0],y[-1] = 1e-100, 1e-100
+                y[0],y[-1] = minimum, minimum
                 if orientation == 'horizontal':
                     self.set_xscale('log')
-                elif orientation == 'vertical':
+                else:  # orientation == 'vertical'
                     self.set_yscale('log')
 
-            fill = False
-            if histtype == 'stepfilled':
-                fill = True
-            elif histtype != 'step':
-                raise ValueError, 'invalid histtype: %s' % histtype
+            fill = (histtype == 'stepfilled')
 
-            for m in n:
+            for m, c in zip(n, color):
                 y[1:-1:2], y[2::2] = m, m
+                if log:
+                    y[y<minimum]=minimum
                 if orientation == 'horizontal':
                     x,y = y,x
-                elif orientation != 'vertical':
-                    raise ValueError, 'invalid orientation: %s' % orientation
 
-                color = self._get_lines._get_next_cycle_color()
                 if fill:
                     patches.append( self.fill(x, y,
-                        closed=False, facecolor=color) )
+                        closed=False, facecolor=c) )
                 else:
                     patches.append( self.fill(x, y,
-                        closed=False, edgecolor=color, fill=False) )
+                        closed=False, edgecolor=c, fill=False) )
 
             # adopted from adjust_x/ylim part of the bar method
             if orientation == 'horizontal':
-                xmin, xmax = 0, self.dataLim.intervalx[1]
+                xmin0 = max(_saved_bounds[0]*0.9, minimum)
+                xmax = self.dataLim.intervalx[1]
                 for m in n:
                     xmin = np.amin(m[m!=0]) # filter out the 0 height bins
-                xmin = max(xmin*0.9, 1e-100)
+                xmin = max(xmin*0.9, minimum)
+                xmin = min(xmin0, xmin)
                 self.dataLim.intervalx = (xmin, xmax)
             elif orientation == 'vertical':
-                ymin, ymax = 0, self.dataLim.intervaly[1]
+                ymin0 = max(_saved_bounds[1]*0.9, minimum)
+                ymax = self.dataLim.intervaly[1]
                 for m in n:
                     ymin = np.amin(m[m!=0]) # filter out the 0 height bins
-                ymin = max(ymin*0.9, 1e-100)
+                ymin = max(ymin*0.9, minimum)
+                ymin = min(ymin0, ymin)
                 self.dataLim.intervaly = (ymin, ymax)
-            self.autoscale_view()
 
+        if label is None:
+            labels = [None]
+        elif is_string_like(label):
+            labels = [label]
+        elif is_sequence_of_strings(label):
+            labels = list(label)
         else:
-            raise ValueError, 'invalid histtype: %s' % histtype
+            raise ValueError('invalid label: must be string or sequence of strings')
 
-        label = kwargs.pop('label', '')
-
-        if is_string_like(label):
-            labels = [label] + ['_nolegend_']*(len(patches)-1)
-        elif is_sequence_of_strings:
-            labels = list(label) + ['_nolegend_']*(len(patches)-1)
-        else:
-            raise ValueError, 'invalid label: must be string or sequence of strings'
+        if len(labels) < nx:
+            labels += [None] * (nx - len(labels))
 
         for (patch, lbl) in zip(patches, labels):
-            for p in patch:
+            if patch:
+                p = patch[0]
                 p.update(kwargs)
-                p.set_label(lbl)
-                lbl = '_nolegend_'
+                if lbl is not None: p.set_label(lbl)
+
+                for p in patch[1:]:
+                    p.update(kwargs)
+                    p.set_label('_nolegend_')
 
         if binsgiven:
-            self.set_autoscale_on(False)
             if orientation == 'vertical':
-                self.autoscale_view(scalex=False, scaley=True)
-                XL = self.xaxis.get_major_locator().view_limits(bins[0], bins[-1])
-                self.set_xbound(XL)
+                self.update_datalim([(bins[0],0), (bins[-1],0)], updatey=False)
             else:
-                self.autoscale_view(scalex=True, scaley=False)
-                YL = self.yaxis.get_major_locator().view_limits(bins[0], bins[-1])
-                self.set_ybound(YL)
+                self.update_datalim([(0,bins[0]), (0,bins[-1])], updatex=False)
 
-        if len(n)==1:
+        self.set_autoscalex_on(_saved_autoscalex)
+        self.set_autoscaley_on(_saved_autoscaley)
+        self.autoscale_view()
+
+        if nx == 1:
             return n[0], bins, cbook.silent_list('Patch', patches[0])
         else:
             return n, bins, cbook.silent_list('Lists of Patches', patches)
-    hist.__doc__ = cbook.dedent(hist.__doc__) % martist.kwdocd
 
+    @docstring.dedent_interpd
     def psd(self, x, NFFT=256, Fs=2, Fc=0, detrend=mlab.detrend_none,
             window=mlab.window_hanning, noverlap=0, pad_to=None,
             sides='default', scale_by_freq=None, **kwargs):
@@ -7346,12 +7883,7 @@ class Axes(martist.Artist):
 
         return pxx, freqs
 
-    psd_doc_dict = dict()
-    psd_doc_dict.update(martist.kwdocd)
-    psd_doc_dict.update(mlab.kwdocd)
-    psd_doc_dict['PSD'] = cbook.dedent(psd_doc_dict['PSD'])
-    psd.__doc__ = cbook.dedent(psd.__doc__) % psd_doc_dict
-
+    @docstring.dedent_interpd
     def csd(self, x, y, NFFT=256, Fs=2, Fc=0, detrend=mlab.detrend_none,
             window=mlab.window_hanning, noverlap=0, pad_to=None,
             sides='default', scale_by_freq=None, **kwargs):
@@ -7419,8 +7951,8 @@ class Axes(martist.Artist):
         self.set_yticks(ticks)
 
         return pxy, freqs
-    csd.__doc__ = cbook.dedent(csd.__doc__) % psd_doc_dict
 
+    @docstring.dedent_interpd
     def cohere(self, x, y, NFFT=256, Fs=2, Fc=0, detrend=mlab.detrend_none,
                window=mlab.window_hanning, noverlap=0, pad_to=None,
                sides='default', scale_by_freq=None, **kwargs):
@@ -7476,8 +8008,8 @@ class Axes(martist.Artist):
         self.grid(True)
 
         return cxy, freqs
-    cohere.__doc__ = cbook.dedent(cohere.__doc__) % psd_doc_dict
 
+    @docstring.dedent_interpd
     def specgram(self, x, NFFT=256, Fs=2, Fc=0, detrend=mlab.detrend_none,
                  window=mlab.window_hanning, noverlap=128,
                  cmap=None, xextent=None, pad_to=None, sides='default',
@@ -7550,8 +8082,6 @@ class Axes(martist.Artist):
         self.axis('auto')
 
         return Pxx, freqs, bins, im
-    specgram.__doc__ = cbook.dedent(specgram.__doc__) % psd_doc_dict
-    del psd_doc_dict #So that this does not become an Axes attribute
 
     def spy(self, Z, precision=0, marker=None, markersize=None,
             aspect='equal',  **kwargs):
@@ -7689,19 +8219,16 @@ class Axes(martist.Artist):
             *Z*   anything that can be interpreted as a 2-D array
 
         kwargs all are passed to :meth:`~matplotlib.axes.Axes.imshow`.
-        :meth:`matshow` sets defaults for *extent*, *origin*,
-        *interpolation*, and *aspect*; use care in overriding the
-        *extent* and *origin* kwargs, because they interact.  (Also,
-        if you want to change them, you probably should be using
-        imshow directly in your own version of matshow.)
+        :meth:`matshow` sets defaults for *origin*,
+        *interpolation*, and *aspect*; if you want row zero to
+        be at the bottom instead of the top, you can set the *origin*
+        kwarg to "lower".
 
         Returns: an :class:`matplotlib.image.AxesImage` instance.
         '''
-        Z = np.asarray(Z)
+        Z = np.asanyarray(Z)
         nr, nc = Z.shape
-        extent = [-0.5, nc-0.5, nr-0.5, -0.5]
-        kw = {'extent': extent,
-              'origin': 'upper',
+        kw = {'origin': 'upper',
               'interpolation': 'nearest',
               'aspect': 'equal'}          # (already the imshow default)
         kw.update(kwargs)
@@ -7717,32 +8244,41 @@ class Axes(martist.Artist):
                                                  integer=True))
         return im
 
-
-    def get_tightbbox(self, renderer):
+    def get_tightbbox(self, renderer, call_axes_locator=True):
         """
         return the tight bounding box of the axes.
         The dimension of the Bbox in canvas coordinate.
+
+        If call_axes_locator is False, it does not call the
+        _axes_locator attribute, which is necessary to get the correct
+        bounding box. call_axes_locator==False can be used if the
+        caller is only intereted in the relative size of the tightbbox
+        compared to the axes bbox.
         """
 
         artists = []
         bb = []
 
-        artists.append(self)
+        if not self.get_visible():
+            return None
+
+        locator = self.get_axes_locator()
+        if locator and call_axes_locator:
+            pos = locator(self, renderer)
+            self.apply_aspect(pos)
+        else:
+            self.apply_aspect()
+
+        bb.append(self.get_window_extent(renderer))
 
         if self.title.get_visible():
-            artists.append(self.title)
+            bb.append(self.title.get_window_extent(renderer))
 
-        if self.xaxis.get_visible():
-            artists.append(self.xaxis.label)
-            bbx1, bbx2 = self.xaxis.get_ticklabel_extents(renderer)
-            bb.extend([bbx1, bbx2])
-        if self.yaxis.get_visible():
-            artists.append(self.yaxis.label)
-            bby1, bby2 = self.yaxis.get_ticklabel_extents(renderer)
-            bb.extend([bby1, bby2])
+        bb_xaxis = self.xaxis.get_tightbbox(renderer)
+        if bb_xaxis: bb.append(bb_xaxis)
 
-
-        bb.extend([c.get_window_extent(renderer) for c in artists])
+        bb_yaxis = self.yaxis.get_tightbbox(renderer)
+        if bb_yaxis: bb.append(bb_yaxis)
 
         _bbox = mtransforms.Bbox.union([b for b in bb if b.width!=0 or b.height!=0])
 
@@ -7762,6 +8298,24 @@ class Axes(martist.Artist):
         self.xaxis.set_minor_locator(mticker.NullLocator())
         self.yaxis.set_minor_locator(mticker.NullLocator())
 
+    def tricontour(self, *args, **kwargs):
+        return mtri.tricontour(self, *args, **kwargs)
+    tricontour.__doc__ = mtri.TriContourSet.tricontour_doc
+
+    def tricontourf(self, *args, **kwargs):
+        return mtri.tricontourf(self, *args, **kwargs)
+    tricontourf.__doc__ = mtri.TriContourSet.tricontour_doc
+
+    def tripcolor(self, *args, **kwargs):
+        return mtri.tripcolor(self, *args, **kwargs)
+    tripcolor.__doc__ = mtri.tripcolor.__doc__
+
+    def triplot(self, *args, **kwargs):
+        mtri.triplot(self, *args, **kwargs)
+    triplot.__doc__ = mtri.triplot.__doc__
+
+
+from matplotlib.gridspec import GridSpec, SubplotSpec
 
 class SubplotBase:
     """
@@ -7780,96 +8334,71 @@ class SubplotBase:
         being created.  *plotNum* starts at 1 in the upper left
         corner and increases to the right.
 
+
         If *numRows* <= *numCols* <= *plotNum* < 10, *args* can be the
         decimal integer *numRows* * 100 + *numCols* * 10 + *plotNum*.
         """
 
         self.figure = fig
 
-        if len(args)==1:
-            s = str(args[0])
-            if len(s) != 3:
-                raise ValueError('Argument to subplot must be a 3 digits long')
-            rows, cols, num = map(int, s)
+        if len(args) == 1:
+            if isinstance(args[0], SubplotSpec):
+                self._subplotspec = args[0]
+            else:
+                try:
+                    s = str(int(args[0]))
+                    rows, cols, num = map(int, s)
+                except ValueError:
+                    raise ValueError(
+                         'Single argument to subplot must be a 3-digit integer')
+                self._subplotspec = GridSpec(rows, cols)[num-1]
+                # num - 1 for converting from MATLAB to python indexing
         elif len(args)==3:
             rows, cols, num = args
+            rows = int(rows)
+            cols = int(cols)
+            if isinstance(num, tuple) and len(num) == 2:
+                num = [int(n) for n in num]
+                self._subplotspec = GridSpec(rows, cols)[num[0]-1:num[1]]
+            else:
+                self._subplotspec = GridSpec(rows, cols)[int(num)-1]
+                # num - 1 for converting from MATLAB to python indexing
         else:
-            raise ValueError(  'Illegal argument to subplot')
-
-
-        total = rows*cols
-        num -= 1    # convert from matlab to python indexing
-                    # ie num in range(0,total)
-        if num >= total:
-            raise ValueError( 'Subplot number exceeds total subplots')
-        self._rows = rows
-        self._cols = cols
-        self._num = num
+            raise ValueError('Illegal argument(s) to subplot: %s' % (args,))
 
         self.update_params()
 
         # _axes_class is set in the subplot_class_factory
         self._axes_class.__init__(self, fig, self.figbox, **kwargs)
 
+
+
     def get_geometry(self):
         'get the subplot geometry, eg 2,2,3'
-        return self._rows, self._cols, self._num+1
+        rows, cols, num1, num2 = self.get_subplotspec().get_geometry()
+        return rows, cols, num1+1 # for compatibility
 
     # COVERAGE NOTE: Never used internally or from examples
     def change_geometry(self, numrows, numcols, num):
         'change subplot geometry, eg. from 1,1,1 to 2,2,3'
-        self._rows = numrows
-        self._cols = numcols
-        self._num = num-1
+        self._subplotspec = GridSpec(numrows, numcols)[num-1]
         self.update_params()
         self.set_position(self.figbox)
+
+    def get_subplotspec(self):
+        'get the SubplotSpec instance associated with the subplot'
+        return self._subplotspec
+
+    def set_subplotspec(self, subplotspec):
+        'set the SubplotSpec instance associated with the subplot'
+        self._subplotspec = subplotspec
 
     def update_params(self):
         'update the subplot position from fig.subplotpars'
 
-        rows = self._rows
-        cols = self._cols
-        num = self._num
-
-        pars = self.figure.subplotpars
-        left = pars.left
-        right = pars.right
-        bottom = pars.bottom
-        top = pars.top
-        wspace = pars.wspace
-        hspace = pars.hspace
-        totWidth = right-left
-        totHeight = top-bottom
-
-        figH = totHeight/(rows + hspace*(rows-1))
-        sepH = hspace*figH
-
-        figW = totWidth/(cols + wspace*(cols-1))
-        sepW = wspace*figW
-
-        rowNum, colNum =  divmod(num, cols)
-
-        figBottom = top - (rowNum+1)*figH - rowNum*sepH
-        figLeft = left + colNum*(figW + sepW)
-
-        self.figbox = mtransforms.Bbox.from_bounds(figLeft, figBottom,
-                                                   figW, figH)
-        self.rowNum = rowNum
-        self.colNum = colNum
-        self.numRows = rows
-        self.numCols = cols
-
-        if 0:
-            print 'rcn', rows, cols, num
-            print 'lbrt', left, bottom, right, top
-            print 'self.figBottom', self.figBottom
-            print 'self.figLeft', self.figLeft
-            print 'self.figW', self.figW
-            print 'self.figH', self.figH
-            print 'self.rowNum', self.rowNum
-            print 'self.colNum', self.colNum
-            print 'self.numRows', self.numRows
-            print 'self.numCols', self.numCols
+        self.figbox, self.rowNum, self.colNum, self.numRows, self.numCols = \
+                     self.get_subplotspec().get_position(self.figure,
+                                                         return_all=True)
 
 
     def is_first_col(self):
@@ -7924,7 +8453,8 @@ def subplot_class_factory(axes_class=None):
 # This is provided for backward compatibility
 Subplot = subplot_class_factory()
 
-martist.kwdocd['Axes'] = martist.kwdocd['Subplot'] = martist.kwdoc(Axes)
+docstring.interpd.update(Axes=martist.kwdoc(Axes))
+docstring.interpd.update(Subplot=martist.kwdoc(Axes))
 
 """
 # this is some discarded code I was using to find the minimum positive

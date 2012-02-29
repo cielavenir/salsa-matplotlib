@@ -5,7 +5,8 @@ Pyplot tutorial
 ***************
 
 :mod:`matplotlib.pyplot` is a collection of command style functions
-that make matplotlib  work like matlab.  Each ``pyplot`` function makes
+that make matplotlib  work like MATLAB.
+Each ``pyplot`` function makes
 some change to a figure: eg, create a figure, create a plotting area
 in a figure, plot some lines in a plotting area, decorate the plot
 with labels, etc....  :mod:`matplotlib.pyplot` is stateful, in that it
@@ -29,10 +30,10 @@ you can issue the command::
 
     plt.plot([1,2,3,4], [1,4,9,16])
 
-For every x, y pair of arguments, there is a optional third argument
+For every x, y pair of arguments, there is an optional third argument
 which is the format string that indicates the color and line type of
 the plot.  The letters and symbols of the format string are from
-matlab, and you concatenate a color string with a line style string.
+MATLAB, and you concatenate a color string with a line style string.
 The default format string is 'b-', which is a solid blue line.  For
 example, to plot the above with red circles, you would issue
 
@@ -74,19 +75,19 @@ several ways to set line properties
   one line so it is a list of length 1.  I use tuple unpacking in the
   ``line, = plot(x, y, 'o')`` to get the first element of the list::
 
-		     line, = plt.plot(x, y, '-')
+      line, = plt.plot(x, y, '-')
       line.set_antialiased(False) # turn off antialising
 
 * Use the :func:`~matplotlib.pyplot.setp` command.  The example below
-  uses a Matlab-style command to set multiple properties
+  uses a MATLAB-style command to set multiple properties
   on a list of lines.  ``setp`` works transparently with a list of objects
   or a single object.  You can either use python keyword arguments or
-  Matlab-style string/value pairs::
+  MATLAB-style string/value pairs::
 
       lines = plt.plot(x1, y1, x2, y2)
       # use keyword args
       plt.setp(lines, color='r', linewidth=2.0)
-      # or matlab style string value pairs
+      # or MATLAB style string value pairs
       plt.setp(lines, 'color', 'r', 'linewidth', 2.0)
 
 
@@ -149,7 +150,7 @@ Working with multiple figures and axes
 ======================================
 
 
-Matlab, and :mod:`~matplotlib.pyplot`, have the concept of the current
+MATLAB, and :mod:`~matplotlib.pyplot`, have the concept of the current
 figure and the current axes.  All plotting commands apply to the
 current axes.  The function :func:`~matplotlib.pyplot.gca` returns the
 current axes (a :class:`matplotlib.axes.Axes` instance), and
@@ -203,6 +204,15 @@ and the current axes with :func:`~matplotlib.pyplot.cla`.  If you find
 this statefulness, annoying, don't despair, this is just a thin
 stateful wrapper around an object oriented API, which you can use
 instead (see :ref:`artist-tutorial`)
+
+If you are making a long sequence of figures, you need to be aware of one
+more thing: the memory required for a figure is not completely
+released until the figure is explicitly closed with
+:func:`~matplotlib.pyplot.close`.  Deleting all references to the
+figure, and/or using the window manager to kill the window in which
+the figure appears on the screen, is not enough, because pyplot
+maintains internal references until :func:`~matplotlib.pyplot.close`
+is called.
 
 .. _working-with-text:
 
@@ -270,3 +280,4 @@ variety of other coordinate systems one can choose -- see
 :ref:`annotations-tutorial` and :ref:`plotting-guide-annotation` for
 details.  More examples can be found in
 :ref:`pylab_examples-annotation_demo`.
+

@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 fig = plt.figure()
-ax = Axes3D(fig)
+ax = fig.add_subplot(111, projection='3d')
 x, y = np.random.rand(2, 100) * 4
 hist, xedges, yedges = np.histogram2d(x, y, bins=4)
 
@@ -16,7 +16,8 @@ zpos = np.zeros(elements)
 dx = 0.5 * np.ones_like(zpos)
 dy = dx.copy()
 dz = hist.flatten()
-ax.bar3d(xpos, ypos, zpos, dx, dy, dz, color='b')
+
+ax.bar3d(xpos, ypos, zpos, dx, dy, dz, color='b', zsort='average')
 
 plt.show()
 

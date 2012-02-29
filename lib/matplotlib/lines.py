@@ -12,27 +12,20 @@ from matplotlib import verbose
 import artist
 from artist import Artist
 from cbook import iterable, is_string_like, is_numlike, ls_mapper, dedent,\
-flatten
+flatten, is_math_text
 from colors import colorConverter
 from path import Path
 from transforms import Affine2D, Bbox, TransformedPath, IdentityTransform
 
 from matplotlib import rcParams
 from artist import allow_rasterization
-
-# special-purpose marker identifiers:
-(TICKLEFT, TICKRIGHT, TICKUP, TICKDOWN,
-    CARETLEFT, CARETRIGHT, CARETUP, CARETDOWN) = range(8)
-
-
-# COVERAGE NOTE: Never called internally or from examples
-def unmasked_index_ranges(mask, compressed = True):
-    warnings.warn("Import this directly from matplotlib.cbook",
-                   DeprecationWarning)
-    # Warning added 2008/07/22
-    from matplotlib.cbook import unmasked_index_ranges as _unmasked_index_ranges
-    return _unmasked_index_ranges(mask, compressed=compressed)
-
+from matplotlib import docstring
+from matplotlib.font_manager import FontProperties
+from matplotlib.markers import MarkerStyle
+# Imported here for backward compatibility, even though they don't
+# really belong.
+from matplotlib.markers import TICKLEFT, TICKRIGHT, TICKUP, TICKDOWN, \
+         CARETLEFT, CARETRIGHT, CARETUP, CARETDOWN
 
 def segment_hits(cx, cy, x, y, radius):
     """
@@ -107,45 +100,14 @@ class Line2D(Artist):
     drawStyles = {}
     drawStyles.update(_drawStyles_l)
     drawStyles.update(_drawStyles_s)
+    # Need a list ordered with long names first:
+    drawStyleKeys = _drawStyles_l.keys() + _drawStyles_s.keys()
 
-    markers = _markers =  {  # hidden names deprecated
-        '.'  : '_draw_point',
-        ','  : '_draw_pixel',
-        'o'  : '_draw_circle',
-        'v'  : '_draw_triangle_down',
-        '^'  : '_draw_triangle_up',
-        '<'  : '_draw_triangle_left',
-        '>'  : '_draw_triangle_right',
-        '1'  : '_draw_tri_down',
-        '2'  : '_draw_tri_up',
-        '3'  : '_draw_tri_left',
-        '4'  : '_draw_tri_right',
-        's'  : '_draw_square',
-        'p'  : '_draw_pentagon',
-        '*'  : '_draw_star',
-        'h'  : '_draw_hexagon1',
-        'H'  : '_draw_hexagon2',
-        '+'  : '_draw_plus',
-        'x'  : '_draw_x',
-        'D'  : '_draw_diamond',
-        'd'  : '_draw_thin_diamond',
-        '|'  : '_draw_vline',
-        '_'  : '_draw_hline',
-        TICKLEFT    : '_draw_tickleft',
-        TICKRIGHT   : '_draw_tickright',
-        TICKUP      : '_draw_tickup',
-        TICKDOWN    : '_draw_tickdown',
-        CARETLEFT   : '_draw_caretleft',
-        CARETRIGHT  : '_draw_caretright',
-        CARETUP     : '_draw_caretup',
-        CARETDOWN   : '_draw_caretdown',
-        'None' : '_draw_nothing',
-        ' ' : '_draw_nothing',
-        '' : '_draw_nothing',
-    }
-
-    filled_markers = ('o', '^', 'v', '<', '>',
-                        's', 'd', 'D', 'h', 'H', 'p', '*')
+    # Referenced here to maintain API.  These are defined in
+    # MarkerStyle
+    markers = MarkerStyle.markers
+    filled_markers = MarkerStyle.filled_markers
+    fillStyles = MarkerStyle.fillstyles
 
     zorder = 2
     validCap = ('butt', 'round', 'projecting')
@@ -172,7 +134,8 @@ class Line2D(Artist):
                  markeredgewidth = None,
                  markeredgecolor = None,
                  markerfacecolor = None,
-		 fillstyle       = 'full',
+                 markerfacecoloralt = 'none',
+                 fillstyle       = 'full',
                  antialiased     = None,
                  dash_capstyle   = None,
                  solid_capstyle  = None,
@@ -229,6 +192,7 @@ class Line2D(Artist):
         self.set_drawstyle(drawstyle)
         self.set_linewidth(linewidth)
         self.set_color(color)
+        self._marker = MarkerStyle()
         self.set_marker(marker)
         self.set_markevery(markevery)
         self.set_antialiased(antialiased)
@@ -237,11 +201,10 @@ class Line2D(Artist):
 
 
         self.set_markerfacecolor(markerfacecolor)
+        self.set_markerfacecoloralt(markerfacecoloralt)
         self.set_markeredgecolor(markeredgecolor)
         self.set_markeredgewidth(markeredgewidth)
-	self.set_fillstyle(fillstyle)
-
-        self._point_size_reduction = 0.5
+        self.set_fillstyle(fillstyle)
 
         self.verticalOffset = None
 
@@ -249,12 +212,14 @@ class Line2D(Artist):
         # chance to init axes (and hence unit support)
         self.update(kwargs)
         self.pickradius = pickradius
+        self.ind_offset = 0
         if is_numlike(self._picker):
             self.pickradius = self._picker
 
         self._xorig = np.asarray([])
         self._yorig = np.asarray([])
-        self._invalid = True
+        self._invalidx = True
+        self._invalidy = True
         self.set_data(xdata, ydata)
 
     def contains(self, mouseevent):
@@ -278,11 +243,13 @@ class Line2D(Artist):
             raise ValueError,"pick radius should be a distance"
 
         # Make sure we have data to plot
-        if self._invalid:
+        if self._invalidy or self._invalidx:
             self.recache()
         if len(self._xy)==0: return False,{}
 
         # Convert points to pixels
+        if self._transformed_path is None:
+            self._transform_path()
         path, affine = self._transformed_path.get_transformed_path_and_affine()
         path = affine.transform_path(path)
         xy = path.vertices
@@ -304,6 +271,8 @@ class Line2D(Artist):
         else:
             # If line, return the nearby segment(s)
             ind = segment_hits(mouseevent.x,mouseevent.y,xt,yt,pixels)
+
+        ind += self.ind_offset
 
         # Debugging message
         if False and self._label != u'':
@@ -329,9 +298,9 @@ class Line2D(Artist):
 
     def get_fillstyle(self):
         """
-	return the marker fillstyle
+        return the marker fillstyle
         """
-	return self._fillstyle
+        return self._marker.get_fillstyle()
 
     def set_fillstyle(self, fs):
         """
@@ -340,8 +309,7 @@ class Line2D(Artist):
 
         ACCEPTS: ['full' | 'left' | 'right' | 'bottom' | 'top']
         """
-        assert fs in ['full', 'left' , 'right' , 'bottom' , 'top']
-	self._fillstyle = fs
+        self._marker.set_fillstyle(fs)
 
     def set_markevery(self, every):
         """
@@ -385,7 +353,7 @@ class Line2D(Artist):
         bbox.update_from_data_xy(self.get_transform().transform(self.get_xydata()),
                                  ignore=True)
         # correct for marker size, if any
-        if self._marker is not None:
+        if self._marker:
             ms = (self._markersize / 72.0 * self.figure.dpi) * 0.5
             bbox = bbox.padded(ms)
         return bbox
@@ -393,57 +361,52 @@ class Line2D(Artist):
     def set_axes(self, ax):
         Artist.set_axes(self, ax)
         if ax.xaxis is not None:
-            self._xcid = ax.xaxis.callbacks.connect('units', self.recache)
+            self._xcid = ax.xaxis.callbacks.connect('units', self.recache_always)
         if ax.yaxis is not None:
-            self._ycid = ax.yaxis.callbacks.connect('units', self.recache)
+            self._ycid = ax.yaxis.callbacks.connect('units', self.recache_always)
     set_axes.__doc__ = Artist.set_axes.__doc__
 
     def set_data(self, *args):
         """
         Set the x and y data
 
-        ACCEPTS: 2D array
+        ACCEPTS: 2D array (rows are x, y) or two 1D arrays
         """
         if len(args)==1:
             x, y = args[0]
         else:
             x, y = args
 
-        not_masked = 0
-        if not ma.isMaskedArray(x):
-            x = np.asarray(x)
-            not_masked += 1
-        if not ma.isMaskedArray(y):
-            y = np.asarray(y)
-            not_masked += 1
+        self.set_xdata(x)
+        self.set_ydata(y)
 
-        if (not_masked < 2 or
-            (x is not self._xorig and
-             (x.shape != self._xorig.shape or np.any(x != self._xorig))) or
-            (y is not self._yorig and
-              (y.shape != self._yorig.shape or np.any(y != self._yorig)))):
-            self._xorig = x
-            self._yorig = y
-            self._invalid = True
+    def recache_always(self):
+        self.recache(always=True)
 
-    def recache(self):
-        #if self.axes is None: print 'recache no axes'
-        #else: print 'recache units', self.axes.xaxis.units, self.axes.yaxis.units
-        if ma.isMaskedArray(self._xorig) or ma.isMaskedArray(self._yorig):
-            x = ma.asarray(self.convert_xunits(self._xorig), float)
-            y = ma.asarray(self.convert_yunits(self._yorig), float)
-            x = ma.ravel(x)
-            y = ma.ravel(y)
+    def recache(self, always=False):
+        if always or self._invalidx:
+            xconv = self.convert_xunits(self._xorig)
+            if ma.isMaskedArray(self._xorig):
+                x = ma.asarray(xconv, np.float_)
+            else:
+                x = np.asarray(xconv, np.float_)
+            x = x.ravel()
         else:
-            x = np.asarray(self.convert_xunits(self._xorig), float)
-            y = np.asarray(self.convert_yunits(self._yorig), float)
-            x = np.ravel(x)
-            y = np.ravel(y)
+            x = self._x
+        if always or self._invalidy:
+            yconv = self.convert_yunits(self._yorig)
+            if ma.isMaskedArray(self._yorig):
+                y = ma.asarray(yconv, np.float_)
+            else:
+                y = np.asarray(yconv, np.float_)
+            y = y.ravel()
+        else:
+            y = self._y
 
         if len(x)==1 and len(y)>1:
-            x = x * np.ones(y.shape, float)
+            x = x * np.ones(y.shape, np.float_)
         if len(y)==1 and len(x)>1:
-            y = y * np.ones(x.shape, float)
+            y = y * np.ones(x.shape, np.float_)
 
         if len(x) != len(y):
             raise RuntimeError('xdata and ydata must be the same length')
@@ -462,7 +425,7 @@ class Line2D(Artist):
         if (self.axes and len(x) > 100 and self._is_sorted(x) and
             self.axes.name == 'rectilinear' and
             self.axes.get_xscale() == 'linear' and
-            self.axes.get_yscale() == 'linear'):
+            self._markevery is None):
             self._subslice = True
         if hasattr(self, '_path'):
             interpolation_steps = self._path._interpolation_steps
@@ -470,7 +433,8 @@ class Line2D(Artist):
             interpolation_steps = 1
         self._path = Path(self._xy, None, interpolation_steps)
         self._transformed_path = None
-        self._invalid = False
+        self._invalidx = False
+        self._invalidy = False
 
     def _transform_path(self, subslice=None):
         # Masked arrays are now handled by the Path class itself
@@ -488,7 +452,8 @@ class Line2D(Artist):
         ACCEPTS: a :class:`matplotlib.transforms.Transform` instance
         """
         Artist.set_transform(self, t)
-        self._invalid = True
+        self._invalidx = True
+        self._invalidy = True
 
     def _is_sorted(self, x):
         "return true if x is sorted"
@@ -497,14 +462,16 @@ class Line2D(Artist):
 
     @allow_rasterization
     def draw(self, renderer):
-        if self._invalid:
+        if self._invalidy or self._invalidx:
             self.recache()
+        self.ind_offset = 0  # Needed for contains() method.
         if self._subslice and self.axes:
             # Need to handle monotonically decreasing case also...
             x0, x1 = self.axes.get_xbound()
             i0, = self._x.searchsorted([x0], 'left')
             i1, = self._x.searchsorted([x1], 'right')
             subslice = slice(max(i0-1, 0), i1+1)
+            self.ind_offset = subslice.start
             self._transform_path(subslice)
         if self._transformed_path is None:
             self._transform_path()
@@ -538,34 +505,53 @@ class Line2D(Artist):
                 drawFunc = getattr(self, funcname)
                 drawFunc(renderer, gc, tpath, affine.frozen())
 
-        if self._marker is not None:
+        if self._marker:
             gc = renderer.new_gc()
             self._set_gc_clip(gc)
             gc.set_foreground(self.get_markeredgecolor())
             gc.set_linewidth(self._markeredgewidth)
             gc.set_alpha(self._alpha)
-            funcname = self._markers.get(self._marker, '_draw_nothing')
-            if funcname != '_draw_nothing':
-                tpath, affine = self._transformed_path.get_transformed_points_and_affine()
-                if len(tpath.vertices):
-                    # subsample the markers if markevery is not None
-                    markevery = self.get_markevery()
-                    if markevery is not None:
-                        if iterable(markevery):
-                            startind, stride = markevery
-                        else:
-                            startind, stride = 0, markevery
-                        if tpath.codes is not None:
-                            codes = tpath.codes[startind::stride]
-                        else:
-                            codes = None
-                        vertices = tpath.vertices[startind::stride]
-                        subsampled = Path(vertices, codes)
+            marker = self._marker
+            tpath, affine = self._transformed_path.get_transformed_points_and_affine()
+            if len(tpath.vertices):
+                # subsample the markers if markevery is not None
+                markevery = self.get_markevery()
+                if markevery is not None:
+                    if iterable(markevery):
+                        startind, stride = markevery
                     else:
-                        subsampled = tpath
+                        startind, stride = 0, markevery
+                    if tpath.codes is not None:
+                        codes = tpath.codes[startind::stride]
+                    else:
+                        codes = None
+                    vertices = tpath.vertices[startind::stride]
+                    subsampled = Path(vertices, codes)
+                else:
+                    subsampled = tpath
 
-                    markerFunc = getattr(self, funcname)
-                    markerFunc(renderer, gc, subsampled, affine.frozen())
+                snap = marker.get_snap_threshold()
+                if type(snap) == float:
+                    snap = renderer.points_to_pixels(self._markersize) >= snap
+                gc.set_snap(snap)
+                marker_path = marker.get_path()
+                marker_trans = marker.get_transform()
+                w = renderer.points_to_pixels(self._markersize)
+                if marker.get_marker() != ',': # Don't scale for pixels
+                    marker_trans = marker_trans.scale(w)
+                rgbFace = self._get_rgb_face()
+                renderer.draw_markers(
+                    gc, marker_path, marker_trans, subsampled, affine.frozen(),
+                    rgbFace)
+                alt_marker_path = marker.get_alt_path()
+                if alt_marker_path:
+                    alt_marker_trans = marker.get_alt_transform()
+                    alt_marker_trans = alt_marker_trans.scale(w)
+                    rgbFace = self._get_rgb_face(alt=True)
+                    renderer.draw_markers(
+                        gc, alt_marker_path, alt_marker_trans, subsampled,
+                        affine.frozen(), rgbFace)
+
             gc.restore()
 
         gc.restore()
@@ -577,12 +563,12 @@ class Line2D(Artist):
     def get_linestyle(self): return self._linestyle
 
     def get_linewidth(self): return self._linewidth
-    def get_marker(self): return self._marker
+    def get_marker(self): return self._marker.get_marker()
 
     def get_markeredgecolor(self):
         if (is_string_like(self._markeredgecolor) and
             self._markeredgecolor == 'auto'):
-            if self._marker in self.filled_markers:
+            if self._marker.is_filled():
                 return 'k'
             else:
                 return self._color
@@ -593,17 +579,24 @@ class Line2D(Artist):
         return self._markeredgecolor
     def get_markeredgewidth(self): return self._markeredgewidth
 
-    def get_markerfacecolor(self):
-        if (self._markerfacecolor is None or
-            (is_string_like(self._markerfacecolor) and
-             self._markerfacecolor.lower()=='none') ):
-            return self._markerfacecolor
-        elif (is_string_like(self._markerfacecolor) and
-              self._markerfacecolor.lower() == 'auto'):
+    def _get_markerfacecolor(self, alt=False):
+        if alt:
+            fc = self._markerfacecoloralt
+        else:
+            fc = self._markerfacecolor
+
+        if (fc is None or (is_string_like(fc) and fc.lower()=='none') ):
+            return fc
+        elif (is_string_like(fc) and fc.lower() == 'auto'):
             return self._color
         else:
-            return self._markerfacecolor
+            return fc
 
+    def get_markerfacecolor(self):
+        return self._get_markerfacecolor(alt=False)
+
+    def get_markerfacecoloralt(self):
+        return self._get_markerfacecolor(alt=True)
 
     def get_markersize(self): return self._markersize
 
@@ -625,7 +618,7 @@ class Line2D(Artist):
         """
         if orig:
             return self._xorig
-        if self._invalid:
+        if self._invalidx:
             self.recache()
         return self._x
 
@@ -638,7 +631,7 @@ class Line2D(Artist):
         """
         if orig:
             return self._yorig
-        if self._invalid:
+        if self._invalidy:
             self.recache()
         return self._y
 
@@ -647,7 +640,7 @@ class Line2D(Artist):
         Return the :class:`~matplotlib.path.Path` object associated
         with this line.
         """
-        if self._invalid:
+        if self._invalidy or self._invalidx:
             self.recache()
         return self._path
 
@@ -655,7 +648,7 @@ class Line2D(Artist):
         """
         Return the *xy* data as a Nx2 numpy array.
         """
-        if self._invalid:
+        if self._invalidy or self._invalidx:
             self.recache()
         return self._xy
 
@@ -703,13 +696,13 @@ class Line2D(Artist):
         ================    =================
         linestyle           description
         ================    =================
-        '-'                 solid
-        '--'                dashed
-        '-.'                dash_dot
-        ':'                 dotted
-        'None'              draw nothing
-        ' '                 draw nothing
-        ''                  draw nothing
+        ``'-'``             solid
+        ``'--'``            dashed
+        ``'-.'``            dash_dot
+        ``':'``             dotted
+        ``'None'``          draw nothing
+        ``' '``             draw nothing
+        ``''``              draw nothing
         ================    =================
 
         'steps' is equivalent to 'steps-pre' and is maintained for
@@ -720,19 +713,18 @@ class Line2D(Artist):
             :meth:`set_drawstyle`
                To set the drawing style (stepping) of the plot.
 
-        ACCEPTS: [ '-' | '--' | '-.' | ':' | 'None' | ' ' | '' ] and
-        any drawstyle in combination with a linestyle, e.g. 'steps--'.
+        ACCEPTS: [ ``'-'`` | ``'--'`` | ``'-.'`` | ``':'`` | ``'None'`` | ``' '`` | ``''`` ]
+        and any drawstyle in combination with a linestyle, e.g. ``'steps--'``.
         """
 
-        # handle long drawstyle names before short ones !
-        for ds in flatten([k.keys() for k in (self._drawStyles_l,
-                self._drawStyles_s)], is_string_like):
+        for ds in self.drawStyleKeys:  # long names are first in the list
             if linestyle.startswith(ds):
                 self.set_drawstyle(ds)
                 if len(linestyle) > len(ds):
                     linestyle = linestyle[len(ds):]
                 else:
                     linestyle = '-'
+                break
 
         if linestyle not in self._lineStyles:
             if linestyle in ls_mapper:
@@ -744,64 +736,16 @@ class Line2D(Artist):
             linestyle = 'None'
         self._linestyle = linestyle
 
+    @docstring.dedent_interpd
     def set_marker(self, marker):
         """
         Set the line marker
 
-        ========== ==========================
-        marker     description
-        ========== ==========================
-        '.'        point
-        ','        pixel
-        'o'        circle
-        'v'        triangle_down
-        '^'        triangle_up
-        '<'        triangle_left
-        '>'        triangle_right
-        '1'        tri_down
-        '2'        tri_up
-        '3'        tri_left
-        '4'        tri_right
-        's'        square
-        'p'        pentagon
-        '*'        star
-        'h'        hexagon1
-        'H'        hexagon2
-        '+'        plus
-        'x'        x
-        'D'        diamond
-        'd'        thin_diamond
-        '|'        vline
-        '_'        hline
-        TICKLEFT   tickleft
-        TICKRIGHT  tickright
-        TICKUP     tickup
-        TICKDOWN   tickdown
-        CARETLEFT  caretleft
-        CARETRIGHT caretright
-        CARETUP    caretup
-        CARETDOWN  caretdown
-        'None'     nothing
-        ' '        nothing
-        ''         nothing
-        ========== ==========================
+        %(MarkerTable)s
 
-
-
-        ACCEPTS: [ '+' | '*' | ',' | '.' | '1' | '2' | '3' | '4'
-                 | '<' | '>' | 'D' | 'H' | '^' | '_' | 'd'
-                 | 'h' | 'o' | 'p' | 's' | 'v' | 'x' | '|'
-                 | TICKUP | TICKDOWN | TICKLEFT | TICKRIGHT
-                 | 'None' | ' ' | '' ]
-
+        %(MarkerAccepts)s
         """
-        if marker not in self._markers:
-            verbose.report('Unrecognized marker style %s, %s' %
-                                            (marker, type(marker)))
-        if marker in [' ','']:
-            marker = 'None'
-        self._marker = marker
-        self._markerFunc = self._markers[marker]
+        self._marker.set_marker(marker)
 
     def set_markeredgecolor(self, ec):
         """
@@ -825,13 +769,25 @@ class Line2D(Artist):
 
     def set_markerfacecolor(self, fc):
         """
-        Set the marker face color
+        Set the marker face color.
 
         ACCEPTS: any matplotlib color
         """
-        if fc is None :
+        if fc is None:
             fc = 'auto'
+
         self._markerfacecolor = fc
+
+    def set_markerfacecoloralt(self, fc):
+        """
+        Set the alternate marker face color.
+
+        ACCEPTS: any matplotlib color
+        """
+        if fc is None:
+            fc = 'auto'
+
+        self._markerfacecoloralt = fc
 
     def set_markersize(self, sz):
         """
@@ -847,7 +803,8 @@ class Line2D(Artist):
 
         ACCEPTS: 1D array
         """
-        self.set_data(x, self._yorig)
+        self._xorig = x
+        self._invalidx = True
 
     def set_ydata(self, y):
         """
@@ -855,7 +812,8 @@ class Line2D(Artist):
 
         ACCEPTS: 1D array
         """
-        self.set_data(self._xorig, y)
+        self._yorig = y
+        self._invalidy = True
 
     def set_dashes(self, seq):
         """
@@ -875,6 +833,7 @@ class Line2D(Artist):
     def _draw_lines(self, renderer, gc, path, trans):
         self._lineFunc(renderer, gc, path, trans)
 
+
     def _draw_steps_pre(self, renderer, gc, path, trans):
         vertices = self._xy
         steps = ma.zeros((2*len(vertices)-1, 2), np.float_)
@@ -886,6 +845,7 @@ class Line2D(Artist):
         path = path.transformed(self.get_transform())
         self._lineFunc(renderer, gc, path, IdentityTransform())
 
+
     def _draw_steps_post(self, renderer, gc, path, trans):
         vertices = self._xy
         steps = ma.zeros((2*len(vertices)-1, 2), np.float_)
@@ -896,6 +856,7 @@ class Line2D(Artist):
         path = Path(steps)
         path = path.transformed(self.get_transform())
         self._lineFunc(renderer, gc, path, IdentityTransform())
+
 
     def _draw_steps_mid(self, renderer, gc, path, trans):
         vertices = self._xy
@@ -912,12 +873,10 @@ class Line2D(Artist):
         self._lineFunc(renderer, gc, path, IdentityTransform())
 
 
-    def _draw_nothing(self, *args, **kwargs):
-        pass
-
     def _draw_solid(self, renderer, gc, path, trans):
         gc.set_linestyle('solid')
         renderer.draw_path(gc, path, trans)
+
 
     def _draw_dashed(self, renderer, gc, path, trans):
         gc.set_linestyle('dashed')
@@ -937,346 +896,6 @@ class Line2D(Artist):
         renderer.draw_path(gc, path, trans)
 
 
-    def _draw_point(self, renderer, gc, path, path_trans):
-    	fs = self.get_fillstyle()
-	if fs!='full':
-            raise NotImplementedError('non-full markers have not been implemented for this marker style yet; please contribute')
-
-        w = renderer.points_to_pixels(self._markersize) * \
-            self._point_size_reduction * 0.5
-        gc.set_snap(renderer.points_to_pixels(self._markersize) > 3.0)
-        rgbFace = self._get_rgb_face()
-        transform = Affine2D().scale(w)
-        renderer.draw_markers(
-            gc, Path.unit_circle(), transform, path, path_trans,
-            rgbFace)
-
-    _draw_pixel_transform = Affine2D().translate(-0.5, -0.5)
-    def _draw_pixel(self, renderer, gc, path, path_trans):
-    	fs = self.get_fillstyle()
-	if fs!='full':
-            raise NotImplementedError('non-full markers have not been implemented for this marker style yet; please contribute')
-
-        rgbFace = self._get_rgb_face()
-        gc.set_snap(False)
-        renderer.draw_markers(gc, Path.unit_rectangle(),
-                              self._draw_pixel_transform,
-                              path, path_trans, rgbFace)
-
-
-    def _draw_circle(self, renderer, gc, path, path_trans):
-    	fs = self.get_fillstyle()
-	if fs!='full':
-            raise NotImplementedError('non-full markers have not been implemented for this marker style yet; please contribute')
-
-        w = renderer.points_to_pixels(self._markersize) * 0.5
-        gc.set_snap(renderer.points_to_pixels(self._markersize) > 3.0)
-        rgbFace = self._get_rgb_face()
-        transform = Affine2D().scale(w, w)
-        renderer.draw_markers(
-            gc, Path.unit_circle(), transform, path, path_trans,
-            rgbFace)
-
-
-    _triangle_path = Path([[0.0, 1.0], [-1.0, -1.0], [1.0, -1.0], [0.0, 1.0]])
-    def _draw_triangle_up(self, renderer, gc, path, path_trans):
-
-    	fs = self.get_fillstyle()
-	if fs!='full':
-            raise NotImplementedError('non-full markers have not been implemented for this marker style yet; please contribute')
-
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 5.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset, offset)
-        rgbFace = self._get_rgb_face()
-        renderer.draw_markers(gc, self._triangle_path, transform,
-                              path, path_trans, rgbFace)
-
-
-    def _draw_triangle_down(self, renderer, gc, path, path_trans):
-    	fs = self.get_fillstyle()
-	if fs!='full':
-            raise NotImplementedError('non-full markers have not been implemented for this marker style yet; please contribute')
-
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 5.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset, -offset)
-        rgbFace = self._get_rgb_face()
-        renderer.draw_markers(gc, self._triangle_path, transform,
-                              path, path_trans, rgbFace)
-
-
-    def _draw_triangle_left(self, renderer, gc, path, path_trans):
-    	fs = self.get_fillstyle()
-	if fs!='full':
-            raise NotImplementedError('non-full markers have not been implemented for this marker style yet; please contribute')
-
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 5.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset, offset).rotate_deg(90)
-        rgbFace = self._get_rgb_face()
-        renderer.draw_markers(gc, self._triangle_path, transform,
-                              path, path_trans, rgbFace)
-
-
-    def _draw_triangle_right(self, renderer, gc, path, path_trans):
-    	fs = self.get_fillstyle()
-	if fs!='full':
-            raise NotImplementedError('non-full markers have not been implemented for this marker style yet; please contribute')
-
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 5.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset, offset).rotate_deg(-90)
-        rgbFace = self._get_rgb_face()
-        renderer.draw_markers(gc, self._triangle_path, transform,
-                              path, path_trans, rgbFace)
-
-
-    def _draw_square(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 2.0)
-        side = renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().translate(-0.5, -0.5).scale(side)
-        rgbFace = self._get_rgb_face()
-	fs = self.get_fillstyle()
-	if fs=='full':
-            renderer.draw_markers(gc, Path.unit_rectangle(), transform,
-                                  path, path_trans, rgbFace)
-        else:
-            # build a bottom filled square out of two rectangles, one
-            # filled.  Use the rotation to support left, right, bottom
-            # or top
-            if fs=='bottom': rotate = 0.
-            elif fs=='top': rotate = 180.
-            elif fs=='left': rotate = 270.
-            else: rotate = 90.
-
-            bottom = Path([[0.0, 0.0], [1.0, 0.0], [1.0, 0.5], [0.0, 0.5], [0.0, 0.0]])
-            top = Path([[0.0, 0.5], [1.0, 0.5], [1.0, 1.0], [0.0, 1.0], [0.0, 0.05]])
-            transform = transform.rotate_deg(rotate)
-            renderer.draw_markers(gc, bottom, transform,
-                                  path, path_trans, rgbFace)
-            renderer.draw_markers(gc, top, transform,
-                                  path, path_trans, None)
-
-    def _draw_diamond(self, renderer, gc, path, path_trans):
-    	fs = self.get_fillstyle()
-	if fs!='full':
-            raise NotImplementedError('non-full markers have not been implemented for this marker style yet; please contribute')
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 5.0)
-        side = renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().translate(-0.5, -0.5).rotate_deg(45).scale(side)
-        rgbFace = self._get_rgb_face()
-        renderer.draw_markers(gc, Path.unit_rectangle(), transform,
-                              path, path_trans, rgbFace)
-
-
-    def _draw_thin_diamond(self, renderer, gc, path, path_trans):
-    	fs = self.get_fillstyle()
-	if fs!='full':
-            raise NotImplementedError('non-full markers have not been implemented for this marker style yet; please contribute')
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 3.0)
-        offset = renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().translate(-0.5, -0.5) \
-            .rotate_deg(45).scale(offset * 0.6, offset)
-        rgbFace = self._get_rgb_face()
-        renderer.draw_markers(gc, Path.unit_rectangle(), transform,
-                              path, path_trans, rgbFace)
-
-
-    def _draw_pentagon(self, renderer, gc, path, path_trans):
-    	fs = self.get_fillstyle()
-	if fs!='full':
-            raise NotImplementedError('non-full markers have not been implemented for this marker style yet; please contribute')
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 5.0)
-        offset = 0.5 * renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset)
-        rgbFace = self._get_rgb_face()
-        renderer.draw_markers(gc, Path.unit_regular_polygon(5), transform,
-                              path, path_trans, rgbFace)
-
-    def _draw_star(self, renderer, gc, path, path_trans):
-    	fs = self.get_fillstyle()
-	if fs!='full':
-            raise NotImplementedError('non-full markers have not been implemented for this marker style yet; please contribute')
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 5.0)
-        offset = 0.5 * renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset)
-        rgbFace = self._get_rgb_face()
-        _starpath = Path.unit_regular_star(5, innerCircle=0.381966)
-        renderer.draw_markers(gc, _starpath, transform,
-                              path, path_trans, rgbFace)
-
-
-    def _draw_hexagon1(self, renderer, gc, path, path_trans):
-    	fs = self.get_fillstyle()
-	if fs!='full':
-            raise NotImplementedError('non-full markers have not been implemented for this marker style yet; please contribute')
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 5.0)
-        offset = 0.5 * renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset)
-        rgbFace = self._get_rgb_face()
-        renderer.draw_markers(gc, Path.unit_regular_polygon(6), transform,
-                              path, path_trans, rgbFace)
-
-
-    def _draw_hexagon2(self, renderer, gc, path, path_trans):
-    	fs = self.get_fillstyle()
-	if fs!='full':
-            raise NotImplementedError('non-full markers have not been implemented for this marker style yet; please contribute')
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 5.0)
-        offset = 0.5 * renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset).rotate_deg(30)
-        rgbFace = self._get_rgb_face()
-        renderer.draw_markers(gc, Path.unit_regular_polygon(6), transform,
-                              path, path_trans, rgbFace)
-
-
-    _line_marker_path = Path([[0.0, -1.0], [0.0, 1.0]])
-    def _draw_vline(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 1.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset)
-        renderer.draw_markers(gc, self._line_marker_path, transform,
-                              path, path_trans)
-
-
-    def _draw_hline(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 1.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset).rotate_deg(90)
-        renderer.draw_markers(gc, self._line_marker_path, transform,
-                              path, path_trans)
-
-
-    _tickhoriz_path = Path([[0.0, 0.0], [1.0, 0.0]])
-    def _draw_tickleft(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 1.0)
-        offset = renderer.points_to_pixels(self._markersize)
-        marker_transform = Affine2D().scale(-offset, 1.0)
-        renderer.draw_markers(gc, self._tickhoriz_path, marker_transform,
-                              path, path_trans)
-
-
-    def _draw_tickright(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 1.0)
-        offset = renderer.points_to_pixels(self._markersize)
-        marker_transform = Affine2D().scale(offset, 1.0)
-        renderer.draw_markers(gc, self._tickhoriz_path, marker_transform,
-                              path, path_trans)
-
-
-    _tickvert_path = Path([[-0.0, 0.0], [-0.0, 1.0]])
-    def _draw_tickup(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 1.0)
-        offset = renderer.points_to_pixels(self._markersize)
-        marker_transform = Affine2D().scale(1.0, offset)
-        renderer.draw_markers(gc, self._tickvert_path, marker_transform,
-                              path, path_trans)
-
-
-    def _draw_tickdown(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 1.0)
-        offset = renderer.points_to_pixels(self._markersize)
-        marker_transform = Affine2D().scale(1.0, -offset)
-        renderer.draw_markers(gc, self._tickvert_path, marker_transform,
-                              path, path_trans)
-
-
-    _plus_path = Path([[-1.0, 0.0], [1.0, 0.0],
-                       [0.0, -1.0], [0.0, 1.0]],
-                      [Path.MOVETO, Path.LINETO,
-                       Path.MOVETO, Path.LINETO])
-    def _draw_plus(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 3.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset)
-        renderer.draw_markers(gc, self._plus_path, transform,
-                              path, path_trans)
-
-
-    _tri_path = Path([[0.0, 0.0], [0.0, -1.0],
-                      [0.0, 0.0], [0.8, 0.5],
-                      [0.0, 0.0], [-0.8, 0.5]],
-                     [Path.MOVETO, Path.LINETO,
-                      Path.MOVETO, Path.LINETO,
-                      Path.MOVETO, Path.LINETO])
-    def _draw_tri_down(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 5.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset)
-        renderer.draw_markers(gc, self._tri_path, transform,
-                              path, path_trans)
-
-
-    def _draw_tri_up(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 5.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset).rotate_deg(180)
-        renderer.draw_markers(gc, self._tri_path, transform,
-                              path, path_trans)
-
-
-    def _draw_tri_left(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 5.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset).rotate_deg(90)
-        renderer.draw_markers(gc, self._tri_path, transform,
-                              path, path_trans)
-
-
-    def _draw_tri_right(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 5.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset).rotate_deg(270)
-        renderer.draw_markers(gc, self._tri_path, transform,
-                              path, path_trans)
-
-
-    _caret_path = Path([[-1.0, 1.5], [0.0, 0.0], [1.0, 1.5]])
-    def _draw_caretdown(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 3.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset)
-        renderer.draw_markers(gc, self._caret_path, transform,
-                              path, path_trans)
-
-
-    def _draw_caretup(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 3.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset).rotate_deg(180)
-        renderer.draw_markers(gc, self._caret_path, transform,
-                              path, path_trans)
-
-
-    def _draw_caretleft(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 3.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset).rotate_deg(270)
-        renderer.draw_markers(gc, self._caret_path, transform,
-                              path, path_trans)
-
-
-    def _draw_caretright(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 3.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset).rotate_deg(90)
-        renderer.draw_markers(gc, self._caret_path, transform,
-                              path, path_trans)
-
-
-    _x_path = Path([[-1.0, -1.0], [1.0, 1.0],
-                    [-1.0, 1.0], [1.0, -1.0]],
-                   [Path.MOVETO, Path.LINETO,
-                    Path.MOVETO, Path.LINETO])
-    def _draw_x(self, renderer, gc, path, path_trans):
-        gc.set_snap(renderer.points_to_pixels(self._markersize) >= 3.0)
-        offset = 0.5*renderer.points_to_pixels(self._markersize)
-        transform = Affine2D().scale(offset)
-        renderer.draw_markers(gc, self._x_path, transform,
-                              path, path_trans)
-
-
     def update_from(self, other):
         'copy properties from other to self'
         Artist.update_from(self, other)
@@ -1285,9 +904,9 @@ class Line2D(Artist):
         self._color = other._color
         self._markersize = other._markersize
         self._markerfacecolor = other._markerfacecolor
+        self._markerfacecoloralt = other._markerfacecoloralt
         self._markeredgecolor = other._markeredgecolor
         self._markeredgewidth = other._markeredgewidth
-        self._fillstyle = other._fillstyle
         self._dashSeq = other._dashSeq
         self._dashcapstyle = other._dashcapstyle
         self._dashjoinstyle = other._dashjoinstyle
@@ -1295,12 +914,13 @@ class Line2D(Artist):
         self._solidjoinstyle = other._solidjoinstyle
 
         self._linestyle = other._linestyle
-        self._marker = other._marker
+        self._marker = MarkerStyle(other._marker.get_marker(),
+                                   other._marker.get_fillstyle())
         self._drawstyle = other._drawstyle
 
 
-    def _get_rgb_face(self):
-        facecolor = self.get_markerfacecolor()
+    def _get_rgb_face(self, alt=False):
+        facecolor = self._get_markerfacecolor(alt=alt)
         if is_string_like(facecolor) and facecolor.lower()=='none':
             rgbFace = None
         else:
@@ -1341,6 +961,9 @@ class Line2D(Artist):
         'alias for set_markerfacecolor'
         self.set_markerfacecolor(val)
 
+    def set_mfcalt(self, val):
+        'alias for set_markerfacecoloralt'
+        self.set_markerfacecoloralt(val)
 
     def set_ms(self, val):
         'alias for set_markersize'
@@ -1379,6 +1002,9 @@ class Line2D(Artist):
         'alias for get_markerfacecolor'
         return self.get_markerfacecolor()
 
+    def get_mfcalt(self, alt=False):
+        'alias for get_markerfacecoloralt'
+        return self.get_markerfacecoloralt()
 
     def get_ms(self):
         'alias for get_markersize'
@@ -1545,11 +1171,12 @@ class VertexSelector:
         self.process_selected(ind, xdata[ind], ydata[ind])
 
 lineStyles = Line2D._lineStyles
-lineMarkers = Line2D._markers
+lineMarkers = MarkerStyle.markers
 drawStyles = Line2D.drawStyles
+fillStyles = MarkerStyle.fillstyles
 
-artist.kwdocd['Line2D'] = artist.kwdoc(Line2D)
+docstring.interpd.update(Line2D = artist.kwdoc(Line2D))
 
 # You can not set the docstring of an instancemethod,
 # but you can on the underlying function.  Go figure.
-Line2D.__init__.im_func.__doc__ = dedent(Line2D.__init__.__doc__) % artist.kwdocd
+docstring.dedent_interpd(Line2D.__init__.im_func)
