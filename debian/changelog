@@ -4,8 +4,9 @@ matplotlib (1.1.1~rc1-1) UNRELEASED; urgency=low
   * debian/control
     - replace ttf-lyx with fonts-lyx (package rename); thanks to Ryo IGARASHI
       for the report; Closes: #664048
+    - bump required numpy version to 1.4 at least
 
- -- Sandro Tosi <morph@debian.org>  Fri, 23 Mar 2012 18:20:24 +0100
+ -- Sandro Tosi <morph@debian.org>  Fri, 23 Mar 2012 19:06:55 +0100
 
 matplotlib (1.1.0-1) unstable; urgency=low
 
