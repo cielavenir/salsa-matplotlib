@@ -81,6 +81,7 @@ clean:
 install-arch: build-arch $(PYVERS:%=install-%-stamp)
 	dh_testdir
 	dh_testroot
+	dh_numpy
 
 install-%-stamp: build-%-stamp
 	dh_testdir
