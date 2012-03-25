@@ -508,8 +508,15 @@ class Line2D(Artist):
         if self._marker:
             gc = renderer.new_gc()
             self._set_gc_clip(gc)
-            gc.set_foreground(self.get_markeredgecolor())
-            gc.set_linewidth(self._markeredgewidth)
+            rgbFace = self._get_rgb_face()
+            rgbFaceAlt = self._get_rgb_face(alt=True)
+            edgecolor = self.get_markeredgecolor()
+            if is_string_like(edgecolor) and edgecolor.lower() == 'none':
+                gc.set_linewidth(0)
+                gc.set_foreground(rgbFace)
+            else:
+                gc.set_foreground(edgecolor)
+                gc.set_linewidth(self._markeredgewidth)
             gc.set_alpha(self._alpha)
             marker = self._marker
             tpath, affine = self._transformed_path.get_transformed_points_and_affine()
@@ -534,12 +541,16 @@ class Line2D(Artist):
                 if type(snap) == float:
                     snap = renderer.points_to_pixels(self._markersize) >= snap
                 gc.set_snap(snap)
+                gc.set_joinstyle(marker.get_joinstyle())
+                gc.set_capstyle(marker.get_capstyle())
                 marker_path = marker.get_path()
                 marker_trans = marker.get_transform()
                 w = renderer.points_to_pixels(self._markersize)
-                if marker.get_marker() != ',': # Don't scale for pixels
+                if marker.get_marker() != ',':
+                    # Don't scale for pixels, and don't stroke them
                     marker_trans = marker_trans.scale(w)
-                rgbFace = self._get_rgb_face()
+                else:
+                    gc.set_linewidth(0)
                 renderer.draw_markers(
                     gc, marker_path, marker_trans, subsampled, affine.frozen(),
                     rgbFace)
@@ -547,10 +558,9 @@ class Line2D(Artist):
                 if alt_marker_path:
                     alt_marker_trans = marker.get_alt_transform()
                     alt_marker_trans = alt_marker_trans.scale(w)
-                    rgbFace = self._get_rgb_face(alt=True)
                     renderer.draw_markers(
                         gc, alt_marker_path, alt_marker_trans, subsampled,
-                        affine.frozen(), rgbFace)
+                        affine.frozen(), rgbFaceAlt)
 
             gc.restore()
 
@@ -567,16 +577,15 @@ class Line2D(Artist):
 
     def get_markeredgecolor(self):
         if (is_string_like(self._markeredgecolor) and
-            self._markeredgecolor == 'auto'):
+                                    self._markeredgecolor == 'auto'):
+            if self._marker.get_marker() in ('.', ','):
+                return self._color
             if self._marker.is_filled():
-                return 'k'
+                return 'k'  # Bad hard-wired default...
             else:
                 return self._color
-        else:
-            return self._markeredgecolor
-
-
         return self._markeredgecolor
+
     def get_markeredgewidth(self): return self._markeredgewidth
 
     def _get_markerfacecolor(self, alt=False):

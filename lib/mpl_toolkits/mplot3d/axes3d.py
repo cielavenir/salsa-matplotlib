@@ -251,7 +251,7 @@ class Axes3D(Axes):
             This function was added, but not tested. Please report any bugs.
         """
         Axes.set_autoscale_on(self, b)
-        self.set_autoscalez_on(self, b)
+        self.set_autoscalez_on(b)
 
     def set_autoscalez_on(self, b) :
         """
@@ -824,7 +824,9 @@ class Axes3D(Axes):
     def cla(self):
         """Clear axes and disable mouse button callbacks.
         """
-        self.disable_mouse_rotation()
+        # Disabling mouse interaction might have been needed a long
+        # time ago, but I can't find a reason for it now - BVR (2012-03)
+        #self.disable_mouse_rotation()
         self.zaxis.cla()
 
         # TODO: Support sharez
@@ -1916,7 +1918,7 @@ class Axes3D(Axes):
             vs = art3d.get_patch_verts(p)
             verts += vs.tolist()
             verts_zs += [z] * len(vs)
-            art3d.patch_2d_to_3d(p, zs, zdir)
+            art3d.patch_2d_to_3d(p, z, zdir)
             if 'alpha' in kwargs:
                 p.set_alpha(kwargs['alpha'])
 

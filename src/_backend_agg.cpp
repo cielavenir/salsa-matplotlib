@@ -433,10 +433,10 @@ RendererAgg::set_clipbox(const Py::Object& cliprect, R& rasterizer)
     double l, b, r, t;
     if (py_convert_bbox(cliprect.ptr(), l, b, r, t))
     {
-        rasterizer.clip_box(std::max(int(mpl_round(l)), 0),
-                            std::max(int(height) - int(mpl_round(b)), 0),
-                            std::min(int(mpl_round(r)), int(width)),
-                            std::min(int(height) - int(mpl_round(t)), int(height)));
+        rasterizer.clip_box(std::max(int(floor(l - 0.5)), 0),
+                            std::max(int(floor(height - b - 0.5)), 0),
+                            std::min(int(floor(r - 0.5)), int(width)),
+                            std::min(int(floor(height - t - 0.5)), int(height)));
     }
     else
     {
@@ -650,7 +650,7 @@ RendererAgg::draw_markers(const Py::Tuple& args)
     // Deal with the difference in y-axis direction
     marker_trans *= agg::trans_affine_scaling(1.0, -1.0);
     trans *= agg::trans_affine_scaling(1.0, -1.0);
-    trans *= agg::trans_affine_translation(0.0, (double)height);
+    trans *= agg::trans_affine_translation(0.5, (double)height + 0.5);
 
     PathIterator       marker_path(marker_path_obj);
     transformed_path_t marker_path_transformed(marker_path, marker_trans);
@@ -736,8 +736,8 @@ RendererAgg::draw_markers(const Py::Tuple& args)
                     continue;
                 }
 
-                x = (double)(int)x;
-                y = (double)(int)y;
+                x = floor(x);
+                y = floor(y);
 
                 // Cull points outside the boundary of the image.
                 // Values that are too large may overflow and create
@@ -772,8 +772,8 @@ RendererAgg::draw_markers(const Py::Tuple& args)
                     continue;
                 }
 
-                x = (double)(int)x;
-                y = (double)(int)y;
+                x = floor(x);
+                y = floor(y);
 
                 // Cull points outside the boundary of the image.
                 // Values that are too large may overflow and create
@@ -988,6 +988,7 @@ RendererAgg::draw_image(const Py::Tuple& args)
     agg::trans_affine affine_trans;
     bool has_affine = false;
     double x, y, w, h;
+    double alpha;
 
     if (args.size() == 7)
     {
@@ -1005,6 +1006,8 @@ RendererAgg::draw_image(const Py::Tuple& args)
         w = h = 0; /* w and h not used in this case, but assign to prevent
                   warnings from the compiler */
     }
+
+    alpha = gc.alpha;
 
     theRasterizer.reset_clipping();
     rendererBase.reset_clipping(true);
@@ -1097,7 +1100,8 @@ RendererAgg::draw_image(const Py::Tuple& args)
     else
     {
         set_clipbox(gc.cliprect, rendererBase);
-        rendererBase.blend_from(pixf, 0, (int)x, (int)(height - (y + image->rowsOut)));
+        rendererBase.blend_from(
+            pixf, 0, (int)x, (int)(height - (y + image->rowsOut)), alpha * 255);
     }
 
     rendererBase.reset_clipping(true);

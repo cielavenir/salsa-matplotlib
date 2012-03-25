@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""Module for creating Sankey diagrams using matplotlib
+"""
+Module for creating Sankey diagrams using matplotlib
 """
 __author__ = "Kevin L. Davies"
 __credits__ = ["Yannick Copin"]
@@ -40,6 +41,7 @@ from matplotlib.path import Path
 from matplotlib.patches import PathPatch
 from matplotlib.transforms import Affine2D
 from matplotlib import verbose
+from matplotlib import docstring
 
 # Angles [deg/90]
 RIGHT = 0
@@ -49,19 +51,18 @@ DOWN = 3
 
 
 class Sankey:
-    """Sankey diagram in matplotlib
+    """
+    Sankey diagram in matplotlib
 
-    "Sankey diagrams are a specific type of flow diagram, in which the width of
-    the arrows is shown proportionally to the flow quantity.  They are typically
-    used to visualize energy or material or cost transfers between processes."
-    --http://en.wikipedia.org/wiki/Sankey_diagram, accessed 6/1/2011
+      Sankey diagrams are a specific type of flow diagram, in which
+      the width of the arrows is shown proportionally to the flow
+      quantity.  They are typically used to visualize energy or
+      material or cost transfers between processes.
+      `Wikipedia (6/1/2011) <http://en.wikipedia.org/wiki/Sankey_diagram>`_
+
     """
     def _arc(self, quadrant=0, cw=True, radius=1, center=(0,0)):
         """
-        call signature::
-
-          _arc(quadrant=0, cw=True, radius=1, center=(0,0))
-
         Return the codes and vertices for a rotated, scaled, and translated
         90 degree arc.
 
@@ -104,15 +105,18 @@ class Sankey:
             # Negate x.
             if cw:
                 # Swap x and y.
-                vertices = np.column_stack((-ARC_VERTICES[:,1], ARC_VERTICES[:,0]))
+                vertices = np.column_stack((-ARC_VERTICES[:,1],
+                                             ARC_VERTICES[:,0]))
             else:
-                vertices = np.column_stack((-ARC_VERTICES[:,0], ARC_VERTICES[:,1]))
+                vertices = np.column_stack((-ARC_VERTICES[:,0],
+                                             ARC_VERTICES[:,1]))
         if quadrant > 1: radius = -radius # Rotate 180 deg.
-        return zip(ARC_CODES,
-                   radius*vertices + np.tile(center, (ARC_VERTICES.shape[0], 1)))
+        return zip(ARC_CODES, radius*vertices +
+                              np.tile(center, (ARC_VERTICES.shape[0], 1)))
 
     def _add_input(self, path, angle, flow, length):
-        """Add an input to a path and return its tip and label locations.
+        """
+        Add an input to a path and return its tip and label locations.
         """
         if angle is None:
             return [0, 0], [0, 0]
@@ -158,7 +162,8 @@ class Sankey:
             return dip, label_location
 
     def _add_output(self, path, angle, flow, length):
-        """Append an output to a path and return its tip and label locations.
+        """
+        Append an output to a path and return its tip and label locations.
 
         Note: *flow* is negative for an output.
         """
@@ -196,9 +201,11 @@ class Sankey:
                 else:
                     path.append((Path.LINETO, [x, y]))
                 path.extend([(Path.LINETO, [x, y + sign * length]),
-                             (Path.LINETO, [x - self.shoulder, y + sign * length]),
+                             (Path.LINETO, [x - self.shoulder,
+                                            y + sign * length]),
                              (Path.LINETO, tip),
-                             (Path.LINETO, [x + self.shoulder - flow, y + sign * length]),
+                             (Path.LINETO, [x + self.shoulder - flow,
+                                            y + sign * length]),
                              (Path.LINETO, [x - flow, y + sign * length])])
                 path.extend(self._arc(quadrant=quadrant,
                                       cw=angle==DOWN,
@@ -210,7 +217,8 @@ class Sankey:
             return tip, label_location
 
     def _revert(self, path, first_action=Path.LINETO):
-        """A path is not simply revertable by path[::-1] since the code
+        """
+        A path is not simply revertable by path[::-1] since the code
         specifies an action to take from the **previous** point.
         """
         reverse_path = []
@@ -226,28 +234,23 @@ class Sankey:
         #path[2] = path[2][::-1]
         #return path
 
+    @docstring.dedent_interpd
     def add(self, patchlabel='', flows=np.array([1.0,-1.0]), orientations=[0,0],
             labels='', trunklength=1.0, pathlengths=0.25, prior=None,
             connect=(0,0), rotation=0, **kwargs):
         """
-        call signature::
-
-          add(patchlabel='', flows=np.array([1.0,-1.0]), orientations=[0,0],
-              labels='', trunklength=1.0, pathlengths=0.25, prior=None,
-              connect=(0,0), rotation=0, **kwargs)
-
         Add a simple Sankey diagram with flows at the same hierarchical level.
 
         Return value is the instance of :class:`Sankey`.
 
         Optional keyword arguments:
 
-          ===============   ==========================================
+          ===============   ==========================================================
           Keyword           Description
-          ===============   ==========================================
+          ===============   ==========================================================
           *patchlabel*      label to be placed at the center of the diagram
                             Note: *label* (not *patchlabel*) will be passed to
-                            the patch through **kwargs and can be used to create
+                            the patch through ``**kwargs`` and can be used to create
                             an entry in the legend.
           *flows*           array of flow values
                             By convention, inputs are positive and outputs are
@@ -289,12 +292,15 @@ class Sankey:
                             will be rotated accordingly (e.g., if *rotation*
                             == 90, an *orientations* entry of 1 means to/from
                             the left).
-          ===============   ==========================================
+          ===============   ==========================================================
 
-        Valid kwargs are :meth:`~matplotlib.patches.PathPatch` arguments:
-        %(PathPatch)s
-        As examples, *fill*=False and *label*="A legend entry".  By default,
-        *facecolor*='#bfd1d4' (light blue) and *lineweight*=0.5.
+        Valid kwargs are :meth:`matplotlib.patches.PathPatch` arguments:
+
+        %(Patch)s
+
+        As examples, ``fill=False`` and ``label='A legend entry'``.
+        By default, ``facecolor='#bfd1d4'`` (light blue) and
+        ``linewidth=0.5``.
 
         The indexing parameters (*prior* and *connect*) are zero-based.
 
@@ -317,13 +323,13 @@ class Sankey:
         if rotation == None:
             rotation = 0
         else:
-            rotation /= 90.0 # In the code below, angles are expressed in deg/90.
+            rotation /= 90.0 # In the code below, angles are expressed in deg/90
         assert len(orientations) == n, ("orientations and flows must have the "
                                         "same length.\norientations has length "
                                         "%d, but flows has length %d."
                                         % len(orientations), n)
         if getattr(labels, '__iter__', False):
-        # iterable() isn't used because it would give True if labels is a string.
+        # iterable() isn't used because it would give True if labels is a string
             assert len(labels) == n, ("If labels is a list, then labels and "
                                       "flows must have the same length.\n"
                                       "labels has length %d, but flows has "
@@ -422,7 +428,8 @@ class Sankey:
             lllength = pathlengths
             d = dict(RIGHT=pathlengths)
             pathlengths = [d.get(angle, 0) for angle in angles]
-            # Determine the lengths of the top-side arrows from the middle outwards.
+            # Determine the lengths of the top-side arrows
+            # from the middle outwards.
             for i, (angle, is_input, flow) \
                 in enumerate(zip(angles, are_inputs, scaled_flows)):
                 if angle == DOWN and is_input:
@@ -431,7 +438,8 @@ class Sankey:
                 elif angle == UP and not is_input:
                     pathlengths[i] = urlength
                     urlength -= flow # Flow is negative for outputs.
-            # Determine the lengths of the bottom-side arrows from the middle outwards.
+            # Determine the lengths of the bottom-side arrows
+            # from the middle outwards.
             for i, (angle, is_input, flow) \
                 in enumerate(zip(angles, are_inputs, scaled_flows)[::-1]):
                 if angle == UP and is_input:
@@ -440,7 +448,8 @@ class Sankey:
                 elif angle == DOWN and not is_input:
                     pathlengths[n-i-1] = lrlength
                     lrlength -= flow
-            # Determine the lengths of the left-side arrows from the bottom upwards.
+            # Determine the lengths of the left-side arrows
+            # from the bottom upwards.
             has_left_input = False
             for i, (angle, is_input, spec) \
                 in enumerate(zip(angles, are_inputs, zip(scaled_flows,
@@ -451,7 +460,8 @@ class Sankey:
                             pathlengths[n-i-1] = 0
                         else:
                             has_left_input = True
-            # Determine the lengths of the right-side arrows from the top downwards.
+            # Determine the lengths of the right-side arrows
+            # from the top downwards.
             has_right_output = False
             for i, (angle, is_input, spec) \
                 in enumerate(zip(angles, are_inputs, zip(scaled_flows,
@@ -499,40 +509,57 @@ class Sankey:
         label_locations = np.zeros((n,2))
         # Add the top-side inputs and outputs from the middle outwards.
         for i, (angle, is_input, spec) \
-            in enumerate(zip(angles, are_inputs, zip(scaled_flows, pathlengths))):
+            in enumerate(zip(angles, are_inputs,
+                             zip(scaled_flows, pathlengths))):
             if angle == DOWN and is_input:
-                tips[i,:], label_locations[i,:] = self._add_input(ulpath, angle, *spec)
+                tips[i,:], label_locations[i,:] = self._add_input(ulpath, angle,
+                                                                  *spec)
             elif angle == UP and not is_input:
-                tips[i,:], label_locations[i,:] = self._add_output(urpath, angle, *spec)
+                tips[i,:], label_locations[i,:] = self._add_output(urpath,
+                                                                   angle, *spec)
         # Add the bottom-side inputs and outputs from the middle outwards.
         for i, (angle, is_input, spec) \
-            in enumerate(zip(angles, are_inputs, zip(scaled_flows, pathlengths))[::-1]):
+            in enumerate(zip(angles, are_inputs,
+                             zip(scaled_flows, pathlengths))[::-1]):
             if angle == UP and is_input:
-                tips[n-i-1,:], label_locations[n-i-1,:] = self._add_input(llpath, angle, *spec)
+                (tips[n-i-1,:],
+                 label_locations[n-i-1,:]) = self._add_input(llpath, angle,
+                                                             *spec)
             elif angle == DOWN and not is_input:
-                tips[n-i-1,:], label_locations[n-i-1,:] = self._add_output(lrpath, angle, *spec)
+                (tips[n-i-1,:],
+                 label_locations[n-i-1,:]) = self._add_output(lrpath, angle,
+                                                              *spec)
         # Add the left-side inputs from the bottom upwards.
         has_left_input = False
         for i, (angle, is_input, spec) \
-            in enumerate(zip(angles, are_inputs, zip(scaled_flows, pathlengths))[::-1]):
+            in enumerate(zip(angles, are_inputs,
+                             zip(scaled_flows, pathlengths))[::-1]):
             if angle == RIGHT and is_input:
                 if not has_left_input:
-                    # Make sure the lower path extends at least as far as the upper one.
+                    # Make sure the lower path extends
+                    # at least as far as the upper one.
                     if llpath[-1][1][0] > ulpath[-1][1][0]:
-                        llpath.append((Path.LINETO, [ulpath[-1][1][0], llpath[-1][1][1]]))
+                        llpath.append((Path.LINETO, [ulpath[-1][1][0],
+                                                     llpath[-1][1][1]]))
                     has_left_input = True
-                tips[n-i-1,:], label_locations[n-i-1,:] = self._add_input(llpath, angle, *spec)
+                (tips[n-i-1,:],
+                 label_locations[n-i-1,:]) = self._add_input(llpath, angle,
+                                                             *spec)
         # Add the right-side outputs from the top downwards.
         has_right_output = False
         for i, (angle, is_input, spec) \
-            in enumerate(zip(angles, are_inputs, zip(scaled_flows, pathlengths))):
+            in enumerate(zip(angles, are_inputs,
+                             zip(scaled_flows, pathlengths))):
             if angle == RIGHT and not is_input:
                 if not has_right_output:
-                    # Make sure the upper path extends at least as far as the lower one.
+                    # Make sure the upper path extends
+                    # at least as far as the lower one.
                     if urpath[-1][1][0] < lrpath[-1][1][0]:
-                        urpath.append((Path.LINETO, [lrpath[-1][1][0], urpath[-1][1][1]]))
+                        urpath.append((Path.LINETO, [lrpath[-1][1][0],
+                                                     urpath[-1][1][1]]))
                     has_right_output = True
-                tips[i,:], label_locations[i,:] = self._add_output(urpath, angle, *spec)
+                (tips[i,:],
+                 label_locations[i,:]) = self._add_output(urpath, angle, *spec)
         # Trim any hanging vertices.
         if not has_left_input:
             ulpath.pop()
@@ -542,8 +569,8 @@ class Sankey:
             urpath.pop()
 
         # Concatenate the subpaths in the correct order (clockwise from top).
-        path = (urpath + self._revert(lrpath) + llpath + self._revert(ulpath)
-               + [(Path.CLOSEPOLY, urpath[0][1])])
+        path = (urpath + self._revert(lrpath) + llpath + self._revert(ulpath) +
+                [(Path.CLOSEPOLY, urpath[0][1])])
 
         # Create a patch with the Sankey outline.
         codes, vertices = zip(*path)
@@ -561,7 +588,8 @@ class Sankey:
                 vertices = rotate(vertices)
             text = self.ax.text(0, 0, s=patchlabel, ha='center', va='center')
         else:
-            rotation = self.diagrams[prior].angles[connect[0]]  - angles[connect[1]]
+            rotation = (self.diagrams[prior].angles[connect[0]] -
+                        angles[connect[1]])
             angles = [_get_angle(angle, rotation) for angle in angles]
             rotate = Affine2D().rotate_deg(rotation*90).transform_point
             tips = rotate(tips)
@@ -580,8 +608,8 @@ class Sankey:
             xs, ys = zip(*vertices)
             self.ax.plot(xs, ys, 'go-')
         patch = PathPatch(Path(vertices, codes),
-                          fc=kwargs.pop('fc', kwargs.pop('facecolor', # Custom defaults
-                                        '#bfd1d4')),
+                          fc=kwargs.pop('fc', kwargs.pop('facecolor',
+                                        '#bfd1d4')), # Custom defaults
                           lw=kwargs.pop('lw', kwargs.pop('linewidth',
                                         '0.5')),
                           **kwargs)
@@ -592,7 +620,7 @@ class Sankey:
             if labels[i] is None or angle is None:
                 labels[i] = ''
             elif self.unit is not None:
-                quantity = self.format%abs(number) + self.unit
+                quantity = self.format % abs(number) + self.unit
                 if labels[i] != '':
                     labels[i] += "\n"
                 labels[i] += quantity
@@ -608,10 +636,14 @@ class Sankey:
         # user wants to provide labels later.
 
         # Expand the size of the diagram if necessary.
-        self.extent = (min(np.min(vertices[:,0]), np.min(label_locations[:,0]), self.extent[0]),
-                       max(np.max(vertices[:,0]), np.max(label_locations[:,0]), self.extent[1]),
-                       min(np.min(vertices[:,1]), np.min(label_locations[:,1]), self.extent[2]),
-                       max(np.max(vertices[:,1]), np.max(label_locations[:,1]), self.extent[3]))
+        self.extent = (min(np.min(vertices[:,0]), np.min(label_locations[:,0]),
+                           self.extent[0]),
+                       max(np.max(vertices[:,0]), np.max(label_locations[:,0]),
+                           self.extent[1]),
+                       min(np.min(vertices[:,1]), np.min(label_locations[:,1]),
+                           self.extent[2]),
+                       max(np.max(vertices[:,1]), np.max(label_locations[:,1]),
+                           self.extent[3]))
         # Include both vertices _and_ label locations in the extents; there are
         # where either could determine the margins (e.g., arrow shoulders).
 
@@ -624,19 +656,15 @@ class Sankey:
 
     def finish(self):
         """
-        call signature::
-
-          finish()
-
         Adjust the axes and return a list of information about the Sankey
         subdiagram(s).
 
         Return value is a list of subdiagrams represented with the following
         fields:
 
-          ===============   ==========================================
+          ===============   =====================================================
           Field             Description
-          ===============   ==========================================
+          ===============   =====================================================
           *patch*           Sankey outline (an instance of
                             :class:`~maplotlib.patches.PathPatch`)
           *flows*           values of the flows (positive for input, negative
@@ -659,7 +687,7 @@ class Sankey:
                             label of the diagram
           *texts*           list of :class:`~matplotlib.text.Text` instances for
                             the labels of flows
-          ===============   ==========================================
+          ===============   =====================================================
 
         .. seealso::
 
@@ -676,21 +704,13 @@ class Sankey:
                  radius=0.1, shoulder=0.03, offset=0.15, head_angle=100,
                  margin=0.4, tolerance=1e-6, **kwargs):
         """
-        call signature::
-
-          Sankey(ax=None, scale=1.0, unit='', format='%G', gap=0.25, radius=0.1,
-                 shoulder=0.03, offset=0.15, head_angle=100, margin=0.4,
-                 tolerance=1e-6, **kwargs)
-
-        Create a new Sankey diagram.
-
-        Return value is an instance of :class:`Sankey`.
+        Create a new Sankey instance.
 
         Optional keyword arguments:
 
-          ===============   ==========================================
+          ===============   ====================================================
           Field             Description
-          ===============   ==========================================
+          ===============   ====================================================
           *ax*              axes onto which the data should be plotted
                             If *ax* isn't provided, new axes will be created.
           *scale*           scaling factor for the flows
@@ -721,36 +741,44 @@ class Sankey:
                             flows
                             The magnitude of the sum of connected flows cannot
                             be greater than *tolerance*.
-          ===============   ==========================================
+          ===============   ====================================================
 
         The optional arguments listed above are applied to all subdiagrams so
         that there is consistent alignment and formatting.
 
         If :class:`Sankey` is instantiated with any keyword arguments other than
-        those explicitly listed above (**kwargs), they will be passed to
+        those explicitly listed above (``**kwargs``), they will be passed to
         :meth:`add`, which will create the first subdiagram.
 
         In order to draw a complex Sankey diagram, create an instance of
-        :class:`Sankey` by calling it without any kwargs:
-            >>> sankey = Sankey()
-        Then add simple Sankey sub-diagrams:
-            >>> sankey.add() # 1
-            >>> sankey.add() # 2
-            >>> #...
-            >>> sankey.add() # n
-        Finally, create the full diagram:
-            >>> sankey.finish()
-        Or, instead, simply daisy-chain those calls:
-            >>> Sankey().add().add...  .add().finish()
+        :class:`Sankey` by calling it without any kwargs::
+
+            sankey = Sankey()
+
+        Then add simple Sankey sub-diagrams::
+
+            sankey.add() # 1
+            sankey.add() # 2
+            #...
+            sankey.add() # n
+
+        Finally, create the full diagram::
+
+            sankey.finish()
+
+        Or, instead, simply daisy-chain those calls::
+
+            Sankey().add().add...  .add().finish()
 
         .. seealso::
 
             :meth:`add`
             :meth:`finish`
 
+
         **Examples:**
 
-            .. plot:: mpl_examples/api/sankey_demo.py
+            .. plot:: mpl_examples/api/sankey_demo_basics.py
         """
         # Check the arguments.
         assert gap >= 0, ("The gap is negative.\nThis isn't allowed because it "

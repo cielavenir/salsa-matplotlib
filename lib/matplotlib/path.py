@@ -59,10 +59,13 @@ class Path(object):
     at all, but have a default one provided for them by
     :meth:`iter_segments`.
 
-    Note also that the vertices and codes arrays should be treated as
-    immutable -- there are a number of optimizations and assumptions
-    made up front in the constructor that will not change when the
-    data changes.
+    .. note::
+
+        The vertices and codes arrays should be treated as
+        immutable -- there are a number of optimizations and assumptions
+        made up front in the constructor that will not change when the
+        data changes.
+
     """
 
     # Path codes
@@ -80,7 +83,7 @@ class Path(object):
 
     code_type = np.uint8
 
-    def __init__(self, vertices, codes=None, _interpolation_steps=1):
+    def __init__(self, vertices, codes=None, _interpolation_steps=1, closed=False):
         """
         Create a new path with the given vertices and codes.
 
@@ -117,6 +120,11 @@ class Path(object):
             assert len(codes) == len(vertices)
             if len(codes):
                 assert codes[0] == self.MOVETO
+        elif closed:
+            codes = np.empty(len(vertices), dtype=self.code_type)
+            codes[0] = self.MOVETO
+            codes[1:-1] = self.LINETO
+            codes[-1] = self.CLOSEPOLY
 
         assert vertices.ndim == 2
         assert vertices.shape[1] == 2
@@ -622,7 +630,7 @@ class Path(object):
 
         if is_wedge:
             length = n * 3 + 4
-            vertices = np.empty((length, 2), np.float_)
+            vertices = np.zeros((length, 2), np.float_)
             codes = cls.CURVE4 * np.ones((length, ), cls.code_type)
             vertices[1] = [xA[0], yA[0]]
             codes[0:2] = [cls.MOVETO, cls.LINETO]

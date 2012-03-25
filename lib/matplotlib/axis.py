@@ -102,7 +102,12 @@ class Tick(artist.Artist):
                 size = rcParams['%s.minor.size'%name]
         self._size = size
 
-        self._width = width # can be None for marker default
+        if width is None:
+            if major:
+                width = rcParams['%s.major.width'%name]
+            else:
+                width = rcParams['%s.minor.width'%name]
+        self._width = width
 
         if color is None:
             color = rcParams['%s.color' % name]
@@ -171,7 +176,7 @@ class Tick(artist.Artist):
 
     def contains(self, mouseevent):
         """
-        Test whether the mouse event occured in the Tick marks.
+        Test whether the mouse event occurred in the Tick marks.
 
         This function always returns false.  It is more useful to test if the
         axis as a whole contains the mouse rather than the set of tick marks.
@@ -1142,7 +1147,7 @@ class Axis(artist.Artist):
         return self.major.locator()
 
     def _get_tick(self, major):
-        'return the default tick intsance'
+        'return the default tick instance'
         raise NotImplementedError('derived must override')
 
     def _copy_tick_props(self, src, dest):

@@ -39,7 +39,7 @@ from setupext import build_agg, build_gtkagg, build_tkagg,\
      build_ttconv, print_line, print_status, print_message, \
      print_raw, check_for_freetype, check_for_libpng, check_for_gtk, \
      check_for_tk, check_for_macosx, check_for_numpy, \
-     check_for_qt, check_for_qt4, check_for_cairo, \
+     check_for_qt, check_for_qt4, check_for_pyside, check_for_cairo, \
      check_provide_pytz, check_provide_dateutil,\
      check_for_dvipng, check_for_ghostscript, check_for_latex, \
      check_for_pdftops, check_for_datetime, options, build_png, build_tri
@@ -113,7 +113,7 @@ if 1:
     baseline_images = [chop_package(f) for f in baseline_images]
     package_data['matplotlib'].extend(baseline_images)
 
-if not check_for_numpy():
+if not check_for_numpy(__version__numpy__):
     sys.exit(1)
 
 if not check_for_freetype():
@@ -173,6 +173,7 @@ if options['build_macosx']:
 # These are informational only.  We don't build any extensions for them.
 check_for_qt()
 check_for_qt4()
+check_for_pyside()
 check_for_cairo()
 
 print_raw("")

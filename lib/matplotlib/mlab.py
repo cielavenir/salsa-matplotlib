@@ -638,7 +638,7 @@ def cohere_pairs( X, ij, NFFT=256, Fs=2, detrend=detrend_none,
         FFTSlices[iCol] = Slices
         if preferSpeedOverMemory:
             FFTConjSlices[iCol] = np.conjugate(Slices)
-        Pxx[iCol] = np.divide(np.mean(abs(Slices)**2), normVal)
+        Pxx[iCol] = np.divide(np.mean(abs(Slices)**2, axis=0), normVal)
     del Slices, ind, windowVals
 
     # compute the coherences and phases for all pairs using the
@@ -656,7 +656,7 @@ def cohere_pairs( X, ij, NFFT=256, Fs=2, detrend=detrend_none,
             Pxy = FFTSlices[i] * FFTConjSlices[j]
         else:
             Pxy = FFTSlices[i] * np.conjugate(FFTSlices[j])
-        if numSlices>1: Pxy = np.mean(Pxy)
+        if numSlices>1: Pxy = np.mean(Pxy, axis=0)
         #Pxy = np.divide(Pxy, normVal)
         Pxy /= normVal
         #Cxy[(i,j)] = np.divide(np.absolute(Pxy)**2, Pxx[i]*Pxx[j])
@@ -2321,6 +2321,8 @@ def csv2rec(fname, comments='#', skiprows=0, checkrows=0, delimiter=',',
     for i, row in enumerate(reader):
         if not len(row): continue
         if row[0].startswith(comments): continue
+        # Ensure that the row returned always has the same nr of elements
+        row.extend([''] * (len(converters) - len(row)))
         rows.append([func(name, val) for func, name, val in zip(converters, names, row)])
         rowmasks.append([ismissing(name, val) for name, val in zip(names, row)])
     fh.close()

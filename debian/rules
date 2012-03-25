@@ -34,7 +34,7 @@ build-%-stamp:
 	python$* ./setup.py build $(PY_BUILD_FLAGS)
 	python$*-dbg ./setup.py build $(PY_BUILD_FLAGS)
 
-#ifeq (,$(findstring notest,$(DEB_BUILD_OPTIONS)))
+#ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 #	LIB=$$(python$$* -c "from distutils.command.build import build ; from distutils.core import Distribution ; b = build(Distribution()) ; b.finalize_options() ; print b.build_purelib")
 #	PYTHONPATH=$$LIB python$* -c "import matplotlib as m ; m.test(verbosity=1)"
 #	LIB=$$(python$$*-dbg -c "from distutils.command.build import build ; from distutils.core import Distribution ; b = build(Distribution()) ; b.finalize_options() ; print b.build_purelib")
@@ -81,6 +81,7 @@ clean:
 install-arch: build-arch $(PYVERS:%=install-%-stamp)
 	dh_testdir
 	dh_testroot
+	dh_numpy
 
 install-%-stamp: build-%-stamp
 	dh_testdir

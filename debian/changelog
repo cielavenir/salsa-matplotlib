@@ -1,3 +1,18 @@
+matplotlib (1.1.1~rc1-1) unstable; urgency=low
+
+  * New upstream (release candidate) release
+    - provide ipython 0.11 compatibility; thanks to Julian Taylor for the
+      report; Closes: #636464
+  * debian/control
+    - replace ttf-lyx with fonts-lyx (package rename); thanks to Ryo IGARASHI
+      for the report; Closes: #664048
+    - bump required numpy version to 1.4 at least
+    - bump Standards-Version to 3.9.3 (no changes needed)
+  * debian/{control, rules}
+    - use dh_numpy
+
+ -- Sandro Tosi <morph@debian.org>  Sun, 25 Mar 2012 14:45:00 +0200
+
 matplotlib (1.1.0-1) unstable; urgency=low
 
   * New upstream release

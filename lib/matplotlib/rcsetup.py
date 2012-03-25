@@ -406,6 +406,7 @@ defaultParams = {
     'text.latex.preview' : [False, validate_bool],
     'text.dvipnghack'     : [None, validate_bool_maybe_none],
     'text.hinting'        : [True, validate_bool],
+    'text.antialiased'    : [True, validate_bool],
 
     # The following are deprecated and replaced by, e.g., 'font.style'
     #'text.fontstyle'      : ['normal', str],
@@ -486,6 +487,8 @@ defaultParams = {
     # tick properties
     'xtick.major.size' : [4, validate_float],      # major xtick size in points
     'xtick.minor.size' : [2, validate_float],      # minor xtick size in points
+    'xtick.major.width': [0.5, validate_float],      # major xtick width in points
+    'xtick.minor.width': [0.5, validate_float],      # minor xtick width in points
     'xtick.major.pad'  : [4, validate_float],      # distance to label in points
     'xtick.minor.pad'  : [4, validate_float],      # distance to label in points
     'xtick.color'      : ['k', validate_color],    # color of the xtick labels
@@ -494,6 +497,8 @@ defaultParams = {
 
     'ytick.major.size' : [4, validate_float],      # major ytick size in points
     'ytick.minor.size' : [2, validate_float],      # minor ytick size in points
+    'ytick.major.width': [0.5, validate_float],      # major ytick width in points
+    'ytick.minor.width': [0.5, validate_float],      # minor ytick width in points
     'ytick.major.pad'  : [4, validate_float],      # distance to label in points
     'ytick.minor.pad'  : [4, validate_float],      # distance to label in points
     'ytick.color'      : ['k', validate_color],    # color of the ytick labels
