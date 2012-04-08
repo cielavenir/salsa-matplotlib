@@ -3,8 +3,10 @@ matplotlib (1.1.1~rc1-2) UNRELEASED; urgency=low
   * debian/patches/60_new_syntax_to_load_searchindex.patch
     - use new Sphinx syntax to load searchindex.js so dh_sphinxdoc is able to
       recognize search.html as a valid Sphinx search page
+  * debian/{control, rules}
+    - use dh_sphinxdoc
 
- -- Sandro Tosi <morph@debian.org>  Sun, 08 Apr 2012 16:46:05 +0200
+ -- Sandro Tosi <morph@debian.org>  Sun, 08 Apr 2012 16:50:32 +0200
 
 matplotlib (1.1.1~rc1-1) unstable; urgency=low
 

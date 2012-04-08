@@ -134,9 +134,8 @@ binary-indep: build-indep install-indep
 	find $(CURDIR)/debian/$(pd)/ -type f -name '*.pyc' | xargs rm -f
 	dh_installexamples -p$(pd) -i examples/*
 	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js -Xobjects.inv
-	ln -sf /usr/share/javascript/jquery/jquery.js \
-		$(CURDIR)/debian/$(pd)/usr/share/doc/python-matplotlib-doc/html/_static/jquery.js
 	dh_link -i
+	dh_sphinxdoc
 	dh_lintian -i
 	dh_fixperms -i
 	dh_installdeb -i
