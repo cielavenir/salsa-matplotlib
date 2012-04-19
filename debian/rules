@@ -20,7 +20,7 @@ build-indep-stamp: $(DEFPY:%=build-%-stamp)
 	echo "examples.directory : $(CURDIR)/sampledata" >> $(CURDIR)/doc/matplotlibrc
 
 	# build the doc
-	-( cd doc ; MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
+	-( cd doc ; MPLCONFIGDIR=. MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
 		PYTHONPATH=../build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py --small all )
 
 	touch $@
