@@ -1,0 +1,17 @@
+Description: use recent sphinx syntax to load searchindex.js, so dh_sphinxdoc can recognize it
+Author: Sandro Tosi <morph@debian.org>
+Forwarded: yes
+Bug: https://github.com/matplotlib/matplotlib/issues/820
+Index: matplotlib-1.1.1~rc1/doc/_templates/search.html
+===================================================================
+--- matplotlib-1.1.1~rc1.orig/doc/_templates/search.html	2012-03-23 02:58:28.000000000 +0100
++++ matplotlib-1.1.1~rc1/doc/_templates/search.html	2012-04-08 16:03:22.404159237 +0200
+@@ -38,5 +38,7 @@
+ {% endblock %}
+ {% block footer %}
+   {{ super() }}
+-  <script type="text/javascript" src="searchindex.js"></script>
++  <script type="text/javascript">
++    jQuery(function() { Search.loadIndex("searchindex.js"); });
++  </script>
+ {% endblock %}
