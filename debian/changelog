@@ -1,4 +1,4 @@
-matplotlib (1.1.1~rc1-2) UNRELEASED; urgency=low
+matplotlib (1.1.1~rc1-2) unstable; urgency=low
 
   * debian/patches/60_new_syntax_to_load_searchindex.patch
     - use new Sphinx syntax to load searchindex.js so dh_sphinxdoc is able to
@@ -9,7 +9,7 @@ matplotlib (1.1.1~rc1-2) UNRELEASED; urgency=low
     - set MPLCONFIGDIR to a writable directory; thanks to Lucas Nussbaum for the
       report; Closes: #669549
 
- -- Sandro Tosi <morph@debian.org>  Thu, 19 Apr 2012 22:32:11 +0200
+ -- Sandro Tosi <morph@debian.org>  Sat, 12 May 2012 18:05:15 +0200
 
 matplotlib (1.1.1~rc1-1) unstable; urgency=low
 
