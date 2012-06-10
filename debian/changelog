@@ -1,3 +1,17 @@
+matplotlib (1.1.1~rc2-1) unstable; urgency=low
+
+  * New upstream release candidate
+  * debian/control
+    - remove some unnecessary build-depends; thanks to Michael Droettboom from
+      upstream for the review of the b-d packages list
+    - remove Qt3 dependencies, not required since a long time, easying Qt3
+      removal from Debian; thanks to Ana Guerrero for report; Closes: #673399
+    - add python-nose to b-d, needed to run tests
+  * debian/rules
+    - enable tests at build time
+
+ -- Sandro Tosi <morph@debian.org>  Sun, 10 Jun 2012 16:21:11 +0200
+
 matplotlib (1.1.1~rc1-2) unstable; urgency=low
 
   * debian/patches/60_new_syntax_to_load_searchindex.patch
