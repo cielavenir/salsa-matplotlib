@@ -1,5 +1,6 @@
-matplotlib (1.1.1~rc1-3) UNRELEASED; urgency=low
+matplotlib (1.1.1~rc2-1) UNRELEASED; urgency=low
 
+  * New upstream release candidate
   * debian/control
     - remove some unnecessary build-depends; thanks to Michael Droettboom from
       upstream for the review of the b-d packages list
@@ -9,7 +10,7 @@ matplotlib (1.1.1~rc1-3) UNRELEASED; urgency=low
   * debian/rules
     - enable tests at build time
 
- -- Sandro Tosi <morph@debian.org>  Sun, 20 May 2012 19:42:12 +0200
+ -- Sandro Tosi <morph@debian.org>  Sun, 10 Jun 2012 10:17:59 +0200
 
 matplotlib (1.1.1~rc1-2) unstable; urgency=low
 
