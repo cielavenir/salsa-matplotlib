@@ -1,3 +1,12 @@
+matplotlib (1.1.1-1) experimental; urgency=low
+
+  * New upstream release
+    - Closes: #680883; thanks to Yannick Roehlly for the report
+  * debian/control
+    - add ghostscript and inkscape to b-d, needed to run tests
+
+ -- Sandro Tosi <morph@debian.org>  Sat, 11 Aug 2012 20:15:53 +0200
+
 matplotlib (1.1.1~rc2-1) unstable; urgency=low
 
   * New upstream release candidate

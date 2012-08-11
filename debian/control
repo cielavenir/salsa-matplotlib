@@ -5,7 +5,9 @@ Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.
 Uploaders: Sandro Tosi <morph@debian.org>
 Build-Depends: debhelper (>= 7),
                dvipng,
+               ghostscript,
                graphviz,
+               inkscape,,
                libfreetype6-dev,
                libgtk2.0-dev,
                libpng-dev,
