@@ -1,3 +1,10 @@
+matplotlib (1.1.1-1) UNRELEASED; urgency=low
+
+  * New upstream release
+    - Closes: #680883; thanks to Yannick Roehlly for the report
+
+ -- Sandro Tosi <morph@debian.org>  Sat, 11 Aug 2012 15:04:54 +0200
+
 matplotlib (1.1.1~rc2-1) unstable; urgency=low
 
   * New upstream release candidate
