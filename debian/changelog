@@ -5,8 +5,9 @@ matplotlib (1.2.0~rc1-1) UNRELEASED; urgency=low
     - updated Homepage field to new upstream website location
   * debian/copyright
     - converted to DEP-5 format
+    - updated to new upstream code
 
- -- Sandro Tosi <morph@debian.org>  Sun, 16 Sep 2012 20:09:26 +0200
+ -- Sandro Tosi <morph@debian.org>  Sun, 16 Sep 2012 20:45:20 +0200
 
 matplotlib (1.1.1-1) experimental; urgency=low
 
