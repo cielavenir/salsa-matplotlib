@@ -62,7 +62,7 @@ License:
  Agreement.
 
 Files: debian/*
-Copyright (C) 2008-2011 Sandro Tosi <morph@debian.org>
+Copyright (C) 2008-2012 Sandro Tosi <morph@debian.org>
 License: same as upstream
 
 Files: lib/matplotlib/fontconfig_pattern.py
