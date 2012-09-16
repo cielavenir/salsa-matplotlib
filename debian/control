@@ -36,7 +36,7 @@ Build-Depends: debhelper (>= 7),
                zlib1g-dev
 XS-Python-Version: all
 Standards-Version: 3.9.3
-Homepage: http://matplotlib.sf.net/
+Homepage: http://matplotlib.org/
 Vcs-Svn: svn://svn.debian.org/svn/python-modules/packages/matplotlib/trunk/
 Vcs-Browser: http://svn.debian.org/viewsvn/python-modules/packages/matplotlib/trunk/
 
