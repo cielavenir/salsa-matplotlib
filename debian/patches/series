@@ -3,4 +3,3 @@
 30_disable_sample_downloads.patch
 40_bts608939_draw_markers_description.patch
 50_bts608942_spaces_in_param_args.patch
-60_new_syntax_to_load_searchindex.patch

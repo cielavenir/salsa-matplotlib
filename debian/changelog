@@ -7,8 +7,10 @@ matplotlib (1.2.0~rc1-1) UNRELEASED; urgency=low
     - converted to DEP-5 format
     - updated to new upstream code
     - extended packaging copyright years
+  * debian/patches/60_new_syntax_to_load_searchindex.patch
+    - removed, merged upstream
 
- -- Sandro Tosi <morph@debian.org>  Sun, 16 Sep 2012 20:45:50 +0200
+ -- Sandro Tosi <morph@debian.org>  Sun, 16 Sep 2012 23:35:28 +0200
 
 matplotlib (1.1.1-1) experimental; urgency=low
 
