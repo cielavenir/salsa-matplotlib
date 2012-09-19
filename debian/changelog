@@ -1,4 +1,4 @@
-matplotlib (1.2.0~rc1-1) UNRELEASED; urgency=low
+matplotlib (1.2.0~rc2-1) UNRELEASED; urgency=low
 
   * New upstream release candidate
   * debian/control
@@ -12,7 +12,7 @@ matplotlib (1.2.0~rc1-1) UNRELEASED; urgency=low
   * debian/watch
     - updated to point to github
 
- -- Sandro Tosi <morph@debian.org>  Tue, 18 Sep 2012 00:00:40 +0200
+ -- Sandro Tosi <morph@debian.org>  Wed, 19 Sep 2012 20:13:16 +0200
 
 matplotlib (1.1.1-1) experimental; urgency=low
 
