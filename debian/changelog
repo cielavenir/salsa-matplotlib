@@ -17,8 +17,9 @@ matplotlib (1.2.0~rc2-1) UNRELEASED; urgency=low
     - disabled, but not removed in case we'll have to restore it
   * debian/python-matplotlib-data.install
     - install sampledata from new location (now it's in upstream tarball)
+    - use matplotlibrc.template to install base matplotlib.conf file
 
- -- Sandro Tosi <morph@debian.org>  Sat, 22 Sep 2012 21:48:30 +0200
+ -- Sandro Tosi <morph@debian.org>  Sat, 22 Sep 2012 21:49:48 +0200
 
 matplotlib (1.1.1-1) experimental; urgency=low
 
