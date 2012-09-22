@@ -15,8 +15,10 @@ matplotlib (1.2.0~rc2-1) UNRELEASED; urgency=low
     - removed, no longer needed
   * debian/patches/10_build_fix.patch
     - disabled, but not removed in case we'll have to restore it
+  * debian/python-matplotlib-data.install
+    - no longer install sampledata, now included in upstream tarball
 
- -- Sandro Tosi <morph@debian.org>  Sat, 22 Sep 2012 21:46:34 +0200
+ -- Sandro Tosi <morph@debian.org>  Sat, 22 Sep 2012 21:47:33 +0200
 
 matplotlib (1.1.1-1) experimental; urgency=low
 
