@@ -33,6 +33,8 @@ Build-Depends: debhelper (>= 7),
                texlive-latex-extra,
                texlive-latex-recommended,
                tk8.5-dev,
+               xauth,
+               xvfb,
                zlib1g-dev
 XS-Python-Version: all
 Standards-Version: 3.9.3
