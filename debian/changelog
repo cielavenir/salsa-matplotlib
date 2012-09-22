@@ -11,8 +11,10 @@ matplotlib (1.2.0~rc2-1) UNRELEASED; urgency=low
     - removed, merged upstream
   * debian/watch
     - updated to point to github
+  * debian/patches/30_disable_sample_downloads.patch
+    - removed, no longer needed
 
- -- Sandro Tosi <morph@debian.org>  Wed, 19 Sep 2012 20:13:16 +0200
+ -- Sandro Tosi <morph@debian.org>  Sat, 22 Sep 2012 21:45:26 +0200
 
 matplotlib (1.1.1-1) experimental; urgency=low
 
