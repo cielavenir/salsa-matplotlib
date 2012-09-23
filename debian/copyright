@@ -5,7 +5,7 @@ Source: http://matplotlib.org
 
 
 Files: *
-Copyright (c) 2002-2008 John D. Hunter
+Copyright: Copyright (c) 2002-2008 John D. Hunter
 License:
  Matplotlib only uses BSD compatible code, and its license is based
  on the PSF license. See the Open Source Initiative licenses page
@@ -62,7 +62,7 @@ License:
  Agreement.
 
 Files: debian/*
-Copyright (C) 2008-2012 Sandro Tosi <morph@debian.org>
+Copyright: Copyright (C) 2008-2012 Sandro Tosi <morph@debian.org>
 License: same as upstream
 
 Files: lib/matplotlib/fontconfig_pattern.py
