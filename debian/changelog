@@ -1,4 +1,4 @@
-matplotlib (1.2.0~rc2-1) UNRELEASED; urgency=low
+matplotlib (1.2.0~rc2-1) experimental; urgency=low
 
   * New upstream release candidate
   * debian/control
@@ -26,7 +26,7 @@ matplotlib (1.2.0~rc2-1) UNRELEASED; urgency=low
     - run tests under 'xvfb-run', needed to run inkscape (which is required to
       compare SVG images); adding relevant b-d (xvfb and xauth)
 
- -- Sandro Tosi <morph@debian.org>  Sun, 23 Sep 2012 19:16:18 +0200
+ -- Sandro Tosi <morph@debian.org>  Tue, 25 Sep 2012 19:44:06 +0200
 
 matplotlib (1.1.1-1) experimental; urgency=low
 
