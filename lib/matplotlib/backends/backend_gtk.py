@@ -1,7 +1,12 @@
-from __future__ import division
+from __future__ import division, print_function
 
 import os, sys, warnings
 def fn_name(): return sys._getframe(1).f_code.co_name
+
+if sys.version_info[0] >= 3:
+    warnings.warn(
+        "The gtk* backends have not been tested with Python 3.x",
+        ImportWarning)
 
 try:
     import gobject
@@ -35,6 +40,7 @@ from matplotlib import lines
 from matplotlib import markers
 from matplotlib import cbook
 from matplotlib import verbose
+from matplotlib import rcParams
 
 backend_version = "%d.%d.%d" % gtk.pygtk_version
 
@@ -84,10 +90,15 @@ def new_figure_manager(num, *args, **kwargs):
     """
     FigureClass = kwargs.pop('FigureClass', Figure)
     thisFig = FigureClass(*args, **kwargs)
-    canvas = FigureCanvasGTK(thisFig)
+    return new_figure_manager_given_figure(num, thisFig)
+
+
+def new_figure_manager_given_figure(num, figure):
+    """
+    Create a new figure manager instance for the given figure.
+    """
+    canvas = FigureCanvasGTK(figure)
     manager = FigureManagerGTK(canvas, num)
-    # equals:
-    #manager = FigureManagerGTK(FigureCanvasGTK(Figure(*args, **kwargs), num)
     return manager
 
 
@@ -183,6 +194,10 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
                65455 : '/',
                65439 : 'dec',
                65421 : 'enter',
+               65511 : 'super',
+               65512 : 'super',
+               65406 : 'alt',
+               65289 : 'tab',
                }
 
     # Setting this as a static constant prevents
@@ -198,7 +213,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
                   gdk.POINTER_MOTION_HINT_MASK)
 
     def __init__(self, figure):
-        if _debug: print 'FigureCanvasGTK.%s' % fn_name()
+        if _debug: print('FigureCanvasGTK.%s' % fn_name())
         FigureCanvasBase.__init__(self, figure)
         gtk.DrawingArea.__init__(self)
 
@@ -227,6 +242,8 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
 
         self._idle_event_id = gobject.idle_add(self.idle_event)
 
+        self.last_downclick = {}
+
     def destroy(self):
         #gtk.DrawingArea.destroy(self)
         self.close_event()
@@ -235,7 +252,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
             gobject.source_remove(self._idle_draw_id)
 
     def scroll_event(self, widget, event):
-        if _debug: print 'FigureCanvasGTK.%s' % fn_name()
+        if _debug: print('FigureCanvasGTK.%s' % fn_name())
         x = event.x
         # flipy so y=0 is bottom of canvas
         y = self.allocation.height - event.y
@@ -247,15 +264,31 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         return False  # finish event propagation?
 
     def button_press_event(self, widget, event):
-        if _debug: print 'FigureCanvasGTK.%s' % fn_name()
+        if _debug: print('FigureCanvasGTK.%s' % fn_name())
         x = event.x
         # flipy so y=0 is bottom of canvas
         y = self.allocation.height - event.y
-        FigureCanvasBase.button_press_event(self, x, y, event.button, guiEvent=event)
+        dblclick = (event.type == gdk._2BUTTON_PRESS)
+        if not dblclick:
+            # GTK is the only backend that generates a DOWN-UP-DOWN-DBLCLICK-UP  event
+            # sequence for a double click.  All other backends have a DOWN-UP-DBLCLICK-UP
+            # sequence.  In order to provide consistency to matplotlib users, we will
+            # eat the extra DOWN event in the case that we detect it is part of a double
+            # click.
+            # first, get the double click time in milliseconds.
+            current_time  = event.get_time()
+            last_time     = self.last_downclick.get(event.button,0)
+            dblclick_time = gtk.settings_get_for_screen(gdk.screen_get_default()).get_property('gtk-double-click-time')
+            delta_time    = current_time-last_time
+            if delta_time < dblclick_time:
+                del self.last_downclick[event.button] # we do not want to eat more than one event.
+                return False                          # eat.
+            self.last_downclick[event.button] = current_time
+        FigureCanvasBase.button_press_event(self, x, y, event.button, dblclick=dblclick, guiEvent=event)
         return False  # finish event propagation?
 
     def button_release_event(self, widget, event):
-        if _debug: print 'FigureCanvasGTK.%s' % fn_name()
+        if _debug: print('FigureCanvasGTK.%s' % fn_name())
         x = event.x
         # flipy so y=0 is bottom of canvas
         y = self.allocation.height - event.y
@@ -263,21 +296,21 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         return False  # finish event propagation?
 
     def key_press_event(self, widget, event):
-        if _debug: print 'FigureCanvasGTK.%s' % fn_name()
+        if _debug: print('FigureCanvasGTK.%s' % fn_name())
         key = self._get_key(event)
-        if _debug: print "hit", key
+        if _debug: print("hit", key)
         FigureCanvasBase.key_press_event(self, key, guiEvent=event)
         return False  # finish event propagation?
 
     def key_release_event(self, widget, event):
-        if _debug: print 'FigureCanvasGTK.%s' % fn_name()
+        if _debug: print('FigureCanvasGTK.%s' % fn_name())
         key = self._get_key(event)
-        if _debug: print "release", key
+        if _debug: print("release", key)
         FigureCanvasBase.key_release_event(self, key, guiEvent=event)
         return False  # finish event propagation?
 
     def motion_notify_event(self, widget, event):
-        if _debug: print 'FigureCanvasGTK.%s' % fn_name()
+        if _debug: print('FigureCanvasGTK.%s' % fn_name())
         if event.is_hint:
             x, y, state = event.window.get_pointer()
         else:
@@ -292,23 +325,28 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         FigureCanvasBase.leave_notify_event(self, event)
 
     def enter_notify_event(self, widget, event):
-        FigureCanvasBase.enter_notify_event(self, event)
+        x, y, state = event.window.get_pointer()
+        FigureCanvasBase.enter_notify_event(self, event, xy=(x,y))
 
     def _get_key(self, event):
         if event.keyval in self.keyvald:
             key = self.keyvald[event.keyval]
-        elif event.keyval <256:
+        elif event.keyval < 256:
             key = chr(event.keyval)
         else:
             key = None
 
-        ctrl  = event.state & gdk.CONTROL_MASK
-        shift = event.state & gdk.SHIFT_MASK
+        for key_mask, prefix in (
+                                 [gdk.MOD4_MASK, 'super'],
+                                 [gdk.MOD1_MASK, 'alt'],
+                                 [gdk.CONTROL_MASK, 'ctrl'],):
+            if event.state & key_mask:
+                key = '{}+{}'.format(prefix, key)
+
         return key
 
-
     def configure_event(self, widget, event):
-        if _debug: print 'FigureCanvasGTK.%s' % fn_name()
+        if _debug: print('FigureCanvasGTK.%s' % fn_name())
         if widget.window is None:
             return
         w, h = event.width, event.height
@@ -359,7 +397,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         Make sure _._pixmap is at least width, height,
         create new pixmap if necessary
         """
-        if _debug: print 'FigureCanvasGTK.%s' % fn_name()
+        if _debug: print('FigureCanvasGTK.%s' % fn_name())
 
         create_pixmap = False
         if width > self._pixmap_width:
@@ -389,7 +427,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
     def expose_event(self, widget, event):
         """Expose_event for all GTK backends. Should not be overridden.
         """
-        if _debug: print 'FigureCanvasGTK.%s' % fn_name()
+        if _debug: print('FigureCanvasGTK.%s' % fn_name())
 
         if GTK_WIDGET_DRAWABLE(self):
             if self._need_redraw:
@@ -435,7 +473,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         if is_string_like(filename):
             try:
                 pixbuf.save(filename, format)
-            except gobject.GError, exc:
+            except gobject.GError as exc:
                 error_msg_gtk('Save figure failure:\n%s' % (exc,), parent=self)
         elif is_writable_file_like(filename):
             if hasattr(pixbuf, 'save_to_callback'):
@@ -443,15 +481,12 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
                     data.write(buf)
                 try:
                     pixbuf.save_to_callback(save_callback, format, user_data=filename)
-                except gobject.GError, exc:
+                except gobject.GError as exc:
                     error_msg_gtk('Save figure failure:\n%s' % (exc,), parent=self)
             else:
                 raise ValueError("Saving to a Python file-like object is only supported by PyGTK >= 2.8")
         else:
             raise ValueError("filename must be a path or a file-like object")
-
-    def get_default_filetype(self):
-        return 'png'
 
     def new_timer(self, *args, **kwargs):
         """
@@ -495,11 +530,11 @@ class FigureManagerGTK(FigureManagerBase):
     window      : The gtk.Window   (gtk only)
     """
     def __init__(self, canvas, num):
-        if _debug: print 'FigureManagerGTK.%s' % fn_name()
+        if _debug: print('FigureManagerGTK.%s' % fn_name())
         FigureManagerBase.__init__(self, canvas, num)
 
         self.window = gtk.Window()
-        self.window.set_title("Figure %d" % num)
+        self.set_window_title("Figure %d" % num)
         if (window_icon):
             try:
                 self.window.set_icon_from_file(window_icon)
@@ -515,9 +550,6 @@ class FigureManagerGTK(FigureManagerBase):
         self.vbox.show()
 
         self.canvas.show()
-
-        # attach a show method to the figure  for pylab ease of use
-        self.canvas.figure.show = lambda *args: self.window.show()
 
         self.vbox.pack_start(self.canvas, True, True)
 
@@ -550,7 +582,7 @@ class FigureManagerGTK(FigureManagerBase):
         self.canvas.grab_focus()
 
     def destroy(self, *args):
-        if _debug: print 'FigureManagerGTK.%s' % fn_name()
+        if _debug: print('FigureManagerGTK.%s' % fn_name())
         if hasattr(self, 'toolbar') and self.toolbar is not None:
             self.toolbar.destroy()
         if hasattr(self, 'vbox'):
@@ -570,7 +602,7 @@ class FigureManagerGTK(FigureManagerBase):
         # show the figure window
         self.window.show()
 
-    def full_screen_toggle (self):
+    def full_screen_toggle(self):
         self._full_screen_flag = not self._full_screen_flag
         if self._full_screen_flag:
             self.window.fullscreen()
@@ -582,13 +614,16 @@ class FigureManagerGTK(FigureManagerBase):
     def _get_toolbar(self, canvas):
         # must be inited after the window, drawingArea and figure
         # attrs are set
-        if matplotlib.rcParams['toolbar'] == 'classic':
+        if rcParams['toolbar'] == 'classic':
             toolbar = NavigationToolbar (canvas, self.window)
-        elif matplotlib.rcParams['toolbar'] == 'toolbar2':
+        elif rcParams['toolbar'] == 'toolbar2':
             toolbar = NavigationToolbar2GTK (canvas, self.window)
         else:
             toolbar = None
         return toolbar
+
+    def get_window_title(self):
+        return self.window.get_title()
 
     def set_window_title(self, title):
         self.window.set_title(title)
@@ -602,19 +637,6 @@ class FigureManagerGTK(FigureManagerBase):
 
 
 class NavigationToolbar2GTK(NavigationToolbar2, gtk.Toolbar):
-    # list of toolitems to add to the toolbar, format is:
-    # text, tooltip_text, image_file, callback(str)
-    toolitems = (
-        ('Home', 'Reset original view', 'home.png', 'home'),
-        ('Back', 'Back to  previous view','back.png', 'back'),
-        ('Forward', 'Forward to next view','forward.png', 'forward'),
-        ('Pan', 'Pan axes with left mouse, zoom with right', 'move.png','pan'),
-        ('Zoom', 'Zoom to rectangle','zoom_to_rect.png', 'zoom'),
-        (None, None, None, None),
-        ('Subplots', 'Configure subplots','subplots.png', 'configure_subplots'),
-        ('Save', 'Save the figure','filesave.png', 'save_figure'),
-        )
-
     def __init__(self, canvas, window):
         self.win = window
         gtk.Toolbar.__init__(self)
@@ -649,7 +671,7 @@ class NavigationToolbar2GTK(NavigationToolbar2, gtk.Toolbar):
         w = abs(x1 - x0)
         h = abs(y1 - y0)
 
-        rect = [int(val)for val in min(x0,x1), min(y0, y1), w, h]
+        rect = [int(val)for val in (min(x0,x1), min(y0, y1), w, h)]
         try:
             lastrect, pixmapBack = self._pixmapBack
         except AttributeError:
@@ -674,7 +696,7 @@ class NavigationToolbar2GTK(NavigationToolbar2, gtk.Toolbar):
 
 
     def _init_toolbar2_4(self):
-        basedir = os.path.join(matplotlib.rcParams['datapath'],'images')
+        basedir = os.path.join(rcParams['datapath'],'images')
         if not _new_tooltip_api:
             self.tooltips = gtk.Tooltips()
 
@@ -682,7 +704,7 @@ class NavigationToolbar2GTK(NavigationToolbar2, gtk.Toolbar):
             if text is None:
                 self.insert( gtk.SeparatorToolItem(), -1 )
                 continue
-            fname = os.path.join(basedir, image_file)
+            fname = os.path.join(basedir, image_file + '.png')
             image = gtk.Image()
             image.set_from_file(fname)
             tbutton = gtk.ToolButton(image, text)
@@ -708,18 +730,20 @@ class NavigationToolbar2GTK(NavigationToolbar2, gtk.Toolbar):
         self.show_all()
 
     def get_filechooser(self):
-        return FileChooserDialog(
+        fc = FileChooserDialog(
             title='Save the figure',
             parent=self.win,
             filetypes=self.canvas.get_supported_filetypes(),
             default_filetype=self.canvas.get_default_filetype())
+        fc.set_current_name(self.canvas.get_default_filename())
+        return fc
 
     def save_figure(self, *args):
         fname, format = self.get_filechooser().get_filename_from_user()
         if fname:
             try:
                 self.canvas.print_figure(fname, format=format)
-            except Exception, e:
+            except Exception as e:
                 error_msg_gtk(str(e), parent=self)
 
     def configure_subplots(self, button):
@@ -982,7 +1006,7 @@ class NavigationToolbar(gtk.Toolbar):
         if fname:
             try:
                 self.canvas.print_figure(fname, format=format)
-            except Exception, e:
+            except Exception as e:
                 error_msg_gtk(str(e), parent=self)
 
 
@@ -1167,12 +1191,12 @@ class DialogLineprops:
 
         button = self.wtree.get_widget('colorbutton_linestyle')
         color = button.get_color()
-        r, g, b = [val/65535. for val in color.red, color.green, color.blue]
+        r, g, b = [val/65535. for val in (color.red, color.green, color.blue)]
         line.set_color((r,g,b))
 
         button = self.wtree.get_widget('colorbutton_markerface')
         color = button.get_color()
-        r, g, b = [val/65535. for val in color.red, color.green, color.blue]
+        r, g, b = [val/65535. for val in (color.red, color.green, color.blue)]
         line.set_markerfacecolor((r,g,b))
 
         line.figure.canvas.draw()
@@ -1194,12 +1218,12 @@ class DialogLineprops:
         self.cbox_markers.set_active(self.markerd[marker])
 
         r,g,b = colorConverter.to_rgb(line.get_color())
-        color = gtk.gdk.Color(*[int(val*65535) for val in r,g,b])
+        color = gtk.gdk.Color(*[int(val*65535) for val in (r,g,b)])
         button = self.wtree.get_widget('colorbutton_linestyle')
         button.set_color(color)
 
         r,g,b = colorConverter.to_rgb(line.get_markerfacecolor())
-        color = gtk.gdk.Color(*[int(val*65535) for val in r,g,b])
+        color = gtk.gdk.Color(*[int(val*65535) for val in (r,g,b)])
         button = self.wtree.get_widget('colorbutton_markerface')
         button.set_color(color)
         self._updateson = True
@@ -1233,7 +1257,7 @@ try:
         icon_filename = 'matplotlib.png'
     else:
         icon_filename = 'matplotlib.svg'
-    window_icon = os.path.join(matplotlib.rcParams['datapath'], 'images', icon_filename)
+    window_icon = os.path.join(rcParams['datapath'], 'images', icon_filename)
 except:
     window_icon = None
     verbose.report('Could not load matplotlib icon: %s' % sys.exc_info()[1])

@@ -1,6 +1,7 @@
 """
 Manage figures for pyplot interface.
 """
+from __future__ import print_function
 
 import sys, gc
 
@@ -9,11 +10,11 @@ import traceback
 
 
 def error_msg(msg):
-    print >>sys.stderr, msg
+    print(msg, file=sys.stderr)
 
 class Gcf(object):
     """
-    Manage a set of integer-numbered figures.
+    Singleton to manage a set of integer-numbered figures.
 
     This class is never instantiated; it consists of two class
     attributes (a list and a dictionary), and a set of static
@@ -71,9 +72,13 @@ class Gcf(object):
     @staticmethod
     def destroy_fig(fig):
         "*fig* is a Figure instance"
-        for manager in Gcf.figs.values():
+        num = None
+        for manager in Gcf.figs.itervalues():
             if manager.canvas.figure == fig:
-                Gcf.destroy(manager.num)
+                num = manager.num
+                break
+        if num is not None:
+            Gcf.destroy(num)
 
     @staticmethod
     def destroy_all():
@@ -126,6 +131,7 @@ class Gcf(object):
             if m != manager: Gcf._activeQue.append(m)
         Gcf._activeQue.append(manager)
         Gcf.figs[manager.num] = manager
+
 
 atexit.register(Gcf.destroy_all)
 

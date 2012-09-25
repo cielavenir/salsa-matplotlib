@@ -36,47 +36,39 @@
       at the size at 12 pixels scaled by 2 through a transform,
       because the hints will have been computed differently (except
       you have disabled hints).
-
- This hack is enabled only when VERTICAL_HINTING is defined, and will
- only be effective when load_char and set_text are called with 'flags=
- LOAD_DEFAULT', which is the default.
  */
-#define VERTICAL_HINTING
-#ifdef VERTICAL_HINTING
-#define HORIZ_HINTING 8
-#else
-#define HORIZ_HINTING 1
-#endif
 
 FT_Library _ft2Library;
 
-// FT2Image::FT2Image() :
-//   _isDirty(true),
-//   _buffer(NULL),
-//   _width(0), _height(0),
-//   _rgbCopy(NULL),
-//   _rgbaCopy(NULL) {
-//   _VERBOSE("FT2Image::FT2Image");
-// }
-
-FT2Image::FT2Image(unsigned long width, unsigned long height) :
+FT2Image::FT2Image(Py::PythonClassInstance *self, Py::Tuple &args, Py::Dict &kwds) :
+    Py::PythonClass< FT2Image >::PythonClass(self, args, kwds),
     _isDirty(true),
     _buffer(NULL),
-    _width(0), _height(0),
-    _rgbCopy(NULL),
-    _rgbaCopy(NULL)
+    _width(0), _height(0)
 {
     _VERBOSE("FT2Image::FT2Image");
+
+    args.verify_length(2);
+    int width = Py::Int(args[0]);
+    int height = Py::Int(args[1]);
+
     resize(width, height);
 }
 
-FT2Image::~FT2Image()
-{
-    _VERBOSE("FT2Image::~FT2Image");
+FT2Image::~FT2Image() {
     delete [] _buffer;
     _buffer = NULL;
-    delete _rgbCopy;
-    delete _rgbaCopy;
+}
+
+Py::PythonClassObject<FT2Image> FT2Image::factory(int width, int height)
+{
+    Py::Callable class_type(type());
+    Py::Tuple args(2);
+    args[0] = Py::Int(width);
+    args[1] = Py::Int(height);
+    Py::PythonClassObject<FT2Image> o = Py::PythonClassObject<FT2Image>(
+        class_type.apply(args, Py::Dict()));
+    return o;
 }
 
 void
@@ -197,6 +189,7 @@ FT2Image::py_write_bitmap(const Py::Tuple & args)
 
     return Py::Object();
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Image, py_write_bitmap)
 
 void
 FT2Image::draw_rect(unsigned long x0, unsigned long y0,
@@ -247,6 +240,7 @@ FT2Image::py_draw_rect(const Py::Tuple & args)
 
     return Py::Object();
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Image, py_draw_rect)
 
 void
 FT2Image::draw_rect_filled(unsigned long x0, unsigned long y0,
@@ -290,9 +284,10 @@ FT2Image::py_draw_rect_filled(const Py::Tuple & args)
 
     return Py::Object();
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Image, py_draw_rect_filled)
 
 char FT2Image::as_str__doc__[] =
-    "width, height, s = image_as_str()\n"
+    "s = image.as_str()\n"
     "\n"
     "Return the image buffer as a string\n"
     "\n"
@@ -304,10 +299,73 @@ FT2Image::py_as_str(const Py::Tuple & args)
     args.verify_length(0);
 
     return Py::asObject
-      (PyString_FromStringAndSize((const char *)_buffer,
-                                  _width*_height)
-       );
+      (PyBytes_FromStringAndSize((const char *)_buffer, _width*_height));
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Image, py_as_str)
+
+char FT2Image::as_rgba_str__doc__[] =
+    "s = image.as_rgba_str()\n"
+    "\n"
+    "Return the image buffer as a RGBA string\n"
+    "\n"
+    ;
+Py::Object
+FT2Image::py_as_rgba_str(const Py::Tuple & args)
+{
+    _VERBOSE("FT2Image::as_str");
+    args.verify_length(0);
+
+    Py_ssize_t size = _width*_height*4;
+    PyObject* result = PyBytes_FromStringAndSize(NULL, size);
+
+    unsigned char *src     = _buffer;
+    unsigned char *src_end = src + (_width * _height);
+    unsigned char *dst     = (unsigned char *)PyBytes_AS_STRING(result);
+
+    while (src != src_end)
+    {
+        *dst++ = 0;
+        *dst++ = 0;
+        *dst++ = 0;
+        *dst++ = *src++;
+    }
+
+    return Py::asObject(result);
+}
+PYCXX_VARARGS_METHOD_DECL(FT2Image, py_as_rgba_str)
+
+/* TODO: This could take a color as an argument, but for
+   now it defaults to black on white background */
+char FT2Image::as_rgb_str__doc__[] =
+    "s = image.as_rgb_str()\n"
+    "\n"
+    "Return the image buffer as a RGB string\n"
+    "\n"
+    ;
+Py::Object
+FT2Image::py_as_rgb_str(const Py::Tuple & args)
+{
+    _VERBOSE("FT2Image::as_str");
+    args.verify_length(0);
+
+    Py_ssize_t size = _width*_height*3;
+    PyObject* result = PyBytes_FromStringAndSize(NULL, size);
+
+    unsigned char *src     = _buffer;
+    unsigned char *src_end = src + (_width * _height);
+    unsigned char *dst     = (unsigned char *)PyBytes_AS_STRING(result);
+
+    while (src != src_end)
+    {
+        unsigned char tmp = 255 - *src++;
+        *dst++ = tmp;
+        *dst++ = tmp;
+        *dst++ = tmp;
+    }
+
+    return Py::asObject(result);
+}
+PYCXX_VARARGS_METHOD_DECL(FT2Image, py_as_rgb_str)
 
 char FT2Image::as_array__doc__[] =
     "x = image.as_array()\n"
@@ -330,98 +388,7 @@ FT2Image::py_as_array(const Py::Tuple & args)
 
     return Py::asObject((PyObject*)A);
 }
-
-void
-FT2Image::makeRgbCopy()
-{
-    if (!_isDirty)
-    {
-        return;
-    }
-
-    if (!_rgbCopy)
-    {
-        _rgbCopy = new FT2Image(_width * 3, _height);
-    }
-    else
-    {
-        _rgbCopy->resize(_width * 3, _height);
-    }
-    unsigned char *src            = _buffer;
-    unsigned char *src_end        = src + (_width * _height);
-    unsigned char *dst            = _rgbCopy->_buffer;
-
-    unsigned char tmp;
-    while (src != src_end)
-    {
-        tmp = 255 - *src++;
-        *dst++ = tmp;
-        *dst++ = tmp;
-        *dst++ = tmp;
-    }
-}
-
-char FT2Image::as_rgb_str__doc__[] =
-    "width, height, s = image_as_rgb_str()\n"
-    "\n"
-    "Return the image buffer as a 24-bit RGB string.\n"
-    "\n"
-    ;
-Py::Object
-FT2Image::py_as_rgb_str(const Py::Tuple & args)
-{
-    _VERBOSE("FT2Image::as_str_rgb");
-    args.verify_length(0);
-
-    makeRgbCopy();
-
-    return _rgbCopy->py_as_str(args);
-}
-
-void FT2Image::makeRgbaCopy()
-{
-    if (!_isDirty)
-    {
-        return;
-    }
-
-    if (!_rgbaCopy)
-    {
-        _rgbaCopy = new FT2Image(_width * 4, _height);
-    }
-    else
-    {
-        _rgbaCopy->resize(_width * 4, _height);
-    }
-    unsigned char *src            = _buffer;
-    unsigned char *src_end        = src + (_width * _height);
-    unsigned char *dst            = _rgbaCopy->_buffer;
-
-    while (src != src_end)
-    {
-        // We know the array has already been zero'ed out in
-        // the resize method, so we just skip over the r, g and b.
-        dst += 3;
-        *dst++ = *src++;
-    }
-}
-
-char FT2Image::as_rgba_str__doc__[] =
-    "width, height, s = image_as_rgb_str()\n"
-    "\n"
-    "Return the image buffer as a 32-bit RGBA string.\n"
-    "\n"
-    ;
-Py::Object
-FT2Image::py_as_rgba_str(const Py::Tuple & args)
-{
-    _VERBOSE("FT2Image::as_str_rgba");
-    args.verify_length(0);
-
-    makeRgbaCopy();
-
-    return _rgbaCopy->py_as_str(args);
-}
+PYCXX_VARARGS_METHOD_DECL(FT2Image, py_as_array)
 
 Py::Object
 FT2Image::py_get_width(const Py::Tuple & args)
@@ -431,6 +398,7 @@ FT2Image::py_get_width(const Py::Tuple & args)
 
     return Py::Int((long)get_width());
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Image, py_get_width)
 
 Py::Object
 FT2Image::py_get_height(const Py::Tuple & args)
@@ -440,27 +408,30 @@ FT2Image::py_get_height(const Py::Tuple & args)
 
     return Py::Int((long)get_height());
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Image, py_get_height)
 
-Glyph::Glyph(const FT_Face& face, const FT_Glyph& glyph, size_t ind) :
-        glyphInd(ind)
+Py::PythonClassObject<Glyph> Glyph::factory(
+        const FT_Face& face, const FT_Glyph& glyph, size_t ind, long hinting_factor)
 {
-    _VERBOSE("Glyph::Glyph");
+    Py::Callable class_type(type());
+    Py::PythonClassObject<Glyph> obj = Py::PythonClassObject<Glyph>(
+        class_type.apply(Py::Tuple(), Py::Dict()));
+    Glyph* o = obj.getCxxObject();
 
+    o->glyphInd = ind;
     FT_BBox bbox;
     FT_Glyph_Get_CBox(glyph, ft_glyph_bbox_subpixels, &bbox);
 
-    setattr("width",        Py::Int(face->glyph->metrics.width / HORIZ_HINTING));
-    setattr("height",       Py::Int(face->glyph->metrics.height));
-    setattr("horiBearingX", Py::Int(face->glyph->metrics.horiBearingX / HORIZ_HINTING));
-    setattr("horiBearingY", Py::Int(face->glyph->metrics.horiBearingY));
-    setattr("horiAdvance",  Py::Int(face->glyph->metrics.horiAdvance));
-    setattr("linearHoriAdvance",  Py::Int(face->glyph->linearHoriAdvance / HORIZ_HINTING));
-    setattr("vertBearingX", Py::Int(face->glyph->metrics.vertBearingX));
+    o->setattro("width",        Py::Int(face->glyph->metrics.width / hinting_factor));
+    o->setattro("height",       Py::Int(face->glyph->metrics.height));
+    o->setattro("horiBearingX", Py::Int(face->glyph->metrics.horiBearingX / hinting_factor));
+    o->setattro("horiBearingY", Py::Int(face->glyph->metrics.horiBearingY));
+    o->setattro("horiAdvance",  Py::Int(face->glyph->metrics.horiAdvance));
+    o->setattro("linearHoriAdvance",  Py::Int(face->glyph->linearHoriAdvance / hinting_factor));
+    o->setattro("vertBearingX", Py::Int(face->glyph->metrics.vertBearingX));
 
-    setattr("vertBearingY", Py::Int(face->glyph->metrics.vertBearingY));
-    setattr("vertAdvance",  Py::Int(face->glyph->metrics.vertAdvance));
-    //setattr("bitmap_left",  Py::Int( face->glyph->bitmap_left) );
-    //setattr("bitmap_top",  Py::Int( face->glyph->bitmap_top) );
+    o->setattro("vertBearingY", Py::Int(face->glyph->metrics.vertBearingY));
+    o->setattro("vertAdvance",  Py::Int(face->glyph->metrics.vertAdvance));
 
     Py::Tuple abbox(4);
 
@@ -468,7 +439,9 @@ Glyph::Glyph(const FT_Face& face, const FT_Glyph& glyph, size_t ind) :
     abbox[1] = Py::Int(bbox.yMin);
     abbox[2] = Py::Int(bbox.xMax);
     abbox[3] = Py::Int(bbox.yMax);
-    setattr("bbox", abbox);
+    o->setattro("bbox", abbox);
+
+    return obj;
 }
 
 Glyph::~Glyph()
@@ -477,7 +450,7 @@ Glyph::~Glyph()
 }
 
 int
-Glyph::setattr(const char *name, const Py::Object &value)
+Glyph::setattro(const Py::String &name, const Py::Object &value)
 {
     _VERBOSE("Glyph::setattr");
     __dict__[name] = value;
@@ -485,11 +458,11 @@ Glyph::setattr(const char *name, const Py::Object &value)
 }
 
 Py::Object
-Glyph::getattr(const char *name)
+Glyph::getattro(const Py::String &name)
 {
     _VERBOSE("Glyph::getattr");
     if (__dict__.hasKey(name)) return __dict__[name];
-    else return getattr_default(name);
+    else return genericGetAttro(name);
 }
 
 inline double conv(int v)
@@ -498,7 +471,11 @@ inline double conv(int v)
 }
 
 
-//see http://freetype.sourceforge.net/freetype2/docs/glyphs/glyphs-6.html
+char FT2Font::get_path__doc__[] =
+    "get_path()\n"
+    "\n"
+    "Get the path data from the currently loaded glyph as a tuple of vertices, codes.\n"
+    ;
 Py::Object
 FT2Font::get_path()
 {
@@ -856,12 +833,17 @@ FT2Font::get_path()
 
     return result;
 }
+PYCXX_NOARGS_METHOD_DECL(FT2Font, get_path)
 
-
-FT2Font::FT2Font(std::string facefile) :
-    image(NULL)
+FT2Font::FT2Font(Py::PythonClassInstance *self, Py::Tuple &args, Py::Dict &kwds) :
+    Py::PythonClass<FT2Font>::PythonClass(self, args, kwds),
+    image()
 {
+    args.verify_length(1);
+    std::string facefile = Py::String(args[0]);
+
     _VERBOSE(Printf("FT2Font::FT2Font %s", facefile.c_str()).str());
+
     clear(Py::Tuple(0));
 
     int error = FT_New_Face(_ft2Library, facefile.c_str(), 0, &face);
@@ -870,40 +852,46 @@ FT2Font::FT2Font(std::string facefile) :
     {
         std::ostringstream s;
         s << "Could not load facefile " << facefile << "; Unknown_File_Format" << std::endl;
+        ob_refcnt--;
         throw Py::RuntimeError(s.str());
     }
     else if (error == FT_Err_Cannot_Open_Resource)
     {
         std::ostringstream s;
         s << "Could not open facefile " << facefile << "; Cannot_Open_Resource" << std::endl;
+        ob_refcnt--;
         throw Py::RuntimeError(s.str());
     }
     else if (error == FT_Err_Invalid_File_Format)
     {
         std::ostringstream s;
         s << "Could not open facefile " << facefile << "; Invalid_File_Format" << std::endl;
+        ob_refcnt--;
         throw Py::RuntimeError(s.str());
     }
     else if (error)
     {
         std::ostringstream s;
         s << "Could not open facefile " << facefile << "; freetype error code " << error << std::endl;
+        ob_refcnt--;
         throw Py::RuntimeError(s.str());
     }
 
     // set a default fontsize 12 pt at 72dpi
-#ifdef VERTICAL_HINTING
-    error = FT_Set_Char_Size(face, 12 * 64, 0, 72 * HORIZ_HINTING, 72);
-    static FT_Matrix transform = { 65536 / HORIZ_HINTING, 0, 0, 65536 };
+    hinting_factor = 8;
+    if (kwds.hasKey("hinting_factor"))
+    {
+        hinting_factor = Py::Long(kwds["hinting_factor"]);
+    }
+
+    error = FT_Set_Char_Size(face, 12 * 64, 0, 72 * hinting_factor, 72);
+    static FT_Matrix transform = { 65536 / hinting_factor, 0, 0, 65536 };
     FT_Set_Transform(face, &transform, 0);
-#else
-    error = FT_Set_Char_Size(face, 12 * 64, 0, 72, 72);
-#endif
-    //error = FT_Set_Char_Size( face, 20 * 64, 0, 80, 80 );
     if (error)
     {
         std::ostringstream s;
         s << "Could not set the fontsize for facefile  " << facefile << std::endl;
+        ob_refcnt--;
         throw Py::RuntimeError(s.str());
     }
 
@@ -929,40 +917,40 @@ FT2Font::FT2Font(std::string facefile) :
         style_name = "UNAVAILABLE";
     }
 
-    setattr("postscript_name", Py::String(ps_name));
-    setattr("num_faces",       Py::Int(face->num_faces));
-    setattr("family_name",     Py::String(family_name));
-    setattr("style_name",      Py::String(style_name));
-    setattr("face_flags",      Py::Int(face->face_flags));
-    setattr("style_flags",     Py::Int(face->style_flags));
-    setattr("num_glyphs",      Py::Int(face->num_glyphs));
-    setattr("num_fixed_sizes", Py::Int(face->num_fixed_sizes));
-    setattr("num_charmaps",    Py::Int(face->num_charmaps));
+    setattro("postscript_name", Py::String(ps_name));
+    setattro("num_faces",       Py::Int(face->num_faces));
+    setattro("family_name",     Py::String(family_name));
+    setattro("style_name",      Py::String(style_name));
+    setattro("face_flags",      Py::Int(face->face_flags));
+    setattro("style_flags",     Py::Int(face->style_flags));
+    setattro("num_glyphs",      Py::Int(face->num_glyphs));
+    setattro("num_fixed_sizes", Py::Int(face->num_fixed_sizes));
+    setattro("num_charmaps",    Py::Int(face->num_charmaps));
 
     int scalable = FT_IS_SCALABLE(face);
 
-    setattr("scalable", Py::Int(scalable));
+    setattro("scalable", Py::Int(scalable));
 
     if (scalable)
     {
-        setattr("units_per_EM", Py::Int(face->units_per_EM));
+        setattro("units_per_EM", Py::Int(face->units_per_EM));
 
         Py::Tuple bbox(4);
         bbox[0] = Py::Int(face->bbox.xMin);
         bbox[1] = Py::Int(face->bbox.yMin);
         bbox[2] = Py::Int(face->bbox.xMax);
         bbox[3] = Py::Int(face->bbox.yMax);
-        setattr("bbox",  bbox);
-        setattr("ascender",            Py::Int(face->ascender));
-        setattr("descender",           Py::Int(face->descender));
-        setattr("height",              Py::Int(face->height));
-        setattr("max_advance_width",   Py::Int(face->max_advance_width));
-        setattr("max_advance_height",  Py::Int(face->max_advance_height));
-        setattr("underline_position",  Py::Int(face->underline_position));
-        setattr("underline_thickness", Py::Int(face->underline_thickness));
+        setattro("bbox",  bbox);
+        setattro("ascender",            Py::Int(face->ascender));
+        setattro("descender",           Py::Int(face->descender));
+        setattro("height",              Py::Int(face->height));
+        setattro("max_advance_width",   Py::Int(face->max_advance_width));
+        setattro("max_advance_height",  Py::Int(face->max_advance_height));
+        setattro("underline_position",  Py::Int(face->underline_position));
+        setattro("underline_thickness", Py::Int(face->underline_thickness));
     }
 
-    setattr("fname", Py::String(facefile));
+    setattro("fname", Py::String(facefile));
 
     _VERBOSE("FT2Font::FT2Font done");
 }
@@ -971,7 +959,6 @@ FT2Font::~FT2Font()
 {
     _VERBOSE("FT2Font::~FT2Font");
 
-    Py_XDECREF(image);
     FT_Done_Face(face);
 
     for (size_t i = 0; i < glyphs.size(); i++)
@@ -981,7 +968,7 @@ FT2Font::~FT2Font()
 }
 
 int
-FT2Font::setattr(const char *name, const Py::Object &value)
+FT2Font::setattro(const Py::String &name, const Py::Object &value)
 {
     _VERBOSE("FT2Font::setattr");
     __dict__[name] = value;
@@ -989,11 +976,11 @@ FT2Font::setattr(const char *name, const Py::Object &value)
 }
 
 Py::Object
-FT2Font::getattr(const char *name)
+FT2Font::getattro(const Py::String &name)
 {
     _VERBOSE("FT2Font::getattr");
     if (__dict__.hasKey(name)) return __dict__[name];
-    else return getattr_default(name);
+    else return genericGetAttro(name);
 }
 
 char FT2Font::clear__doc__[] =
@@ -1007,9 +994,6 @@ FT2Font::clear(const Py::Tuple & args)
 {
     _VERBOSE("FT2Font::clear");
     args.verify_length(0);
-
-    Py_XDECREF(image);
-    image = NULL;
 
     angle = 0.0;
 
@@ -1025,9 +1009,7 @@ FT2Font::clear(const Py::Tuple & args)
 
     return Py::Object();
 }
-
-
-
+PYCXX_VARARGS_METHOD_DECL(FT2Font, clear)
 
 char FT2Font::set_size__doc__[] =
     "set_size(ptsize, dpi)\n"
@@ -1044,24 +1026,19 @@ FT2Font::set_size(const Py::Tuple & args)
     double ptsize = Py::Float(args[0]);
     double dpi = Py::Float(args[1]);
 
-#ifdef VERTICAL_HINTING
     int error = FT_Set_Char_Size(face, (long)(ptsize * 64), 0,
-                                 (unsigned int)dpi * HORIZ_HINTING,
+                                 (unsigned int)dpi * hinting_factor,
                                  (unsigned int)dpi);
-    static FT_Matrix transform = { 65536 / HORIZ_HINTING, 0, 0, 65536 };
+    static FT_Matrix transform = { 65536 / hinting_factor, 0, 0, 65536 };
     FT_Set_Transform(face, &transform, 0);
-#else
-    int error = FT_Set_Char_Size(face, (long)(ptsize * 64), 0,
-                                 (unsigned int)dpi,
-                                 (unsigned int)dpi);
-#endif
+
     if (error)
     {
         throw Py::RuntimeError("Could not set the fontsize");
     }
     return Py::Object();
 }
-
+PYCXX_VARARGS_METHOD_DECL(FT2Font, set_size)
 
 char FT2Font::set_charmap__doc__[] =
     "set_charmap(i)\n"
@@ -1087,6 +1064,7 @@ FT2Font::set_charmap(const Py::Tuple & args)
     }
     return Py::Object();
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Font, set_charmap)
 
 char FT2Font::select_charmap__doc__[] =
     "select_charmap(i)\n"
@@ -1108,6 +1086,7 @@ FT2Font::select_charmap(const Py::Tuple & args)
     }
     return Py::Object();
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Font, select_charmap)
 
 FT_BBox
 FT2Font::compute_string_bbox()
@@ -1148,7 +1127,6 @@ FT2Font::compute_string_bbox()
     return bbox;
 }
 
-
 char FT2Font::get_kerning__doc__[] =
     "dx = get_kerning(left, right, mode)\n"
     "\n"
@@ -1176,7 +1154,7 @@ FT2Font::get_kerning(const Py::Tuple & args)
 
     if (!FT_Get_Kerning(face, left, right, mode, &delta))
     {
-        return Py::Int(delta.x / HORIZ_HINTING);
+        return Py::Int(delta.x / hinting_factor);
     }
     else
     {
@@ -1184,7 +1162,7 @@ FT2Font::get_kerning(const Py::Tuple & args)
 
     }
 }
-
+PYCXX_VARARGS_METHOD_DECL(FT2Font, get_kerning)
 
 
 char FT2Font::set_text__doc__[] =
@@ -1264,7 +1242,7 @@ FT2Font::set_text(const Py::Tuple & args, const Py::Dict & kwargs)
             FT_Vector delta;
             FT_Get_Kerning(face, previous, glyph_index,
                            FT_KERNING_DEFAULT, &delta);
-            pen.x += delta.x / HORIZ_HINTING;
+            pen.x += delta.x / hinting_factor;
         }
         error = FT_Load_Glyph(face, glyph_index, flags);
         if (error)
@@ -1306,6 +1284,7 @@ FT2Font::set_text(const Py::Tuple & args, const Py::Dict & kwargs)
     _VERBOSE("FT2Font::set_text done");
     return xys;
 }
+PYCXX_KEYWORDS_METHOD_DECL(FT2Font, set_text)
 
 char FT2Font::get_num_glyphs__doc__[] =
     "get_num_glyphs()\n"
@@ -1320,6 +1299,7 @@ FT2Font::get_num_glyphs(const Py::Tuple & args)
 
     return Py::Int((long)glyphs.size());
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Font, get_num_glyphs)
 
 char FT2Font::load_char__doc__[] =
     "load_char(charcode, flags=LOAD_FORCE_AUTOHINT)\n"
@@ -1367,10 +1347,9 @@ FT2Font::load_char(const Py::Tuple & args, const Py::Dict & kwargs)
 
     size_t num = glyphs.size();  //the index into the glyphs list
     glyphs.push_back(thisGlyph);
-    Glyph* gm = new Glyph(face, thisGlyph, num);
-    return Py::asObject(gm);
+    return Glyph::factory(face, thisGlyph, num, hinting_factor);
 }
-
+PYCXX_KEYWORDS_METHOD_DECL(FT2Font, load_char)
 
 char FT2Font::load_glyph__doc__[] =
     "load_glyph(glyphindex, flags=LOAD_FORCE_AUTOHINT)\n"
@@ -1418,10 +1397,9 @@ FT2Font::load_glyph(const Py::Tuple & args, const Py::Dict & kwargs)
 
     size_t num = glyphs.size();  //the index into the glyphs list
     glyphs.push_back(thisGlyph);
-    Glyph* gm = new Glyph(face, thisGlyph, num);
-    return Py::asObject(gm);
+    return Glyph::factory(face, thisGlyph, num, hinting_factor);
 }
-
+PYCXX_KEYWORDS_METHOD_DECL(FT2Font, load_glyph)
 
 char FT2Font::get_width_height__doc__[] =
     "w, h = get_width_height()\n"
@@ -1443,6 +1421,7 @@ FT2Font::get_width_height(const Py::Tuple & args)
     ret[1] = Py::Int(bbox.yMax - bbox.yMin);
     return ret;
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Font, get_width_height)
 
 char FT2Font::get_descent__doc__[] =
     "d = get_descent()\n"
@@ -1460,6 +1439,7 @@ FT2Font::get_descent(const Py::Tuple & args)
     FT_BBox bbox = compute_string_bbox();
     return Py::Int(- bbox.yMin);;
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Font, get_descent)
 
 char FT2Font::draw_glyphs_to_bitmap__doc__[] =
     "draw_glyphs_to_bitmap()\n"
@@ -1484,9 +1464,8 @@ FT2Font::draw_glyphs_to_bitmap(const Py::Tuple &args, const Py::Dict &kwargs)
     size_t width = (string_bbox.xMax - string_bbox.xMin) / 64 + 2;
     size_t height = (string_bbox.yMax - string_bbox.yMin) / 64 + 2;
 
-    Py_XDECREF(image);
-    image = NULL;
-    image = new FT2Image(width, height);
+    image = FT2Image::factory(width, height);
+    FT2Image* image_cxx = Py::PythonClassObject<FT2Image>(image).getCxxObject();
 
     for (size_t n = 0; n < glyphs.size(); n++)
     {
@@ -1510,12 +1489,12 @@ FT2Font::draw_glyphs_to_bitmap(const Py::Tuple &args, const Py::Dict &kwargs)
         FT_Int x = (FT_Int)(bitmap->left - (string_bbox.xMin / 64.));
         FT_Int y = (FT_Int)((string_bbox.yMax / 64.) - bitmap->top + 1);
 
-        image->draw_bitmap(&bitmap->bitmap, x, y);
+        image_cxx->draw_bitmap(&bitmap->bitmap, x, y);
     }
 
     return Py::Object();
 }
-
+PYCXX_KEYWORDS_METHOD_DECL(FT2Font, draw_glyphs_to_bitmap)
 
 char FT2Font::get_xys__doc__[] =
     "get_xys()\n"
@@ -1570,6 +1549,7 @@ FT2Font::get_xys(const Py::Tuple &args, const Py::Dict &kwargs)
 
     return xys;
 }
+PYCXX_KEYWORDS_METHOD_DECL(FT2Font, get_xys)
 
 char FT2Font::draw_glyph_to_bitmap__doc__[] =
     "draw_glyph_to_bitmap(bitmap, x, y, glyph)\n"
@@ -1589,11 +1569,7 @@ FT2Font::draw_glyph_to_bitmap(const Py::Tuple &args, const Py::Dict &kwargs)
     _VERBOSE("FT2Font::draw_glyph_to_bitmap");
     args.verify_length(4);
 
-    if (!FT2Image::check(args[0].ptr()))
-    {
-        throw Py::TypeError("Usage: draw_glyph_to_bitmap(bitmap, x,y,glyph)");
-    }
-    FT2Image* im = static_cast<FT2Image*>(args[0].ptr());
+    FT2Image* im = Py::PythonClassObject<FT2Image>(args[0]).getCxxObject();
 
     double xd = Py::Float(args[1]);
     double yd = Py::Float(args[2]);
@@ -1603,11 +1579,7 @@ FT2Font::draw_glyph_to_bitmap(const Py::Tuple &args, const Py::Dict &kwargs)
     sub_offset.x = 0; // int((xd - (double)x) * 64.0);
     sub_offset.y = 0; // int((yd - (double)y) * 64.0);
 
-    if (!Glyph::check(args[3].ptr()))
-    {
-        throw Py::TypeError("Usage: draw_glyph_to_bitmap(bitmap, x,y,glyph)");
-    }
-    Glyph* glyph = static_cast<Glyph*>(args[3].ptr());
+    Glyph* glyph = Py::PythonClassObject<Glyph>(args[3]).getCxxObject();
 
     long antialiased = 1;
     if (kwargs.hasKey("antialiased"))
@@ -1615,7 +1587,7 @@ FT2Font::draw_glyph_to_bitmap(const Py::Tuple &args, const Py::Dict &kwargs)
         antialiased = Py::Long(kwargs["antialiased"]);
     }
 
-    if ((size_t)glyph->glyphInd >= glyphs.size())
+    if (glyph->glyphInd >= glyphs.size())
     {
         throw Py::ValueError("glyph num is out of range");
     }
@@ -1636,6 +1608,7 @@ FT2Font::draw_glyph_to_bitmap(const Py::Tuple &args, const Py::Dict &kwargs)
     im->draw_bitmap(&bitmap->bitmap, x + bitmap->left, y);
     return Py::Object();
 }
+PYCXX_KEYWORDS_METHOD_DECL(FT2Font, draw_glyph_to_bitmap)
 
 char FT2Font::get_glyph_name__doc__[] =
     "get_glyph_name(index)\n"
@@ -1654,12 +1627,13 @@ FT2Font::get_glyph_name(const Py::Tuple & args)
     }
 
     char buffer[128];
-    if (FT_Get_Glyph_Name(face, (FT_UInt) Py::Int(args[0]), buffer, 128))
+    if (FT_Get_Glyph_Name(face, (FT_UInt) (unsigned long)Py::Int(args[0]), buffer, 128))
     {
         throw Py::RuntimeError("Could not get glyph names.");
     }
     return Py::String(buffer);
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Font, get_glyph_name)
 
 char FT2Font::get_charmap__doc__[] =
     "get_charmap()\n"
@@ -1685,7 +1659,7 @@ FT2Font::get_charmap(const Py::Tuple & args)
     }
     return charmap;
 }
-
+PYCXX_VARARGS_METHOD_DECL(FT2Font, get_charmap)
 
 // ID        Platform       Encoding
 // 0         Unicode        Reserved (set to 0)
@@ -1774,10 +1748,12 @@ FT2Font::get_sfnt(const Py::Tuple & args)
         key[2] = Py::Int(sfnt.language_id);
         key[3] = Py::Int(sfnt.name_id);
         names[key] = Py::String((char *) sfnt.string,
-                                (int) sfnt.string_len);
+                                (int) sfnt.string_len,
+                                "latin-1");
     }
     return names;
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Font, get_sfnt)
 
 char FT2Font::get_name_index__doc__[] =
     "get_name_index(name)\n"
@@ -1795,6 +1771,7 @@ FT2Font::get_name_index(const Py::Tuple & args)
     return Py::Long((long)
                     FT_Get_Name_Index(face, (FT_String *) glyphname.c_str()));
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Font, get_name_index)
 
 char FT2Font::get_ps_font_info__doc__[] =
     "get_ps_font_info()\n"
@@ -1827,6 +1804,7 @@ FT2Font::get_ps_font_info(const Py::Tuple & args)
     info[8] = Py::Int(fontinfo.underline_thickness);
     return info;
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Font, get_ps_font_info)
 
 char FT2Font::get_sfnt_table__doc__[] =
     "get_sfnt_table(name)\n"
@@ -1922,9 +1900,15 @@ FT2Font::get_sfnt_table(const Py::Tuple & args)
         }
     case 2:
         {
+            #if PY3K
+            char os_2_dict[] = "{s:h, s:h, s:h, s:h, s:h, s:h, s:h, s:h,"
+                "s:h, s:h, s:h, s:h, s:h, s:h, s:h, s:h, s:y#, s:(llll),"
+                "s:y#, s:h, s:h, s:h}";
+            #else
             char os_2_dict[] = "{s:h, s:h, s:h, s:h, s:h, s:h, s:h, s:h,"
                 "s:h, s:h, s:h, s:h, s:h, s:h, s:h, s:h, s:s#, s:(llll),"
                 "s:s#, s:h, s:h, s:h}";
+            #endif
             TT_OS2 *t = (TT_OS2 *)table;
             return Py::asObject(Py_BuildValue(os_2_dict,
                                               "version", (unsigned)t->version,
@@ -2035,10 +2019,14 @@ FT2Font::get_sfnt_table(const Py::Tuple & args)
             pclt["typeFamily"]         = Py::Int((short) t->TypeFamily);
             pclt["capHeight"]          = Py::Int((short) t->CapHeight);
             pclt["symbolSet"]          = Py::Int((short) t->SymbolSet);
+            #if PY3K
+            pclt["typeFace"]           = Py::String((char *) t->TypeFace, 16, "latin-1");
+            pclt["characterComplement"] = Py::Bytes((char *) t->CharacterComplement, 8);
+            #else
             pclt["typeFace"]           = Py::String((char *) t->TypeFace, 16);
-            pclt["characterComplement"] = Py::String((char *)
-                                                     t->CharacterComplement, 8);
-            pclt["filename"]           = Py::String((char *) t->FileName, 6);
+            pclt["characterComplement"] = Py::String((char *) t->CharacterComplement, 8);
+            #endif
+            // pclt["filename"]           = Py::String((char *) t->FileName, 6);
             pclt["strokeWeight"]       = Py::Int((int) t->StrokeWeight);
             pclt["widthType"]          = Py::Int((int) t->WidthType);
             pclt["serifStyle"]         = Py::Int((int) t->SerifStyle);
@@ -2048,6 +2036,7 @@ FT2Font::get_sfnt_table(const Py::Tuple & args)
         return Py::Object();
     }
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Font, get_sfnt_table)
 
 char FT2Font::get_image__doc__ [] =
     "get_image()\n"
@@ -2057,13 +2046,13 @@ Py::Object
 FT2Font::get_image(const Py::Tuple &args)
 {
     args.verify_length(0);
-    if (image)
+    if (!image.isNone())
     {
-        Py_XINCREF(image);
-        return Py::asObject(image);
+        return image;
     }
     throw Py::RuntimeError("You must call .set_text() before .get_image()");
 }
+PYCXX_VARARGS_METHOD_DECL(FT2Font, get_image)
 
 char FT2Font::attach_file__doc__ [] =
     "attach_file(filename)\n"
@@ -2088,53 +2077,35 @@ FT2Font::attach_file(const Py::Tuple &args)
     }
     return Py::Object();
 }
-
-Py::Object
-ft2font_module::new_ft2image(const Py::Tuple &args)
-{
-    args.verify_length(2);
-
-    int width = Py::Int(args[0]);
-    int height = Py::Int(args[1]);
-
-    return Py::asObject(new FT2Image(width, height));
-}
-
-Py::Object
-ft2font_module::new_ft2font(const Py::Tuple &args)
-{
-    _VERBOSE("ft2font_module::new_ft2font ");
-    args.verify_length(1);
-
-    std::string facefile = Py::String(args[0]);
-    return Py::asObject(new FT2Font(facefile));
-}
+PYCXX_VARARGS_METHOD_DECL(FT2Font, attach_file)
 
 void
-FT2Image::init_type()
+FT2Image::init_type(void)
 {
     _VERBOSE("FT2Image::init_type");
     behaviors().name("FT2Image");
     behaviors().doc("FT2Image");
 
-    add_varargs_method("write_bitmap", &FT2Image::py_write_bitmap,
-                       FT2Image::write_bitmap__doc__);
-    add_varargs_method("draw_rect", &FT2Image::py_draw_rect,
-                       FT2Image::draw_rect__doc__);
-    add_varargs_method("draw_rect_filled", &FT2Image::py_draw_rect_filled,
-                       FT2Image::draw_rect_filled__doc__);
-    add_varargs_method("as_array", &FT2Image::py_as_array,
-                       FT2Image::as_array__doc__);
-    add_varargs_method("as_str", &FT2Image::py_as_str,
-                       FT2Image::as_str__doc__);
-    add_varargs_method("as_rgb_str", &FT2Image::py_as_rgb_str,
-                       FT2Image::as_rgb_str__doc__);
-    add_varargs_method("as_rgba_str", &FT2Image::py_as_rgba_str,
-                       FT2Image::as_rgba_str__doc__);
-    add_varargs_method("get_width", &FT2Image::py_get_width,
-                       "Returns the width of the image");
-    add_varargs_method("get_height", &FT2Image::py_get_height,
-                       "Returns the height of the image");
+    PYCXX_ADD_VARARGS_METHOD(write_bitmap, py_write_bitmap,
+                             FT2Image::write_bitmap__doc__);
+    PYCXX_ADD_VARARGS_METHOD(draw_rect, py_draw_rect,
+                             FT2Image::draw_rect__doc__);
+    PYCXX_ADD_VARARGS_METHOD(draw_rect_filled, py_draw_rect_filled,
+                             FT2Image::draw_rect_filled__doc__);
+    PYCXX_ADD_VARARGS_METHOD(as_array, py_as_array,
+                             FT2Image::as_array__doc__);
+    PYCXX_ADD_VARARGS_METHOD(as_str, py_as_str,
+                             FT2Image::as_str__doc__);
+    PYCXX_ADD_VARARGS_METHOD(as_rgb_str, py_as_rgb_str,
+                             FT2Image::as_rgb_str__doc__);
+    PYCXX_ADD_VARARGS_METHOD(as_rgba_str, py_as_rgba_str,
+                             FT2Image::as_rgba_str__doc__);
+    PYCXX_ADD_VARARGS_METHOD(get_width, py_get_width,
+                             "Returns the width of the image");
+    PYCXX_ADD_VARARGS_METHOD(get_height, py_get_height,
+                             "Returns the height of the image");
+
+    behaviors().readyType();
 }
 
 void
@@ -2143,8 +2114,9 @@ Glyph::init_type()
     _VERBOSE("Glyph::init_type");
     behaviors().name("Glyph");
     behaviors().doc("Glyph");
-    behaviors().supportGetattr();
-    behaviors().supportSetattr();
+    behaviors().supportGetattro();
+    behaviors().supportSetattro();
+    behaviors().readyType();
 }
 
 void
@@ -2153,58 +2125,59 @@ FT2Font::init_type()
     _VERBOSE("FT2Font::init_type");
     behaviors().name("FT2Font");
     behaviors().doc("FT2Font");
+    behaviors().supportGetattro();
+    behaviors().supportSetattro();
 
-    add_varargs_method("clear", &FT2Font::clear,
-                       FT2Font::clear__doc__);
-    add_keyword_method("draw_glyph_to_bitmap", &FT2Font::draw_glyph_to_bitmap,
-                       FT2Font::draw_glyph_to_bitmap__doc__);
-    add_keyword_method("draw_glyphs_to_bitmap", &FT2Font::draw_glyphs_to_bitmap,
-                       FT2Font::draw_glyphs_to_bitmap__doc__);
-    add_keyword_method("get_xys", &FT2Font::get_xys,
-                       FT2Font::get_xys__doc__);
+    PYCXX_ADD_VARARGS_METHOD(clear, clear,
+                             FT2Font::clear__doc__);
+    PYCXX_ADD_KEYWORDS_METHOD(draw_glyph_to_bitmap, draw_glyph_to_bitmap,
+                             FT2Font::draw_glyph_to_bitmap__doc__);
+    PYCXX_ADD_KEYWORDS_METHOD(draw_glyphs_to_bitmap, draw_glyphs_to_bitmap,
+                             FT2Font::draw_glyphs_to_bitmap__doc__);
+    PYCXX_ADD_KEYWORDS_METHOD(get_xys, get_xys,
+                             FT2Font::get_xys__doc__);
 
-    add_varargs_method("get_num_glyphs", &FT2Font::get_num_glyphs,
-                       FT2Font::get_num_glyphs__doc__);
-    add_keyword_method("load_char", &FT2Font::load_char,
-                       FT2Font::load_char__doc__);
-    add_keyword_method("load_glyph", &FT2Font::load_glyph,
-                       FT2Font::load_glyph__doc__);
-    add_keyword_method("set_text", &FT2Font::set_text,
-                       FT2Font::set_text__doc__);
-    add_varargs_method("set_size", &FT2Font::set_size,
-                       FT2Font::set_size__doc__);
-    add_varargs_method("set_charmap", &FT2Font::set_charmap,
-                       FT2Font::set_charmap__doc__);
-    add_varargs_method("select_charmap", &FT2Font::select_charmap,
-                       FT2Font::select_charmap__doc__);
+    PYCXX_ADD_VARARGS_METHOD(get_num_glyphs, get_num_glyphs,
+                             FT2Font::get_num_glyphs__doc__);
+    PYCXX_ADD_KEYWORDS_METHOD(load_char, load_char,
+                              FT2Font::load_char__doc__);
+    PYCXX_ADD_KEYWORDS_METHOD(load_glyph, load_glyph,
+                              FT2Font::load_glyph__doc__);
+    PYCXX_ADD_KEYWORDS_METHOD(set_text, set_text,
+                              FT2Font::set_text__doc__);
+    PYCXX_ADD_VARARGS_METHOD(set_size, set_size,
+                             FT2Font::set_size__doc__);
+    PYCXX_ADD_VARARGS_METHOD(set_charmap, set_charmap,
+                             FT2Font::set_charmap__doc__);
+    PYCXX_ADD_VARARGS_METHOD(select_charmap, select_charmap,
+                             FT2Font::select_charmap__doc__);
 
-    add_varargs_method("get_width_height", &FT2Font::get_width_height,
-                       FT2Font::get_width_height__doc__);
-    add_varargs_method("get_descent", &FT2Font::get_descent,
-                       FT2Font::get_descent__doc__);
-    add_varargs_method("get_glyph_name", &FT2Font::get_glyph_name,
-                       FT2Font::get_glyph_name__doc__);
-    add_varargs_method("get_charmap", &FT2Font::get_charmap,
-                       FT2Font::get_charmap__doc__);
-    add_varargs_method("get_kerning", &FT2Font::get_kerning,
-                       FT2Font::get_kerning__doc__);
-    add_varargs_method("get_sfnt", &FT2Font::get_sfnt,
-                       FT2Font::get_sfnt__doc__);
-    add_varargs_method("get_name_index", &FT2Font::get_name_index,
-                       FT2Font::get_name_index__doc__);
-    add_varargs_method("get_ps_font_info", &FT2Font::get_ps_font_info,
-                       FT2Font::get_ps_font_info__doc__);
-    add_varargs_method("get_sfnt_table", &FT2Font::get_sfnt_table,
-                       FT2Font::get_sfnt_table__doc__);
-    add_varargs_method("get_image", &FT2Font::get_image,
-                       FT2Font::get_image__doc__);
-    add_varargs_method("attach_file", &FT2Font::attach_file,
-                       FT2Font::attach_file__doc__);
-    add_noargs_method("get_path", &FT2Font::get_path,
-                      "");
+    PYCXX_ADD_VARARGS_METHOD(get_width_height, get_width_height,
+                             FT2Font::get_width_height__doc__);
+    PYCXX_ADD_VARARGS_METHOD(get_descent, get_descent,
+                             FT2Font::get_descent__doc__);
+    PYCXX_ADD_VARARGS_METHOD(get_glyph_name, get_glyph_name,
+                             FT2Font::get_glyph_name__doc__);
+    PYCXX_ADD_VARARGS_METHOD(get_charmap, get_charmap,
+                             FT2Font::get_charmap__doc__);
+    PYCXX_ADD_VARARGS_METHOD(get_kerning, get_kerning,
+                             FT2Font::get_kerning__doc__);
+    PYCXX_ADD_VARARGS_METHOD(get_sfnt, get_sfnt,
+                             FT2Font::get_sfnt__doc__);
+    PYCXX_ADD_VARARGS_METHOD(get_name_index, get_name_index,
+                             FT2Font::get_name_index__doc__);
+    PYCXX_ADD_VARARGS_METHOD(get_ps_font_info, get_ps_font_info,
+                             FT2Font::get_ps_font_info__doc__);
+    PYCXX_ADD_VARARGS_METHOD(get_sfnt_table, get_sfnt_table,
+                             FT2Font::get_sfnt_table__doc__);
+    PYCXX_ADD_VARARGS_METHOD(get_image, get_image,
+                             FT2Font::get_image__doc__);
+    PYCXX_ADD_VARARGS_METHOD(attach_file, attach_file,
+                             FT2Font::attach_file__doc__);
+    PYCXX_ADD_NOARGS_METHOD(get_path, get_path,
+                            FT2Font::get_path__doc__);
 
-    behaviors().supportGetattr();
-    behaviors().supportSetattr();
+    behaviors().readyType();
 }
 
 //todo add module docs strings
@@ -2260,18 +2233,35 @@ char ft2font_new__doc__[] =
     "  postscript_name        PostScript name of the font\n"
     ;
 
-#if defined(_MSC_VER)
-DL_EXPORT(void)
-#elif defined(__cplusplus)
-extern "C" void
+ft2font_module::ft2font_module()
+    : Py::ExtensionModule<ft2font_module>("ft2font")
+{
+    FT2Image::init_type();
+    Glyph::init_type();
+    FT2Font::init_type();
+
+    initialize("The ft2font module");
+
+    Py::Dict d(moduleDictionary());
+    Py::Object ft2font_type(FT2Font::type());
+    d["FT2Font"] = ft2font_type;
+    Py::Object ft2image_type(FT2Image::type());
+    d["FT2Image"] = ft2image_type;
+}
+
+ft2font_module::~ft2font_module()
+{
+    FT_Done_FreeType(_ft2Library);
+}
+
+PyMODINIT_FUNC
+#if PY3K
+PyInit_ft2font(void)
 #else
-void
-#endif
 initft2font(void)
+#endif
 {
     static ft2font_module* ft2font = new ft2font_module;
-    import_array();
-
     Py::Dict d = ft2font->moduleDictionary();
     d["SCALABLE"]         = Py::Int(FT_FACE_FLAG_SCALABLE);
     d["FIXED_SIZES"]      = Py::Int(FT_FACE_FLAG_FIXED_SIZES);
@@ -2331,10 +2321,10 @@ initft2font(void)
 
         d["__freetype_version__"] = Py::String(version_string);
     }
-}
 
-ft2font_module::~ft2font_module()
-{
+    import_array();
 
-    FT_Done_FreeType(_ft2Library);
+    #if PY3K
+    return ft2font->module().ptr();
+    #endif
 }

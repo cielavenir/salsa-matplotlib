@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import division, print_function
 
 import math
 import os
@@ -27,7 +27,6 @@ from matplotlib.figure import Figure
 from matplotlib.mathtext import MathTextParser
 from matplotlib.transforms import Affine2D
 from matplotlib.backends._backend_gdk import pixbuf_get_pixels_array
-
 
 backend_version = "%d.%d.%d" % gtk.pygtk_version
 _debug = False
@@ -423,11 +422,15 @@ def new_figure_manager(num, *args, **kwargs):
     """
     FigureClass = kwargs.pop('FigureClass', Figure)
     thisFig = FigureClass(*args, **kwargs)
-    canvas  = FigureCanvasGDK(thisFig)
+    return new_figure_manager_given_figure(num, thisFig)
+
+
+def new_figure_manager_given_figure(num, figure):
+    """
+    Create a new figure manager instance for the given figure.
+    """
+    canvas  = FigureCanvasGDK(figure)
     manager = FigureManagerBase(canvas, num)
-    # equals:
-    #manager = FigureManagerBase (FigureCanvasGDK (Figure(*args, **kwargs),
-    #                             num)
     return manager
 
 
@@ -469,6 +472,3 @@ class FigureCanvasGDK (FigureCanvasBase):
                                  0, 0, 0, 0, width, height)
 
         pixbuf.save(filename, format)
-
-    def get_default_filetype(self):
-        return 'png'

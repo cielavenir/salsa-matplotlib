@@ -35,7 +35,7 @@ build-%-stamp:
 	python$*-dbg ./setup.py build $(PY_BUILD_FLAGS)
 
 ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
-	echo "datapath : $(CURDIR)/lib/matplotlib/mpl-data/" > matplotlibrc
+	echo "backend      : TkAgg" > matplotlibrc
 	-PYTHONPATH=$(shell python$* -c "from distutils.command.build import build ; \
 	                                from distutils.core import Distribution ; \
 					b = build(Distribution()) ; \
@@ -43,7 +43,7 @@ ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 					print b.build_platlib") \
 	MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ \
 	MPLCONFIGDIR=. \
-		python$* -c "import matplotlib as m ; m.test(verbosity=1)"
+		xvfb-run python$* -c "import matplotlib as m ; m.test(verbosity=1)"
 
 	-PYTHONPATH=$(shell python$*-dbg -c "from distutils.command.build import build ; \
 	                                    from distutils.core import Distribution ; \
@@ -52,7 +52,7 @@ ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 					    print b.build_platlib") \
 	MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ \
 	MPLCONFIGDIR=. \
-		python$*-dbg -c "import matplotlib as m ; m.test(verbosity=1)"
+		xvfb-run python$*-dbg -c "import matplotlib as m ; m.test(verbosity=1)"
 	rm -f matplotlibrc
 endif
 
@@ -134,10 +134,10 @@ install-indep: build-indep
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/pdfcorefonts/readme.txt
 	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/images/*.svg
 	# link to fonts in ttf-lyx
-	ln -sf /usr/share/fonts/truetype/ttf-lyx/cmex10.ttf $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/cmex10.ttf
-	ln -sf /usr/share/fonts/truetype/ttf-lyx/cmmi10.ttf $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/cmmi10.ttf
-	ln -sf /usr/share/fonts/truetype/ttf-lyx/cmr10.ttf $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/cmr10.ttf
-	ln -sf /usr/share/fonts/truetype/ttf-lyx/cmsy10.ttf $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/cmsy10.ttf
+	for font in cmex10.ttf cmmi10.ttf cmr10.ttf cmsy10.ttf ; \
+	do \
+	    ln -sf /usr/share/fonts/truetype/lyx/$$font $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/$$font; \
+	done
 
 # binary
 binary-indep: build-indep install-indep

@@ -8,7 +8,7 @@ This code is released under the matplotlib license
 
 """
 
-from __future__ import division
+from __future__ import division, print_function
 
 import os, sys, math
 
@@ -78,6 +78,13 @@ def new_figure_manager(num, *args, **kwargs):
     """
     FigureClass = kwargs.pop('FigureClass', Figure)
     figure = FigureClass(*args, **kwargs)
+    return new_figure_manager_given_figure(num, figure)
+
+
+def new_figure_manager_given_figure(num, figure):
+    """
+    Create a new figure manager instance for the given figure.
+    """
     window = Fltk.Fl_Double_Window(10,10,30,30)
     canvas = FigureCanvasFltkAgg(figure)
     window.end()
@@ -108,7 +115,7 @@ class FltkCanvas(Fltk.Fl_Widget):
             self._source.resize(newsize)
             self._source.draw()
         t1,t2,w,h = self._source.figure.bbox.bounds
-        Fltk.fl_draw_image(self._source.buffer_rgba(0,0),0,0,int(w),int(h),4,0)
+        Fltk.fl_draw_image(self._source.buffer_rgba(),0,0,int(w),int(h),4,0)
         self.redraw()
 
     def blit(self,bbox=None):
@@ -118,7 +125,7 @@ class FltkCanvas(Fltk.Fl_Widget):
            t1o,t2o,wo,ho = self._source.figure.bbox.bounds
            t1,t2,w,h = bbox.bounds
         x,y=int(t1),int(t2)
-        Fltk.fl_draw_image(self._source.buffer_rgba(x,y),x,y,int(w),int(h),4,int(wo)*4)
+        Fltk.fl_draw_image(self._source.buffer_rgba(),x,y,int(w),int(h),4,int(wo)*4)
         #self.redraw()
 
     def handle(self, event):
@@ -136,6 +143,8 @@ class FltkCanvas(Fltk.Fl_Widget):
                     self._key=special_key[ikey]
                 except:
                     self._key=None
+
+            # TODO: Handle ctrl, alt, super modifiers.
             FigureCanvasBase.key_press_event(self._source, self._key)
             return 1
         elif event == Fltk.FL_KEYUP:
@@ -155,8 +164,8 @@ class FltkCanvas(Fltk.Fl_Widget):
             if self._draw_overlay:
                 self._oldx=x
                 self._oldy=y
-            if Fltk.Fl.event_clicks():
-                FigureCanvasBase.button_press_event(self._source, x, yf, self._button)
+            if Fltk.Fl.event_clicks():  # according to docs, event_clicks() returns nonzero if this is a double click.
+                FigureCanvasBase.button_press_event(self._source, x, yf, self._button, dblclick=True)
                 return 1
             else:
                 FigureCanvasBase.button_press_event(self._source, x, yf, self._button)
@@ -502,7 +511,7 @@ def save_figure(ptr,base):
 
     try:
         base.canvas.print_figure(fname, format=format)
-    except IOError, msg:
+    except IOError as msg:
         err = '\n'.join(map(str, msg))
         msg = 'Failed to save %s: Error msg was\n\n%s' % (
             fname, err)

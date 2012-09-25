@@ -1,10 +1,10 @@
 Metadata-Version: 1.0
 Name: matplotlib
-Version: 1.1.1
+Version: 1.2.0rc2
 Summary: Python plotting package
-Home-page: http://matplotlib.sourceforge.net
-Author: John D. Hunter
-Author-email: jdh2358@gmail.com
+Home-page: http://matplotlib.org
+Author: John D. Hunter, Michael Droettboom
+Author-email: mdroe@stsci.edu
 License: UNKNOWN
 Description: 
               matplotlib strives to produce publication quality 2D graphics

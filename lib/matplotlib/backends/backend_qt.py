@@ -1,7 +1,12 @@
-from __future__ import division
+from __future__ import division, print_function
 import math
 import os
 import sys
+import warnings
+
+warnings.warn("QT3-based backends are deprecated and will be removed after"
+              " the v1.2.x release. Use the equivalent QT4 backend instead.",
+              DeprecationWarning)
 
 import matplotlib
 from matplotlib import verbose
@@ -18,7 +23,9 @@ from matplotlib.widgets import SubplotTool
 try:
     import qt
 except ImportError:
-    raise ImportError("Qt backend requires pyqt to be installed.")
+    raise ImportError("Qt backend requires pyqt to be installed."
+                      " NOTE: QT3-based backends will not work in"
+                      " Python 3.")
 
 backend_version = "0.9.1"
 def fn_name(): return sys._getframe(1).f_code.co_name
@@ -46,7 +53,7 @@ def _create_qApp():
     Only one qApp can exist at a time, so check before creating one
     """
     if qt.QApplication.startingUp():
-        if DEBUG: print "Starting up QApplication"
+        if DEBUG: print("Starting up QApplication")
         global qApp
         qApp = qt.QApplication( [" "] )
         qt.QObject.connect( qApp, qt.SIGNAL( "lastWindowClosed()" ),
@@ -69,9 +76,16 @@ def new_figure_manager( num, *args, **kwargs ):
     Create a new figure manager instance
     """
     FigureClass = kwargs.pop('FigureClass', Figure)
-    thisFig = FigureClass( *args, **kwargs )
-    canvas = FigureCanvasQT( thisFig )
-    manager = FigureManagerQT( canvas, num )
+    thisFig = FigureClass(*args, **kwargs)
+    return new_figure_manager_given_figure(num, thisFig)
+
+
+def new_figure_manager_given_figure(num, figure):
+    """
+    Create a new figure manager instance for the given figure.
+    """
+    canvas = FigureCanvasQT(figure)
+    manager = FigureManagerQT(canvas, num)
     return manager
 
 
@@ -83,7 +97,7 @@ class FigureCanvasQT( qt.QWidget, FigureCanvasBase ):
     # left 1, middle 2, right 3
     buttond = {1:1, 2:3, 4:2}
     def __init__( self, figure ):
-        if DEBUG: print 'FigureCanvasQt: ', figure
+        if DEBUG: print('FigureCanvasQt: ', figure)
         _create_qApp()
 
         qt.QWidget.__init__( self, None, "QWidget figure" )
@@ -106,14 +120,22 @@ class FigureCanvasQT( qt.QWidget, FigureCanvasBase ):
         y = self.figure.bbox.height - event.pos().y()
         button = self.buttond[event.button()]
         FigureCanvasBase.button_press_event( self, x, y, button )
-        if DEBUG: print 'button pressed:', event.button()
+        if DEBUG: print('button pressed:', event.button())
+
+    def mouseDoubleClickEvent( self, event ):
+        x = event.pos().x()
+        # flipy so y=0 is bottom of canvas
+        y = self.figure.bbox.height - event.pos().y()
+        button = self.buttond[event.button()]
+        FigureCanvasBase.button_press_event( self, x, y, button, dblclick=True )
+        if DEBUG: print('button doubleclicked:', event.button())
 
     def mouseMoveEvent( self, event ):
         x = event.x()
         # flipy so y=0 is bottom of canvas
         y = self.figure.bbox.height - event.y()
         FigureCanvasBase.motion_notify_event( self, x, y )
-        if DEBUG: print 'mouse move'
+        if DEBUG: print('mouse move')
 
     def mouseReleaseEvent( self, event ):
         x = event.x()
@@ -121,24 +143,24 @@ class FigureCanvasQT( qt.QWidget, FigureCanvasBase ):
         y = self.figure.bbox.height - event.y()
         button = self.buttond[event.button()]
         FigureCanvasBase.button_release_event( self, x, y, button )
-        if DEBUG: print 'button released'
+        if DEBUG: print('button released')
 
     def keyPressEvent( self, event ):
         key = self._get_key( event )
         FigureCanvasBase.key_press_event( self, key )
-        if DEBUG: print 'key press', key
+        if DEBUG: print('key press', key)
 
     def keyReleaseEvent( self, event ):
         key = self._get_key(event)
         FigureCanvasBase.key_release_event( self, key )
-        if DEBUG: print 'key release', key
+        if DEBUG: print('key release', key)
 
     def resizeEvent( self, event ):
-        if DEBUG: print 'resize (%d x %d)' % (event.size().width(), event.size().height())
+        if DEBUG: print('resize (%d x %d)' % (event.size().width(), event.size().height()))
         qt.QWidget.resizeEvent( self, event )
         w = event.size().width()
         h = event.size().height()
-        if DEBUG: print "FigureCanvasQt.resizeEvent(", w, ",", h, ")"
+        if DEBUG: print("FigureCanvasQt.resizeEvent(", w, ",", h, ")")
         dpival = self.figure.dpi
         winch = w/dpival
         hinch = h/dpival
@@ -173,6 +195,8 @@ class FigureCanvasQT( qt.QWidget, FigureCanvasBase ):
         else:
             key = None
 
+        # TODO: Handle ctrl, alt, super modifiers. qt4 backend has implemented.
+
         return key
 
     def flush_events(self):
@@ -197,7 +221,7 @@ class FigureManagerQT( FigureManagerBase ):
     """
 
     def __init__( self, canvas, num ):
-        if DEBUG: print 'FigureManagerQT.%s' % fn_name()
+        if DEBUG: print('FigureManagerQT.%s' % fn_name())
         FigureManagerBase.__init__( self, canvas, num )
         self.canvas = canvas
         self.window = qt.QMainWindow( None, None, qt.Qt.WDestructiveClose )
@@ -209,7 +233,7 @@ class FigureManagerQT( FigureManagerBase ):
         # Give the keyboard focus to the figure instead of the manager
         self.canvas.setFocusPolicy( qt.QWidget.ClickFocus )
         self.canvas.setFocus()
-        self.window.setCaption( "Figure %d" % num )
+        self.set_window_title( "Figure %d" % num )
 
         self.window._destroying = False
 
@@ -241,9 +265,6 @@ class FigureManagerQT( FigureManagerBase ):
         if matplotlib.is_interactive():
             self.window.show()
 
-        # attach a show method to the figure for pylab ease of use
-        self.canvas.figure.show = lambda *args: self.window.show()
-
         def notify_axes_change( fig ):
            # This will be called whenever the current axes is changed
            if self.toolbar != None: self.toolbar.update()
@@ -262,7 +283,7 @@ class FigureManagerQT( FigureManagerBase ):
         # must be inited after the window, drawingArea and figure
         # attrs are set
         if matplotlib.rcParams['toolbar'] == 'classic':
-            print "Classic toolbar is not yet supported"
+            print("Classic toolbar is not yet supported")
         elif matplotlib.rcParams['toolbar'] == 'toolbar2':
             toolbar = NavigationToolbar2QT(canvas, parent)
         else:
@@ -280,27 +301,16 @@ class FigureManagerQT( FigureManagerBase ):
         if self.window._destroying: return
         self.window._destroying = True
         if self.toolbar: self.toolbar.destroy()
-        if DEBUG: print "destroy figure manager"
+        if DEBUG: print("destroy figure manager")
         self.window.close(True)
+
+    def get_window_title(self):
+        return str(self.window.caption())
 
     def set_window_title(self, title):
         self.window.setCaption(title)
 
 class NavigationToolbar2QT( NavigationToolbar2, qt.QWidget ):
-    # list of toolitems to add to the toolbar, format is:
-    # text, tooltip_text, image_file, callback(str)
-    toolitems = (
-        ('Home', 'Reset original view', 'home.ppm', 'home'),
-        ('Back', 'Back to  previous view','back.ppm', 'back'),
-        ('Forward', 'Forward to next view','forward.ppm', 'forward'),
-        (None, None, None, None),
-        ('Pan', 'Pan axes with left mouse, zoom with right', 'move.ppm', 'pan'),
-        ('Zoom', 'Zoom to rectangle','zoom_to_rect.ppm', 'zoom'),
-        (None, None, None, None),
-        ('Subplots', 'Configure subplots','subplots.png', 'configure_subplots'),
-        ('Save', 'Save the figure','filesave.ppm', 'save_figure'),
-        )
-
     def __init__( self, canvas, parent ):
         self.canvas = canvas
         self.buttons = {}
@@ -321,7 +331,7 @@ class NavigationToolbar2QT( NavigationToolbar2, qt.QWidget ):
                 self.layout.addSpacing( 8 )
                 continue
 
-            fname = os.path.join( basedir, image_file )
+            fname = os.path.join(basedir, image_file + '.ppm')
             image = qt.QPixmap()
             image.load( fname )
 
@@ -377,7 +387,7 @@ class NavigationToolbar2QT( NavigationToolbar2, qt.QWidget ):
         self.locLabel.setText( s )
 
     def set_cursor( self, cursor ):
-        if DEBUG: print 'Set cursor' , cursor
+        if DEBUG: print('Set cursor' , cursor)
         qt.QApplication.restoreOverrideCursor()
         qt.QApplication.setOverrideCursor( qt.QCursor( cursord[cursor] ) )
 
@@ -389,7 +399,7 @@ class NavigationToolbar2QT( NavigationToolbar2, qt.QWidget ):
         w = abs(x1 - x0)
         h = abs(y1 - y0)
 
-        rect = [ int(val)for val in min(x0,x1), min(y0, y1), w, h ]
+        rect = [ int(val)for val in (min(x0,x1), min(y0, y1), w, h) ]
         self.canvas.drawRectangle( rect )
 
     def configure_subplots(self):
@@ -424,7 +434,7 @@ class NavigationToolbar2QT( NavigationToolbar2, qt.QWidget ):
         sorted_filetypes.sort()
         default_filetype = self.canvas.get_default_filetype()
 
-        start = "image." + default_filetype
+        start = self.canvas.get_default_filename()
         filters = []
         selectedFilter = None
         for name, exts in sorted_filetypes:
@@ -441,7 +451,7 @@ class NavigationToolbar2QT( NavigationToolbar2, qt.QWidget ):
         if fname:
             try:
                 self.canvas.print_figure( unicode(fname) )
-            except Exception, e:
+            except Exception as e:
                 qt.QMessageBox.critical(
                     self, "Error saving file", str(e),
                     qt.QMessageBox.Ok, qt.QMessageBox.NoButton)

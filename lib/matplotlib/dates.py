@@ -86,7 +86,7 @@ Here are all the date tickers:
       :class:`matplotlib.dates.rrulewrapper`.  The
       :class:`rrulewrapper` is a simple wrapper around a
       :class:`dateutils.rrule` (`dateutil
-      <https://moin.conectiva.com.br/DateUtil>`_) which allow almost
+      <http://labix.org/python-dateutil>`_) which allow almost
       arbitrary date tick specifications.  See `rrule example
       <../examples/pylab_examples/date_demo_rrule.html>`_.
 
@@ -107,7 +107,10 @@ Here all all the date formatters:
     * :class:`IndexDateFormatter`: date plots with implicit *x*
       indexing.
 """
+from __future__ import print_function
+
 import re, time, math, datetime
+from itertools import izip
 
 import matplotlib
 import numpy as np
@@ -299,13 +302,13 @@ def drange(dstart, dend, delta):
             delta.microseconds/MUSECONDS_PER_DAY)
     f1 = _to_ordinalf(dstart)
     f2 = _to_ordinalf(dend)
-    
+
     num = int(np.ceil((f2-f1)/step))        #calculate the difference between dend and dstart in times of delta
     dinterval_end = dstart + num*delta      #calculate end of the interval which will be generated
     if dinterval_end >= dend:               #ensure, that an half open interval will be generated [dstart, dend)
         dinterval_end -= delta              #if the endpoint is greated than dend, just subtract one delta
         num -= 1
-        
+
     f2 = _to_ordinalf(dinterval_end) #new float-endpoint
     return np.linspace(f1, f2, num+1)
 
@@ -730,7 +733,7 @@ class AutoDateLocator(DateLocator):
                 # Assume we were given an integer. Use this as the maximum
                 # number of ticks for every frequency and create a
                 # dictionary for this
-                self.maxticks = dict(zip(self._freqs,
+                self.maxticks = dict(izip(self._freqs,
                     [maxticks]*len(self._freqs)))
         self.interval_multiples = interval_multiples
         self.intervald = {
@@ -790,7 +793,7 @@ class AutoDateLocator(DateLocator):
         # an interval from an list specific to that frequency that gives no
         # more than maxticks tick positions. Also, set up some ranges
         # (bymonth, etc.) as appropriate to be passed to rrulewrapper.
-        for i, (freq, num) in enumerate(zip(self._freqs, nums)):
+        for i, (freq, num) in enumerate(izip(self._freqs, nums)):
             # If this particular frequency doesn't give enough ticks, continue
             if num < self.minticks:
                 # Since we're not using this particular frequency, set
@@ -1215,4 +1218,4 @@ if __name__=='__main__':
 
     #for t in  ticks: print formatter(t)
 
-    for t in dates: print formatter(t)
+    for t in dates: print(formatter(t))

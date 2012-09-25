@@ -1,3 +1,4 @@
+from __future__ import print_function
 import warnings
 # 2.3 compatibility
 try:
@@ -5,6 +6,7 @@ try:
 except NameError:
     import sets
     set = sets.Set
+from itertools import izip
 
 import numpy as np
 
@@ -126,8 +128,6 @@ class Triangulation(object):
         """
         # Indices of sorted x,y points.
         j_sorted = np.lexsort(keys=(self.x, self.y))
-
-        # Mask, in j_sorted order, which is True for duplicate points.
         mask_duplicates = np.hstack([
             False,
             (np.diff(self.x[j_sorted]) == 0) & (np.diff(self.y[j_sorted]) == 0),
@@ -145,12 +145,12 @@ class Triangulation(object):
         border = (self.triangle_neighbors == -1)
 
         edges = {}
-        edges.update(dict(zip(self.triangle_nodes[border[:,0]][:,1],
-                              self.triangle_nodes[border[:,0]][:,2])))
-        edges.update(dict(zip(self.triangle_nodes[border[:,1]][:,2],
-                              self.triangle_nodes[border[:,1]][:,0])))
-        edges.update(dict(zip(self.triangle_nodes[border[:,2]][:,0],
-                              self.triangle_nodes[border[:,2]][:,1])))
+        edges.update(dict(izip(self.triangle_nodes[border[:,0]][:,1],
+                               self.triangle_nodes[border[:,0]][:,2])))
+        edges.update(dict(izip(self.triangle_nodes[border[:,1]][:,2],
+                               self.triangle_nodes[border[:,1]][:,0])))
+        edges.update(dict(izip(self.triangle_nodes[border[:,2]][:,0],
+                               self.triangle_nodes[border[:,2]][:,1])))
 
         # Take an arbitrary starting point and its subsequent node
         hull = list(edges.popitem())

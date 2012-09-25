@@ -8,6 +8,7 @@ counterparts (e.g. you may not be able to select all line styles) but
 they are meant to be fast for common use cases (e.g. a large set of solid
 line segemnts)
 """
+from __future__ import print_function
 import warnings
 import numpy as np
 import numpy.ma as ma
@@ -41,13 +42,19 @@ class Collection(artist.Artist, cm.ScalarMappable):
         * *antialiaseds*: None
         * *offsets*: None
         * *transOffset*: transforms.IdentityTransform()
+        * *offset_position*: 'screen' (default) or 'data'
         * *norm*: None (optional for
           :class:`matplotlib.cm.ScalarMappable`)
         * *cmap*: None (optional for
           :class:`matplotlib.cm.ScalarMappable`)
+        * *hatch*: None
 
     *offsets* and *transOffset* are used to translate the patch after
-    rendering (default no offsets).
+    rendering (default no offsets).  If offset_position is 'screen'
+    (default) the offset is applied after the master transform has
+    been applied, that is, the offsets are in screen coordinates.  If
+    offset_position is 'data', the offset is applied before the master
+    transform, i.e., the offsets are in data coordinates.
 
     If any of *edgecolors*, *facecolors*, *linewidths*, *antialiaseds*
     are None, they default to their :data:`matplotlib.rcParams` patch
@@ -76,7 +83,9 @@ class Collection(artist.Artist, cm.ScalarMappable):
                  norm = None,  # optional for ScalarMappable
                  cmap = None,  # ditto
                  pickradius = 5.0,
+                 hatch=None,
                  urls = None,
+                 offset_position='screen',
                  **kwargs
                  ):
         """
@@ -94,7 +103,8 @@ class Collection(artist.Artist, cm.ScalarMappable):
         self.set_antialiased(antialiaseds)
         self.set_pickradius(pickradius)
         self.set_urls(urls)
-
+        self.set_hatch(hatch)
+        self.set_offset_position(offset_position)
 
         self._uniform_offsets = None
         self._offsets = np.array([], np.float_)
@@ -146,9 +156,16 @@ class Collection(artist.Artist, cm.ScalarMappable):
     def get_transforms(self):
         return self._transforms
 
+    def get_offset_transform(self):
+        t = self._transOffset
+        if (not isinstance(t, transforms.Transform)
+            and hasattr(t, '_as_mpl_transform')):
+            t = t._as_mpl_transform(self.axes)
+        return t
+
     def get_datalim(self, transData):
         transform = self.get_transform()
-        transOffset = self._transOffset
+        transOffset = self.get_offset_transform()
         offsets = self._offsets
         paths = self.get_paths()
 
@@ -182,7 +199,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         """Point prep for drawing and hit testing"""
 
         transform = self.get_transform()
-        transOffset = self._transOffset
+        transOffset = self.get_offset_transform()
         offsets = self._offsets
         paths = self.get_paths()
 
@@ -222,7 +239,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
     @allow_rasterization
     def draw(self, renderer):
         if not self.get_visible(): return
-        renderer.open_group(self.__class__.__name__)
+        renderer.open_group(self.__class__.__name__, self.get_gid())
 
         self.update_scalarmappable()
 
@@ -232,10 +249,14 @@ class Collection(artist.Artist, cm.ScalarMappable):
         self._set_gc_clip(gc)
         gc.set_snap(self.get_snap())
 
+        if self._hatch:
+            gc.set_hatch(self._hatch)
+
         renderer.draw_path_collection(
             gc, transform.frozen(), paths, self.get_transforms(),
             offsets, transOffset, self.get_facecolor(), self.get_edgecolor(),
-            self._linewidths, self._linestyles, self._antialiaseds, self._urls)
+            self._linewidths, self._linestyles, self._antialiaseds, self._urls,
+            self._offset_position)
 
         gc.restore()
         renderer.close_group(self.__class__.__name__)
@@ -291,6 +312,42 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
     def get_urls(self): return self._urls
 
+    def set_hatch(self, hatch):
+        """
+        Set the hatching pattern
+
+        *hatch* can be one of::
+
+          /   - diagonal hatching
+          \   - back diagonal
+          |   - vertical
+          -   - horizontal
+          +   - crossed
+          x   - crossed diagonal
+          o   - small circle
+          O   - large circle
+          .   - dots
+          *   - stars
+
+        Letters can be combined, in which case all the specified
+        hatchings are done.  If same letter repeats, it increases the
+        density of hatching of that pattern.
+
+        Hatching is supported in the PostScript, PDF, SVG and Agg
+        backends only.
+
+        Unlike other properties such as linewidth and colors, hatching
+        can only be specified for the collection as a whole, not separately
+        for each member.
+
+        ACCEPTS: [ '/' | '\\\\' | '|' | '-' | '+' | 'x' | 'o' | 'O' | '.' | '*' ]
+        """
+        self._hatch = hatch
+
+    def get_hatch(self):
+        'Return the current hatching pattern'
+        return self._hatch
+
     def set_offsets(self, offsets):
         """
         Set the offsets for the collection.  *offsets* can be a scalar
@@ -315,6 +372,29 @@ class Collection(artist.Artist, cm.ScalarMappable):
             return self._offsets
         else:
             return self._uniform_offsets
+
+    def set_offset_position(self, offset_position):
+        """
+        Set how offsets are applied.  If *offset_position* is 'screen'
+        (default) the offset is applied after the master transform has
+        been applied, that is, the offsets are in screen coordinates.
+        If offset_position is 'data', the offset is applied before the
+        master transform, i.e., the offsets are in data coordinates.
+        """
+        if offset_position not in ('screen', 'data'):
+            raise ValueError("offset_position must be 'screen' or 'data'")
+        self._offset_position = offset_position
+
+    def get_offset_position(self):
+        """
+        Returns how offsets are applied for the collection.  If
+        *offset_position* is 'screen', the offset is applied after the
+        master transform has been applied, that is, the offsets are in
+        screen coordinates.  If offset_position is 'data', the offset
+        is applied before the master transform, i.e., the offsets are
+        in data coordinates.
+        """
+        return self._offset_position
 
     def set_linewidth(self, lw):
         """
@@ -546,6 +626,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         self._linewidths = other._linewidths
         self._linestyles = other._linestyles
         self._pickradius = other._pickradius
+        self._hatch = other._hatch
 
         # update_from for scalarmappable
         self._A = other._A
@@ -1129,6 +1210,74 @@ class PatchCollection(Collection):
                         for p in patches]
         self._paths = paths
 
+class TriMesh(Collection):
+    """
+    Class for the efficient drawing of a triangular mesh using
+    Gouraud shading.
+
+    A triangular mesh is a :class:`~matplotlib.tri.Triangulation`
+    object.
+    """
+    def __init__(self, triangulation, **kwargs):
+        Collection.__init__(self, **kwargs)
+        self._triangulation = triangulation;
+        self._shading = 'gouraud'
+        self._is_filled = True
+
+        self._bbox = transforms.Bbox.unit()
+
+        # Unfortunately this requires a copy, unless Triangulation
+        # was rewritten.
+        xy = np.hstack((triangulation.x.reshape(-1,1),
+                        triangulation.y.reshape(-1,1)))
+        self._bbox.update_from_data_xy(xy)
+
+    def get_paths(self):
+        if self._paths is None:
+            self.set_paths()
+        return self._paths
+
+    def set_paths(self):
+        self._paths = self.convert_mesh_to_paths(self._triangulation)
+
+    @staticmethod
+    def convert_mesh_to_paths(tri):
+        """
+        Converts a given mesh into a sequence of
+        :class:`matplotlib.path.Path` objects for easier rendering by
+        backends that do not directly support meshes.
+
+        This function is primarily of use to backend implementers.
+        """
+        Path = mpath.Path
+        triangles = tri.get_masked_triangles()
+        verts = np.concatenate((tri.x[triangles][...,np.newaxis],
+                                tri.y[triangles][...,np.newaxis]), axis=2)
+        return [Path(x) for x in verts]
+
+    @allow_rasterization
+    def draw(self, renderer):
+        if not self.get_visible(): return
+        renderer.open_group(self.__class__.__name__)
+        transform = self.get_transform()
+
+        # Get a list of triangles and the color at each vertex.
+        tri = self._triangulation
+        triangles = tri.get_masked_triangles()
+
+        verts = np.concatenate((tri.x[triangles][...,np.newaxis],
+                                tri.y[triangles][...,np.newaxis]), axis=2)
+
+        self.update_scalarmappable()
+        colors = self._facecolors[triangles];
+
+        gc = renderer.new_gc()
+        self._set_gc_clip(gc)
+        gc.set_linewidth(self.get_linewidth()[0])
+        renderer.draw_gouraud_triangles(gc, verts, colors, transform.frozen())
+        gc.restore()
+        renderer.close_group(self.__class__.__name__)
+
 
 class QuadMesh(Collection):
     """
@@ -1159,15 +1308,14 @@ class QuadMesh(Collection):
     at (0, 1), then at (0, 2) .. (0, meshWidth), (1, 0), (1, 1), and
     so on.
 
-    *shading* may be 'flat', 'faceted' or 'gouraud'
+    *shading* may be 'flat', or 'gouraud'
     """
-    def __init__(self, meshWidth, meshHeight, coordinates, showedges,
+    def __init__(self, meshWidth, meshHeight, coordinates,
                  antialiased=True, shading='flat', **kwargs):
         Collection.__init__(self, **kwargs)
         self._meshWidth = meshWidth
         self._meshHeight = meshHeight
         self._coordinates = coordinates
-        self._showedges = showedges
         self._antialiased = antialiased
         self._shading = shading
 
@@ -1264,9 +1412,9 @@ class QuadMesh(Collection):
     @allow_rasterization
     def draw(self, renderer):
         if not self.get_visible(): return
-        renderer.open_group(self.__class__.__name__)
+        renderer.open_group(self.__class__.__name__, self.get_gid())
         transform = self.get_transform()
-        transOffset = self._transOffset
+        transOffset = self.get_offset_transform()
         offsets = self._offsets
 
         if self.have_units():
@@ -1307,7 +1455,7 @@ class QuadMesh(Collection):
             renderer.draw_quad_mesh(
                 gc, transform.frozen(), self._meshWidth, self._meshHeight,
                 coordinates, offsets, transOffset, self.get_facecolor(),
-                self._antialiased, self._showedges)
+                self._antialiased, self.get_edgecolors())
         gc.restore()
         renderer.close_group(self.__class__.__name__)
 
@@ -1315,7 +1463,7 @@ class QuadMesh(Collection):
 
 
 patchstr = artist.kwdoc(Collection)
-for k in ('QuadMesh', 'PolyCollection', 'BrokenBarHCollection',
+for k in ('QuadMesh', 'TriMesh', 'PolyCollection', 'BrokenBarHCollection',
            'RegularPolyCollection', 'PathCollection',
           'StarPolygonCollection', 'PatchCollection',
           'CircleCollection', 'Collection',):
