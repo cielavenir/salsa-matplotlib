@@ -1,3 +1,11 @@
+matplotlib (1.2.0~rc2-2) UNRELEASED; urgency=low
+
+  * debian/{control, rules}
+    - provide Python 3 packages, based on the work of Thomas Kluyver (thanks!);
+      thanks to Yaroslav Halchenko for the report; Closes: #669272
+
+ -- Sandro Tosi <morph@debian.org>  Mon, 22 Oct 2012 18:51:11 +0200
+
 matplotlib (1.2.0~rc2-1) experimental; urgency=low
 
   * New upstream release candidate
