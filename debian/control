@@ -13,19 +13,30 @@ Build-Depends: debhelper (>= 7),
                libpng-dev,
                python-all-dbg (>= 2.4.4-6),
                python-all-dev (>= 2.3.5-7),
+               python3-all-dbg,
+               python3-all-dev,
                python-dateutil,
+               python3-dateutil,
                python-gtk2-dev,
                python-imaging,
                python-nose,
                python-numpy (>= 1:1.5.1-4),
                python-numpy-dbg (>= 1:1.5.1-4),
+               python3-numpy,
+               python3-numpy-dbg,
                python-pkg-resources,
+               python3-pkg-resources,
                python-qt4,
+               python3-pyqt4,
                python-setuptools,
+               python3-setuptools,
+               python3-six,
                python-sphinx (>= 1.0.7+dfsg),
                python-support (>= 1.0.0),
                python-tk (>= 2.5.2-1.1),
+               python3-tk,
                python-tz,
+               python3-tz,
                python-wxgtk2.8,
                python-xlwt,
                tcl8.5-dev,
@@ -37,6 +48,7 @@ Build-Depends: debhelper (>= 7),
                xvfb,
                zlib1g-dev
 XS-Python-Version: all
+X-Python3-Version: >= 3.2
 Standards-Version: 3.9.3
 Homepage: http://matplotlib.org/
 Vcs-Svn: svn://svn.debian.org/svn/python-modules/packages/matplotlib/trunk/
@@ -74,6 +86,37 @@ Description: Python based plotting system in a style similar to Matlab
  Matlab users. All of the plotting commands in the pylab interface can
  be accessed either via a functional interface familiar to Matlab
  users or an object oriented interface familiar to Python users.
+
+Package: python3-matplotlib
+Architecture: any
+Depends: python3-cairo,
+         python3-dateutil,
+         python3-gobject,
+         python-matplotlib-data (>= ${source:Version}),
+         python3-pyparsing,
+         python3-six,
+         python3-tz,
+         ${misc:Depends},
+         ${python3:Depends},
+         ${shlibs:Depends}
+Recommends: python3-tk
+Enhances: ipython3
+Suggests: dvipng,
+          ipython3,
+          librsvg2-common,
+          python-matplotlib-doc,
+          python3-pyqt4,
+          python3-scipy,
+          texlive-extra-utils,
+          texlive-latex-extra
+Description: Python based plotting system in a style similar to Matlab (Python 3)
+ Matplotlib is a pure Python plotting library designed to bring
+ publication quality plotting to Python with a syntax familiar to
+ Matlab users. All of the plotting commands in the pylab interface can
+ be accessed either via a functional interface familiar to Matlab
+ users or an object oriented interface familiar to Python users.
+ .
+ This package contains the Python 3 version of matplotlib.
 
 Package: python-matplotlib-data
 Architecture: all
@@ -116,3 +159,20 @@ Description: Python based plotting system (debug extension)
  users or an object oriented interface familiar to Python users.
  .
  This package contains the debug extension for python-matplotlib.
+
+Package: python3-matplotlib-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: python3-all-dbg,
+         python3-matplotlib (= ${binary:Version}),
+         ${misc:Depends},
+         ${shlibs:Depends}
+Description: Python based plotting system (debug extension, Python 3)
+ Matplotlib is a pure Python plotting library designed to bring
+ publication quality plotting to Python with a syntax familiar to
+ Matlab users. All of the plotting commands in the pylab interface can
+ be accessed either via a functional interface familiar to Matlab
+ users or an object oriented interface familiar to Python users.
+ .
+ This package contains the debug extension for python3-matplotlib.

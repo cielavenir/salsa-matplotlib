@@ -1,12 +1,15 @@
 #!/usr/bin/make -f
 
-PYVERS := $(shell pyversions -v -r debian/control)
+PY2VERS := $(shell pyversions -v -r debian/control)
+PY3VERS := $(shell py3versions -v -r debian/control)
 DEFPY := $(shell pyversions -v -d)
 PY_PLATFORM := $(shell python -c 'from distutils.util import get_platform; print get_platform()')
 pd := python-matplotlib-doc
 p := python-matplotlib
+p3 := python3-matplotlib
 pdata := python-matplotlib-data
 pdbg := python-matplotlib-dbg
+p3dbg := python3-matplotlib-dbg
 
 # build
 build: build-arch build-indep
@@ -25,7 +28,7 @@ build-indep-stamp: $(DEFPY:%=build-%-stamp)
 
 	touch $@
 
-build-arch: $(PYVERS:%=build-%-stamp)
+build-arch: $(PY2VERS:%=build-%-stamp) $(PY3VERS:%=build-%-stamp)
 
 build-%-stamp:
 	dh_testdir
@@ -64,7 +67,7 @@ clean:
 	dh_testdir
 	dh_testroot
 	
-	for i in $(PYVERS); do \
+	for i in $(PY2VERS) $(PY3VERS); do \
 		python$(i) ./setup.py clean --all; \
 		python$(i)-dbg ./setup.py clean --all; \
 	done
@@ -93,10 +96,11 @@ clean:
 	sed -i '/^examples\./d' $(CURDIR)/doc/matplotlibrc
 
 # install
-install-arch: build-arch $(PYVERS:%=install-%-stamp)
+install-arch: build-arch $(PY2VERS:%=install-%-stamp) $(PY3VERS:%=install-py3-%-stamp)
 	dh_testdir
 	dh_testroot
 	dh_numpy
+	dh_numpy3
 
 install-%-stamp: build-%-stamp
 	dh_testdir
@@ -120,6 +124,31 @@ install-%-stamp: build-%-stamp
 
 	rm -rf $(CURDIR)/debian/$(pdbg)/usr/lib/python$*/site-packages/matplotlib/mpl-data/
 	rm -rf $(CURDIR)/debian/$(pdbg)/usr/lib/python$*/site-packages/matplotlib/backends/Matplotlib.nib/
+
+	touch $@
+
+install-py3-%-stamp: build-%-stamp
+	dh_testdir
+	dh_testroot
+
+	python$* ./setup.py install_lib \
+		-d $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/ --no-compile
+	python$* ./setup.py install_egg_info \
+		-d $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/
+	python$*-dbg ./setup.py install_lib \
+		-d $(CURDIR)/debian/$(p3dbg)/usr/lib/python3/dist-packages/ --no-compile
+
+	find debian/$(p3dbg) ! -type d ! -name '*.so' | xargs rm -f
+	find debian/$(p3dbg) -depth -empty -exec rmdir {} \;
+
+	# don't install baseline_images, needed for tests only, but huge
+	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/*-packages/matplotlib/tests/baseline_images/
+
+	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/mpl-data/
+	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/backends/Matplotlib.nib/
+
+	rm -rf $(CURDIR)/debian/$(p3dbg)/usr/lib/python3/dist-packages/matplotlib/mpl-data/
+	rm -rf $(CURDIR)/debian/$(p3dbg)/usr/lib/python3/dist-packages/matplotlib/backends/Matplotlib.nib/
 
 	touch $@
 
@@ -171,9 +200,11 @@ binary-arch: build-arch install-arch
 		fi; \
 	done
 	dh_pysupport -a
+	dh_python3 -a
 	dh_link -a
 	dh_lintian -a
-	dh_strip -a --dbg-package=$(pdbg)
+	dh_strip -a -p$(p) --dbg-package=$(pdbg)
+	dh_strip -a -p$(p3) --dbg-package=$(p3dbg)
 	# fix python-debug-in-wrong-location lintian warning
 	cd debian/*-dbg/usr/lib/debug/usr/lib && mv pyshared pymodules
 	dh_compress -a
