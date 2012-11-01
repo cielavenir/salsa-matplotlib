@@ -1,3 +1,9 @@
+matplotlib (1.2.0~rc3-1) UNRELEASED; urgency=low
+
+  * New upstream release candidate
+
+ -- Sandro Tosi <morph@debian.org>  Thu, 01 Nov 2012 13:03:13 +0100
+
 matplotlib (1.2.0~rc2-2) experimental; urgency=low
 
   * debian/{control, rules}
