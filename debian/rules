@@ -43,7 +43,7 @@ ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 	                                from distutils.core import Distribution ; \
 					b = build(Distribution()) ; \
 					b.finalize_options() ; \
-					print b.build_platlib") \
+					print(b.build_platlib)") \
 	MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ \
 	MPLCONFIGDIR=. \
 		xvfb-run python$* -c "import matplotlib as m ; m.test(verbosity=1)"
@@ -52,7 +52,7 @@ ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 	                                    from distutils.core import Distribution ; \
 					    b = build(Distribution()) ; \
 					    b.finalize_options() ; \
-					    print b.build_platlib") \
+					    print(b.build_platlib)") \
 	MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ \
 	MPLCONFIGDIR=. \
 		xvfb-run python$*-dbg -c "import matplotlib as m ; m.test(verbosity=1)"
