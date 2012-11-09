@@ -18,10 +18,6 @@ build-indep: build-indep-stamp
 build-indep-stamp: $(DEFPY:%=build-%-stamp)
 	dh_testdir
 
-	# add information to use local copy of 'sampledata' and bypass downloading
-	echo "examples.download : False" >> $(CURDIR)/doc/matplotlibrc
-	echo "examples.directory : $(CURDIR)/sampledata" >> $(CURDIR)/doc/matplotlibrc
-
 	# build the doc
 	-( cd doc ; MPLCONFIGDIR=. MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
 		PYTHONPATH=../build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py --small all )
