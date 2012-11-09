@@ -16,7 +16,11 @@ Build-Depends: debhelper (>= 7),
                python3-all-dbg,
                python3-all-dev,
                python-dateutil,
+               python-cairo,
+               python3-cairo,
                python3-dateutil,
+               python-gi,
+               python3-gi,
                python-gtk2-dev,
                python-imaging,
                python-nose,
@@ -57,9 +61,7 @@ Vcs-Browser: http://svn.debian.org/viewsvn/python-modules/packages/matplotlib/tr
 
 Package: python-matplotlib
 Architecture: any
-Depends: python-cairo,
-         python-dateutil,
-         python-gobject,
+Depends: python-dateutil,
          python-matplotlib-data (>= ${source:Version}),
          python-pyparsing,
          python-tz,
@@ -69,14 +71,19 @@ Depends: python-cairo,
 Recommends: python-glade2, python-tk (>= 2.5.2-1.1)
 Enhances: ipython
 Suggests: dvipng,
+          gir1.2-gtk-3.0,
           ipython (>= 0.6.3),
           librsvg2-common,
+          python-cairo,
           python-configobj,
           python-excelerator,
+          python-fltk,
+          python-gobject,
           python-gtk2,
           python-matplotlib-doc,
           python-qt4,
           python-scipy,
+          python-sip,
           python-traits (>= 2.0),
           python-wxgtk2.8,
           texlive-extra-utils,
@@ -90,9 +97,7 @@ Description: Python based plotting system in a style similar to Matlab
 
 Package: python3-matplotlib
 Architecture: any
-Depends: python3-cairo,
-         python3-dateutil,
-         python3-gobject,
+Depends: python3-dateutil,
          python-matplotlib-data (>= ${source:Version}),
          python3-pyparsing,
          python3-six,
@@ -103,11 +108,16 @@ Depends: python3-cairo,
 Recommends: python3-tk
 Enhances: ipython3
 Suggests: dvipng,
+          gir1.2-gtk-3.0,
           ipython3,
           librsvg2-common,
           python-matplotlib-doc,
+          python3-cairo,
+          python3-gi,
+          python3-gobject,
           python3-pyqt4,
           python3-scipy,
+          python3-sip,
           texlive-extra-utils,
           texlive-latex-extra
 Description: Python based plotting system in a style similar to Matlab (Python 3)

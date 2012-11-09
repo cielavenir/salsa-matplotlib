@@ -3,8 +3,10 @@ matplotlib (1.2.0-1) UNRELEASED; urgency=low
   * New upstream release
   * debian/{control, rules}
     - run tests for python3 module
+  * debian/{control, README.debian}
+    - add several missing dependencies (and b-d) for Matplotlib backends
 
- -- Sandro Tosi <morph@debian.org>  Thu, 08 Nov 2012 23:23:55 +0100
+ -- Sandro Tosi <morph@debian.org>  Fri, 09 Nov 2012 19:47:52 +0100
 
 matplotlib (1.2.0~rc2-2) experimental; urgency=low
 
