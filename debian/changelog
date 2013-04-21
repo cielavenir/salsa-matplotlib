@@ -1,9 +1,10 @@
-matplotlib (1.2.0-2) UNRELEASED; urgency=low
+matplotlib (1.2.1-1) UNRELEASED; urgency=low
 
+  * New upstream release
   * debian/watch
     - switch back to SF for upstream tarballs
 
- -- Sandro Tosi <morph@debian.org>  Sun, 21 Apr 2013 21:03:03 +0200
+ -- Sandro Tosi <morph@debian.org>  Sun, 21 Apr 2013 21:42:59 +0200
 
 matplotlib (1.2.0-1) experimental; urgency=low
 
