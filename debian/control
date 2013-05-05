@@ -56,8 +56,8 @@ XS-Python-Version: all
 X-Python3-Version: >= 3.2
 Standards-Version: 3.9.3
 Homepage: http://matplotlib.org/
-Vcs-Svn: svn://svn.debian.org/svn/python-modules/packages/matplotlib/trunk/
-Vcs-Browser: http://svn.debian.org/viewsvn/python-modules/packages/matplotlib/trunk/
+Vcs-Svn: svn://anonscm.debian.org/python-modules/packages/matplotlib/trunk/
+Vcs-Browser: http://anonscm.debian.org/viewvc/python-modules/packages/matplotlib/trunk/
 
 Package: python-matplotlib
 Architecture: any
