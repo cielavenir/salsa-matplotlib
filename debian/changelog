@@ -7,8 +7,9 @@ matplotlib (1.2.1-1) UNRELEASED; urgency=low
 
   [ Jakub Wilk ]
   * Use canonical URIs for Vcs-* fields.
+  * Fix typos in README.debian.
 
- -- Jakub Wilk <jwilk@debian.org>  Sun, 05 May 2013 16:01:14 +0200
+ -- Jakub Wilk <jwilk@debian.org>  Wed, 12 Jun 2013 13:14:38 +0200
 
 matplotlib (1.2.0-1) experimental; urgency=low
 

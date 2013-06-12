@@ -5,7 +5,7 @@ For various functions to work, for example
 
   help() -> modules
 
-you need to set the enviromental variable:
+you need to set the environmental variable:
 
   $ export MATPLOTLIBDATA=/usr/share/matplotlib/
 
@@ -33,7 +33,7 @@ to add or modify a line like this:
   #
   # The Agg, Ps, Pdf and SVG backends do not require external
   # dependencies. Do not choose GTK, GTKAgg, GTKCairo, TkAgg or WXAgg if
-  # you have disabled the relevent extension modules.
+  # you have disabled the relevant extension modules.
 
 so usually, you can have a backend if you have the Python bindings installed:
 
