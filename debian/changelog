@@ -7,6 +7,8 @@ matplotlib (1.3.0~rc4-1) UNRELEASED; urgency=low
   * Remove references to Fltk backend, now removed upstream
   * debian/control
     - add python-numpydoc to b-d, needed to build doc
+    - add python{,3}-pyparsing, it's no longer bundled in the upstream tarball;
+      Closes: #531024
   * debian/README.debian
     - changed location of user-specific config file
 
@@ -14,7 +16,7 @@ matplotlib (1.3.0~rc4-1) UNRELEASED; urgency=low
   * Use canonical URIs for Vcs-* fields.
   * Fix typos in README.debian.
 
- -- Sandro Tosi <morph@debian.org>  Mon, 24 Jun 2013 20:22:55 +0200
+ -- Sandro Tosi <morph@debian.org>  Mon, 24 Jun 2013 21:55:31 +0200
 
 matplotlib (1.2.0-1) experimental; urgency=low
 
