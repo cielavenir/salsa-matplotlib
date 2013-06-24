@@ -22,7 +22,7 @@ If you want to change it, you have two ways: system wide, changing the file
 
 or on a user basis, changing the file
 
-  $HOME/.matplotlib/matplotlibrc
+  $HOME/.config/matplotlib/matplotlibrc
 
 to add or modify a line like this:
 
