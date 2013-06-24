@@ -68,10 +68,6 @@ License: same as upstream
 Files: lib/matplotlib/fontconfig_pattern.py
 Author: Michael Droettboom <mdroe@stsci.edu>
 
-Files: lib/matplotlib/backends/backend_fltkagg.py
-Copyright: Gregory Lielens, Free Field Technologies SA and
-           John D. Hunter 2004
-
 Files: lib/matplotlib/backends/backend_wxagg.py
 Copyright: Copyright (C) 2003-5 Jeremy O'Donoghue, John Hunter, Illinois Institute of Technology
 

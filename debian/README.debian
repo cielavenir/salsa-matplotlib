@@ -29,7 +29,7 @@ to add or modify a line like this:
   backend : <backend>
 
   # Default backend, one of: GTK GTKAgg GTKCairo GTK3Agg GTK3Cairo CocoaAgg
-  # FltkAgg MacOSX QtAgg Qt4Agg TkAgg WX WXAgg Agg Cairo GDK PS PDF SVG Template
+  # MacOSX QtAgg Qt4Agg TkAgg WX WXAgg Agg Cairo GDK PS PDF SVG Template
   #
   # The Agg, Ps, Pdf and SVG backends do not require external
   # dependencies. Do not choose GTK, GTKAgg, GTKCairo, TkAgg or WXAgg if
@@ -42,4 +42,3 @@ so usually, you can have a backend if you have the Python bindings installed:
   QT   -> python-qt4, python-sip
   WX   -> python-wxgtk2.6 or python-wxgtk2.8
   GTK3 -> gir1.2-gtk-3.0, python-gi, python-gobject
-  FLTK -> python-fltk
