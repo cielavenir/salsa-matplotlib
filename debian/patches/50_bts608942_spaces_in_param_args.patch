@@ -1,10 +1,8 @@
 Description: don't separate param and its argument with a space
 
-Index: matplotlib-1.1.0~rc1/lib/mpl_toolkits/axes_grid1/axes_divider.py
-===================================================================
---- matplotlib-1.1.0~rc1.orig/lib/mpl_toolkits/axes_grid1/axes_divider.py	2011-09-24 17:08:27.000000000 +0200
-+++ matplotlib-1.1.0~rc1/lib/mpl_toolkits/axes_grid1/axes_divider.py	2011-09-26 23:46:30.091617839 +0200
-@@ -199,12 +199,12 @@
+--- a/lib/mpl_toolkits/axes_grid1/axes_divider.py
++++ b/lib/mpl_toolkits/axes_grid1/axes_divider.py
+@@ -201,12 +201,12 @@ class Divider(object):
      def locate(self, nx, ny, nx1=None, ny1=None, axes=None, renderer=None):
          """
  
@@ -19,7 +17,7 @@ Index: matplotlib-1.1.0~rc1/lib/mpl_toolkits/axes_grid1/axes_divider.py
          """
  
  
-@@ -251,12 +251,12 @@
+@@ -253,12 +253,12 @@ class Divider(object):
          (:class:`mpl_toolkits.axes_grid.axes_divider.AxesLocator`) for
          specified cell.
  
@@ -34,7 +32,7 @@ Index: matplotlib-1.1.0~rc1/lib/mpl_toolkits/axes_grid1/axes_divider.py
          """
          return AxesLocator(self, nx, ny, nx1, ny1)
  
-@@ -297,12 +297,12 @@
+@@ -299,12 +299,12 @@ class AxesLocator(object):
          """
          :param axes_divider: An instance of AxesDivider class.
  

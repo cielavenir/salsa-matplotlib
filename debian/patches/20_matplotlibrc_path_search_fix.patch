@@ -2,11 +2,9 @@ Description: Fixes the path to search for matplotlibrc file
 Forwarded: not-needed
 Author: Sandro Tosi <morph@debian.org>
 
-Index: matplotlib-1.1.0~rc1/lib/matplotlib/__init__.py
-===================================================================
---- matplotlib-1.1.0~rc1.orig/lib/matplotlib/__init__.py	2011-09-24 17:08:26.000000000 +0200
-+++ matplotlib-1.1.0~rc1/lib/matplotlib/__init__.py	2011-09-26 23:45:59.369692360 +0200
-@@ -485,10 +485,12 @@
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -607,10 +607,12 @@ def _get_data_path():
              raise RuntimeError('Path in environment MATPLOTLIBDATA not a directory')
          return path
  
@@ -20,12 +18,12 @@ Index: matplotlib-1.1.0~rc1/lib/matplotlib/__init__.py
      # setuptools' namespace_packages may highjack this init file
      # so need to try something known to be in matplotlib, not basemap
      import matplotlib.afm
-@@ -596,7 +598,7 @@
-     if os.path.exists(fname): return fname
+@@ -727,7 +729,7 @@ def matplotlib_fname():
+                     _get_xdg_config_dir())
+             return fname
  
- 
--    path =  get_data_path() # guaranteed to exist or raise
-+    path =  '/etc' # guaranteed to exist or raise
+-    path = get_data_path()  # guaranteed to exist or raise
++    path = '/etc'  # guaranteed to exist or raise
      fname = os.path.join(path, 'matplotlibrc')
      if not os.path.exists(fname):
          warnings.warn('Could not find matplotlibrc; using defaults')
