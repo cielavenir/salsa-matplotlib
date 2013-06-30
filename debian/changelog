@@ -1,7 +1,8 @@
 matplotlib (1.3.0~rc4-1) UNRELEASED; urgency=low
 
   [ Sandro Tosi ]
-  * New upstream release candidate
+  * New upstream release candidate; thanks to Julian Taylor for the report;
+    Closes: #705631
   * debian/watch
     - switch back to SF for upstream tarballs
   * Remove references to Fltk backend, now removed upstream
