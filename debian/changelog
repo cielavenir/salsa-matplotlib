@@ -14,12 +14,14 @@ matplotlib (1.3.0~rc4-1) UNRELEASED; urgency=low
     - changed location of user-specific config file
   * debian/patches/*
     - refreshed and removed merged patch
+  * debian/patches/60_override_loader_during_tests.patch
+    - override __loader__ function during tests
 
   [ Jakub Wilk ]
   * Use canonical URIs for Vcs-* fields.
   * Fix typos in README.debian.
 
- -- Sandro Tosi <morph@debian.org>  Sun, 30 Jun 2013 18:53:10 +0200
+ -- Sandro Tosi <morph@debian.org>  Wed, 03 Jul 2013 23:58:40 +0200
 
 matplotlib (1.2.0-1) experimental; urgency=low
 
