@@ -1,0 +1,22 @@
+Description: Create the doc/mpl_examples symlink if not existing.
+Author: Michael Droettboom
+Origin: upstream, https://github.com/matplotlib/matplotlib/pull/2187
+Applied-Upstream: https://github.com/mdboom/matplotlib/commit/63405ffaa3fb164950d79408855485f5c4b3d9f2
+Last-Update: 2013-07-03
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/doc/make.py
++++ b/doc/make.py
+@@ -236,6 +236,12 @@ current_dir = os.getcwd()
+ os.chdir(os.path.dirname(os.path.join(current_dir, __file__)))
+ copy_if_out_of_date('../INSTALL', 'users/installing.rst')
+ 
++# Create the examples symlink, if it doesn't exist
++if not os.path.exists('mpl_examples'):
++    if hasattr(os, 'symlink'):
++        os.symlink('../examples', 'mpl_examples')
++    else:
++        shutil.copytree('../examples', 'mpl_examples')
+ 
+ if len(sys.argv)>1:
+     if '--small' in sys.argv[1:]:

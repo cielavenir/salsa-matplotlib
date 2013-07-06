@@ -91,6 +91,9 @@ clean:
 	# restore "pristine" doc/matplotlibrc
 	sed -i '/^examples\./d' $(CURDIR)/doc/matplotlibrc
 
+	# remove doc symlinks to examples directory
+	rm -rf doc/mpl_examples
+
 # install
 install-arch: build-arch $(PY2VERS:%=install-%-stamp) $(PY3VERS:%=install-py3-%-stamp)
 	dh_testdir
