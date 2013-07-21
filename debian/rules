@@ -93,6 +93,7 @@ clean:
 
 	# remove doc symlinks to examples directory
 	rm -rf doc/mpl_examples
+	rm -rf doc/mpl_toolkits/axes_grid/examples
 
 # install
 install-arch: build-arch $(PY2VERS:%=install-%-stamp) $(PY3VERS:%=install-py3-%-stamp)
