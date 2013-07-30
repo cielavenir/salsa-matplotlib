@@ -2,3 +2,4 @@
 20_matplotlibrc_path_search_fix.patch
 40_bts608939_draw_markers_description.patch
 50_bts608942_spaces_in_param_args.patch
+60_set_distribute_version.patch
