@@ -108,7 +108,7 @@ install-%-stamp: build-%-stamp
 
 	python$* ./setup.py install_lib \
 		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/ --no-compile
-	python$* ./setupegg.py install_egg_info \
+	python$* ./setup.py install_egg_info \
 		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/
 	python$*-dbg ./setup.py install_lib \
 		-d $(CURDIR)/debian/$(pdbg)/usr/lib/python$*/site-packages/ --no-compile
