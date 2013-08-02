@@ -15,8 +15,6 @@ matplotlib (1.3.0-1) UNRELEASED; urgency=low
     - changed location of user-specific config file
   * debian/patches/*
     - refreshed and removed merged patch
-  * debian/patches/60_set_distribute_version.patch
-    - set distribute version as shipped by Debian
   * debian/copyright
     - extend packaging copyright years
     - update upstream copyright notice
