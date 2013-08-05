@@ -89,20 +89,20 @@ def copytree(src, dst, symlinks=False, ignore=None):
                 copy2(srcname, dstname)
         # catch the Error from the recursive copytree so that we can
         # continue with other files
-        except Error, err:
+        except Error as err:
             errors.extend(err.args[0])
-        except EnvironmentError, why:
+        except EnvironmentError as why:
             errors.append((srcname, dstname, str(why)))
     try:
         copystat(src, dst)
-    except OSError, why:
+    except OSError as why:
         if WindowsError is not None and isinstance(why, WindowsError):
             # Copying file access times may fail on Windows
             pass
         else:
             errors.extend((src, dst, str(why)))
     if errors:
-        raise Error, errors
+        raise Error(errors)
 
 ### End compatibility block for pre-v2.6 ###
 
@@ -110,7 +110,15 @@ def copytree(src, dst, symlinks=False, ignore=None):
 def copy_if_out_of_date(original, derived):
     if (not os.path.exists(derived) or
         os.stat(derived).st_mtime < os.stat(original).st_mtime):
-        shutil.copyfile(original, derived)
+        try:
+            shutil.copyfile(original, derived)
+        except IOError:
+            if os.path.basename(original) == 'matplotlibrc':
+                msg = "'%s' not found. " % original + \
+                      "Did you run `python setup.py build`?"
+                raise IOError(msg)
+            else:
+                raise
 
 def check_build():
     build_dirs = ['build', 'build/doctrees', 'build/html', 'build/latex',
@@ -228,6 +236,19 @@ current_dir = os.getcwd()
 os.chdir(os.path.dirname(os.path.join(current_dir, __file__)))
 copy_if_out_of_date('../INSTALL', 'users/installing.rst')
 
+# Create the examples symlink, if it doesn't exist
+
+required_symlinks = [
+    ('mpl_examples', '../examples/'),
+    ('mpl_toolkits/axes_grid/examples', '../../../examples/axes_grid/')
+    ]
+
+for link, target in required_symlinks:
+    if not os.path.exists(link):
+        if hasattr(os, 'symlink'):
+            os.symlink(target, link)
+        else:
+            shutil.copytree(os.path.join(link, '..', target), link)
 
 if len(sys.argv)>1:
     if '--small' in sys.argv[1:]:

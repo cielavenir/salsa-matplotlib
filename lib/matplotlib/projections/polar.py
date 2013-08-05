@@ -57,14 +57,10 @@ class PolarTransform(Transform):
         t *= theta_direction
         t += theta_offset
 
-        if rmin != 0:
-            r = r - rmin
-            mask = r < 0
-            x[:] = np.where(mask, np.nan, r * np.cos(t))
-            y[:] = np.where(mask, np.nan, r * np.sin(t))
-        else:
-            x[:] = r * np.cos(t)
-            y[:] = r * np.sin(t)
+        r = r - rmin
+        mask = r < 0
+        x[:] = np.where(mask, np.nan, r * np.cos(t))
+        y[:] = np.where(mask, np.nan, r * np.sin(t))
 
         return xy
     transform_non_affine.__doc__ = Transform.transform_non_affine.__doc__
@@ -478,7 +474,7 @@ cbook.simple_linear_interpolation on the data before passing to matplotlib.""")
         If *labels* is None, the labels will be ``fmt %% angle``
 
         *frac* is the fraction of the polar axes radius at which to
-        place the label (1 is the edge). Eg. 1.05 is outside the axes
+        place the label (1 is the edge). e.g., 1.05 is outside the axes
         and 0.95 is inside the axes.
 
         Return value is a list of tuples (*line*, *label*), where
@@ -779,4 +775,3 @@ PolarAxes.RadialLocator = RadialLocator
 #             result = self.transform(result)
 #             return mpath.Path(result, codes)
 #         transform_path_non_affine = transform_path
-

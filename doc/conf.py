@@ -11,24 +11,41 @@
 # All configuration values have a default value; values that are commented out
 # serve to show the default value.
 
-import sys, os
+import os
+import sys
+import sphinx
 
 # If your extensions are in another directory, add it here. If the directory
 # is relative to the documentation root, use os.path.abspath to make it
 # absolute, like shown here.
-sys.path.append(os.path.abspath('sphinxext'))
+sys.path.append(os.path.abspath('.'))
 
 # General configuration
 # ---------------------
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['matplotlib.sphinxext.mathmpl', 'math_symbol_table',
+extensions = ['matplotlib.sphinxext.mathmpl', 'sphinxext.math_symbol_table',
               'sphinx.ext.autodoc', 'matplotlib.sphinxext.only_directives',
-              'sphinx.ext.doctest',
+              'sphinx.ext.doctest', 'sphinx.ext.autosummary',
               'matplotlib.sphinxext.plot_directive', 'sphinx.ext.inheritance_diagram',
-              'gen_gallery', 'gen_rst',
-              'matplotlib.sphinxext.ipython_console_highlighting', 'github']
+              'sphinxext.gen_gallery', 'sphinxext.gen_rst',
+              'matplotlib.sphinxext.ipython_console_highlighting',
+              'sphinxext.github',
+              'numpydoc']
+
+
+try:
+    import numpydoc
+except ImportError:
+    raise ImportError("No module named numpydoc - you need to install "
+                      "numpydoc to build the documentation.")
+
+
+autosummary_generate = True
+
+if sphinx.__version__ >= 1.1:
+    autodoc_docstring_signature = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -41,13 +58,18 @@ master_doc = 'contents'
 
 # General substitutions.
 project = 'Matplotlib'
-copyright = '2012 John Hunter, Darren Dale, Eric Firing, Michael Droettboom and the matplotlib development team'
+copyright = '2002 - 2012 John Hunter, Darren Dale, Eric Firing, Michael Droettboom and the matplotlib development team; 2012 - 2013 The matplotlib development team'
 
 # The default replacements for |version| and |release|, also used in various
 # other places throughout the built documents.
 #
 # The short X.Y version.
-import matplotlib
+try:
+    import matplotlib
+except ImportError:
+    msg = "Error: matplotlib must be installed before building the documentation"
+    sys.exit(msg)
+
 version = matplotlib.__version__
 # The full version, including alpha/beta/rc tags.
 release = version
@@ -81,6 +103,28 @@ default_role = 'obj'
 # ----------------------------
 
 plot_formats = [('png', 80), ('hires.png', 200), ('pdf', 50)]
+
+# Subdirectories in 'examples/' directory of package and titles for gallery
+mpl_example_sections = (
+    ('lines_bars_and_markers', 'Lines, bars, and markers'),
+    ('shapes_and_collections', 'Shapes and collections'),
+    ('statistics', 'Statistical plots'),
+    ('images_contours_and_fields', 'Images, contours, and fields'),
+    ('pie_and_polar_charts', 'Pie and polar charts'),
+    ('color', 'Color'),
+    ('text_labels_and_annotations', 'Text, labels, and annotations'),
+    ('ticks_and_spines', 'Ticks and spines'),
+    ('subplots_axes_and_figures', 'Subplots, axes, and figures'),
+    ('specialty_plots', 'Specialty plots'),
+    ('showcase', 'Showcase'),
+    ('api', 'API'),
+    ('pylab_examples', 'pylab examples'),
+    ('mplot3d', 'mplot3d toolkit'),
+    ('axes_grid', 'axes_grid toolkit'),
+    ('units', 'units'),
+    ('widgets', 'widgets'),
+    )
+
 
 # Github extension
 
@@ -133,10 +177,13 @@ html_sidebars = {'index': 'indexsidebar.html',
 
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
-html_additional_pages = {'index': 'index.html', 'gallery':'gallery.html'}
+html_additional_pages = {'index': 'index.html',
+                         'gallery':'gallery.html',
+                         'citing': 'citing.html'}
 
 # If false, no module index is generated.
 #html_use_modindex = True
+html_domain_indices = ["py-modindex"]
 
 # If true, the reST sources are included in the HTML build as _sources/<name>.
 #html_copy_source = True
@@ -173,11 +220,25 @@ latex_documents = [
 latex_logo = None
 
 # Additional stuff for the LaTeX preamble.
-latex_preamble = """
+latex_preamble =r"""
+   % In the parameters section, place a newline after the Parameters
+   % header.  (This is stolen directly from Numpy's conf.py, since it
+   % affects Numpy-style docstrings).
+   \usepackage{expdlist}
+   \let\latexdescription=\description
+   \def\description{\latexdescription{}{} \breaklabel}
+
    \usepackage{amsmath}
    \usepackage{amsfonts}
    \usepackage{amssymb}
    \usepackage{txfonts}
+
+   % The enumitem package provides unlimited nesting of lists and
+   % enums.  Sphinx may use this in the future, in which case this can
+   % be removed.  See
+   % https://bitbucket.org/birkenfeld/sphinx/issue/777/latex-output-too-deeply-nested
+   \usepackage{enumitem}
+   \setlistdepth{2048}
 """
 
 # Documents to append as an appendix to all manuals.
@@ -203,3 +264,7 @@ texinfo_documents = [
    'Matplotlib', "Python plotting package", 'Programming',
    1),
 ]
+
+
+################# numpydoc config ####################
+numpydoc_show_class_members = False

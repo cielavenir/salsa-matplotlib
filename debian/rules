@@ -91,6 +91,10 @@ clean:
 	# restore "pristine" doc/matplotlibrc
 	sed -i '/^examples\./d' $(CURDIR)/doc/matplotlibrc
 
+	# remove doc symlinks to examples directory
+	rm -rf doc/mpl_examples
+	rm -rf doc/mpl_toolkits/axes_grid/examples
+
 # install
 install-arch: build-arch $(PY2VERS:%=install-%-stamp) $(PY3VERS:%=install-py3-%-stamp)
 	dh_testdir
@@ -104,7 +108,7 @@ install-%-stamp: build-%-stamp
 
 	python$* ./setup.py install_lib \
 		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/ --no-compile
-	python$* ./setupegg.py install_egg_info \
+	python$* ./setup.py install_egg_info \
 		-d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/
 	python$*-dbg ./setup.py install_lib \
 		-d $(CURDIR)/debian/$(pdbg)/usr/lib/python$*/site-packages/ --no-compile
@@ -171,11 +175,11 @@ binary-indep: build-indep install-indep
 	dh_installchangelogs -i CHANGELOG
 	dh_installdocs -p$(pd) -i doc/build/html/ doc/build/latex/Matplotlib.pdf
 	# remove pyc file from doc
-	find $(CURDIR)/debian/$(pd)/ -type f -name '*.pyc' | xargs rm -f
 	dh_installexamples -p$(pd) -i examples/*
 	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js -Xobjects.inv
 	dh_link -i
 	dh_sphinxdoc
+	find $(CURDIR)/debian/$(pd)/ -type f -name '*.pyc' | xargs --no-run-if-empty rm
 	dh_lintian -i
 	dh_fixperms -i
 	dh_installdeb -i
@@ -187,7 +191,7 @@ binary-arch: build-arch install-arch
 	dh_testdir -a
 	dh_testroot -a
 	dh_installchangelogs -a CHANGELOG
-	dh_installdocs -p$(p) -a README.txt TODO
+	dh_installdocs -p$(p) -a README.rst TODO
 	# make python scripts starting with '#!' executable
 	for i in `find debian -mindepth 2 -type f ! -perm 755`; do \
 		if head -1 $$i | grep -q '^#!'; then \

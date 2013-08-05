@@ -16,9 +16,8 @@ Features that are implemented
 
 TODO:
 
-  * allow save to file handle
-
   * integrate screen dpi w/ ppi and text
+
 """
 from __future__ import division
 import threading
@@ -154,11 +153,13 @@ class RendererAgg(RendererBase):
         ox, oy, width, height, descent, font_image, used_characters = \
             self.mathtext_parser.parse(s, self.dpi, prop)
 
-        x = int(x) + ox
-        y = int(y) - oy
+        xd = descent * np.sin(np.deg2rad(angle))
+        yd = descent * np.cos(np.deg2rad(angle))
+        x = np.round(x + ox + xd)
+        y = np.round(y - oy + yd)
         self._renderer.draw_text_image(font_image, x, y + 1, angle, gc)
 
-    def draw_text(self, gc, x, y, s, prop, angle, ismath):
+    def draw_text(self, gc, x, y, s, prop, angle, ismath=False, mtext=None):
         """
         Render the text
         """
@@ -177,9 +178,14 @@ class RendererAgg(RendererBase):
             # space) in the following call to draw_text_image).
             font.set_text(s, 0, flags=flags)
         font.draw_glyphs_to_bitmap(antialiased=rcParams['text.antialiased'])
+        d = font.get_descent() / 64.0
+        # The descent needs to be adjusted for the angle
+        xd = -d * np.sin(np.deg2rad(angle))
+        yd = d * np.cos(np.deg2rad(angle))
 
         #print x, y, int(x), int(y), s
-        self._renderer.draw_text_image(font.get_image(), int(x), int(y) + 1, angle, gc)
+        self._renderer.draw_text_image(
+            font.get_image(), np.round(x - xd), np.round(y + yd) + 1, angle, gc)
 
     def get_text_width_height_descent(self, s, prop, ismath):
         """
@@ -215,7 +221,7 @@ class RendererAgg(RendererBase):
         return w, h, d
 
 
-    def draw_tex(self, gc, x, y, s, prop, angle):
+    def draw_tex(self, gc, x, y, s, prop, angle, ismath='TeX!', mtext=None):
         # todo, handle props, angle, origins
         size = prop.get_size_in_points()
 
@@ -225,6 +231,12 @@ class RendererAgg(RendererBase):
         if im is None:
             Z = texmanager.get_grey(s, size, self.dpi)
             Z = np.array(Z * 255.0, np.uint8)
+
+        w, h, d = self.get_text_width_height_descent(s, prop, ismath)
+        xd = d * np.sin(np.deg2rad(angle))
+        yd = d * np.cos(np.deg2rad(angle))
+        x = np.round(x + xd)
+        y = np.round(y + yd)
 
         self._renderer.draw_text_image(Z, x, y, angle, gc)
 
@@ -308,7 +320,7 @@ class RendererAgg(RendererBase):
         >>> region = renderer.copy_from_bbox()
         >>> x1, y1, x2, y2 = region.get_extents()
         >>> renderer.restore_region(region, bbox=(x1+dx, y1, x2, y2),
-                                    xy=(x1-dx, y1))
+        ...                         xy=(x1-dx, y1))
 
         """
         if bbox is not None or xy is not None:
@@ -431,7 +443,7 @@ class FigureCanvasAgg(FigureCanvasBase):
         """
         if __debug__: verbose.report('FigureCanvasAgg.draw', 'debug-annoying')
 
-        self.renderer = self.get_renderer()
+        self.renderer = self.get_renderer(cleared=True)
         # acquire a lock on the shared font cache
         RendererAgg.lock.acquire()
 
@@ -442,7 +454,7 @@ class FigureCanvasAgg(FigureCanvasBase):
 
 
 
-    def get_renderer(self):
+    def get_renderer(self, cleared=False):
         l, b, w, h = self.figure.bbox.bounds
         key = w, h, self.figure.dpi
         try: self._lastKey, self.renderer
@@ -452,6 +464,8 @@ class FigureCanvasAgg(FigureCanvasBase):
         if need_new_renderer:
             self.renderer = RendererAgg(w, h, self.figure.dpi)
             self._lastKey = key
+        elif cleared:
+            self.renderer.clear()
         return self.renderer
 
     def tostring_rgb(self):

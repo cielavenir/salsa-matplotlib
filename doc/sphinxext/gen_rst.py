@@ -2,32 +2,41 @@
 generate the rst files for the examples by iterating over the pylab examples
 """
 from __future__ import print_function
-import os, glob
-
+import io
 import os
 import re
 import sys
-fileList = []
+
+import sphinx.errors
+
+
+exclude_example_sections = ['widgets']
+noplot_regex = re.compile(r"#\s*-\*-\s*noplot\s*-\*-")
+
 
 def out_of_date(original, derived):
     """
     Returns True if derivative is out-of-date wrt original,
     both of which are full file paths.
 
-    TODO: this check isn't adequate in some cases.  Eg, if we discover
+    TODO: this check isn't adequate in some cases.  e.g., if we discover
     a bug when building the examples, the original and derived will be
     unchanged but we still want to force a rebuild.
     """
     return (not os.path.exists(derived) or
             os.stat(derived).st_mtime < os.stat(original).st_mtime)
 
-noplot_regex = re.compile(r"#\s*-\*-\s*noplot\s*-\*-")
-
 def generate_example_rst(app):
     rootdir = os.path.join(app.builder.srcdir, 'mpl_examples')
     exampledir = os.path.join(app.builder.srcdir, 'examples')
     if not os.path.exists(exampledir):
         os.makedirs(exampledir)
+
+    example_sections = list(app.builder.config.mpl_example_sections)
+    for i, (subdir, title) in enumerate(example_sections):
+        if subdir in exclude_example_sections:
+            example_sections.pop(i)
+    example_subdirs, titles = zip(*example_sections)
 
     datad = {}
     for root, subFolders, files in os.walk(rootdir):
@@ -37,15 +46,15 @@ def generate_example_rst(app):
                 continue
 
             fullpath = os.path.join(root,fname)
-            contents = file(fullpath).read()
+            contents = io.open(fullpath, encoding='utf8').read()
             # indent
             relpath = os.path.split(root)[-1]
             datad.setdefault(relpath, []).append((fullpath, fname, contents))
 
-    subdirs = datad.keys()
+    subdirs = list(datad.keys())
     subdirs.sort()
 
-    fhindex = file(os.path.join(exampledir, 'index.rst'), 'w')
+    fhindex = open(os.path.join(exampledir, 'index.rst'), 'w')
     fhindex.write("""\
 .. _examples-index:
 
@@ -77,7 +86,7 @@ Matplotlib Examples
             os.makedirs(outputdir)
 
         subdirIndexFile = os.path.join(rstdir, 'index.rst')
-        fhsubdirIndex = file(subdirIndexFile, 'w')
+        fhsubdirIndex = open(subdirIndexFile, 'w')
         fhindex.write('    %s/index.rst\n\n'%subdir)
 
         fhsubdirIndex.write("""\
@@ -114,39 +123,34 @@ Matplotlib Examples
 
             fhsubdirIndex.write('    %s <%s>\n'%(os.path.basename(basename),rstfile))
 
-            do_plot = (subdir in ('api',
-                                  'pylab_examples',
-                                  'units',
-                                  'mplot3d',
-                                  'axes_grid',
-                                  ) and
-                       not noplot_regex.search(contents))
+            do_plot = (subdir in example_subdirs
+                       and not noplot_regex.search(contents))
             if not do_plot:
-                fhstatic = file(outputfile, 'w')
+                fhstatic = io.open(outputfile, 'w', encoding='utf-8')
                 fhstatic.write(contents)
                 fhstatic.close()
 
             if not out_of_date(fullpath, outrstfile):
                 continue
 
-            fh = file(outrstfile, 'w')
-            fh.write('.. _%s-%s:\n\n'%(subdir, basename))
+            fh = io.open(outrstfile, 'w', encoding='utf-8')
+            fh.write(u'.. _%s-%s:\n\n' % (subdir, basename))
             title = '%s example code: %s'%(subdir, fname)
             #title = '<img src=%s> %s example code: %s'%(thumbfile, subdir, fname)
 
-            fh.write(title + '\n')
-            fh.write('='*len(title) + '\n\n')
+            fh.write(title + u'\n')
+            fh.write(u'=' * len(title) + u'\n\n')
 
             if do_plot:
-                fh.write("\n\n.. plot:: %s\n\n::\n\n" % fullpath)
+                fh.write(u"\n\n.. plot:: %s\n\n::\n\n" % fullpath)
             else:
-                fh.write("[`source code <%s>`_]\n\n::\n\n" % fname)
+                fh.write(u"[`source code <%s>`_]\n\n::\n\n" % fname)
 
             # indent the contents
-            contents = '\n'.join(['    %s'%row.rstrip() for row in contents.split('\n')])
+            contents = u'\n'.join([u'    %s'%row.rstrip() for row in contents.split(u'\n')])
             fh.write(contents)
 
-            fh.write('\n\nKeywords: python, matplotlib, pylab, example, codex (see :ref:`how-to-search-examples`)')
+            fh.write(u'\n\nKeywords: python, matplotlib, pylab, example, codex (see :ref:`how-to-search-examples`)')
             fh.close()
 
         fhsubdirIndex.close()
@@ -157,3 +161,8 @@ Matplotlib Examples
 
 def setup(app):
     app.connect('builder-inited', generate_example_rst)
+
+    try: # multiple plugins may use mpl_example_sections
+        app.add_config_value('mpl_example_sections', [], True)
+    except sphinx.errors.ExtensionError:
+        pass # mpl_example_sections already defined

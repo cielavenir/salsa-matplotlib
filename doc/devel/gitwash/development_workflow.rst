@@ -106,7 +106,8 @@ In more detail
 Asking for code review
 ======================
 
-#. Go to your repo URL |emdash| e.g. ``http://github.com/your-user-name/matplotlib``.
+#. Go to your repo URL |emdash| e.g.,
+   ``http://github.com/your-user-name/matplotlib``.
 #. Click on the *Branch list* button:
 
    .. image:: branch_list.png
@@ -133,6 +134,9 @@ The generated comparison, is between your feature branch
 without interfering with the output from the comparison.  More detail?
 Note the three dots in the URL above (``master...my-new-feature``) and
 see :ref:`dot2-dot3`.
+
+It's a good idea to consult the :ref:`pull-request-checklist` to make
+sure your pull request is ready for merging.
 
 Asking for your changes to be merged into the main repo
 =======================================================

@@ -53,7 +53,7 @@
 
 const size_t NUM_VERTICES[] = { 1, 1, 1, 2, 3, 1 };
 
-typedef agg::pixfmt_rgba32 pixfmt;
+typedef agg::pixfmt_rgba32_plain pixfmt;
 typedef agg::renderer_base<pixfmt> renderer_base;
 typedef agg::renderer_scanline_aa_solid<renderer_base> renderer_aa;
 typedef agg::renderer_scanline_bin_solid<renderer_base> renderer_bin;
@@ -62,6 +62,7 @@ typedef agg::rasterizer_scanline_aa<agg::rasterizer_sl_clip_dbl> rasterizer;
 typedef agg::scanline_p8 scanline_p8;
 typedef agg::scanline_bin scanline_bin;
 typedef agg::amask_no_clip_gray8 alpha_mask_type;
+typedef agg::scanline_u8_am<alpha_mask_type> scanline_am;
 
 typedef agg::renderer_base<agg::pixfmt_gray8> renderer_base_alpha_mask_type;
 typedef agg::renderer_scanline_aa_solid<renderer_base_alpha_mask_type> renderer_alpha_mask_type;
@@ -121,6 +122,7 @@ public:
 
     double linewidth;
     double alpha;
+    bool forced_alpha;
     agg::rgba color;
 
     Py::Object cliprect;
@@ -135,6 +137,10 @@ public:
 
     Py::Object hatchpath;
 
+    double sketch_scale;
+    double sketch_length;
+    double sketch_randomness;
+
 protected:
     agg::rgba get_color(const Py::Object& gc);
     double points_to_pixels(const Py::Object& points);
@@ -146,6 +152,7 @@ protected:
     void _set_antialiased(const Py::Object& gc);
     void _set_snap(const Py::Object& gc);
     void _set_hatch_path(const Py::Object& gc);
+    void _set_sketch_params(const Py::Object& gc);
 };
 
 
@@ -215,7 +222,7 @@ public:
     agg::pixfmt_gray8 pixfmtAlphaMask;
     renderer_base_alpha_mask_type rendererBaseAlphaMask;
     renderer_alpha_mask_type rendererAlphaMask;
-    agg::scanline_p8 scanlineAlphaMask;
+    scanline_am scanlineAlphaMask;
 
     scanline_p8 slineP8;
     scanline_bin slineBin;
@@ -237,7 +244,7 @@ public:
 protected:
     double points_to_pixels(const Py::Object& points);
     agg::rgba rgb_to_color(const Py::SeqBase<Py::Object>& rgb, double alpha);
-    facepair_t _get_rgba_face(const Py::Object& rgbFace, double alpha);
+    facepair_t _get_rgba_face(const Py::Object& rgbFace, double alpha, bool forced_alpha);
 
     template<class R>
     void set_clipbox(const Py::Object& cliprect, R& rasterizer);

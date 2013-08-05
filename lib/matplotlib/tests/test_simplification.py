@@ -28,7 +28,7 @@ def test_clipping():
     ax.plot(t, s, linewidth=1.0)
     ax.set_ylim((-0.20, -0.28))
 
-@image_comparison(baseline_images=['overflow'], tol=1e-2, remove_text=True)
+@image_comparison(baseline_images=['overflow'], remove_text=True)
 def test_overflow():
     x = np.array([1.0,2.0,3.0,2.0e5])
     y = np.arange(len(x))
@@ -152,7 +152,7 @@ AAj1//+nPwAA/////w=="""
     verts = np.fromstring(decodebytes(data), dtype='<i4')
     verts = verts.reshape((len(verts) / 2, 2))
     path = Path(verts)
-    segs = path.iter_segments(transforms.IdentityTransform, clip=(0.0, 0.0, 100.0, 100.0))
+    segs = path.iter_segments(transforms.IdentityTransform(), clip=(0.0, 0.0, 100.0, 100.0))
     segs = list(segs)
     assert len(segs) == 1
     assert segs[0][1] == Path.MOVETO
@@ -168,7 +168,7 @@ def test_throw_rendering_complexity_exceeded():
     ax = fig.add_subplot(111)
     ax.plot(xx, yy)
     try:
-        fig.savefig(io.StringIO())
+        fig.savefig(io.BytesIO())
     finally:
         rcParams['path.simplify'] = True
 

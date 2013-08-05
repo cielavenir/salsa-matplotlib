@@ -43,7 +43,7 @@ License   : matplotlib license (PSF compatible)
             see license/LICENSE_TTFQUERY.
 """
 
-import os, sys, subprocess, warnings
+import os, sys, warnings
 try:
     set
 except NameError:
@@ -51,9 +51,10 @@ except NameError:
 import matplotlib
 from matplotlib import afm
 from matplotlib import ft2font
-from matplotlib import rcParams, get_configdir
+from matplotlib import rcParams, get_cachedir
 from matplotlib.cbook import is_string_like
 import matplotlib.cbook as cbook
+from matplotlib.compat import subprocess
 from matplotlib.fontconfig_pattern import \
     parse_fontconfig_pattern, generate_fontconfig_pattern
 
@@ -272,7 +273,7 @@ def get_fontconfig_fonts(fontext='ttf'):
     try:
         pipe = subprocess.Popen(['fc-list', '', 'file'], stdout=subprocess.PIPE)
         output = pipe.communicate()[0]
-    except OSError:
+    except OSError, IOError:
         # Calling fc-list did not work, so we'll just return nothing
         return fontfiles
 
@@ -390,14 +391,14 @@ def ttfFontProperty(font):
     sfnt2 = sfnt.get((1,0,0,2))
     sfnt4 = sfnt.get((1,0,0,4))
     if sfnt2:
-        sfnt2 = sfnt2.lower()
+        sfnt2 = sfnt2.decode('ascii').lower()
     else:
         sfnt2 = ''
     if sfnt4:
-        sfnt4 = sfnt4.lower()
+        sfnt4 = sfnt4.decode('ascii').lower()
     else:
         sfnt4 = ''
-    if   sfnt4.find('oblique') >= 0:
+    if sfnt4.find('oblique') >= 0:
         style = 'oblique'
     elif sfnt4.find('italic') >= 0:
         style = 'italic'
@@ -454,7 +455,7 @@ def ttfFontProperty(font):
     #  Absolute sizes are: xx-small, x-small, small, medium, large, x-large,
     #    and xx-large.
     #  Relative sizes are: larger, smaller
-    #  Length value is an absolute font size, e.g. 12pt
+    #  Length value is an absolute font size, e.g., 12pt
     #  Percentage values are in 'em's.  Most robust specification.
 
     #  !!!!  Incomplete
@@ -523,7 +524,7 @@ def afmFontProperty(fontpath, font):
     #  Absolute sizes are: xx-small, x-small, small, medium, large, x-large,
     #    and xx-large.
     #  Relative sizes are: larger, smaller
-    #  Length value is an absolute font size, e.g. 12pt
+    #  Length value is an absolute font size, e.g., 12pt
     #  Percentage values are in 'em's.  Most robust specification.
 
     #  All AFM fonts are apparently scalable.
@@ -565,7 +566,10 @@ def createFontList(fontfiles, fontext='ttf'):
             except RuntimeError:
                 verbose.report("Could not parse font file %s"%fpath)
                 continue
-            prop = afmFontProperty(fpath, font)
+            try:
+                prop = afmFontProperty(fpath, font)
+            except KeyError:
+                continue
         else:
             try:
                 font = ft2font.FT2Font(str(fpath))
@@ -576,7 +580,10 @@ def createFontList(fontfiles, fontext='ttf'):
                 verbose.report("Cannot handle unicode filenames")
                 #print >> sys.stderr, 'Bad file is', fpath
                 continue
-            prop = ttfFontProperty(font)
+            try:
+                prop = ttfFontProperty(font)
+            except KeyError:
+                continue
 
         fontlist.append(prop)
     return fontlist
@@ -612,7 +619,7 @@ class FontProperties(object):
 
       - size: Either an relative value of 'xx-small', 'x-small',
         'small', 'medium', 'large', 'x-large', 'xx-large' or an
-        absolute font size, e.g. 12
+        absolute font size, e.g., 12
 
     The default font property for TrueType fonts (as specified in the
     default :file:`matplotlibrc` file) is::
@@ -623,7 +630,7 @@ class FontProperties(object):
     .ttf file, by using the *fname* kwarg.
 
     The preferred usage of font sizes is to use the relative values,
-    e.g.  'large', instead of absolute font sizes, e.g. 12.  This
+    e.g.,  'large', instead of absolute font sizes, e.g., 12.  This
     approach allows all text sizes to be made larger or smaller based
     on the font manager's default font size.
 
@@ -771,7 +778,7 @@ class FontProperties(object):
                 return float(self._size)
             except ValueError:
                 pass
-        default_size = fontManager.get_default_size()
+        default_size = FontManager.get_default_size()
         return default_size * font_scalings.get(self._size)
 
     def get_file(self):
@@ -798,14 +805,15 @@ class FontProperties(object):
         """
         Change the font family.  May be either an alias (generic name
         is CSS parlance), such as: 'serif', 'sans-serif', 'cursive',
-        'fantasy', or 'monospace', or a real font name.
+        'fantasy', or 'monospace', a real font name or a list of real
+        font names.  Real font names are not supported when
+        `text.usetex` is `True`.
         """
         if family is None:
-            self._family = None
-        else:
-            if is_string_like(family):
-                family = [family]
-            self._family = family
+            family = rcParams['font.family']
+        if is_string_like(family):
+            family = [family]
+        self._family = family
     set_name = set_family
 
     def set_style(self, style):
@@ -813,6 +821,8 @@ class FontProperties(object):
         Set the font style.  Values are: 'normal', 'italic' or
         'oblique'.
         """
+        if style is None:
+            style = rcParams['font.style']
         if style not in ('normal', 'italic', 'oblique', None):
             raise ValueError("style must be normal, italic or oblique")
         self._slant = style
@@ -822,6 +832,8 @@ class FontProperties(object):
         """
         Set the font variant.  Values are: 'normal' or 'small-caps'.
         """
+        if variant is None:
+            variant = rcParams['font.variant']
         if variant not in ('normal', 'small-caps', None):
             raise ValueError("variant must be normal or small-caps")
         self._variant = variant
@@ -833,14 +845,15 @@ class FontProperties(object):
         'regular', 'book', 'medium', 'roman', 'semibold', 'demibold',
         'demi', 'bold', 'heavy', 'extra bold', 'black'
         """
-        if weight is not None:
-            try:
-                weight = int(weight)
-                if weight < 0 or weight > 1000:
-                    raise ValueError()
-            except ValueError:
-                if weight not in weight_dict:
-                    raise ValueError("weight is invalid")
+        if weight is None:
+            weight = rcParams['font.weight']
+        try:
+            weight = int(weight)
+            if weight < 0 or weight > 1000:
+                raise ValueError()
+        except ValueError:
+            if weight not in weight_dict:
+                raise ValueError("weight is invalid")
         self._weight = weight
 
     def set_stretch(self, stretch):
@@ -850,28 +863,30 @@ class FontProperties(object):
         'semi-expanded', 'expanded', 'extra-expanded' or
         'ultra-expanded', or a numeric value in the range 0-1000.
         """
-        if stretch is not None:
-            try:
-                stretch = int(stretch)
-                if stretch < 0 or stretch > 1000:
-                    raise ValueError()
-            except ValueError:
-                if stretch not in stretch_dict:
-                    raise ValueError("stretch is invalid")
+        if stretch is None:
+            stretch = rcParams['font.stretch']
+        try:
+            stretch = int(stretch)
+            if stretch < 0 or stretch > 1000:
+                raise ValueError()
+        except ValueError:
+            if stretch not in stretch_dict:
+                raise ValueError("stretch is invalid")
         self._stretch = stretch
 
     def set_size(self, size):
         """
         Set the font size.  Either an relative value of 'xx-small',
         'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
-        or an absolute font size, e.g. 12.
+        or an absolute font size, e.g., 12.
         """
-        if size is not None:
-            try:
-                size = float(size)
-            except ValueError:
-                if size is not None and size not in font_scalings:
-                    raise ValueError("size is invalid")
+        if size is None:
+            size = rcParams['font.size']
+        try:
+            size = float(size)
+        except ValueError:
+            if size is not None and size not in font_scalings:
+                raise ValueError("size is invalid")
         self._size = size
 
     def set_file(self, file):
@@ -991,7 +1006,10 @@ class FontManager:
         self.afmfiles = findSystemFonts(paths, fontext='afm') + \
             findSystemFonts(fontext='afm')
         self.afmlist = createFontList(self.afmfiles, fontext='afm')
-        self.defaultFont['afm'] = self.afmfiles[0]
+        if len(self.afmfiles):
+            self.defaultFont['afm'] = self.afmfiles[0]
+        else:
+            self.defaultFont['afm'] = None
 
         self.ttf_lookup_cache = {}
         self.afm_lookup_cache = {}
@@ -1002,7 +1020,8 @@ class FontManager:
         """
         return self.__default_weight
 
-    def get_default_size(self):
+    @staticmethod
+    def get_default_size():
         """
         Return the default font size.
         """
@@ -1047,9 +1066,12 @@ class FontManager:
                 options = [x.lower() for x in options]
                 if family2 in options:
                     idx = options.index(family2)
-                    return 0.1 * (float(idx) / len(options))
+                    return ((0.1 * (float(idx) / len(options))) *
+                            (float(i) / float(len(families))))
             elif family1 == family2:
-                return 0.0
+                # The score should be weighted by where in the
+                # list the font was found.
+                return float(i) / float(len(families))
         return 1.0
 
     def score_style(self, style1, style2):
@@ -1262,6 +1284,7 @@ def is_opentype_cff_font(filename):
     return False
 
 fontManager = None
+_fmcache = None
 
 # The experimental fontconfig-based backend.
 if USE_FONTCONFIG and sys.platform != 'win32':
@@ -1273,16 +1296,17 @@ if USE_FONTCONFIG and sys.platform != 'win32':
         try:
             pipe = subprocess.Popen(['fc-match', '-sv', pattern], stdout=subprocess.PIPE)
             output = pipe.communicate()[0]
-        except OSError:
+        except OSError, IOError:
             return None
         if pipe.returncode == 0:
             for match in _fc_match_regex.finditer(output):
                 file = match.group(1)
+                file = file.decode(sys.getfilesystemencoding())
                 if os.path.splitext(file)[1][1:] in fontexts:
                     return file
         return None
 
-    _fc_match_regex = re.compile(r'\sfile:\s+"([^"]*)"')
+    _fc_match_regex = re.compile(br'\sfile:\s+"([^"]*)"')
     _fc_match_cache = {}
 
     def findfont(prop, fontext='ttf'):
@@ -1300,28 +1324,37 @@ if USE_FONTCONFIG and sys.platform != 'win32':
         return result
 
 else:
-    if sys.version_info[0] >= 3:
-        _fmcache = os.path.join(get_configdir(), 'fontList.py3k.cache')
+    if not 'TRAVIS' in os.environ:
+        cachedir = get_cachedir()
+        if cachedir is not None:
+            if sys.version_info[0] >= 3:
+                _fmcache = os.path.join(cachedir, 'fontList.py3k.cache')
+            else:
+                _fmcache = os.path.join(cachedir, 'fontList.cache')
     else:
-        _fmcache = os.path.join(get_configdir(), 'fontList.cache')
+        _fmcache = None
 
     fontManager = None
 
     def _rebuild():
         global fontManager
         fontManager = FontManager()
-        pickle_dump(fontManager, _fmcache)
+        if _fmcache:
+            pickle_dump(fontManager, _fmcache)
         verbose.report("generated new fontManager")
 
-    try:
-        fontManager = pickle_load(_fmcache)
-        if (not hasattr(fontManager, '_version') or
-            fontManager._version != FontManager.__version__):
+    if _fmcache:
+        try:
+            fontManager = pickle_load(_fmcache)
+            if (not hasattr(fontManager, '_version') or
+                fontManager._version != FontManager.__version__):
+                _rebuild()
+            else:
+                fontManager.default_size = None
+                verbose.report("Using fontManager instance from %s" % _fmcache)
+        except:
             _rebuild()
-        else:
-            fontManager.default_size = None
-            verbose.report("Using fontManager instance from %s" % _fmcache)
-    except:
+    else:
         _rebuild()
 
     def findfont(prop, **kw):
