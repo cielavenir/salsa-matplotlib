@@ -1,3 +1,18 @@
+matplotlib (1.3.0-2) UNRELEASED; urgency=low
+
+  * Acknowledge NMU, thanks Anton Gladky; Closes: #719065
+
+ -- Sandro Tosi <morph@debian.org>  Mon, 30 Sep 2013 23:54:51 +0200
+
+matplotlib (1.3.0-1.1) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Fix error in font_manager.py: UnicodeDecodeError when starting 
+    ipython --pylab. (Closes: #719065)
+  * Fix AttributeError error where there are no writable directories.
+
+ -- Anton Gladky <gladk@debian.org>  Sun, 29 Sep 2013 16:10:15 +0200
+
 matplotlib (1.3.0-1) unstable; urgency=low
 
   [ Sandro Tosi ]

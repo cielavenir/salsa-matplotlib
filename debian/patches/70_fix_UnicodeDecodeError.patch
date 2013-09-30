@@ -1,0 +1,78 @@
+Description: UnicodeDecodeError when starting ipython --pylab
+Author: Michael Droettboom <mdboom@gmail.com>
+Bug-Debian: http://bugs.debian.org/719065
+Origin: UnicodeDecodeError when starting ipython --pylab
+Reviewed-By: Anton Gladky <gladk@debian.org>
+Last-Update: 2013-09-29
+
+--- matplotlib-1.3.0.orig/lib/matplotlib/font_manager.py
++++ matplotlib-1.3.0/lib/matplotlib/font_manager.py
+@@ -391,11 +391,11 @@ def ttfFontProperty(font):
+     sfnt2 = sfnt.get((1,0,0,2))
+     sfnt4 = sfnt.get((1,0,0,4))
+     if sfnt2:
+-        sfnt2 = sfnt2.decode('ascii').lower()
++        sfnt2 = sfnt2.decode('macroman').lower()
+     else:
+         sfnt2 = ''
+     if sfnt4:
+-        sfnt4 = sfnt4.decode('ascii').lower()
++        sfnt4 = sfnt4.decode('macroman').lower()
+     else:
+         sfnt4 = ''
+     if sfnt4.find('oblique') >= 0:
+--- matplotlib-1.3.0.orig/lib/matplotlib/texmanager.py
++++ matplotlib-1.3.0/lib/matplotlib/texmanager.py
+@@ -169,7 +169,7 @@ Could not rename old TeX cache dir "%s":
+         ff = rcParams['font.family']
+         if len(ff) == 1 and ff[0].lower() in self.font_families:
+             self.font_family = ff[0].lower()
+-        elif ff.lower() in self.font_families:
++        elif isinstance(ff, basestring) and ff.lower() in self.font_families:
+             self.font_family = ff.lower()
+         else:
+             mpl.verbose.report(
+--- matplotlib-1.3.0.orig/lib/matplotlib/textpath.py
++++ matplotlib-1.3.0/lib/matplotlib/textpath.py
+@@ -63,7 +63,7 @@ class TextToPath(object):
+         """
+         sfnt = font.get_sfnt()
+         try:
+-            ps_name = sfnt[(1, 0, 0, 6)].decode('ascii')
++            ps_name = sfnt[(1, 0, 0, 6)].decode('macroman')
+         except KeyError:
+             ps_name = sfnt[(3, 1, 0x0409, 6)].decode('utf-16be')
+         char_id = urllib.quote('%s-%x' % (ps_name, ccode))
+--- matplotlib-1.3.0.orig/lib/matplotlib/backends/backend_ps.py
++++ matplotlib-1.3.0/lib/matplotlib/backends/backend_ps.py
+@@ -750,10 +750,11 @@ grestore
+             self.set_color(*gc.get_rgb())
+             sfnt = font.get_sfnt()
+             try:
+-                ps_name = sfnt[(1,0,0,6)]
++                ps_name = sfnt[(1,0,0,6)].decode('macroman')
+             except KeyError:
+                 ps_name = sfnt[(3,1,0x0409,6)].decode(
+-                    'utf-16be').encode('ascii','replace')
++                    'utf-16be')
++            ps_name = ps_name.encode('ascii','replace')
+             self.set_font(ps_name, prop.get_size_in_points())
+ 
+             cmap = font.get_charmap()
+--- matplotlib-1.3.0.orig/lib/matplotlib/backends/backend_pdf.py
++++ matplotlib-1.3.0/lib/matplotlib/backends/backend_pdf.py
+@@ -1002,11 +1002,12 @@ end"""
+         # You are lost in a maze of TrueType tables, all different...
+         sfnt = font.get_sfnt()
+         try:
+-            ps_name = sfnt[(1,0,0,6)] # Macintosh scheme
++            ps_name = sfnt[(1,0,0,6)].decode('macroman') # Macintosh scheme
+         except KeyError:
+             # Microsoft scheme:
+-            ps_name = sfnt[(3,1,0x0409,6)].decode('utf-16be').encode('ascii','replace')
++            ps_name = sfnt[(3,1,0x0409,6)].decode('utf-16be')
+             # (see freetype/ttnameid.h)
++        ps_name = ps_name.encode('ascii', 'replace')
+         ps_name = Name(ps_name)
+         pclt = font.get_sfnt_table('pclt') \
+             or { 'capHeight': 0, 'xHeight': 0 }
