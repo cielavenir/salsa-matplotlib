@@ -71,10 +71,14 @@ Depends: python-dateutil,
          ${misc:Depends},
          ${python:Depends},
          ${shlibs:Depends}
-Recommends: python-glade2, python-tk (>= 2.5.2-1.1)
+Recommends: python-glade2,
+            python-imaging,
+            python-tk (>= 2.5.2-1.1)
 Enhances: ipython
 Suggests: dvipng,
           gir1.2-gtk-3.0,
+          ghostscript,
+          inkscape,
           ipython (>= 0.6.3),
           librsvg2-common,
           python-cairo,
@@ -109,10 +113,13 @@ Depends: python3-dateutil,
          ${misc:Depends},
          ${python3:Depends},
          ${shlibs:Depends}
-Recommends: python3-tk
+Recommends: python3-imaging,
+            python3-tk
 Enhances: ipython3
 Suggests: dvipng,
           gir1.2-gtk-3.0,
+          ghostscript,
+          inkscape,
           ipython3,
           librsvg2-common,
           python-matplotlib-doc,
