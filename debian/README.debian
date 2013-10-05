@@ -42,3 +42,15 @@ so usually, you can have a backend if you have the Python bindings installed:
   QT   -> python-qt4, python-sip
   WX   -> python-wxgtk2.6 or python-wxgtk2.8
   GTK3 -> gir1.2-gtk-3.0, python-gi, python-gobject
+
+
+Use MatplotLib with pkg_resources.require()
+-------------------------------------------
+
+If you want to use MatplotLib like this:
+
+  python -c 'import pkg_resources; pkg_resources.require("matplotlib")'
+
+(also in the Python3 flavour), you'll have to instal python-nose and
+python-tornado (as specified in the Suggest field) or python3-nose and
+python3-tornado if you're aiming at py3k.
