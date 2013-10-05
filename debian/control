@@ -95,7 +95,8 @@ Suggests: dvipng,
           python-traits (>= 2.0),
           python-wxgtk2.8,
           texlive-extra-utils,
-          texlive-latex-extra
+          texlive-latex-extra,
+          ttf-staypuft
 Description: Python based plotting system in a style similar to Matlab
  Matplotlib is a pure Python plotting library designed to bring
  publication quality plotting to Python with a syntax familiar to
@@ -132,7 +133,8 @@ Suggests: dvipng,
           python3-sip,
           python3-tornado,
           texlive-extra-utils,
-          texlive-latex-extra
+          texlive-latex-extra,
+          ttf-staypuft
 Description: Python based plotting system in a style similar to Matlab (Python 3)
  Matplotlib is a pure Python plotting library designed to bring
  publication quality plotting to Python with a syntax familiar to

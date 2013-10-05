@@ -1,0 +1,19 @@
+Description: Try to use also StayPuft (a free font) for xkcd
+Author: Sandro Tosi <morph@debian.org>
+Origin: vendor
+Bug: http://bugs.debian.org/720549
+Forwarded: not-needed
+Last-Update: 2013-10-06
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/lib/matplotlib/pyplot.py
++++ b/lib/matplotlib/pyplot.py
+@@ -289,7 +289,7 @@ def xkcd(scale=1, length=100, randomness
+     from matplotlib import patheffects
+     context = rc_context()
+     try:
+-        rcParams['font.family'] = ['Humor Sans', 'Comic Sans MS']
++        rcParams['font.family'] = ['Humor Sans', 'Comic Sans MS', 'StayPuft']
+         rcParams['font.size'] = 14.0
+         rcParams['path.sketch'] = (scale, length, randomness)
+         rcParams['path.effects'] = [
