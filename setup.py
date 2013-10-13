@@ -46,6 +46,8 @@ except ImportError:
 else:
     del sdist.sdist.make_release_tree
 
+from distutils.dist import Distribution
+
 import setupext
 from setupext import print_line, print_raw, print_message, print_status
 
@@ -126,6 +128,7 @@ if __name__ == '__main__':
     package_data = {}
     package_dir = {'': 'lib'}
     install_requires = []
+    setup_requires = []
     default_backend = None
 
 
@@ -188,6 +191,7 @@ if __name__ == '__main__':
             package_data.setdefault(key, [])
             package_data[key] = list(set(val + package_data[key]))
         install_requires.extend(package.get_install_requires())
+        setup_requires.extend(package.get_setup_requires())
 
     # Write the default matplotlibrc file
     if default_backend is None:
@@ -204,6 +208,27 @@ if __name__ == '__main__':
     if setupext.options['verbose']:
         for mod in ext_modules:
             mod.extra_compile_args.append('-DVERBOSE')
+
+
+    extra_args = {}
+    if sys.version_info[0] >= 3:
+        # Automatically 2to3 source on Python 3.x.  This isn't set on
+        # Python 2 because it's not needed, and some really old
+        # versions of distribute don't support it.
+        extra_args['use_2to3'] = True
+
+    # Finalize the extension modules so they can get the Numpy include
+    # dirs
+    for mod in ext_modules:
+        mod.finalize()
+
+
+    # Avoid installing setup_requires dependencies if the user just
+    # queries for information
+    if (any('--' + opt in sys.argv for opt in
+           Distribution.display_option_names + ['help']) or
+        'clean' in sys.argv):
+        setup_requires = []
 
 
     # Finally, pass this all along to distutils to do the heavy lifting.
@@ -233,12 +258,12 @@ if __name__ == '__main__':
 
           # List third-party Python packages that we require
           install_requires=install_requires,
-
-          # Automatically 2to3 source on Python 3.x
-          use_2to3=True,
+          setup_requires=setup_requires,
 
           # matplotlib has C/C++ extensions, so it's not zip safe.
           # Telling setuptools this prevents it from doing an automatic
           # check for zip safety.
           zip_safe=False,
+
+          **extra_args
          )

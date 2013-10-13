@@ -1462,6 +1462,7 @@ lib/matplotlib/tests/baseline_images/test_axes/hist_stacked_stepfilled_alpha.svg
 lib/matplotlib/tests/baseline_images/test_axes/hist_stacked_weights.pdf
 lib/matplotlib/tests/baseline_images/test_axes/hist_stacked_weights.png
 lib/matplotlib/tests/baseline_images/test_axes/hist_stacked_weights.svg
+lib/matplotlib/tests/baseline_images/test_axes/hist_step.png
 lib/matplotlib/tests/baseline_images/test_axes/hist_steplog.pdf
 lib/matplotlib/tests/baseline_images/test_axes/hist_steplog.png
 lib/matplotlib/tests/baseline_images/test_axes/hist_steplog.svg
@@ -1486,6 +1487,9 @@ lib/matplotlib/tests/baseline_images/test_axes/markevery_line.svg
 lib/matplotlib/tests/baseline_images/test_axes/mixed_collection.pdf
 lib/matplotlib/tests/baseline_images/test_axes/mixed_collection.png
 lib/matplotlib/tests/baseline_images/test_axes/mixed_collection.svg
+lib/matplotlib/tests/baseline_images/test_axes/mollweide_grid.pdf
+lib/matplotlib/tests/baseline_images/test_axes/mollweide_grid.png
+lib/matplotlib/tests/baseline_images/test_axes/mollweide_grid.svg
 lib/matplotlib/tests/baseline_images/test_axes/nonfinite_limits.pdf
 lib/matplotlib/tests/baseline_images/test_axes/nonfinite_limits.png
 lib/matplotlib/tests/baseline_images/test_axes/nonfinite_limits.svg

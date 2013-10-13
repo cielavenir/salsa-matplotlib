@@ -97,11 +97,12 @@ Occasionally the internal documentation (python docstrings) will refer
 to MATLAB&reg;, a registered trademark of The MathWorks, Inc.
 
 """
-from __future__ import print_function
+from __future__ import print_function, absolute_import
 
 import sys
+import distutils.version
 
-__version__  = '1.3.0'
+__version__  = '1.3.1'
 __version__numpy__ = '1.5' # minimum required numpy version
 
 try:
@@ -109,20 +110,46 @@ try:
 except ImportError:
     raise ImportError("matplotlib requires dateutil")
 
+def compare_versions(a, b):
+    "return True if a is greater than or equal to b"
+    if a:
+        a = distutils.version.LooseVersion(a)
+        b = distutils.version.LooseVersion(b)
+        if a>=b: return True
+        else: return False
+    else: return False
+
 try:
     import pyparsing
 except ImportError:
     raise ImportError("matplotlib requires pyparsing")
 else:
-    _required = [1, 5, 6]
-    if [int(x) for x in pyparsing.__version__.split('.')] < _required:
+    if not compare_versions(pyparsing.__version__, '1.5.6'):
         raise ImportError(
-            "matplotlib requires pyparsing >= {0}".format(
-                '.'.join(str(x) for x in _required)))
+            "matplotlib requires pyparsing >= 1.5.6")
+
+    # pyparsing 2.0.0 bug, but it may be patched in distributions
+    try:
+        f = pyparsing.Forward()
+        f <<= pyparsing.Literal('a')
+        bad_pyparsing = f is None
+    except:
+        bad_pyparsing = True
+
+    # pyparsing 1.5.6 does not have <<= on the Forward class, but
+    # pyparsing 2.0.0 and later will spew deprecation warnings if
+    # using << instead.  Additionally, the <<= in pyparsing 1.5.7 is
+    # broken, since it doesn't return self.  In order to support
+    # pyparsing 1.5.6 and above with a common code base, this small
+    # monkey patch is applied.
+    if bad_pyparsing:
+        def _forward_ilshift(self, other):
+            self.__lshift__(other)
+            return self
+        pyparsing.Forward.__ilshift__ = _forward_ilshift
 
 import os, re, shutil, warnings
 import distutils.sysconfig
-import distutils.version
 
 # cbook must import matplotlib only within function
 # definitions, so it is safe to import from it here.
@@ -135,12 +162,6 @@ except NameError:
     # Python 3
     from imp import reload
 
-# Needed for toolkit setuptools support
-if 0:
-    try:
-        __import__('pkg_resources').declare_namespace(__name__)
-    except ImportError:
-        pass # must not have setuptools
 
 if not hasattr(sys, 'argv'):  # for modpython
     sys.argv = ['modpython']
@@ -180,14 +201,10 @@ if not _python24:
 
 
 import numpy
-from distutils import version
-expected_version = version.LooseVersion(__version__numpy__)
-found_version = version.LooseVersion(numpy.__version__)
-if not found_version >= expected_version:
+if not compare_versions(numpy.__version__, __version__numpy__):
     raise ImportError(
         'numpy %s or later is required; you have %s' % (
             __version__numpy__, numpy.__version__))
-del version
 
 
 def _is_writable_dir(p):
@@ -322,17 +339,22 @@ def checkdep_dvipng():
         return None
 
 def checkdep_ghostscript():
-    try:
-        if sys.platform == 'win32':
-            command_args = ['gswin32c', '--version']
-        else:
-            command_args = ['gs', '--version']
-        s = subprocess.Popen(command_args, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-        v = byte2str(s.stdout.read()[:-1])
-        return v
-    except (IndexError, ValueError, OSError):
-        return None
+    if sys.platform == 'win32':
+        gs_execs = ['gswin32c', 'gswin64c', 'gs']
+    else:
+        gs_execs = ['gs']
+    for gs_exec in gs_execs:
+        try:
+            s = subprocess.Popen(
+                [gs_exec, '--version'], stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE)
+            stdout, stderr = s.communicate()
+            if s.returncode == 0:
+                v = byte2str(stdout[:-1])
+                return gs_exec, v
+        except (IndexError, ValueError, OSError):
+            pass
+    return None, None
 
 def checkdep_tex():
     try:
@@ -381,15 +403,6 @@ def checkdep_xmllint():
     except (IndexError, ValueError, UnboundLocalError, OSError):
         return None
 
-def compare_versions(a, b):
-    "return True if a is greater than or equal to b"
-    if a:
-        a = distutils.version.LooseVersion(a)
-        b = distutils.version.LooseVersion(b)
-        if a>=b: return True
-        else: return False
-    else: return False
-
 def checkdep_ps_distiller(s):
     if not s:
         return False
@@ -397,7 +410,7 @@ def checkdep_ps_distiller(s):
     flag = True
     gs_req = '7.07'
     gs_sugg = '7.07'
-    gs_v = checkdep_ghostscript()
+    gs_exec, gs_v = checkdep_ghostscript()
     if compare_versions(gs_v, gs_sugg): pass
     elif compare_versions(gs_v, gs_req):
         verbose.report(('ghostscript-%s found. ghostscript-%s or later '
@@ -452,7 +465,7 @@ def checkdep_usetex(s):
                        'backend unless dvipng-1.5 or later is '
                        'installed on your system')
 
-    gs_v = checkdep_ghostscript()
+    gs_exec, gs_v = checkdep_ghostscript()
     if compare_versions(gs_v, gs_sugg): pass
     elif compare_versions(gs_v, gs_req):
         verbose.report(('ghostscript-%s found. ghostscript-%s or later is '
@@ -1037,6 +1050,7 @@ def rcdefaults():
     the rc file, but mpl's internal params.  See rc_file_defaults for
     reloading the default params from the rc file
     """
+    rcParams.clear()
     rcParams.update(rcParamsDefault)
 
 
@@ -1096,7 +1110,7 @@ def rc_file_defaults():
     rcParams.update(rcParamsOrig)
 
 _use_error_msg = """ This call to matplotlib.use() has no effect
-because the the backend has already been chosen;
+because the backend has already been chosen;
 matplotlib.use() must be called *before* pylab, matplotlib.pyplot,
 or matplotlib.backends is imported for the first time.
 """

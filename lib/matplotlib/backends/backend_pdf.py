@@ -1002,11 +1002,12 @@ end"""
         # You are lost in a maze of TrueType tables, all different...
         sfnt = font.get_sfnt()
         try:
-            ps_name = sfnt[(1,0,0,6)] # Macintosh scheme
+            ps_name = sfnt[(1,0,0,6)].decode('macroman') # Macintosh scheme
         except KeyError:
             # Microsoft scheme:
-            ps_name = sfnt[(3,1,0x0409,6)].decode('utf-16be').encode('ascii','replace')
+            ps_name = sfnt[(3,1,0x0409,6)].decode('utf-16be')
             # (see freetype/ttnameid.h)
+        ps_name = ps_name.encode('ascii', 'replace')
         ps_name = Name(ps_name)
         pclt = font.get_sfnt_table('pclt') \
             or { 'capHeight': 0, 'xHeight': 0 }
@@ -1545,6 +1546,7 @@ class RendererPdf(RendererBase):
 
         if not len(facecolors):
             filled = False
+            can_do_optimization = not gc.get_hatch()
         else:
             if np.all(facecolors[:, 3] == facecolors[0, 3]):
                 filled = facecolors[0, 3] != 0.0
@@ -2137,11 +2139,12 @@ class GraphicsContextPdf(GraphicsContextBase):
         """Set clip rectangle. Calls self.pop() and self.push()."""
         cmds = []
         # Pop graphics state until we hit the right one or the stack is empty
-        while (self._cliprect, self._clippath) != (cliprect, clippath) \
-                and self.parent is not None:
+        while ((self._cliprect, self._clippath) != (cliprect, clippath)
+                and self.parent is not None):
             cmds.extend(self.pop())
         # Unless we hit the right one, set the clip polygon
-        if (self._cliprect, self._clippath) != (cliprect, clippath):
+        if ((self._cliprect, self._clippath) != (cliprect, clippath) or
+            self.parent is None):
             cmds.extend(self.push())
             if self._cliprect != cliprect:
                 cmds.extend([cliprect, Op.rectangle, Op.clip, Op.endpath])
@@ -2246,15 +2249,12 @@ class PdfPages(object):
     Use like this::
 
         # Initialize:
-        pp = PdfPages('foo.pdf')
+        with PdfPages('foo.pdf') as pdf:
 
-        # As many times as you like, create a figure fig, then either:
-        fig.savefig(pp, format='pdf') # note the format argument!
-        # or:
-        pp.savefig(fig)
-
-        # Once you are done, remember to close the object:
-        pp.close()
+            # As many times as you like, create a figure fig and save it:
+            # When no figure is specified the current figure is saved
+            pdf.savefig(fig)
+            pdf.savefig()
 
     (In reality PdfPages is a thin wrapper around PdfFile, in order to
     avoid confusion when using savefig and forgetting the format
@@ -2269,6 +2269,12 @@ class PdfPages(object):
         file with the same name is overwritten.
         """
         self._file = PdfFile(filename)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     def close(self):
         """
@@ -2304,6 +2310,12 @@ class PdfPages(object):
                 raise ValueError("No such figure: " + repr(figure))
             else:
                 figureManager.canvas.figure.savefig(self, format='pdf', **kwargs)
+
+    def get_pagecount(self):
+        """
+        Returns the current number of pages in the multipage pdf file.
+        """
+        return len(self._file.pageList)
 
 class FigureCanvasPdf(FigureCanvasBase):
     """

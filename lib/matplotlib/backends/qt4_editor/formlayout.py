@@ -49,6 +49,8 @@ import sys
 STDERR = sys.stderr
 
 from matplotlib.backends.qt4_compat import QtGui,QtCore
+from matplotlib.colors import rgb2hex
+
 if not hasattr(QtGui,'QFormLayout'):
     raise ImportError, "Warning: formlayout requires PyQt4 >v4.3 or PySide"
 
@@ -92,17 +94,32 @@ class ColorButton(QPushButton):
     def get_color(self):
         return self._color
 
-    @pyqtSignature("QColor")
+    @QtCore.Slot("QColor")
     def set_color(self, color):
         if color != self._color:
             self._color = color
             self.emit(SIGNAL("colorChanged(QColor)"), self._color)
             pixmap = QPixmap(self.iconSize())
             pixmap.fill(color)
-            self.setIcon(QIcon(pixmap))
+            self.setIcon(QtGui.QIcon(pixmap))
 
-    color = pyqtProperty("QColor", get_color, set_color)
+    color = QtCore.Property("QColor", get_color, set_color)
 
+def col2hex(color):
+    """Convert matplotlib color to hex before passing to Qt"""
+    return rgb2hex(colorConverter.to_rgb(color))
+
+def to_qcolor(color):
+    """Create a QColor from a matplotlib color"""
+    qcolor = QtGui.QColor()
+    color = str(color)
+    try:
+        color = col2hex(color)
+    except ValueError:
+        #print('WARNING: ignoring invalid color %r' % color)
+        return qcolor # return invalid QColor
+    qcolor.setNamedColor(color) # set using hex color
+    return qcolor # return valid QColor
 
 def text_to_qcolor(text):
     """

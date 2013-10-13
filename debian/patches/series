@@ -3,4 +3,4 @@
 40_bts608939_draw_markers_description.patch
 50_bts608942_spaces_in_param_args.patch
 60_deal_with_no_writable_dirs.patch
-70_fix_UnicodeDecodeError.patch
+70_bts720549_try_StayPuft_for_xkcd.patch
