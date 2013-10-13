@@ -1,4 +1,4 @@
-matplotlib (1.3.1-1) UNRELEASED; urgency=low
+matplotlib (1.3.1-1) unstable; urgency=low
 
   * New upstream release
   * Acknowledge NMU, thanks Anton Gladky; Closes: #719065, #719384
@@ -16,7 +16,7 @@ matplotlib (1.3.1-1) UNRELEASED; urgency=low
     - try also StayPuft font when using xkcd style function; thanks to Elena
       Grandi for the report; Closes: #720549
 
- -- Sandro Tosi <morph@debian.org>  Sat, 12 Oct 2013 17:15:00 +0200
+ -- Sandro Tosi <morph@debian.org>  Sun, 13 Oct 2013 10:47:22 +0200
 
 matplotlib (1.3.0-1.1) unstable; urgency=low
 
