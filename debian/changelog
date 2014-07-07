@@ -1,5 +1,6 @@
 matplotlib (1.3.1-2) UNRELEASED; urgency=low
 
+  [ Sandro Tosi ]
   * debian/control
     - added python3-gi-cairo to Suggest for py3k package; thanks to Arnaud
       Gardelein for the report; Closes: #730728
@@ -7,6 +8,16 @@ matplotlib (1.3.1-2) UNRELEASED; urgency=low
       patch; Closes: #743899
   * debian/python-matplotlib.preinst
     - removed, no longer needed
+
+  [ Julian Taylor ]
+  * fix_infinite_recursion.diff:
+    fix infinite recursion in units with ndarray subclasses (Closes: #729590)
+  * multiarch-tktcl.patch:
+    fix missing tkagg due to multiarch tktcl (Closes: #750630)
+  * update to tcl/tk 8.6 to match what python-tk is using (Closes: #752548)
+  * add python{,3}-tk-dbg build depends for debugging enabled tk backend
+    (Closes: #714948)
+  * add autopkg tests for the basic backends
 
  -- Sandro Tosi <morph@debian.org>  Sat, 19 Apr 2014 23:04:06 +0200
 

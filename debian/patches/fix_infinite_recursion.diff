@@ -1,0 +1,22 @@
+Description: fix infinite recursion in units with ndarray subclasses
+Origin: upstream, https://github.com/matplotlib/matplotlib/commit/21fd7c03ba1444
+Bug-Debian: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=729590
+Last-Update: 2013-12-24
+
+--- a/lib/matplotlib/units.py
++++ b/lib/matplotlib/units.py
+@@ -145,7 +145,13 @@
+                     return converter
+             except AttributeError:
+                 # not a masked_array
+-                converter = self.get_converter(xravel[0])
++                # Make sure we don't recurse forever -- it's possible for
++                # ndarray subclasses to continue to return subclasses and
++                # not ever return a non-subclass for a single element.
++                next_item = xravel[0]
++                if (not isinstance(next_item, np.ndarray) or
++                    next_item.shape != x.shape):
++                    converter = self.get_converter(next_item)
+                 return converter
+ 
+         if converter is None and iterable(x):

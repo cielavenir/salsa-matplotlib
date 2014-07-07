@@ -1,0 +1,6 @@
+#!/bin/sh
+set -efu
+
+pys="$(pyversions -r 2>/dev/null) $(py3versions -r 2>/dev/null)"
+
+BACKEND="Qt4Agg" pys=$pys debian/tests/backend-base
