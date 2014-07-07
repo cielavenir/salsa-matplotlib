@@ -42,7 +42,7 @@ ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 					print(b.build_platlib)") \
 	MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ \
 	MPLCONFIGDIR=. \
-		xvfb-run python$* -c "import matplotlib as m ; m.test(verbosity=1)"
+		xvfb-run -a python$* -c "import matplotlib as m ; m.test(verbosity=1)"
 
 	-PYTHONPATH=$(shell python$*-dbg -c "from distutils.command.build import build ; \
 	                                    from distutils.core import Distribution ; \
@@ -51,7 +51,7 @@ ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 					    print(b.build_platlib)") \
 	MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ \
 	MPLCONFIGDIR=. \
-		xvfb-run python$*-dbg -c "import matplotlib as m ; m.test(verbosity=1)"
+		xvfb-run -a python$*-dbg -c "import matplotlib as m ; m.test(verbosity=1)"
 	rm -f matplotlibrc
 endif
 
