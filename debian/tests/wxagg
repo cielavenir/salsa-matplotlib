@@ -1,0 +1,7 @@
+#!/bin/sh
+set -efu
+
+pys="$(pyversions -r 2>/dev/null)"
+
+# todo check why debug fails
+BACKEND="WXAgg" pys=$pys DEBUG=no debian/tests/backend-base 2>&1

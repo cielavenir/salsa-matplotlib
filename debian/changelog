@@ -1,3 +1,40 @@
+matplotlib (1.3.1-2) unstable; urgency=low
+
+  [ Sandro Tosi ]
+  * debian/control
+    - added python3-gi-cairo to Suggest for py3k package; thanks to Arnaud
+      Gardelein for the report; Closes: #730728
+    - fix Recommends to python3-pil; thanks to Ryo IGARASHI for the report and
+      patch; Closes: #743899
+  * debian/python-matplotlib.preinst
+    - removed, no longer needed
+
+  [ Julian Taylor ]
+  * debian/patches/fix_infinite_recursion.patch
+    - fix infinite recursion in units.py with ndarray subclasses
+      (Closes: #729590)
+  * debian/patches/gtk3{agg,cairo}_check_no-multiprocessing.patch
+    - do not use backend_gtk3{cairo,agg}_internal_check with multiprocessing.
+      Workaround to resolve the deadlock in setup.py
+  * debian/patches/multiarch-tktcl.patch
+    - fixed missing tkagg due to absent path to multiarch tktcl
+      (Closes: #750630)
+  * debian/{control,rules}
+    - depend and use packaged jquery instead of shipped minified variants
+      (Closes: #737438)
+  * debian/control
+    - added python{,3}-tk-dbg build depends for debugging enabled tk backend
+      (Closes: #714948)
+    - updated build-depends to use tcl/tk 8.6 to match what python-tk is
+      using (Closes: #752548)
+  * debian/tests
+    - added autopkg tests for the basic backends (Closes: #734988)
+  * debian/rules
+    - run xvfb-run with the -a flag to allow multiple instances at the same
+      time
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 10 Jul 2014 15:48:15 -0400
+
 matplotlib (1.3.1-1) unstable; urgency=low
 
   * New upstream release

@@ -42,7 +42,7 @@ ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 					print(b.build_platlib)") \
 	MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ \
 	MPLCONFIGDIR=. \
-		xvfb-run python$* -c "import matplotlib as m ; m.test(verbosity=1)"
+		xvfb-run -a python$* -c "import matplotlib as m ; m.test(verbosity=1)"
 
 	-PYTHONPATH=$(shell python$*-dbg -c "from distutils.command.build import build ; \
 	                                    from distutils.core import Distribution ; \
@@ -51,7 +51,7 @@ ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 					    print(b.build_platlib)") \
 	MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ \
 	MPLCONFIGDIR=. \
-		xvfb-run python$*-dbg -c "import matplotlib as m ; m.test(verbosity=1)"
+		xvfb-run -a python$*-dbg -c "import matplotlib as m ; m.test(verbosity=1)"
 	rm -f matplotlibrc
 endif
 
@@ -125,6 +125,16 @@ install-%-stamp: build-%-stamp
 	rm -rf $(CURDIR)/debian/$(pdbg)/usr/lib/python$*/site-packages/matplotlib/mpl-data/
 	rm -rf $(CURDIR)/debian/$(pdbg)/usr/lib/python$*/site-packages/matplotlib/backends/Matplotlib.nib/
 
+	# replace minified jquery with packaged version and hope it works
+	for i in $(PY2VERS); do \
+	    dh_link -ppython-matplotlib usr/share/javascript/jquery/jquery.min.js \
+	      usr/lib/python$$i/site-packages/matplotlib/backends/web_backend/jquery/js/jquery-1.7.1.min.js; \
+	    dh_link -ppython-matplotlib usr/share/javascript/jquery-ui/jquery-ui.min.js \
+	      usr/lib/python$$i/site-packages/matplotlib/backends/web_backend/jquery/js/jquery-ui.min.js; \
+	    dh_link -ppython-matplotlib usr/share/javascript/jquery-ui/css/smoothness/jquery-ui.min.css \
+	      usr/lib/python$$i/site-packages/matplotlib/backends/web_backend/jquery/css/themes/base/jquery-ui.min.css; \
+	done
+
 	touch $@
 
 install-py3-%-stamp: build-%-stamp
@@ -149,6 +159,14 @@ install-py3-%-stamp: build-%-stamp
 
 	rm -rf $(CURDIR)/debian/$(p3dbg)/usr/lib/python3/dist-packages/matplotlib/mpl-data/
 	rm -rf $(CURDIR)/debian/$(p3dbg)/usr/lib/python3/dist-packages/matplotlib/backends/Matplotlib.nib/
+
+	# replace minified jquery with packaged version and hope it works
+	dh_link -ppython3-matplotlib usr/share/javascript/jquery/jquery.min.js \
+	  usr/lib/python3/dist-packages/matplotlib/backends/web_backend/jquery/js/jquery-1.7.1.min.js
+	dh_link -ppython3-matplotlib usr/share/javascript/jquery-ui/jquery-ui.min.js \
+	  usr/lib/python3/dist-packages/matplotlib/backends/web_backend/jquery/js/jquery-ui.min.js
+	dh_link  -ppython3-matplotlib usr/share/javascript/jquery-ui/css/smoothness/jquery-ui.min.css \
+	  usr/lib/python3/dist-packages/matplotlib/backends/web_backend/jquery/css/themes/base/jquery-ui.min.css
 
 	touch $@
 

@@ -42,18 +42,20 @@ Build-Depends: debhelper (>= 7),
                python-sphinx (>= 1.0.7+dfsg),
                python-support (>= 1.0.0),
                python-tk (>= 2.5.2-1.1),
+               python-tk-dbg (>= 2.5.2-1.1),
                python3-tk,
+               python3-tk-dbg,
                python-tornado,
                python3-tornado,
                python-tz,
                python3-tz,
                python-wxgtk2.8,
                python-xlwt,
-               tcl8.5-dev,
+               tcl8.6-dev,
                texlive-fonts-recommended,
                texlive-latex-extra,
                texlive-latex-recommended,
-               tk8.5-dev,
+               tk8.6-dev,
                xauth,
                xvfb,
                zlib1g-dev
@@ -63,6 +65,7 @@ Standards-Version: 3.9.4
 Homepage: http://matplotlib.org/
 Vcs-Svn: svn://anonscm.debian.org/python-modules/packages/matplotlib/trunk/
 Vcs-Browser: http://anonscm.debian.org/viewvc/python-modules/packages/matplotlib/trunk/
+XS-Testsuite: autopkgtest
 
 Package: python-matplotlib
 Architecture: any
@@ -70,6 +73,8 @@ Depends: python-dateutil,
          python-matplotlib-data (>= ${source:Version}),
          python-pyparsing,
          python-tz,
+         libjs-jquery,
+         libjs-jquery-ui,
          ${misc:Depends},
          ${python:Depends},
          ${shlibs:Depends}
@@ -113,10 +118,12 @@ Depends: python3-dateutil,
          python3-pyparsing,
          python3-six,
          python3-tz,
+         libjs-jquery,
+         libjs-jquery-ui,
          ${misc:Depends},
          ${python3:Depends},
          ${shlibs:Depends}
-Recommends: python3-imaging,
+Recommends: python3-pil,
             python3-tk
 Enhances: ipython3
 Suggests: dvipng,
@@ -128,6 +135,7 @@ Suggests: dvipng,
           python-matplotlib-doc,
           python3-cairo,
           python3-gi,
+          python3-gi-cairo,
           python3-gobject,
           python3-nose,
           python3-pyqt4,
