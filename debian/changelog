@@ -1,4 +1,4 @@
-matplotlib (1.3.1-2) UNRELEASED; urgency=low
+matplotlib (1.3.1-2) unstable; urgency=low
 
   [ Sandro Tosi ]
   * debian/control
@@ -10,19 +10,27 @@ matplotlib (1.3.1-2) UNRELEASED; urgency=low
     - removed, no longer needed
 
   [ Julian Taylor ]
-  * fix_infinite_recursion.diff:
-    fix infinite recursion in units with ndarray subclasses (Closes: #729590)
-  * multiarch-tktcl.patch:
-    fix missing tkagg due to multiarch tktcl (Closes: #750630)
-  * update to tcl/tk 8.6 to match what python-tk is using (Closes: #752548)
-  * add python{,3}-tk-dbg build depends for debugging enabled tk backend
-    (Closes: #714948)
-  * add autopkg tests for the basic backends (Closes: #734988)
-  * depend and use packaged jquery instead of shipped minified variants
-    (Closes: #737438)
-  * run xvfb-run with the -a flag to allow multiple instances at the same time
+  * debian/patches/fix_infinite_recursion.diff
+    - fix infinite recursion in units.py with ndarray subclasses
+      (Closes: #729590)
+  * debian/patches/multiarch-tktcl.patch
+    - fixed missing tkagg due to absent path to multiarch tktcl
+      (Closes: #750630)
+  * debian/{control,rules}
+    - depend and use packaged jquery instead of shipped minified variants
+      (Closes: #737438)
+  * debian/control
+    - added python{,3}-tk-dbg build depends for debugging enabled tk backend
+      (Closes: #714948)
+    - updated build-depends to use tcl/tk 8.6 to match what python-tk is
+      using (Closes: #752548)
+  * debian/tests
+    - added autopkg tests for the basic backends (Closes: #734988)
+  * debian/rules
+    - run xvfb-run with the -a flag to allow multiple instances at the same
+      time
 
- -- Sandro Tosi <morph@debian.org>  Sat, 19 Apr 2014 23:04:06 +0200
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 10 Jul 2014 15:48:15 -0400
 
 matplotlib (1.3.1-1) unstable; urgency=low
 
