@@ -10,9 +10,14 @@ matplotlib (1.3.1-2) unstable; urgency=low
     - removed, no longer needed
 
   [ Julian Taylor ]
-  * debian/patches/fix_infinite_recursion.diff
+  * debian/patches/fix_infinite_recursion.patch
     - fix infinite recursion in units.py with ndarray subclasses
       (Closes: #729590)
+  * debian/patches/gtk3agg_check_no-multiprocessing.patch
+    - fix infinite recursion in units.py with ndarray subclasses
+      (Closes: #729590)
+    - do not use backend_gtk3agg_internal_check with multiprocessing.
+      Workaround to resolve the deadlock in setup.py
   * debian/patches/multiarch-tktcl.patch
     - fixed missing tkagg due to absent path to multiarch tktcl
       (Closes: #750630)

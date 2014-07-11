@@ -1,0 +1,39 @@
+Author: Julian Taylor <jtaylor.debian@googlemail.com>
+Subject: Avoid using multiprocessing to figure out if Agg backend should be used
+
+   Seems to cause a dead-lock on many Debian systems.
+   We have all necessary dependencies to support Agg so enable the backend
+   unconditionally.
+
+Origin: Ubuntu
+Last-Update: 2014-07-10
+
+--- a/setupext.py
++++ b/setupext.py
+@@ -1587,24 +1587,9 @@ class BackendGtk3Agg(OptionalBackendPack
+         # This check needs to be performed out-of-process, because
+         # importing gi and then importing regular old pygtk afterward
+         # segfaults the interpreter.
+-        try:
+-            p = multiprocessing.Pool()
+-        except:
+-            return "unknown (can not use multiprocessing to determine)"
+-        try:
+-            success, msg = p.map(backend_gtk3agg_internal_check, [0])[0]
+-        except:
+-            success = False
+-            msg = "Could not determine"
+-        finally:
+-            p.close()
+-            p.join()
+-        if success:
+-            BackendAgg.force = True
++        BackendAgg.force = True
+ 
+-            return msg
+-        else:
+-            raise CheckFailed(msg)
++        return "ok"
+ 
+     def get_package_data(self):
+         return {'matplotlib': ['mpl-data/*.glade']}
