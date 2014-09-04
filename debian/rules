@@ -1,5 +1,7 @@
 #!/usr/bin/make -f
 
+export XDG_RUNTIME_DIR=/tmp
+
 PY2VERS := $(shell pyversions -v -r debian/control)
 PY3VERS := $(shell py3versions -v -r debian/control)
 DEFPY := $(shell pyversions -v -d)
