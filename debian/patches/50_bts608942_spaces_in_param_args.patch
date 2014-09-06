@@ -16,8 +16,8 @@ Description: don't separate param and its argument with a space
 +        :param ny,ny1: same as nx and nx1, but for row positions.
          """
  
- 
-@@ -253,12 +253,12 @@ class Divider(object):
+         figW, figH = self._fig.get_size_inches()
+@@ -250,12 +250,12 @@ class Divider(object):
          (:class:`mpl_toolkits.axes_grid.axes_divider.AxesLocator`) for
          specified cell.
  
@@ -32,7 +32,7 @@ Description: don't separate param and its argument with a space
          """
          return AxesLocator(self, nx, ny, nx1, ny1)
  
-@@ -299,12 +299,12 @@ class AxesLocator(object):
+@@ -298,12 +298,12 @@ class AxesLocator(object):
          """
          :param axes_divider: An instance of AxesDivider class.
  
