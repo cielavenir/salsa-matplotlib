@@ -211,7 +211,7 @@ binary-arch: build-arch install-arch
 	dh_testdir -a
 	dh_testroot -a
 	dh_installchangelogs -a CHANGELOG
-	dh_installdocs -p$(p) -a README.rst TODO
+	dh_installdocs -p$(p) -a README.rst
 	# make python scripts starting with '#!' executable
 	for i in `find debian -mindepth 2 -type f ! -perm 755`; do \
 		if head -1 $$i | grep -q '^#!'; then \
@@ -219,7 +219,7 @@ binary-arch: build-arch install-arch
 			echo "made executable: $$i"; \
 		fi; \
 	done
-	dh_pysupport -a
+	dh_python2 -a
 	dh_python3 -a
 	dh_link -a
 	dh_lintian -a

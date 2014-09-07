@@ -9,6 +9,7 @@ matplotlib (1.4.0-1) UNRELEASED; urgency=medium
     - updated b-d to new requirements
   * debian/rules
     - export XDG_RUNTIME_DIR to prevent build stuck
+    - removed TODO installation in -doc package, no longer shipped
   * debian/patches/*
     - refreshed, removed patches merged upstream
 
@@ -16,7 +17,7 @@ matplotlib (1.4.0-1) UNRELEASED; urgency=medium
   * debian/control:
     - update python{,3}-pyparsing dependency to the required version >= 1.5.6
 
- -- Sandro Tosi <morph@debian.org>  Sat, 06 Sep 2014 20:49:30 +0100
+ -- Sandro Tosi <morph@debian.org>  Sun, 07 Sep 2014 14:07:01 +0100
 
 matplotlib (1.3.1-2) unstable; urgency=low
 

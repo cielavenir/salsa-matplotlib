@@ -4,6 +4,7 @@ Priority: optional
 Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
 Uploaders: Sandro Tosi <morph@debian.org>
 Build-Depends: debhelper (>= 7),
+               dh-python,
                dvipng,
                ghostscript,
                graphviz,
@@ -45,7 +46,6 @@ Build-Depends: debhelper (>= 7),
                python-six,
                python3-six,
                python-sphinx (>= 1.0.7+dfsg),
-               python-support (>= 1.0.0),
                python-tk (>= 2.5.2-1.1),
                python-tk-dbg (>= 2.5.2-1.1),
                python3-tk,
