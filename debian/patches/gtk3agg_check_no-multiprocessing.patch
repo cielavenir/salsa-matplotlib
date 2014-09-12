@@ -10,7 +10,7 @@ Last-Update: 2014-07-10
 
 --- a/setupext.py
 +++ b/setupext.py
-@@ -1587,24 +1587,9 @@ class BackendGtk3Agg(OptionalBackendPack
+@@ -1744,24 +1744,9 @@ class BackendGtk3Agg(OptionalBackendPack
          # This check needs to be performed out-of-process, because
          # importing gi and then importing regular old pygtk afterward
          # segfaults the interpreter.

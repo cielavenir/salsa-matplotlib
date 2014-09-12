@@ -2,9 +2,7 @@
 20_matplotlibrc_path_search_fix.patch
 40_bts608939_draw_markers_description.patch
 50_bts608942_spaces_in_param_args.patch
-60_deal_with_no_writable_dirs.patch
 70_bts720549_try_StayPuft_for_xkcd.patch
 multiarch-tktcl.patch
-fix_infinite_recursion.patch
 gtk3agg_check_no-multiprocessing.patch
 gtk3cairo_check_no-multiprocessing.patch

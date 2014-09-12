@@ -1,4 +1,7 @@
-from __future__ import print_function
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
+
+import six
 
 import numpy as np
 from numpy import ma
@@ -446,7 +449,7 @@ class SymmetricalLogScale(ScaleBase):
 
         assert base > 1.0
         assert linthresh > 0.0
-        assert linscale >= 1.0
+        assert linscale > 0.0
 
         self._transform = self.SymmetricalLogTransform(base,
                                                        linthresh,
@@ -483,7 +486,7 @@ _scale_mapping = {
 
 
 def get_scale_names():
-    names = _scale_mapping.keys()
+    names = list(six.iterkeys(_scale_mapping))
     names.sort()
     return names
 

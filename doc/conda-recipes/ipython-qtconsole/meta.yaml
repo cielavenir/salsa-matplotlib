@@ -1,0 +1,25 @@
+package:
+  name: ipython-qtconsole
+  version: 1.0.0a1
+
+requirements:
+  run:
+    - python
+    - ipython
+    - pyside
+    - pygments
+    - python.app
+
+build:
+  number: 2
+
+app:
+  entry: pythonw ipython qtconsole [osx]
+  entry: ipython qtconsole [not osx]
+  icon: ipy.png
+  summary: IPython QtConsole
+  type: desk
+
+about:
+  home: http://ipython.org/
+  license: BSD

@@ -4,6 +4,7 @@ Priority: optional
 Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
 Uploaders: Sandro Tosi <morph@debian.org>
 Build-Depends: debhelper (>= 7),
+               dh-python,
                dvipng,
                ghostscript,
                graphviz,
@@ -23,24 +24,28 @@ Build-Depends: debhelper (>= 7),
                python3-gi,
                python-gtk2-dev,
                python-imaging,
+               python-mock,
+               python3-mock,
                python-nose,
                python3-nose,
-               python-numpy (>= 1:1.5.1-4),
-               python-numpy-dbg (>= 1:1.5.1-4),
+               python-numpy,
+               python-numpy-dbg,
                python-numpydoc,
                python3-numpy,
                python3-numpy-dbg,
                python-pkg-resources,
                python3-pkg-resources,
-               python-pyparsing,
-               python3-pyparsing,
+               python-pyparsing (>= 1.5.6),
+               python3-pyparsing (>= 1.5.6),
                python-qt4,
                python3-pyqt4,
+               python-pyqt5,
+               python3-pyqt5,
                python-setuptools,
                python3-setuptools,
+               python-six,
                python3-six,
                python-sphinx (>= 1.0.7+dfsg),
-               python-support (>= 1.0.0),
                python-tk (>= 2.5.2-1.1),
                python-tk-dbg (>= 2.5.2-1.1),
                python3-tk,
@@ -61,7 +66,7 @@ Build-Depends: debhelper (>= 7),
                zlib1g-dev
 XS-Python-Version: all
 X-Python3-Version: >= 3.2
-Standards-Version: 3.9.4
+Standards-Version: 3.9.5
 Homepage: http://matplotlib.org/
 Vcs-Svn: svn://anonscm.debian.org/python-modules/packages/matplotlib/trunk/
 Vcs-Browser: http://anonscm.debian.org/viewvc/python-modules/packages/matplotlib/trunk/
@@ -71,7 +76,7 @@ Package: python-matplotlib
 Architecture: any
 Depends: python-dateutil,
          python-matplotlib-data (>= ${source:Version}),
-         python-pyparsing,
+         python-pyparsing (>= 1.5.6),
          python-tz,
          libjs-jquery,
          libjs-jquery-ui,
@@ -115,7 +120,7 @@ Package: python3-matplotlib
 Architecture: any
 Depends: python3-dateutil,
          python-matplotlib-data (>= ${source:Version}),
-         python3-pyparsing,
+         python3-pyparsing (>= 1.5.6),
          python3-six,
          python3-tz,
          libjs-jquery,

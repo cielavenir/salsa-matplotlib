@@ -1371,7 +1371,7 @@ TrapezoidMapTriFinder::find_many(const Py::Tuple& args)
     PyArrayObject* y = (PyArrayObject*)PyArray_ContiguousFromObject(
                            args[1].ptr(), PyArray_DOUBLE, 0, 0);
     bool ok = (x != 0 && y != 0 && PyArray_NDIM(x) == PyArray_NDIM(y));
-    int ndim = PyArray_NDIM(x);
+    int ndim = x == 0 ? 0 : PyArray_NDIM(x);
     for (int i = 0; ok && i < ndim; ++i)
         ok = (PyArray_DIM(x,i) == PyArray_DIM(y,i));
 
@@ -2177,14 +2177,14 @@ TrapezoidMapTriFinder::Trapezoid::set_upper_right(Trapezoid* upper_right_)
 
 
 RandomNumberGenerator::RandomNumberGenerator(unsigned long seed)
-    : _M(21870), _A(1291), _C(4621), _seed(seed % _M)
+    : _m(21870), _a(1291), _c(4621), _seed(seed % _m)
 {}
 
 unsigned long
 RandomNumberGenerator::operator()(unsigned long max_value)
 {
-    _seed = (_seed*_A + _C) % _M;
-    return (_seed*max_value) / _M;
+    _seed = (_seed*_a + _c) % _m;
+    return (_seed*max_value) / _m;
 }
 
 

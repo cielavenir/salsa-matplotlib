@@ -1,8 +1,8 @@
 .. _developers-guide-index:
 
-####################################
-  The Matplotlib Developers' Guide
-####################################
+################################
+The Matplotlib Developers' Guide
+################################
 
 .. htmlonly::
 
@@ -13,6 +13,7 @@
    :maxdepth: 2
 
    coding_guide.rst
+   portable_code.rst
    license.rst
    gitwash/index.rst
    testing.rst

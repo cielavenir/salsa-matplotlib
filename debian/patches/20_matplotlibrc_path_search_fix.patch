@@ -4,7 +4,7 @@ Author: Sandro Tosi <morph@debian.org>
 
 --- a/lib/matplotlib/__init__.py
 +++ b/lib/matplotlib/__init__.py
-@@ -607,10 +607,12 @@ def _get_data_path():
+@@ -653,10 +653,12 @@ def _get_data_path():
              raise RuntimeError('Path in environment MATPLOTLIBDATA not a directory')
          return path
  
@@ -18,8 +18,8 @@ Author: Sandro Tosi <morph@debian.org>
      # setuptools' namespace_packages may highjack this init file
      # so need to try something known to be in matplotlib, not basemap
      import matplotlib.afm
-@@ -727,7 +729,7 @@ def matplotlib_fname():
-                     _get_xdg_config_dir())
+@@ -777,7 +779,7 @@ def matplotlib_fname():
+                     home, '.matplotlib', 'matplotlibrc')
              return fname
  
 -    path = get_data_path()  # guaranteed to exist or raise

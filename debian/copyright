@@ -3,7 +3,6 @@ Upstream-Name: matplotlib
 Upstream-Contact: John D. Hunter, Michael Droettboom <mdroe@stsci.edu>
 Source: http://matplotlib.org
 
-
 Files: *
 Copyright: Copyright (c) 2002 - 2012 John Hunter, Darren Dale, Eric Firing, Michael Droettboom and the matplotlib development team; 2012 - 2013 The matplotlib development team
 License:
@@ -62,7 +61,7 @@ License:
  Agreement.
 
 Files: debian/*
-Copyright: Copyright (C) 2008-2013 Sandro Tosi <morph@debian.org>
+Copyright: Copyright (C) 2008-2014 Sandro Tosi <morph@debian.org>
 License: same as upstream
 
 Files: lib/matplotlib/fontconfig_pattern.py
@@ -407,7 +406,7 @@ License: Simplified BSD
  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Files: ttconv/*
+Files: extern/ttconv/*
 Copyright: Copyright 1995, Trinity College Computing Center.  Written by David Chappell.
 License:
  Permission to use, copy, modify, and distribute this software and its
@@ -417,7 +416,7 @@ License:
  documentation.  This software and documentation are provided "as is" without
  express or implied warranty.
 
-Files: CXX/*
+Files: extern/CXX/*
 Copyright: Copyright (c) 1998 - 2007, The Regents of the University of California
            Produced at the Lawrence Livermore National Laboratory
            All rights reserved.
@@ -447,10 +446,38 @@ License:
  OUT OF THE  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
  DAMAGE.
 
-Files: agg24/*
+Files: extern/agg24/*
 Copyright: Copyright (C) 2002-2005 Maxim Shemanarev (http://www.antigrain.com)
 License:
  Permission to copy, use, modify, sell and distribute this software
  is granted provided this copyright notice appears in all copies.
  This software is provided "as is" without express or implied
  warranty, and with no claim as to its suitability for any purpose.
+
+Files: extern/qhull/*
+Copyright: Copyright (c) 1993-2012 C.B. Barber and The Geometry Center
+License:
+ This software includes Qhull from C.B. Barber and The Geometry Center.
+ Qhull is copyrighted as noted above.  Qhull is free software and may
+ be obtained via http from www.qhull.org.  It may be freely copied, modified,
+ and redistributed under the following conditions:
+ .
+ 1. All copyright notices must remain intact in all files.
+ .
+ 2. A copy of this text file must be distributed along with any copies
+    of Qhull that you redistribute; this includes copies that you have
+    modified, or copies of programs or other software products that
+    include Qhull.
+ .
+ 3. If you modify Qhull, you must include a notice giving the
+    name of the person performing the modification, the date of
+    modification, and the reason for such modification.
+ .
+ 4. When distributing modified versions of Qhull, or other software
+    products that include Qhull, you must provide notice that the original
+    source code may be obtained as noted above.
+ .
+ 5. There is no warranty or other guarantee of fitness for Qhull, it is
+    provided solely "as is".  Bug reports or fixes may be sent to
+    qhull_bug@qhull.org; the authors may or may not act on them as
+    they desire.
