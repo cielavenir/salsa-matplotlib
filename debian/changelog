@@ -4,8 +4,10 @@ matplotlib (1.4.0-2) UNRELEASED; urgency=medium
     - bump deps to WX 3.0; thanks to Olly Betts for the report; Closes: #759094
   * debian/patches/nbagg_py3k_compatibility.patch
     - fix nbagg backend compatibility with py3k
+  * debian/tests/backend-base
+    - help mpl turn off interactive mode
 
- -- Sandro Tosi <morph@debian.org>  Sun, 21 Sep 2014 11:16:21 +0100
+ -- Sandro Tosi <morph@debian.org>  Sun, 21 Sep 2014 11:31:10 +0100
 
 matplotlib (1.4.0-1) experimental; urgency=medium
 
