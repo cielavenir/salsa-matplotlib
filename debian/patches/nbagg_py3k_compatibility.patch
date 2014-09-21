@@ -1,0 +1,201 @@
+From 126fb9c3eb820ecf08bca5efb8796eb0a55d9cd6 Mon Sep 17 00:00:00 2001
+From: Thomas A Caswell <tcaswell@gmail.com>
+Date: Wed, 3 Sep 2014 16:23:20 -0400
+Subject: [PATCH 1/3] BUG : fix list comprehensions over class members
+
+Due to scoping fixes in py3k, list comprehensions over class level
+attributes during class definition does not work (see
+http://stackoverflow.com/questions/13905741/accessing-class-variables-from-a-list-comprehension-in-the-class-definition).
+
+Superficially Fixes #3436. There seem to be other issues
+---
+ lib/matplotlib/backends/backend_nbagg.py       | 22 +++++++++++-----------
+ lib/matplotlib/backends/backend_webagg_core.py | 20 ++++++++++----------
+ 2 files changed, 21 insertions(+), 21 deletions(-)
+
+diff --git a/lib/matplotlib/backends/backend_nbagg.py b/lib/matplotlib/backends/backend_nbagg.py
+index c69c558..7676609 100644
+--- a/lib/matplotlib/backends/backend_nbagg.py
++++ b/lib/matplotlib/backends/backend_nbagg.py
+@@ -63,25 +63,25 @@ def connection_info():
+                   str(len(pylab_helpers.Gcf._activeQue)))
+     return '\n'.join(result)
+ 
++# Note: Version 3.2 icons, not the later 4.0 ones.
++# http://fontawesome.io/3.2.1/icons/
++_FONT_AWESOME_CLASSES = {
++    'home': 'icon-home',
++    'back': 'icon-arrow-left',
++    'forward': 'icon-arrow-right',
++    'zoom_to_rect': 'icon-check-empty',
++    'move': 'icon-move',
++    None: None
++}
+ 
+ class NavigationIPy(NavigationToolbar2WebAgg):
+-    # Note: Version 3.2 icons, not the later 4.0 ones.
+-    # http://fontawesome.io/3.2.1/icons/
+-    _font_awesome_classes = {
+-        'home': 'icon-home',
+-        'back': 'icon-arrow-left',
+-        'forward': 'icon-arrow-right',
+-        'zoom_to_rect': 'icon-check-empty',
+-        'move': 'icon-move',
+-        None: None
+-    }
+ 
+     # Use the standard toolbar items + download button
+     toolitems = [(text, tooltip_text,
+                   _font_awesome_classes[image_file], name_of_method)
+                  for text, tooltip_text, image_file, name_of_method
+                  in NavigationToolbar2.toolitems
+-                 if image_file in _font_awesome_classes]
++                 if image_file in _FONT_AWESOME_CLASSES]
+ 
+ 
+ class FigureManagerNbAgg(FigureManagerWebAgg):
+diff --git a/lib/matplotlib/backends/backend_webagg_core.py b/lib/matplotlib/backends/backend_webagg_core.py
+index eee727d..73429ca 100644
+--- a/lib/matplotlib/backends/backend_webagg_core.py
++++ b/lib/matplotlib/backends/backend_webagg_core.py
+@@ -237,17 +237,17 @@ def stop_event_loop(self):
+     stop_event_loop.__doc__ = \
+         backend_bases.FigureCanvasBase.stop_event_loop_default.__doc__
+ 
++_JQUERY_ICON_CLASSES = {
++    'home': 'ui-icon ui-icon-home',
++    'back': 'ui-icon ui-icon-circle-arrow-w',
++    'forward': 'ui-icon ui-icon-circle-arrow-e',
++    'zoom_to_rect': 'ui-icon ui-icon-search',
++    'move': 'ui-icon ui-icon-arrow-4',
++    'download': 'ui-icon ui-icon-disk',
++    None: None,
++}
+ 
+ class NavigationToolbar2WebAgg(backend_bases.NavigationToolbar2):
+-    _jquery_icon_classes = {
+-        'home': 'ui-icon ui-icon-home',
+-        'back': 'ui-icon ui-icon-circle-arrow-w',
+-        'forward': 'ui-icon ui-icon-circle-arrow-e',
+-        'zoom_to_rect': 'ui-icon ui-icon-search',
+-        'move': 'ui-icon ui-icon-arrow-4',
+-        'download': 'ui-icon ui-icon-disk',
+-        None: None,
+-    }
+ 
+     # Use the standard toolbar items + download button
+     toolitems = [(text, tooltip_text, _jquery_icon_classes[image_file],
+@@ -255,7 +255,7 @@ class NavigationToolbar2WebAgg(backend_bases.NavigationToolbar2):
+                  for text, tooltip_text, image_file, name_of_method
+                  in (backend_bases.NavigationToolbar2.toolitems +
+                      (('Download', 'Download plot', 'download', 'download'),))
+-                 if image_file in _jquery_icon_classes]
++                 if image_file in _JQUERY_ICON_CLASSES]
+ 
+     def _init_toolbar(self):
+         self.message = ''
+
+From 32c11afbbb41d5ad60b124f2be43e5ef705287f2 Mon Sep 17 00:00:00 2001
+From: Thomas A Caswell <tcaswell@gmail.com>
+Date: Thu, 4 Sep 2014 14:35:31 -0400
+Subject: [PATCH 2/3] BUG : fix glaring syntax error
+
+---
+ lib/matplotlib/backends/backend_nbagg.py       | 4 +++-
+ lib/matplotlib/backends/backend_webagg_core.py | 4 +++-
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/lib/matplotlib/backends/backend_nbagg.py b/lib/matplotlib/backends/backend_nbagg.py
+index 7676609..7ca9257 100644
+--- a/lib/matplotlib/backends/backend_nbagg.py
++++ b/lib/matplotlib/backends/backend_nbagg.py
+@@ -63,6 +63,7 @@ def connection_info():
+                   str(len(pylab_helpers.Gcf._activeQue)))
+     return '\n'.join(result)
+ 
++
+ # Note: Version 3.2 icons, not the later 4.0 ones.
+ # http://fontawesome.io/3.2.1/icons/
+ _FONT_AWESOME_CLASSES = {
+@@ -74,11 +75,12 @@ def connection_info():
+     None: None
+ }
+ 
++
+ class NavigationIPy(NavigationToolbar2WebAgg):
+ 
+     # Use the standard toolbar items + download button
+     toolitems = [(text, tooltip_text,
+-                  _font_awesome_classes[image_file], name_of_method)
++                  _FONT_AWESOME_CLASSES[image_file], name_of_method)
+                  for text, tooltip_text, image_file, name_of_method
+                  in NavigationToolbar2.toolitems
+                  if image_file in _FONT_AWESOME_CLASSES]
+diff --git a/lib/matplotlib/backends/backend_webagg_core.py b/lib/matplotlib/backends/backend_webagg_core.py
+index 73429ca..9caf288 100644
+--- a/lib/matplotlib/backends/backend_webagg_core.py
++++ b/lib/matplotlib/backends/backend_webagg_core.py
+@@ -237,6 +237,7 @@ def stop_event_loop(self):
+     stop_event_loop.__doc__ = \
+         backend_bases.FigureCanvasBase.stop_event_loop_default.__doc__
+ 
++
+ _JQUERY_ICON_CLASSES = {
+     'home': 'ui-icon ui-icon-home',
+     'back': 'ui-icon ui-icon-circle-arrow-w',
+@@ -247,10 +248,11 @@ def stop_event_loop(self):
+     None: None,
+ }
+ 
++
+ class NavigationToolbar2WebAgg(backend_bases.NavigationToolbar2):
+ 
+     # Use the standard toolbar items + download button
+-    toolitems = [(text, tooltip_text, _jquery_icon_classes[image_file],
++    toolitems = [(text, tooltip_text, _JQUERY_ICON_CLASSES[image_file],
+                   name_of_method)
+                  for text, tooltip_text, image_file, name_of_method
+                  in (backend_bases.NavigationToolbar2.toolitems +
+
+From 3a9757cf2c79d28298b5901ed01e00fe4448f997 Mon Sep 17 00:00:00 2001
+From: Thomas A Caswell <tcaswell@gmail.com>
+Date: Sat, 6 Sep 2014 16:54:27 -0400
+Subject: [PATCH 3/3] BUG : fix encoding of png data
+
+When formatting the png data to send over the wire need to decode the
+byte string to ascii.  If this is not done the literal string sent
+to the browser is:
+   "data:image/png;base64,b'iVBOR...'"
+instead of
+   "data:image/png;base64,iVBOR..."
+
+The extra b' makes the string no longer a valid png which is why
+we were getting white boxes
+---
+ lib/matplotlib/backends/backend_nbagg.py | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/lib/matplotlib/backends/backend_nbagg.py b/lib/matplotlib/backends/backend_nbagg.py
+index 7ca9257..5982569 100644
+--- a/lib/matplotlib/backends/backend_nbagg.py
++++ b/lib/matplotlib/backends/backend_nbagg.py
+@@ -3,6 +3,7 @@
+ import json
+ import io
+ import os
++import six
+ from uuid import uuid4 as uuid
+ 
+ from IPython.display import display, Javascript, HTML
+@@ -193,7 +194,10 @@ def send_json(self, content):
+     def send_binary(self, blob):
+         # The comm is ascii, so we always send the image in base64
+         # encoded data URL form.
+-        data_uri = "data:image/png;base64,{0}".format(b64encode(blob))
++        data = b64encode(blob)
++        if six.PY3:
++            data = data.decode('ascii')
++        data_uri = "data:image/png;base64,{0}".format(data)
+         self.comm.send({'data': data_uri})
+ 
+     def on_message(self, message):
