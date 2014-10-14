@@ -1,5 +1,6 @@
-matplotlib (1.4.0-2) UNRELEASED; urgency=medium
+matplotlib (1.4.1~rc1-1) UNRELEASED; urgency=medium
 
+  * New upstream release candidate
   * debian/control
     - bump deps to WX 3.0; thanks to Olly Betts for the report; Closes: #759094
     - uses cairocffi instead of cairo, preferred upstream; thanks to
@@ -9,7 +10,7 @@ matplotlib (1.4.0-2) UNRELEASED; urgency=medium
   * debian/tests/backend-base
     - help mpl turn off interactive mode
 
- -- Sandro Tosi <morph@debian.org>  Tue, 14 Oct 2014 18:43:27 +0100
+ -- Sandro Tosi <morph@debian.org>  Tue, 14 Oct 2014 18:54:20 +0100
 
 matplotlib (1.4.0-1) experimental; urgency=medium
 
