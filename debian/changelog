@@ -5,12 +5,13 @@ matplotlib (1.4.1~rc1-1) UNRELEASED; urgency=medium
     - bump deps to WX 3.0; thanks to Olly Betts for the report; Closes: #759094
     - uses cairocffi instead of cairo, preferred upstream; thanks to
       Jean-Christophe Jaskula for the report; Closes: #764359
+    - tighten deps on python-six to >= 1.4
   * debian/patches/nbagg_py3k_compatibility.patch
     - fix nbagg backend compatibility with py3k
   * debian/tests/backend-base
     - help mpl turn off interactive mode
 
- -- Sandro Tosi <morph@debian.org>  Tue, 14 Oct 2014 18:54:20 +0100
+ -- Sandro Tosi <morph@debian.org>  Tue, 14 Oct 2014 20:33:07 +0100
 
 matplotlib (1.4.0-1) experimental; urgency=medium
 
