@@ -5,7 +5,6 @@ import six
 
 import os
 import tempfile
-import sys
 import numpy as np
 from nose import with_setup
 from matplotlib import pyplot as plt
@@ -29,7 +28,7 @@ def test_save_animation_smoketest():
         yield check_save_animation, writer, extension
 
 
-@with_setup(CleanupTest.setup_class, CleanupTest.teardown_class)
+@cleanup
 def check_save_animation(writer, extension='mp4'):
     if not animation.writers.is_available(writer):
         raise KnownFailureTest("writer '%s' not available on this system"
@@ -37,12 +36,11 @@ def check_save_animation(writer, extension='mp4'):
     if 'mencoder' in writer:
         raise KnownFailureTest("mencoder is broken")
 
-    ver = sys.version_info
-    if ver[0] == 3 and ver[1] == 2:
-        raise KnownFailureTest("animation saving broken on 3.2")
-
     fig, ax = plt.subplots()
     line, = ax.plot([], [])
+
+    ax.set_xlim(0, 10)
+    ax.set_ylim(-1, 1)
 
     def init():
         line.set_data([], [])

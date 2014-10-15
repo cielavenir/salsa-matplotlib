@@ -9,6 +9,9 @@ cd $ADTTMP
 echo "=== $BACKEND ==="
 
 cat << EOF > test.py
+# https://github.com/matplotlib/matplotlib/issues/3505
+import sys
+sys.ps1 = 'SOMETHING'
 import matplotlib
 matplotlib.use("$BACKEND")
 import matplotlib.pyplot as plt

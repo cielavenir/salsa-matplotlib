@@ -120,6 +120,8 @@ def has_include_file(include_dirs, filename):
     Returns `True` if `filename` can be found in one of the
     directories in `include_dirs`.
     """
+    if sys.platform == 'win32':
+        include_dirs += os.environ.get('INCLUDE', '.').split(';')
     for dir in include_dirs:
         if os.path.exists(os.path.join(dir, filename)):
             return True
@@ -130,8 +132,6 @@ def check_include_file(include_dirs, filename, package):
     """
     Raises an exception if the given include file can not be found.
     """
-    if sys.platform == 'win32':
-        include_dirs.extend(os.getenv('INCLUDE', '.').split(';'))
     if not has_include_file(include_dirs, filename):
         raise CheckFailed(
             "The C/C++ header for %s (%s) could not be found.  You "
@@ -154,6 +154,13 @@ def get_base_dirs():
         'aix5': ['/usr/local'],
         }
     return basedir_map.get(sys.platform, ['/usr/local', '/usr'])
+
+
+def get_include_dirs():
+    """
+    Returns a list of standard include directories on this platform.
+    """
+    return [os.path.join(d, 'include') for d in get_base_dirs()]
 
 
 def is_min_version(found, minversion):
@@ -246,6 +253,11 @@ class PkgConfig(object):
             self.set_pkgconfig_path()
             status, output = getstatusoutput("pkg-config --help")
             self.has_pkgconfig = (status == 0)
+            if not self.has_pkgconfig:
+                print("IMPORTANT WARNING:")
+                print(
+                    "    pkg-config is not installed.\n"
+                    "    matplotlib may not be able to find some of its dependencies")
 
     def set_pkgconfig_path(self):
         pkgconfig_path = sysconfig.get_config_var('LIBDIR')
@@ -830,10 +842,13 @@ class CXX(SetupPackage):
     def check(self):
         if PY3:
             # There is no version of PyCXX in the wild that will work
-            # with Python 3.x
+            # with Python 3.x and matplotlib, since they lack support
+            # for the buffer object.
             self.__class__.found_external = False
-            return ("Official versions of PyCXX are not compatible with "
-                    "Python 3.x.  Using local copy")
+            return ("Official versions of PyCXX are not compatible "
+                    "with matplotlib on Python 3.x, since they lack "
+                    "support for the buffer object.  Using local "
+                    "copy")
 
         self.__class__.found_external = True
         old_stdout = sys.stdout
@@ -927,7 +942,8 @@ class FreeType(SetupPackage):
 
     def check(self):
         if sys.platform == 'win32':
-            return "Unknown version"
+            check_include_file(get_include_dirs(), 'ft2build.h', 'freetype')
+            return 'Using unknown version found on system.'
 
         status, output = getstatusoutput("freetype-config --ftversion")
         if status == 0:
@@ -937,12 +953,12 @@ class FreeType(SetupPackage):
 
         # Early versions of freetype grep badly inside freetype-config,
         # so catch those cases. (tested with 2.5.3).
-        if 'No such file or directory\ngrep:' in version:
+        if version is None or 'No such file or directory\ngrep:' in version:
             version = self.version_from_header()
 
         return self._check_for_pkg_config(
             'freetype2', 'ft2build.h',
-            min_version='2.4', version=version)
+            min_version='2.3', version=version)
 
     def version_from_header(self):
         version = 'Failed to identify version.'
@@ -970,19 +986,14 @@ class FreeType(SetupPackage):
         pkg_config.setup_extension(
             ext, 'freetype2',
             default_include_dirs=[
-                'freetype2', 'lib/freetype2/include',
+                'include/freetype2', 'freetype2',
+                'lib/freetype2/include',
                 'lib/freetype2/include/freetype2'],
             default_library_dirs=[
                 'freetype2/lib'],
-            default_libraries=['freetype', 'z'],
-            alt_exec='freetype-config')
+            default_libraries=['freetype', 'z'])
 
-    def get_extension(self):
-        if sys.platform == 'win32':
-            return None
-        ext = make_extension('freetype2', [])
-        self.add_flags(ext)
-        return ext
+
 
 class FT2Font(SetupPackage):
     name = 'ft2font'
@@ -1003,13 +1014,24 @@ class Png(SetupPackage):
     name = "png"
 
     def check(self):
+        if sys.platform == 'win32':
+            check_include_file(get_include_dirs(), 'png.h', 'png')
+            return 'Using unknown version found on system.'
+
+        status, output = getstatusoutput("libpng-config --version")
+        if status == 0:
+            version = output
+        else:
+            version = None
+
         try:
             return self._check_for_pkg_config(
                 'libpng', 'png.h',
-                min_version='1.2')
+                min_version='1.2', version=version)
         except CheckFailed as e:
-            self.__class__.found_external = False
-            return str(e) + ' Using unknown version.'
+            if has_include_file(get_include_dirs(), 'png.h'):
+                return str(e) + ' Using unknown version found on system.'
+            raise
 
     def get_extension(self):
         sources = [
@@ -1017,7 +1039,8 @@ class Png(SetupPackage):
             ]
         ext = make_extension('matplotlib._png', sources)
         pkg_config.setup_extension(
-            ext, 'libpng', default_libraries=['png', 'z'])
+            ext, 'libpng', default_libraries=['png', 'z'],
+            alt_exec='libpng-config --ldflags')
         Numpy().add_flags(ext)
         CXX().add_flags(ext)
         return ext
@@ -1037,7 +1060,7 @@ class Qhull(SetupPackage):
             # present on this system, so check if the header files can be
             # found.
             include_dirs = [
-                os.path.join(x, 'include', 'qhull') for x in get_base_dirs()]
+                os.path.join(x, 'qhull') for x in get_include_dirs()]
             if has_include_file(include_dirs, 'qhull_a.h'):
                 return 'Using system Qhull (version unknown, no pkg-config info)'
             else:
@@ -1156,7 +1179,7 @@ class Tri(SetupPackage):
 
 class Six(SetupPackage):
     name = "six"
-    min_version = "1.3"
+    min_version = "1.4"
 
     def check(self):
         try:
@@ -1174,6 +1197,24 @@ class Six(SetupPackage):
 
     def get_install_requires(self):
         return ['six>={0}'.format(self.min_version)]
+
+
+class Pytz(SetupPackage):
+    name = "pytz"
+
+    def check(self):
+        try:
+            import pytz
+        except ImportError:
+            return (
+                "pytz was not found. "
+                "pip will attempt to install it "
+                "after matplotlib.")
+
+        return "using pytz version %s" % pytz.__version__
+
+    def get_install_requires(self):
+        return ['pytz']
 
 
 class Dateutil(SetupPackage):

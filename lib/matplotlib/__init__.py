@@ -105,9 +105,10 @@ from __future__ import (absolute_import, division, print_function,
 import six
 import sys
 import distutils.version
+from itertools import chain
 
-__version__  = '1.4.0'
-__version__numpy__ = '1.6' # minimum required numpy version
+__version__  = str('1.4.1rc1')
+__version__numpy__ = str('1.6') # minimum required numpy version
 
 try:
     import dateutil
@@ -243,6 +244,7 @@ def _is_writable_dir(p):
         return False
 
     return True
+
 
 class Verbose:
     """
@@ -506,7 +508,10 @@ def _get_home():
     :see:  http://mail.python.org/pipermail/python-list/2005-February/325395.html
     """
     try:
-        path = os.path.expanduser("~")
+        if six.PY2 and sys.platform == 'win32':
+            path = os.path.expanduser(b"~").decode(sys.getfilesystemencoding())
+        else:
+            path = os.path.expanduser("~")
     except ImportError:
         # This happens on Google App Engine (pwd module is not present).
         pass
@@ -745,7 +750,11 @@ def matplotlib_fname():
     - Lastly, it looks in `$MATPLOTLIBDATA/matplotlibrc` for a
       system-defined copy.
     """
-    fname = os.path.join(os.getcwd(), 'matplotlibrc')
+    if six.PY2:
+        cwd = os.getcwdu()
+    else:
+        cwd = os.getcwd()
+    fname = os.path.join(cwd, 'matplotlibrc')
     if os.path.exists(fname):
         return fname
 
@@ -799,6 +808,18 @@ _deprecated_map = {
 _deprecated_ignore_map = {
     }
 
+_obsolete_set = set(['tk.pythoninspect', ])
+_all_deprecated = set(chain(_deprecated_ignore_map,
+                            _deprecated_map, _obsolete_set))
+
+_rcparam_warn_str = ("Trying to set {key} to {value} via the {func} "
+                     "method of RcParams which does not validate cleanly. "
+                     "This warning will turn into an Exception in 1.5. "
+                     "If you think {value} should validate correctly for "
+                     "rcParams[{key}] "
+                     "please create an issue on github."
+                     )
+
 
 class RcParams(dict):
 
@@ -810,14 +831,27 @@ class RcParams(dict):
     """
 
     validate = dict((key, converter) for key, (default, converter) in
-                    six.iteritems(defaultParams))
+                    six.iteritems(defaultParams)
+                    if key not in _all_deprecated)
     msg_depr = "%s is deprecated and replaced with %s; please use the latter."
     msg_depr_ignore = "%s is deprecated and ignored. Use %s"
+
+    # validate values on the way in
+    def __init__(self, *args, **kwargs):
+        for k, v in six.iteritems(dict(*args, **kwargs)):
+            try:
+                self[k] = v
+            except (ValueError, RuntimeError):
+                # force the issue
+                warnings.warn(_rcparam_warn_str.format(key=repr(k),
+                                                       value=repr(v),
+                                                       func='__init__'))
+                dict.__setitem__(self, k, v)
 
     def __setitem__(self, key, val):
         try:
             if key in _deprecated_map:
-                alt_key, alt_val  = _deprecated_map[key]
+                alt_key, alt_val = _deprecated_map[key]
                 warnings.warn(self.msg_depr % (key, alt_key))
                 key = alt_key
                 val = alt_val(val)
@@ -836,7 +870,7 @@ See rcParams.keys() for a list of valid parameters.' % (key,))
 
     def __getitem__(self, key):
         if key in _deprecated_map:
-            alt_key, alt_val  = _deprecated_map[key]
+            alt_key, alt_val = _deprecated_map[key]
             warnings.warn(self.msg_depr % (key, alt_key))
             key = alt_key
         elif key in _deprecated_ignore_map:
@@ -844,6 +878,22 @@ See rcParams.keys() for a list of valid parameters.' % (key,))
             warnings.warn(self.msg_depr_ignore % (key, alt))
             key = alt
         return dict.__getitem__(self, key)
+
+    # http://stackoverflow.com/questions/2390827/how-to-properly-subclass-dict-and-override-get-set
+    # the default dict `update` does not use __setitem__
+    # so rcParams.update(...) (such as in seaborn) side-steps
+    # all of the validation over-ride update to force
+    # through __setitem__
+    def update(self, *args, **kwargs):
+        for k, v in six.iteritems(dict(*args, **kwargs)):
+            try:
+                self[k] = v
+            except (ValueError, RuntimeError):
+                # force the issue
+                warnings.warn(_rcparam_warn_str.format(key=repr(k),
+                                                       value=repr(v),
+                                                       func='update'))
+                dict.__setitem__(self, k, v)
 
     def __repr__(self):
         import pprint
@@ -898,8 +948,9 @@ def rc_params(fail_on_error=False):
     if not os.path.exists(fname):
         # this should never happen, default in mpl-data should always be found
         message = 'could not find rc file; returning defaults'
-        ret = RcParams([(key, default) for key, (default, _) in \
-                        six.iteritems(defaultParams)])
+        ret = RcParams([(key, default) for key, (default, _) in
+                        six.iteritems(defaultParams)
+                        if key not in _all_deprecated])
         warnings.warn(message)
         return ret
 
@@ -1021,7 +1072,8 @@ def rc_params_from_file(fname, fail_on_error=False, use_default_template=True):
         return config_from_file
 
     iter_params = six.iteritems(defaultParams)
-    config = RcParams([(key, default) for key, (default, _) in iter_params])
+    config = RcParams([(key, default) for key, (default, _) in iter_params
+                                      if key not in _all_deprecated])
     config.update(config_from_file)
 
     verbose.set_level(config['verbose.level'])
@@ -1063,15 +1115,19 @@ if rcParams['examples.directory']:
 
 rcParamsOrig = rcParams.copy()
 
-rcParamsDefault = RcParams([(key, default) for key, (default, converter) in \
-                            six.iteritems(defaultParams)])
+rcParamsDefault = RcParams([(key, default) for key, (default, converter) in
+                            six.iteritems(defaultParams)
+                            if key not in _all_deprecated])
 
-rcParams['ps.usedistiller'] = checkdep_ps_distiller(rcParams['ps.usedistiller'])
+
+rcParams['ps.usedistiller'] = checkdep_ps_distiller(
+                      rcParams['ps.usedistiller'])
 rcParams['text.usetex'] = checkdep_usetex(rcParams['text.usetex'])
 
 if rcParams['axes.formatter.use_locale']:
     import locale
     locale.setlocale(locale.LC_ALL, '')
+
 
 def rc(group, **kwargs):
     """
@@ -1284,12 +1340,7 @@ def interactive(b):
 
 def is_interactive():
     'Return true if plot mode is interactive'
-    # ps1 exists if the python interpreter is running in an
-    # interactive console; sys.flags.interactive is true if a script
-    # is being run via "python -i".
-    b = rcParams['interactive'] and (
-        hasattr(sys, 'ps1') or sys.flags.interactive)
-    return b
+    return rcParams['interactive']
 
 def tk_window_focus():
     """Return true if focus maintenance under TkAgg on win32 is on.

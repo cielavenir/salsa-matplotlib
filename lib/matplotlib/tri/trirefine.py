@@ -37,6 +37,7 @@ class TriRefiner(object):
                 :class:`~matplotlib.tri.TriInterpolator` (optional)
               - the other optional keyword arguments *kwargs* are defined in
                 each TriRefiner concrete implementation
+
           and which returns (as a tuple) a refined triangular mesh and the
           interpolated values of the field at the refined triangulation nodes.
 
@@ -231,7 +232,7 @@ class UniformTriRefiner(TriRefiner):
         # points
         # hint: each apex is shared by 2 masked_triangles except the borders.
         borders = np.sum(neighbors == -1)
-        added_pts = (3*ntri + borders) / 2
+        added_pts = (3*ntri + borders) // 2
         refi_npts = npts + added_pts
         refi_x = np.zeros(refi_npts)
         refi_y = np.zeros(refi_npts)
