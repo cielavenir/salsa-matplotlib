@@ -6,12 +6,10 @@ matplotlib (1.4.1~rc1-1) UNRELEASED; urgency=medium
     - uses cairocffi instead of cairo, preferred upstream; thanks to
       Jean-Christophe Jaskula for the report; Closes: #764359
     - tighten deps on python-six to >= 1.4
-  * debian/patches/nbagg_py3k_compatibility.patch
-    - fix nbagg backend compatibility with py3k
   * debian/tests/backend-base
     - help mpl turn off interactive mode
 
- -- Sandro Tosi <morph@debian.org>  Tue, 14 Oct 2014 20:33:07 +0100
+ -- Sandro Tosi <morph@debian.org>  Wed, 15 Oct 2014 19:57:08 +0100
 
 matplotlib (1.4.0-1) experimental; urgency=medium
 

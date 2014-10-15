@@ -6,4 +6,3 @@
 multiarch-tktcl.patch
 gtk3agg_check_no-multiprocessing.patch
 gtk3cairo_check_no-multiprocessing.patch
-nbagg_py3k_compatibility.patch
