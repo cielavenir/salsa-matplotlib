@@ -1,3 +1,9 @@
+matplotlib (1.4.1-1) UNRELEASED; urgency=medium
+
+  * New upstream release
+
+ -- Sandro Tosi <morph@debian.org>  Thu, 23 Oct 2014 00:45:24 +0100
+
 matplotlib (1.4.1~rc1-1) unstable; urgency=medium
 
   * New upstream release candidate
