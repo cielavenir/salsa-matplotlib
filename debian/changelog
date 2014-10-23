@@ -1,8 +1,10 @@
 matplotlib (1.4.2-1) UNRELEASED; urgency=medium
 
   * New upstream release
+  * debian/control
+    - bump Standards-Version to 3.9.6 (no changes needed)
 
- -- Sandro Tosi <morph@debian.org>  Thu, 23 Oct 2014 19:24:38 +0100
+ -- Sandro Tosi <morph@debian.org>  Thu, 23 Oct 2014 19:25:50 +0100
 
 matplotlib (1.4.1-1) unstable; urgency=medium
 
