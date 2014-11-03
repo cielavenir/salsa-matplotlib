@@ -1,10 +1,10 @@
-matplotlib (1.4.2-3) UNRELEASED; urgency=medium
+matplotlib (1.4.2-3) unstable; urgency=medium
 
   * debian/patches/test_backend_with_timeout.patch
     - fixed patch to correctly terminating run-away processes during backend
       checks; Closes: #767210
 
- -- Sandro Tosi <morph@debian.org>  Thu, 30 Oct 2014 23:28:11 +0000
+ -- Sandro Tosi <morph@debian.org>  Thu, 30 Oct 2014 23:31:03 +0000
 
 matplotlib (1.4.2-2) unstable; urgency=medium
 
