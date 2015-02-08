@@ -3,8 +3,10 @@ matplotlib (1.4.3~rc1-1) UNRELEASED; urgency=medium
   * New upstream release candidate
   * debian/copyright
     - extend packaging copyright years
+  * debian/patches/test_backend_with_timeout.patch
+    - removed, merged upstream
 
- -- Sandro Tosi <morph@debian.org>  Sun, 08 Feb 2015 19:44:00 +0000
+ -- Sandro Tosi <morph@debian.org>  Sun, 08 Feb 2015 20:47:05 +0000
 
 matplotlib (1.4.2-3) unstable; urgency=medium
 
