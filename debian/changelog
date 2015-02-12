@@ -5,8 +5,11 @@ matplotlib (1.4.3~rc1-1) UNRELEASED; urgency=medium
     - extend packaging copyright years
   * debian/patches/test_backend_with_timeout.patch
     - removed, merged upstream
+  * debian/{control, patches/bts613818_use_system_pycxx.patch}
+    - use Debian version of PyCXX, instead of the bundled one; thanks to Julian
+      Taylor for the report and the work on Debian PyCXX side: Closes: #613818
 
- -- Sandro Tosi <morph@debian.org>  Sun, 08 Feb 2015 20:47:05 +0000
+ -- Sandro Tosi <morph@debian.org>  Thu, 12 Feb 2015 19:29:17 +0000
 
 matplotlib (1.4.2-3) unstable; urgency=medium
 

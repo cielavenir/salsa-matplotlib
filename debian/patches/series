@@ -4,5 +4,6 @@
 50_bts608942_spaces_in_param_args.patch
 70_bts720549_try_StayPuft_for_xkcd.patch
 multiarch-tktcl.patch
-gtk3agg_check_no-multiprocessing.patch
+#gtk3agg_check_no-multiprocessing.patch
 gtk3cairo_check_no-multiprocessing.patch
+bts613818_use_system_pycxx.patch
