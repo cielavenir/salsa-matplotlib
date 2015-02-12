@@ -10,8 +10,11 @@ matplotlib (1.4.3~rc1-1) UNRELEASED; urgency=medium
       Taylor for the report and the work on Debian PyCXX side: Closes: #613818
   * debian/watch
     - download tarball from GitHub
+  * debian/patches/CVE-2013-1424.patch
+    - fix a buffer overrun in mplutils Printf(), addressing CVE-2013-1424;
+      thanks to Matt Giuca for the patch; Closes: #775691
 
- -- Sandro Tosi <morph@debian.org>  Thu, 12 Feb 2015 20:53:06 +0000
+ -- Sandro Tosi <morph@debian.org>  Thu, 12 Feb 2015 23:50:30 +0000
 
 matplotlib (1.4.2-3) unstable; urgency=medium
 
