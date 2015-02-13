@@ -1,3 +1,10 @@
+matplotlib (1.4.2-3.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Fix CVE-2013-1424: printf buffer overrun (closes: #775691).
+
+ -- Michael Gilbert <mgilbert@debian.org>  Fri, 13 Feb 2015 23:16:11 +0000
+
 matplotlib (1.4.2-3) unstable; urgency=medium
 
   * debian/patches/test_backend_with_timeout.patch
