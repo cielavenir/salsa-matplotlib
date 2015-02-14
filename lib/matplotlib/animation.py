@@ -23,6 +23,7 @@ from __future__ import (absolute_import, division, print_function,
 import six
 from six.moves import xrange, zip
 
+import platform
 import sys
 import itertools
 import contextlib
@@ -30,6 +31,16 @@ from matplotlib.cbook import iterable, is_string_like
 from matplotlib.compat import subprocess
 from matplotlib import verbose
 from matplotlib import rcParams
+
+# Process creation flag for subprocess to prevent it raising a terminal
+# window. See for example:
+# https://stackoverflow.com/questions/24130623/using-python-subprocess-popen-cant-prevent-exe-stopped-working-prompt
+if platform.system() == 'Windows':
+    CREATE_NO_WINDOW = 0x08000000
+    subprocess_creation_flags = CREATE_NO_WINDOW
+else:
+    # Apparently None won't work here
+    subprocess_creation_flags = 0
 
 # Other potential writing methods:
 # * http://pymedia.org/
@@ -189,7 +200,8 @@ class MovieWriter(object):
                        ' '.join(command))
         self._proc = subprocess.Popen(command, shell=False,
                                       stdout=output, stderr=output,
-                                      stdin=subprocess.PIPE)
+                                      stdin=subprocess.PIPE,
+                                      creationflags=subprocess_creation_flags)
 
     def finish(self):
         'Finish any processing for writing the movie.'
@@ -250,7 +262,8 @@ class MovieWriter(object):
             p = subprocess.Popen(cls.bin_path(),
                              shell=False,
                              stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
+                             stderr=subprocess.PIPE,
+                             creationflags=subprocess_creation_flags)
             p.communicate()
             return True
         except OSError:
@@ -333,7 +346,7 @@ class FileMovieWriter(MovieWriter):
         All keyword arguments in savefig_kwargs are passed on to the 'savefig'
         command that saves the figure.
         '''
-        #Overloaded to explicitly close temp file.
+        # Overloaded to explicitly close temp file.
         verbose.report('MovieWriter.grab_frame: Grabbing frame.',
                        level='debug')
         try:
@@ -367,7 +380,7 @@ class FileMovieWriter(MovieWriter):
     def cleanup(self):
         MovieWriter.cleanup(self)
 
-        #Delete temporary files
+        # Delete temporary files
         if self.clear_temp:
             import os
             verbose.report(
@@ -415,7 +428,7 @@ class FFMpegWriter(MovieWriter, FFMpegBase):
         return args
 
 
-#Combine FFMpeg options with temp file-based writing
+# Combine FFMpeg options with temp file-based writing
 @writers.register('ffmpeg_file')
 class FFMpegFileWriter(FileMovieWriter, FFMpegBase):
     supported_formats = ['png', 'jpeg', 'ppm', 'tiff', 'sgi', 'bmp',
@@ -468,10 +481,12 @@ class MencoderBase:
     @property
     def output_args(self):
         self._remap_metadata()
-        args = ['-o', self.outfile, '-ovc', 'lavc', '-lavcopts',
-                'vcodec=%s' % self.codec]
+        lavcopts = {'vcodec': self.codec}
         if self.bitrate > 0:
-            args.append('vbitrate=%d' % self.bitrate)
+            lavcopts.update(vbitrate=self.bitrate)
+        args = ['-o', self.outfile, '-ovc', 'lavc', '-lavcopts',
+                ':'.join(itertools.starmap('{0}={1}'.format,
+                                           lavcopts.items()))]
         if self.extra_args:
             args.extend(self.extra_args)
         if self.metadata:
@@ -747,7 +762,7 @@ class Animation(object):
             for data in zip(*[a.new_saved_frame_seq()
                               for a in all_anim]):
                 for anim, d in zip(all_anim, data):
-                    #TODO: Need to see if turning off blit is really necessary
+                    # TODO: Need to see if turning off blit is really necessary
                     anim._draw_next_frame(d, blit=False)
                 writer.grab_frame(**savefig_kwargs)
 

@@ -1,9 +1,25 @@
-matplotlib (1.4.2-3.1) unstable; urgency=medium
+matplotlib (1.4.3~rc1-1) experimental; urgency=medium
 
-  * Non-maintainer upload.
-  * Fix CVE-2013-1424: printf buffer overrun (closes: #775691).
+  * New upstream release candidate
+  * debian/copyright
+    - extend packaging copyright years
+  * debian/patches/test_backend_with_timeout.patch
+    - removed, merged upstream
+  * debian/{control, patches/bts613818_use_system_pycxx.patch}
+    - use Debian version of PyCXX, instead of the bundled one; thanks to Julian
+      Taylor for the report and the work on Debian PyCXX side: Closes: #613818
+  * debian/watch
+    - download tarball from GitHub
+  * debian/patches/CVE-2013-1424.patch
+    - fix a buffer overrun in mplutils Printf(), addressing CVE-2013-1424;
+      thanks to Matt Giuca for the patch; Closes: #775691
+  * debian/control
+    - added locales-all to b-d, needed to ensure en_US.UTF-8 locale is
+      available, required by test suite
+  * debian/rules
+    - fix a FTBFS when building twice in a row
 
- -- Michael Gilbert <mgilbert@debian.org>  Fri, 13 Feb 2015 23:16:11 +0000
+ -- Sandro Tosi <morph@debian.org>  Sat, 14 Feb 2015 00:08:01 +0000
 
 matplotlib (1.4.2-3) unstable; urgency=medium
 

@@ -107,7 +107,7 @@ import sys
 import distutils.version
 from itertools import chain
 
-__version__ = str('1.4.2')
+__version__ = str('1.4.3rc1')
 __version__numpy__ = str('1.6')  # minimum required numpy version
 
 try:
@@ -582,8 +582,8 @@ def _get_config_or_cache_dir(xdg_base):
 
     configdir = os.environ.get('MPLCONFIGDIR')
     if configdir is not None:
+        configdir = os.path.abspath(configdir)
         if not os.path.exists(configdir):
-            from matplotlib.cbook import mkdirs
             mkdirs(configdir)
 
         if not _is_writable_dir(configdir):
@@ -1135,7 +1135,7 @@ def rc(group, **kwargs):
     for ``lines.linewidth`` the group is ``lines``, for
     ``axes.facecolor``, the group is ``axes``, and so on.  Group may
     also be a list or tuple of group names, e.g., (*xtick*, *ytick*).
-    *kwargs* is a dictionary attribute name/value pairs, eg::
+    *kwargs* is a dictionary attribute name/value pairs, e.g.,::
 
       rc('lines', linewidth=2, color='r')
 
@@ -1247,10 +1247,16 @@ class rc_context(object):
         self.rcdict = rc
         self.fname = fname
         self._rcparams = rcParams.copy()
-        if self.fname:
-            rc_file(self.fname)
-        if self.rcdict:
-            rcParams.update(self.rcdict)
+        try:
+            if self.fname:
+                rc_file(self.fname)
+            if self.rcdict:
+                rcParams.update(self.rcdict)
+        except:
+            # if anything goes wrong, revert rc parameters and re-raise
+            rcParams.clear()
+            rcParams.update(self._rcparams)
+            raise
 
     def __enter__(self):
         return self
@@ -1334,7 +1340,7 @@ def interactive(b):
     """
     Set interactive mode to boolean b.
 
-    If b is True, then draw after every plotting command, eg, after xlabel
+    If b is True, then draw after every plotting command, e.g., after xlabel
     """
     rcParams['interactive'] = b
 
@@ -1363,7 +1369,7 @@ for s in sys.argv[1:]:
             use(s[2:])
         except (KeyError, ValueError):
             pass
-        # we don't want to assume all -d flags are backends, eg -debug
+        # we don't want to assume all -d flags are backends, e.g., -debug
 
 default_test_modules = [
     'matplotlib.tests.test_agg',
@@ -1371,7 +1377,7 @@ default_test_modules = [
     'matplotlib.tests.test_arrow_patches',
     'matplotlib.tests.test_artist',
     'matplotlib.tests.test_axes',
-    'matplotlib.tests.test_axes_grid1',
+    'matplotlib.tests.test_backend_bases',
     'matplotlib.tests.test_backend_pdf',
     'matplotlib.tests.test_backend_pgf',
     'matplotlib.tests.test_backend_ps',
@@ -1416,6 +1422,7 @@ default_test_modules = [
     'matplotlib.tests.test_transforms',
     'matplotlib.tests.test_triangulation',
     'mpl_toolkits.tests.test_mplot3d',
+    'mpl_toolkits.tests.test_axes_grid1',
     ]
 
 

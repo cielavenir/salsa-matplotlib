@@ -530,9 +530,6 @@ class FigureManagerTkAgg(FigureManagerBase):
         self.set_window_title("Figure %d" % num)
         self.canvas = canvas
         self._num =  num
-        _, _, w, h = canvas.figure.bbox.bounds
-        w, h = int(w), int(h)
-        self.window.minsize(int(w*3/4),int(h*3/4))
         if matplotlib.rcParams['toolbar']=='toolbar2':
             self.toolbar = NavigationToolbar2TkAgg( canvas, self.window )
         else:
@@ -562,7 +559,8 @@ class FigureManagerTkAgg(FigureManagerBase):
         else:
             self.canvas._tkcanvas.master.geometry("%dx%d" % (width, height))
 
-        self.toolbar.configure(width=width)
+        if self.toolbar is not None:
+            self.toolbar.configure(width=width)
 
     def show(self):
         """

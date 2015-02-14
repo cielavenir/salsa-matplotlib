@@ -97,6 +97,10 @@ clean:
 	rm -rf doc/mpl_examples
 	rm -rf doc/mpl_toolkits/axes_grid/examples
 
+	# build twice in a row
+	rm -rf doc/tex.cache/ fontList.py3k.cache result_images/ test_cache/ tex.cache/ examples/pylab_examples/test.xls
+	rm -rf doc/finance.cache/ doc/fontList.cache fontList.cache
+
 # install
 install-arch: build-arch $(PY2VERS:%=install-%-stamp) $(PY3VERS:%=install-py3-%-stamp)
 	dh_testdir

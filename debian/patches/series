@@ -4,7 +4,7 @@
 50_bts608942_spaces_in_param_args.patch
 70_bts720549_try_StayPuft_for_xkcd.patch
 multiarch-tktcl.patch
-gtk3agg_check_no-multiprocessing.patch
+#gtk3agg_check_no-multiprocessing.patch
 gtk3cairo_check_no-multiprocessing.patch
-test_backend_with_timeout.patch
-matplotlib-printf-buffer-overrun.patch
+bts613818_use_system_pycxx.patch
+CVE-2013-1424.patch

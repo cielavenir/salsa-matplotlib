@@ -384,6 +384,23 @@ class RendererBase(object):
                 transform = Affine2D(all_transforms[i % Ntransforms])
             yield path, transform + master_transform
 
+    def _iter_collection_uses_per_path(self, paths, all_transforms,
+                                       offsets, facecolors, edgecolors):
+        """
+        Compute how many times each raw path object returned by
+        _iter_collection_raw_paths would be used when calling
+        _iter_collection. This is intended for the backend to decide
+        on the tradeoff between using the paths in-line and storing
+        them once and reusing. Rounds up in case the number of uses
+        is not the same for every path.
+        """
+        Npaths = len(paths)
+        if Npaths == 0 or (len(facecolors) == 0 and len(edgecolors) == 0):
+            return 0
+        Npath_ids = max(Npaths, len(all_transforms))
+        N = max(Npath_ids, len(offsets))
+        return (N + Npath_ids - 1) // Npath_ids
+
     def _iter_collection(self, gc, master_transform, all_transforms,
                          path_ids, offsets, offsetTrans, facecolors,
                          edgecolors, linewidths, linestyles,
@@ -700,7 +717,7 @@ class RendererBase(object):
         return points converted to pixels
 
         You need to override this function (unless your backend
-        doesn't have a dpi, eg, postscript or svg).  Some imaging
+        doesn't have a dpi, e.g., postscript or svg).  Some imaging
         systems assume some value for pixels per inch::
 
             points to pixels = points * pixels_per_inch/72.0 * dpi/72.0
@@ -1534,7 +1551,7 @@ class PickEvent(Event):
         the :class:`~matplotlib.artist.Artist` picked
 
     other
-        extra class dependent attrs -- eg a
+        extra class dependent attrs -- e.g., a
         :class:`~matplotlib.lines.Line2D` pick may define different
         extra attributes than a
         :class:`~matplotlib.collections.PatchCollection` pick event
@@ -2216,7 +2233,7 @@ class FigureCanvasBase(object):
     def get_window_title(self):
         """
         Get the title text of the window containing the figure.
-        Return None if there is no window (eg, a PS backend).
+        Return None if there is no window (e.g., a PS backend).
         """
         if hasattr(self, "manager"):
             return self.manager.get_window_title()
@@ -2224,7 +2241,7 @@ class FigureCanvasBase(object):
     def set_window_title(self, title):
         """
         Set the title text of the window containing the figure.  Note that
-        this has no effect if there is no window (eg, a PS backend).
+        this has no effect if there is no window (e.g., a PS backend).
         """
         if hasattr(self, "manager"):
             self.manager.set_window_title(title)
@@ -2242,9 +2259,9 @@ class FigureCanvasBase(object):
         """
         Instantiate an instance of FigureCanvasClass
 
-        This is used for backend switching, eg, to instantiate a
+        This is used for backend switching, e.g., to instantiate a
         FigureCanvasPS from a FigureCanvasGTK.  Note, deep copying is
-        not done, so any changes to one of the instances (eg, setting
+        not done, so any changes to one of the instances (e.g., setting
         figure size or line props), will be reflected in the other
         """
         newCanvas = FigureCanvasClass(self.figure)
@@ -2583,14 +2600,14 @@ class FigureManagerBase(object):
     def get_window_title(self):
         """
         Get the title text of the window containing the figure.
-        Return None for non-GUI backends (eg, a PS backend).
+        Return None for non-GUI backends (e.g., a PS backend).
         """
         return 'image'
 
     def set_window_title(self, title):
         """
         Set the title text of the window containing the figure.  Note that
-        this has no effect for non-GUI backends (eg, a PS backend).
+        this has no effect for non-GUI backends (e.g., a PS backend).
         """
         pass
 

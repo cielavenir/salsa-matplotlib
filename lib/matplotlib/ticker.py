@@ -35,7 +35,7 @@ Tick locating
 The Locator class is the base class for all tick locators.  The locators
 handle autoscaling of the view limits based on the data limits, and the
 choosing of tick locations.  A useful semi-automatic tick locator is
-MultipleLocator.  You initialize this with a base, eg 10, and it picks axis
+MultipleLocator.  You initialize this with a base, e.g., 10, and it picks axis
 limits and ticks that are multiples of your base.
 
 The Locator subclasses defined here are
@@ -93,7 +93,7 @@ methods are::
   ax.yaxis.set_major_locator( ymajorLocator )
   ax.yaxis.set_minor_locator( yminorLocator )
 
-The default minor locator is the NullLocator, eg no minor ticks on by
+The default minor locator is the NullLocator, e.g., no minor ticks on by
 default.
 
 Tick formatting
@@ -992,8 +992,8 @@ class Locator(TickHelper):
 class IndexLocator(Locator):
     """
     Place a tick on every multiple of some base number of points
-    plotted, eg on every 5th point.  It is assumed that you are doing
-    index plotting; ie the axis is 0, len(data).  This is mainly
+    plotted, e.g., on every 5th point.  It is assumed that you are doing
+    index plotting; i.e., the axis is 0, len(data).  This is mainly
     useful for x ticks.
     """
     def __init__(self, base, offset):
@@ -1747,8 +1747,8 @@ class AutoMinorLocator(Locator):
 
         if len(majorlocs) > 0:
             t0 = majorlocs[0]
-            tmin = np.ceil((vmin - t0) / minorstep) * minorstep
-            tmax = np.floor((vmax - t0) / minorstep) * minorstep
+            tmin = ((vmin - t0) // minorstep + 1) * minorstep
+            tmax = ((vmax - t0) // minorstep + 1) * minorstep
             locs = np.arange(tmin, tmax, minorstep) + t0
             cond = np.abs((locs - t0) % majorstep) > minorstep / 10.0
             locs = locs.compress(cond)

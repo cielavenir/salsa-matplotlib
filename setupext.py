@@ -13,7 +13,6 @@ import sys
 import warnings
 from textwrap import fill
 
-
 PY3 = (sys.version_info[0] >= 3)
 
 
@@ -1187,12 +1186,17 @@ class Six(SetupPackage):
             import six
         except ImportError:
             return (
-                "six was not found.")
+                "six was not found."
+                "pip will attempt to install it "
+                "after matplotlib.")
 
         if not is_min_version(six.__version__, self.min_version):
-            raise CheckFailed(
-                "Requires six %s or later.  Found %s." %
-                (self.min_version, six.__version__))
+            return ("The installed version of six is {inst_ver} but "
+                    "a the minimum required version is {min_ver}. "
+                    "pip/easy install will attempt to install a "
+                    "newer version."
+                    ).format(min_ver=self.min_version,
+                             inst_ver=six.__version__)
 
         return "using six version %s" % six.__version__
 
@@ -1788,16 +1792,26 @@ class BackendGtk3Agg(OptionalBackendPackage):
         except:
             return "unknown (can not use multiprocessing to determine)"
         try:
-            success, msg = p.map(backend_gtk3agg_internal_check, [0])[0]
+            res = p.map_async(backend_gtk3agg_internal_check, [0])
+            success, msg = res.get(timeout=10)[0]
+        except multiprocessing.TimeoutError:
+            p.terminate()
+            # No result returned. Probaly hanging, terminate the process.
+            success = False
+            raise CheckFailed("Check timed out")
         except:
+            p.close()
+            # Some other error.
             success = False
             msg = "Could not determine"
-        finally:
+            raise
+        else:
             p.close()
+        finally:
             p.join()
+
         if success:
             BackendAgg.force = True
-
             return msg
         else:
             raise CheckFailed(msg)
@@ -1852,12 +1866,25 @@ class BackendGtk3Cairo(OptionalBackendPackage):
             p = multiprocessing.Pool()
         except:
             return "unknown (can not use multiprocessing to determine)"
-        success, msg = p.map(backend_gtk3cairo_internal_check, [0])[0]
-        p.close()
-        p.join()
+        try:
+            res = p.map_async(backend_gtk3cairo_internal_check, [0])
+            success, msg = res.get(timeout=10)[0]
+        except multiprocessing.TimeoutError:
+            p.terminate()
+            # No result returned. Probaly hanging, terminate the process.
+            success = False
+            raise CheckFailed("Check timed out")
+        except:
+            p.close()
+            success = False
+            raise
+        else:
+            p.close()
+        finally:
+            p.join()
+
         if success:
             BackendAgg.force = True
-
             return msg
         else:
             raise CheckFailed(msg)
@@ -1988,13 +2015,21 @@ class BackendQtBase(OptionalBackendPackage):
         else:
             # Multiprocessing OK
             try:
-                msg = p.map(self.callback, [self])[0]
+                res = p.map_async(self.callback, [self])
+                msg = res.get(timeout=10)[0]
+            except multiprocessing.TimeoutError:
+                p.terminate()
+                # No result returned. Probaly hanging, terminate the process.
+                raise CheckFailed("Check timed out")
             except:
-                # If we hit an error on multiprocessing raise it
+                # Some other error.
+                p.close()
                 raise
+            else:
+                # Clean exit
+                p.close()
             finally:
                 # Tidy up multiprocessing
-                p.close()
                 p.join()
 
         return msg
