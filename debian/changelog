@@ -1,4 +1,4 @@
-matplotlib (1.4.3~rc1-1) UNRELEASED; urgency=medium
+matplotlib (1.4.3~rc1-1) experimental; urgency=medium
 
   * New upstream release candidate
   * debian/copyright
@@ -19,7 +19,7 @@ matplotlib (1.4.3~rc1-1) UNRELEASED; urgency=medium
   * debian/rules
     - fix a FTBFS when building twice in a row
 
- -- Sandro Tosi <morph@debian.org>  Sat, 14 Feb 2015 00:07:05 +0000
+ -- Sandro Tosi <morph@debian.org>  Sat, 14 Feb 2015 00:08:01 +0000
 
 matplotlib (1.4.2-3) unstable; urgency=medium
 
