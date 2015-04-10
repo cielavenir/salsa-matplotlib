@@ -3,8 +3,11 @@ matplotlib (1.4.3-1) UNRELEASED; urgency=medium
   * New upstream release
   * debian/patches/CVE-2013-1424.patch
     - dropped, merged upstream
+  * debian/rules
+    - remove embedded CXX, this should avoid accidental usage even though we set
+      to ues the system installed one
 
- -- Sandro Tosi <morph@debian.org>  Fri, 10 Apr 2015 01:24:49 +0100
+ -- Sandro Tosi <morph@debian.org>  Fri, 10 Apr 2015 22:43:59 +0100
 
 matplotlib (1.4.3~rc1-1) experimental; urgency=medium
 

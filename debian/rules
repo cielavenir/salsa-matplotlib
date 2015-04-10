@@ -101,6 +101,9 @@ clean:
 	rm -rf doc/tex.cache/ fontList.py3k.cache result_images/ test_cache/ tex.cache/ examples/pylab_examples/test.xls
 	rm -rf doc/finance.cache/ doc/fontList.cache fontList.cache
 
+	# remove embedded CXX to prevent it to be picked up
+	rm -rf extern/CXX/
+
 # install
 install-arch: build-arch $(PY2VERS:%=install-%-stamp) $(PY3VERS:%=install-py3-%-stamp)
 	dh_testdir
