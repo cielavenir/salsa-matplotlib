@@ -126,7 +126,8 @@ install-%-stamp: build-%-stamp
 	find debian/$(pdbg) -depth -empty -exec rmdir {} \;
 
 	# don't install baseline_images, needed for tests only, but huge
-	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/*-packages/matplotlib/tests/baseline_images/
+	# leave the dir tho, as matplotlib/tests/__init__.py checks for it
+	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/*-packages/matplotlib/tests/baseline_images/*
 
 	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/mpl-data/
 	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/backends/Matplotlib.nib/
@@ -161,7 +162,8 @@ install-py3-%-stamp: build-%-stamp
 	find debian/$(p3dbg) -depth -empty -exec rmdir {} \;
 
 	# don't install baseline_images, needed for tests only, but huge
-	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/*-packages/matplotlib/tests/baseline_images/
+	# leave the dir tho, as matplotlib/tests/__init__.py checks for it
+	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/*-packages/matplotlib/tests/baseline_images/*
 
 	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/mpl-data/
 	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/backends/Matplotlib.nib/
