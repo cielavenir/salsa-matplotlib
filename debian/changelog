@@ -1,8 +1,10 @@
 matplotlib (1.4.3-1) UNRELEASED; urgency=medium
 
   * New upstream release
+  * debian/patches/CVE-2013-1424.patch
+    - dropped, merged upstream
 
- -- Sandro Tosi <morph@debian.org>  Wed, 25 Mar 2015 14:31:54 +0000
+ -- Sandro Tosi <morph@debian.org>  Fri, 10 Apr 2015 01:24:49 +0100
 
 matplotlib (1.4.3~rc1-1) experimental; urgency=medium
 

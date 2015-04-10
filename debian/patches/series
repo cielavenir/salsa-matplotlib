@@ -7,4 +7,3 @@ multiarch-tktcl.patch
 #gtk3agg_check_no-multiprocessing.patch
 gtk3cairo_check_no-multiprocessing.patch
 bts613818_use_system_pycxx.patch
-CVE-2013-1424.patch
