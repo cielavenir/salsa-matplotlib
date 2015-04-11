@@ -1,4 +1,4 @@
-matplotlib (1.4.3-1) UNRELEASED; urgency=medium
+matplotlib (1.4.3-1) experimental; urgency=medium
 
   * New upstream release
   * debian/patches/CVE-2013-1424.patch
@@ -11,7 +11,7 @@ matplotlib (1.4.3-1) UNRELEASED; urgency=medium
   * debian/copyright
     - drop copyright for pyparsing, no longer included in upstream tarball
 
- -- Sandro Tosi <morph@debian.org>  Sat, 11 Apr 2015 01:28:23 +0100
+ -- Sandro Tosi <morph@debian.org>  Sat, 11 Apr 2015 02:22:49 +0100
 
 matplotlib (1.4.3~rc1-1) experimental; urgency=medium
 
