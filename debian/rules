@@ -101,6 +101,9 @@ clean:
 	rm -rf doc/tex.cache/ fontList.py3k.cache result_images/ test_cache/ tex.cache/ examples/pylab_examples/test.xls
 	rm -rf doc/finance.cache/ doc/fontList.cache fontList.cache
 
+	# remove embedded CXX to prevent it to be picked up
+	rm -rf extern/CXX/
+
 # install
 install-arch: build-arch $(PY2VERS:%=install-%-stamp) $(PY3VERS:%=install-py3-%-stamp)
 	dh_testdir
@@ -123,7 +126,8 @@ install-%-stamp: build-%-stamp
 	find debian/$(pdbg) -depth -empty -exec rmdir {} \;
 
 	# don't install baseline_images, needed for tests only, but huge
-	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/*-packages/matplotlib/tests/baseline_images/
+	# leave the dir tho, as matplotlib/tests/__init__.py checks for it
+	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/*-packages/matplotlib/tests/baseline_images/*
 
 	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/mpl-data/
 	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/matplotlib/backends/Matplotlib.nib/
@@ -158,7 +162,8 @@ install-py3-%-stamp: build-%-stamp
 	find debian/$(p3dbg) -depth -empty -exec rmdir {} \;
 
 	# don't install baseline_images, needed for tests only, but huge
-	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/*-packages/matplotlib/tests/baseline_images/
+	# leave the dir tho, as matplotlib/tests/__init__.py checks for it
+	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/*-packages/matplotlib/tests/baseline_images/*
 
 	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/mpl-data/
 	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/backends/Matplotlib.nib/
