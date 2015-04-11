@@ -8,8 +8,10 @@ matplotlib (1.4.3-1) UNRELEASED; urgency=medium
       to ues the system installed one
     - remove the contents of baseline_images, but not the directory itself,
       which is required by matplotlib.tests; Closes: #779847
+  * debian/copyright
+    - drop copyright for pyparsing, no longer included in upstream tarball
 
- -- Sandro Tosi <morph@debian.org>  Sat, 11 Apr 2015 00:48:45 +0100
+ -- Sandro Tosi <morph@debian.org>  Sat, 11 Apr 2015 01:28:23 +0100
 
 matplotlib (1.4.3~rc1-1) experimental; urgency=medium
 
