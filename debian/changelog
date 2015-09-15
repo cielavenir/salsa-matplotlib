@@ -3,8 +3,11 @@ matplotlib (1.4.3-2) UNRELEASED; urgency=medium
   * debian/rules
     - replace JS libraries in all the py3k version of the package; thanks to
       Barry Warsaw for the report and patch; Closes: #792310
+  * debian/missing-sources/*
+    - add missing source (un-minified) for JQuery and JQuery-UI; thanks to
+      bastien ROUCARIÈS for the report; Closes: #788730
 
- -- Sandro Tosi <morph@debian.org>  Mon, 14 Sep 2015 21:07:24 +0100
+ -- Sandro Tosi <morph@debian.org>  Tue, 15 Sep 2015 22:26:00 +0100
 
 matplotlib (1.4.3-1) experimental; urgency=medium
 
