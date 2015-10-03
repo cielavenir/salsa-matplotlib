@@ -1,12 +1,11 @@
 matplotlib (1.5.0~rc2-1) UNRELEASED; urgency=medium
 
   * New upstream release candidate
+    - Lena Söderberg image has been removed; Closes: #794854
+    - include source for minified JS libraries; Closes: #788730
   * debian/rules
     - replace JS libraries in all the py3k version of the package; thanks to
       Barry Warsaw for the report and patch; Closes: #792310
-  * debian/missing-sources/*
-    - add missing source (un-minified) for JQuery and JQuery-UI; thanks to
-      bastien ROUCARIÈS for the report; Closes: #788730
 
  -- Sandro Tosi <morph@debian.org>  Sat, 03 Oct 2015 13:04:59 +0100
 
