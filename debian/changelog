@@ -10,8 +10,10 @@ matplotlib (1.5.0~rc2-1) UNRELEASED; urgency=medium
     - updated for new upstream code
   * debian/patches/*
     - refresh/remove patches for new uptream code
+  * debian/control
+    - add cycler to b-d (bin pkgs depends are detected by dh_python2)
 
- -- Sandro Tosi <morph@debian.org>  Sun, 04 Oct 2015 03:08:32 +0100
+ -- Sandro Tosi <morph@debian.org>  Sun, 04 Oct 2015 17:25:56 +0100
 
 matplotlib (1.4.3-1) experimental; urgency=medium
 
