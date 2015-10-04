@@ -372,43 +372,38 @@ License:
  documentation.  This software and documentation are provided "as is" without
  express or implied warranty.
 
-Files: extern/CXX/*
-Copyright: Copyright (c) 1998 - 2007, The Regents of the University of California
-           Produced at the Lawrence Livermore National Laboratory
-           All rights reserved.
-License:
- Redistribution  and  use  in  source  and  binary  forms,  with  or  without
- modification, are permitted provided that the following conditions are met:
- .
- - Redistributions of  source code must  retain the above  copyright notice,
-   this list of conditions and the disclaimer below.
- - Redistributions in binary form must reproduce the above copyright notice,
-   this  list of  conditions  and  the  disclaimer (as noted below)  in  the
-   documentation and/or materials provided with the distribution.
- - Neither the name of the UC/LLNL nor  the names of its contributors may be
-   used to  endorse or  promote products derived from  this software without
-   specific prior written permission.
- .
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT  HOLDERS AND CONTRIBUTORS "AS IS"
- AND ANY EXPRESS OR  IMPLIED WARRANTIES, INCLUDING,  BUT NOT  LIMITED TO, THE
- IMPLIED WARRANTIES OF MERCHANTABILITY AND  FITNESS FOR A PARTICULAR  PURPOSE
- ARE  DISCLAIMED.  IN  NO  EVENT  SHALL  THE  REGENTS  OF  THE  UNIVERSITY OF
- CALIFORNIA, THE U.S.  DEPARTMENT  OF  ENERGY OR CONTRIBUTORS BE  LIABLE  FOR
- ANY  DIRECT,  INDIRECT,  INCIDENTAL,  SPECIAL,  EXEMPLARY,  OR CONSEQUENTIAL
- DAMAGES (INCLUDING, BUT NOT  LIMITED TO, PROCUREMENT OF  SUBSTITUTE GOODS OR
- SERVICES; LOSS OF  USE, DATA, OR PROFITS; OR  BUSINESS INTERRUPTION) HOWEVER
- CAUSED  AND  ON  ANY  THEORY  OF  LIABILITY,  WHETHER  IN  CONTRACT,  STRICT
- LIABILITY, OR TORT  (INCLUDING NEGLIGENCE OR OTHERWISE)  ARISING IN ANY  WAY
- OUT OF THE  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
- DAMAGE.
-
-Files: extern/agg24/*
+Files: extern/agg24-svn/*
 Copyright: Copyright (C) 2002-2005 Maxim Shemanarev (http://www.antigrain.com)
-License:
+License: ANTIGRAIN
+
+License: ANTIGRAIN
  Permission to copy, use, modify, sell and distribute this software
  is granted provided this copyright notice appears in all copies.
  This software is provided "as is" without express or implied
  warranty, and with no claim as to its suitability for any purpose.
+
+Files: extern/agg24-svn/include/agg_curves.h
+Copyright: Copyright (C) 2002-2005 Maxim Shemanarev (http://www.antigrain.com)
+ Copyright (C) 2005 Tony Juricic (tonygeek@yahoo.com)
+License: ANTIGRAIN
+
+Files: extern/agg24-svn/include/agg_span_gradient_contour.h extern/agg24-svn/include/agg_span_gradient_image.h
+Copyright: Copyright (c) 2007-2008 Milan Marusinec alias Milano (milan@marusinec.sk)
+License: ANTIGRAIN
+
+Files: extern/agg24-svn/include/platform/mac/agg_mac_pmap.h
+Copyright: Copyright (C) 2002-2005 Maxim Shemanarev (McSeem)
+ Copyright (C) 2002 Hansruedi Baer (MacOS support)
+License: ANTIGRAIN
+
+Files: extern/agg24-svn/src/agg_color_rgba.cpp
+Copyright: Copyright (C) 2009 John Horigan (http://www.antigrain.com)
+License: ANTIGRAIN
+
+Files: extern/agg24-svn/src/platform/mac/agg_platform_support.cpp
+Copyright: Copyright (C) 2002-2005 Maxim Shemanarev (McSeem)
+ Copyright (C) 2003 Hansruedi Baer (MacOS support)
+License: ANTIGRAIN
 
 Files: extern/qhull/*
 Copyright: Copyright (c) 1993-2012 C.B. Barber and The Geometry Center
@@ -423,6 +418,7 @@ License:
  2. A copy of this text file must be distributed along with any copies
     of Qhull that you redistribute; this includes copies that you have
     modified, or copies of programs or other software products that
+    C
     include Qhull.
  .
  3. If you modify Qhull, you must include a notice giving the
@@ -437,3 +433,15 @@ License:
     provided solely "as is".  Bug reports or fixes may be sent to
     qhull_bug@qhull.org; the authors may or may not act on them as
     they desire.
+
+Files: lib/matplotlib/backends/web_backend/jquery/css/themes/base/jquery-ui.css lib/matplotlib/backends/web_backend/jquery/css/themes/base/jquery-ui.min.css lib/matplotlib/backends/web_backend/jquery/js/jquery-ui.js lib/matplotlib/backends/web_backend/jquery/js/jquery-ui.min.js
+Copyright: Copyright 2015 jQuery Foundation and other contributors
+License: MIT
+
+Files: lib/matplotlib/backends/web_backend/jquery/js/jquery-1.11.3.js lib/matplotlib/backends/web_backend/jquery/js/jquery-1.11.3.min.js
+Copyright: Copyright 2005, 2014 jQuery Foundation, Inc. and other contributors
+License: MIT
+
+Files: lib/matplotlib/externals/six.py
+Copyright: Copyright (c) 2010-2015 Benjamin Peterson
+License: MIT

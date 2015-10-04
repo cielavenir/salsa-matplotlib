@@ -6,8 +6,10 @@ matplotlib (1.5.0~rc2-1) UNRELEASED; urgency=medium
   * debian/rules
     - replace JS libraries in all the py3k version of the package; thanks to
       Barry Warsaw for the report and patch; Closes: #792310
+  * debian/copyright
+    - updated for new upstream code
 
- -- Sandro Tosi <morph@debian.org>  Sat, 03 Oct 2015 13:04:59 +0100
+ -- Sandro Tosi <morph@debian.org>  Sun, 04 Oct 2015 02:29:49 +0100
 
 matplotlib (1.4.3-1) experimental; urgency=medium
 
