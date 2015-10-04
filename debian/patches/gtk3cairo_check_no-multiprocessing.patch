@@ -1,6 +1,6 @@
 --- a/setupext.py
 +++ b/setupext.py
-@@ -1740,7 +1740,10 @@ class BackendGtk3Agg(OptionalBackendPack
+@@ -1751,7 +1751,10 @@ class BackendGtk3Agg(OptionalBackendPack
      def check_requirements(self):
          if 'TRAVIS' in os.environ:
              raise CheckFailed("Can't build with Travis")
