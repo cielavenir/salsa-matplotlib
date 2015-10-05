@@ -13,7 +13,7 @@ Displays Agg images in the browser, with interactivity
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
+from matplotlib.externals import six
 
 import io
 import json
@@ -234,8 +234,7 @@ class FigureCanvasWebAggCore(backend_agg.FigureCanvasAgg):
             # TODO: We should write a new version of write_png that
             # handles the differencing inline
             _png.write_png(
-                output.tostring(),
-                output.shape[1], output.shape[0],
+                output.view(dtype=np.uint8).reshape(output.shape + (4,)),
                 self._png_buffer)
 
             # Swap the renderer frames
@@ -272,6 +271,8 @@ class FigureCanvasWebAggCore(backend_agg.FigureCanvasAgg):
 
     def handle_event(self, event):
         e_type = event['type']
+        guiEvent = event.get('guiEvent', None)
+
         if e_type == 'ack':
             # Network latency tends to decrease if traffic is flowing
             # in both directions.  Therefore, the browser sends back
@@ -295,28 +296,29 @@ class FigureCanvasWebAggCore(backend_agg.FigureCanvasAgg):
             # The right mouse button pops up a context menu, which
             # doesn't work very well, so use the middle mouse button
             # instead.  It doesn't seem that it's possible to disable
-            # the context menu in recent versions of Chrome.
+            # the context menu in recent versions of Chrome.  If this
+            # is resolved, please also adjust the docstring in MouseEvent.
             if button == 2:
                 button = 3
 
             if e_type == 'button_press':
-                self.button_press_event(x, y, button)
+                self.button_press_event(x, y, button, guiEvent=guiEvent)
             elif e_type == 'button_release':
-                self.button_release_event(x, y, button)
+                self.button_release_event(x, y, button, guiEvent=guiEvent)
             elif e_type == 'motion_notify':
-                self.motion_notify_event(x, y)
+                self.motion_notify_event(x, y, guiEvent=guiEvent)
             elif e_type == 'figure_enter':
-                self.enter_notify_event(xy=(x, y))
+                self.enter_notify_event(xy=(x, y), guiEvent=guiEvent)
             elif e_type == 'figure_leave':
                 self.leave_notify_event()
             elif e_type == 'scroll':
-                self.scroll_event(x, y, event['step'])
+                self.scroll_event(x, y, event['step'], guiEvent=guiEvent)
         elif e_type in ('key_press', 'key_release'):
             key = _handle_key(event['key'])
             if e_type == 'key_press':
-                self.key_press_event(key)
+                self.key_press_event(key, guiEvent=guiEvent)
             elif e_type == 'key_release':
-                self.key_release_event(key)
+                self.key_release_event(key, guiEvent=guiEvent)
         elif e_type == 'toolbar_button':
             # TODO: Be more suspicious of the input
             getattr(self.toolbar, event['name'])()
@@ -327,11 +329,12 @@ class FigureCanvasWebAggCore(backend_agg.FigureCanvasAgg):
             self.send_event('figure_label', label=figure_label)
             self._force_full = True
             self.draw_idle()
+
         else:
-            handler = getattr(self, 'handle_{}'.format(e_type), None)
+            handler = getattr(self, 'handle_{0}'.format(e_type), None)
             if handler is None:
                 import warnings
-                warnings.warn('Unhandled message type {}. {}'.format(
+                warnings.warn('Unhandled message type {0}. {1}'.format(
                                                         e_type, event))
             else:
                 return handler(event)

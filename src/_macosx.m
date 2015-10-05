@@ -2,8 +2,11 @@
 #include <ApplicationServices/ApplicationServices.h>
 #include <sys/socket.h>
 #include <Python.h>
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include "numpy/arrayobject.h"
 #include "path_cleanup.h"
+
+#define PYOSINPUTHOOK_REPETITIVE 1 /* Remove this once Python is fixed */
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1
@@ -36,13 +39,18 @@
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
 #define COMPILING_FOR_10_6
 #endif
-
-static int nwin = 0;   /* The number of open windows */
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+#define COMPILING_FOR_10_7
+#endif
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10100
+#define COMPILING_FOR_10_10
+#endif
 
 /* Use Atsui for Mac OS X 10.4, CoreText for Mac OS X 10.5 */
 #ifndef COMPILING_FOR_10_5
 static int ngc = 0;    /* The number of graphics contexts in use */
 
+#include <Carbon/Carbon.h>
 
 /* For drawing Unicode strings with ATSUI */
 static ATSUStyle style = NULL;
@@ -56,8 +64,6 @@ static ATSUTextLayout layout = NULL;
 
 
 /* Various NSApplicationDefined event subtypes */
-#define STDIN_READY 0
-#define SIGINT_CALLED 1
 #define STOP_EVENT_LOOP 2
 #define WINDOW_CLOSING 3
 
@@ -74,18 +80,11 @@ static ATSUTextLayout layout = NULL;
 
 /* -------------------------- Helper function ---------------------------- */
 
-static void stdin_ready(CFReadStreamRef readStream, CFStreamEventType eventType, void* context)
+static void
+_stdin_callback(CFReadStreamRef stream, CFStreamEventType eventType, void* info)
 {
-    NSEvent* event = [NSEvent otherEventWithType: NSApplicationDefined
-                                        location: NSZeroPoint
-                                   modifierFlags: 0
-                                       timestamp: 0.0
-                                    windowNumber: 0
-                                         context: nil
-                                         subtype: STDIN_READY
-                                           data1: 0
-                                           data2: 0];
-    [NSApp postEvent: event atStart: true];
+    CFRunLoopRef runloop = info;
+    CFRunLoopStop(runloop);
 }
 
 static int sigint_fd = -1;
@@ -96,29 +95,31 @@ static void _sigint_handler(int sig)
     write(sigint_fd, &c, 1);
 }
 
-static void _callback(CFSocketRef s,
-                      CFSocketCallBackType type,
-                      CFDataRef address,
-                      const void * data,
-                      void *info)
+static void _sigint_callback(CFSocketRef s,
+                             CFSocketCallBackType type,
+                             CFDataRef address,
+                             const void * data,
+                             void *info)
 {
     char c;
+    int* interrupted = info;
     CFSocketNativeHandle handle = CFSocketGetNative(s);
+    CFRunLoopRef runloop = CFRunLoopGetCurrent();
     read(handle, &c, 1);
-    NSEvent* event = [NSEvent otherEventWithType: NSApplicationDefined
-                                        location: NSZeroPoint
-                                   modifierFlags: 0
-                                       timestamp: 0.0
-                                    windowNumber: 0
-                                         context: nil
-                                         subtype: SIGINT_CALLED
-                                           data1: 0
-                                           data2: 0];
-    [NSApp postEvent: event atStart: true];
+    *interrupted = 1;
+    CFRunLoopStop(runloop);
+}
+
+static CGEventRef _eventtap_callback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon)
+{
+    CFRunLoopRef runloop = refcon;
+    CFRunLoopStop(runloop);
+    return event;
 }
 
 static int wait_for_stdin(void)
 {
+    int interrupted = 0;
     const UInt8 buffer[] = "/dev/fd/0";
     const CFIndex n = (CFIndex)strlen((char*)buffer);
     CFRunLoopRef runloop = CFRunLoopGetCurrent();
@@ -131,30 +132,38 @@ static int wait_for_stdin(void)
     CFRelease(url);
 
     CFReadStreamOpen(stream);
+#ifdef PYOSINPUTHOOK_REPETITIVE
     if (!CFReadStreamHasBytesAvailable(stream))
     /* This is possible because of how PyOS_InputHook is called from Python */
     {
+#endif
         int error;
-        int interrupted = 0;
         int channel[2];
         CFSocketRef sigint_socket = NULL;
         PyOS_sighandler_t py_sigint_handler = NULL;
         CFStreamClientContext clientContext = {0, NULL, NULL, NULL, NULL};
+        clientContext.info = runloop;
         CFReadStreamSetClient(stream,
                               kCFStreamEventHasBytesAvailable,
-                              stdin_ready,
+                              _stdin_callback,
                               &clientContext);
-        CFReadStreamScheduleWithRunLoop(stream, runloop, kCFRunLoopCommonModes);
-        error = pipe(channel);
+        CFReadStreamScheduleWithRunLoop(stream, runloop, kCFRunLoopDefaultMode);
+        error = socketpair(AF_UNIX, SOCK_STREAM, 0, channel);
         if (error==0)
         {
-            fcntl(channel[1], F_SETFL, O_WRONLY | O_NONBLOCK);
-
-            sigint_socket = CFSocketCreateWithNative(kCFAllocatorDefault,
-                                                     channel[0],
-                                                     kCFSocketReadCallBack,
-                                                     _callback,
-                                                     NULL);
+            CFSocketContext context;
+            context.version = 0;
+            context.info = &interrupted;
+            context.retain = NULL;
+            context.release = NULL;
+            context.copyDescription = NULL;
+            fcntl(channel[0], F_SETFL, O_WRONLY | O_NONBLOCK);
+            sigint_socket = CFSocketCreateWithNative(
+                kCFAllocatorDefault,
+                channel[1],
+                kCFSocketReadCallBack,
+                _sigint_callback,
+                &context);
             if (sigint_socket)
             {
                 CFRunLoopSourceRef source;
@@ -166,31 +175,25 @@ static int wait_for_stdin(void)
                 {
                     CFRunLoopAddSource(runloop, source, kCFRunLoopDefaultMode);
                     CFRelease(source);
-                    sigint_fd = channel[1];
+                    sigint_fd = channel[0];
                     py_sigint_handler = PyOS_setsig(SIGINT, _sigint_handler);
                 }
             }
-            else
-                close(channel[0]);
         }
 
+        NSEvent* event;
         NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-        NSDate* date = [NSDate distantFuture];
-        while (true)
-        {   NSEvent* event = [NSApp nextEventMatchingMask: NSAnyEventMask
-                                                untilDate: date
-                                                   inMode: NSDefaultRunLoopMode
-                                                  dequeue: YES];
-           if (!event) break; /* No windows open */
-           if ([event type]==NSApplicationDefined)
-           {   short subtype = [event subtype];
-               if (subtype==STDIN_READY) break;
-               if (subtype==SIGINT_CALLED)
-               {   interrupted = true;
-                   break;
-               }
-           }
-           [NSApp sendEvent: event];
+        while (true) {
+            while (true) {
+                event = [NSApp nextEventMatchingMask: NSAnyEventMask
+                                           untilDate: [NSDate distantPast]
+                                              inMode: NSDefaultRunLoopMode
+                                             dequeue: YES];
+                if (!event) break;
+                [NSApp sendEvent: event];
+            }
+            CFRunLoopRun();
+            if (interrupted || CFReadStreamHasBytesAvailable(stream)) break;
         }
         [pool release];
 
@@ -199,11 +202,20 @@ static int wait_for_stdin(void)
                                           runloop,
                                           kCFRunLoopCommonModes);
         if (sigint_socket) CFSocketInvalidate(sigint_socket);
-        if (error==0) close(channel[1]);
-        if (interrupted) raise(SIGINT);
+        if (error==0) {
+            close(channel[0]);
+            close(channel[1]);
+        }
+#ifdef PYOSINPUTHOOK_REPETITIVE
     }
+#endif
     CFReadStreamClose(stream);
     CFRelease(stream);
+    if (interrupted) {
+        errno = EINTR;
+        raise(SIGINT);
+        return -1;
+    }
     return 1;
 }
 
@@ -262,7 +274,7 @@ static int _draw_path(CGContextRef cr, void* iterator, int nmax)
         code = get_vertex(iterator, &x1, &y1);
         if (code == CLOSEPOLY)
         {
-            CGContextClosePath(cr);
+            if (n > 0) CGContextClosePath(cr);
             n++;
         }
         else if (code == STOP)
@@ -365,6 +377,12 @@ static void _release_hatch(void* info)
 
 /* ---------------------------- Cocoa classes ---------------------------- */
 
+@interface WindowServerConnectionManager : NSObject
+{
+}
++ (WindowServerConnectionManager*)sharedManager;
+- (void)launch:(NSNotification*)notification;
+@end
 
 @interface Window : NSWindow
 {   PyObject* manager;
@@ -372,7 +390,6 @@ static void _release_hatch(void* info)
 - (Window*)initWithContentRect:(NSRect)rect styleMask:(unsigned int)mask backing:(NSBackingStoreType)bufferingType defer:(BOOL)deferCreation withManager: (PyObject*)theManager;
 - (NSRect)constrainFrameRect:(NSRect)rect toScreen:(NSScreen*)screen;
 - (BOOL)closeButtonPressed;
-- (void)close;
 - (void)dealloc;
 @end
 
@@ -1216,19 +1233,27 @@ GraphicsContext_draw_markers (GraphicsContext* self, PyObject* args)
 static int _transformation_converter(PyObject* object, void* pointer)
 {
     CGAffineTransform* matrix = (CGAffineTransform*)pointer;
-    if (!PyArray_Check(object) || PyArray_NDIM(object)!=2
-        || PyArray_DIM(object, 0)!=3 || PyArray_DIM(object, 1)!=3)
+    if (!PyArray_Check(object))
+       {
+           PyErr_SetString(PyExc_ValueError,
+                           "transformation matrix is not a NumPy array");
+           return 0;
+       }
+    PyArrayObject* aobject = (PyArrayObject*)object;
+
+    if (PyArray_NDIM(aobject)!=2 || PyArray_DIM(aobject, 0)!=3
+        || PyArray_DIM(aobject, 1)!=3)
         {
             PyErr_SetString(PyExc_ValueError,
                 "transformation matrix is not a 3x3 NumPy array");
             return 0;
         }
-    const double a =  *(double*)PyArray_GETPTR2(object, 0, 0);
-    const double b =  *(double*)PyArray_GETPTR2(object, 1, 0);
-    const double c =  *(double*)PyArray_GETPTR2(object, 0, 1);
-    const double d =  *(double*)PyArray_GETPTR2(object, 1, 1);
-    const double tx =  *(double*)PyArray_GETPTR2(object, 0, 2);
-    const double ty =  *(double*)PyArray_GETPTR2(object, 1, 2);
+    const double a =  *(double*)PyArray_GETPTR2(aobject, 0, 0);
+    const double b =  *(double*)PyArray_GETPTR2(aobject, 1, 0);
+    const double c =  *(double*)PyArray_GETPTR2(aobject, 0, 1);
+    const double d =  *(double*)PyArray_GETPTR2(aobject, 1, 1);
+    const double tx =  *(double*)PyArray_GETPTR2(aobject, 0, 2);
+    const double ty =  *(double*)PyArray_GETPTR2(aobject, 1, 2);
     *matrix = CGAffineTransformMake(a, b, c, d, tx, ty);
     return 1;
 }
@@ -1240,9 +1265,12 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
     PyObject* path_ids;
     PyObject* all_transforms;
     PyObject* offsets;
+    PyArrayObject* offsets_arr = 0;
     CGAffineTransform offset_transform;
     PyObject* facecolors;
+    PyArrayObject* facecolors_arr = 0;
     PyObject* edgecolors;
+    PyArrayObject* edgecolors_arr = 0;
     PyObject* linewidths;
     PyObject* linestyles;
     PyObject* antialiaseds;
@@ -1347,29 +1375,29 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
 
     /* ------------------- Check facecolors array ------------------------- */
 
-    facecolors = PyArray_FromObject(facecolors, NPY_DOUBLE, 1, 2);
-    if (!facecolors ||
-        (PyArray_NDIM(facecolors)==1 && PyArray_DIM(facecolors, 0)!=0) ||
-        (PyArray_NDIM(facecolors)==2 && PyArray_DIM(facecolors, 1)!=4))
+    facecolors_arr = (PyArrayObject*) PyArray_FromObject(facecolors, NPY_DOUBLE, 1, 2);
+    if (!facecolors_arr ||
+        (PyArray_NDIM(facecolors_arr)==1 && PyArray_DIM(facecolors_arr, 0)!=0) ||
+        (PyArray_NDIM(facecolors_arr)==2 && PyArray_DIM(facecolors_arr, 1)!=4))
     {
         PyErr_SetString(PyExc_ValueError, "Facecolors must by a Nx4 numpy array or empty");
         ok = 0;
         goto exit;
     }
-    Py_ssize_t Nfacecolors = PyArray_DIM(facecolors, 0);
+    Py_ssize_t Nfacecolors = PyArray_DIM(facecolors_arr, 0);
 
     /* ------------------- Check edgecolors array ------------------------- */
 
-    edgecolors = PyArray_FromObject(edgecolors, NPY_DOUBLE, 1, 2);
-    if (!edgecolors ||
-        (PyArray_NDIM(edgecolors)==1 && PyArray_DIM(edgecolors, 0)!=0) ||
-        (PyArray_NDIM(edgecolors)==2 && PyArray_DIM(edgecolors, 1)!=4))
+    edgecolors_arr = (PyArrayObject*) PyArray_FromObject(edgecolors, NPY_DOUBLE, 1, 2);
+    if (!edgecolors_arr ||
+        (PyArray_NDIM(edgecolors_arr)==1 && PyArray_DIM(edgecolors_arr, 0)!=0) ||
+        (PyArray_NDIM(edgecolors_arr)==2 && PyArray_DIM(edgecolors_arr, 1)!=4))
     {
         PyErr_SetString(PyExc_ValueError, "Edgecolors must by a Nx4 numpy array or empty");
         ok = 0;
         goto exit;
     }
-    Py_ssize_t Nedgecolors = PyArray_DIM(edgecolors, 0);
+    Py_ssize_t Nedgecolors = PyArray_DIM(edgecolors_arr, 0);
 
     /* -------------------------------------------------------------------- */
 
@@ -1378,35 +1406,35 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
 
     /* ------------------- Check offsets array ---------------------------- */
 
-    offsets = PyArray_FromObject(offsets, NPY_DOUBLE, 0, 2);
+    offsets_arr = (PyArrayObject*) PyArray_FromObject(offsets, NPY_DOUBLE, 0, 2);
 
-    if (!offsets ||
-        (PyArray_NDIM(offsets)==2 && PyArray_DIM(offsets, 1)!=2) ||
-        (PyArray_NDIM(offsets)==1 && PyArray_DIM(offsets, 0)!=0))
+    if (!offsets_arr ||
+        (PyArray_NDIM(offsets_arr)==2 && PyArray_DIM(offsets_arr, 1)!=2) ||
+        (PyArray_NDIM(offsets_arr)==1 && PyArray_DIM(offsets_arr, 0)!=0))
     {
-        Py_XDECREF(offsets);
+        Py_XDECREF(offsets_arr);
         PyErr_SetString(PyExc_ValueError, "Offsets array must be Nx2");
         ok = 0;
         goto exit;
     }
-    const Py_ssize_t Noffsets = PyArray_DIM(offsets, 0);
+    const Py_ssize_t Noffsets = PyArray_DIM(offsets_arr, 0);
     if (Noffsets > 0) {
         toffsets = malloc(Noffsets*sizeof(CGPoint));
         if (!toffsets)
         {
-            Py_DECREF(offsets);
+            Py_DECREF(offsets_arr);
             ok = 0;
             goto exit;
         }
         CGPoint point;
         for (i = 0; i < Noffsets; i++)
         {
-            point.x = (CGFloat) (*(double*)PyArray_GETPTR2(offsets, i, 0));
-            point.y = (CGFloat) (*(double*)PyArray_GETPTR2(offsets, i, 1));
+            point.x = (CGFloat) (*(double*)PyArray_GETPTR2(offsets_arr, i, 0));
+            point.y = (CGFloat) (*(double*)PyArray_GETPTR2(offsets_arr, i, 1));
             toffsets[i] = CGPointApplyAffineTransform(point, offset_transform);
         }
     }
-    Py_DECREF(offsets);
+    Py_DECREF(offsets_arr);
 
     /* ------------------- Check transforms ------------------------------- */
 
@@ -1571,10 +1599,10 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
 
     if (Nedgecolors==1)
     {
-        const double r = *(double*)PyArray_GETPTR2(edgecolors, 0, 0);
-        const double g = *(double*)PyArray_GETPTR2(edgecolors, 0, 1);
-        const double b = *(double*)PyArray_GETPTR2(edgecolors, 0, 2);
-        const double a = *(double*)PyArray_GETPTR2(edgecolors, 0, 3);
+        const double r = *(double*)PyArray_GETPTR2(edgecolors_arr, 0, 0);
+        const double g = *(double*)PyArray_GETPTR2(edgecolors_arr, 0, 1);
+        const double b = *(double*)PyArray_GETPTR2(edgecolors_arr, 0, 2);
+        const double a = *(double*)PyArray_GETPTR2(edgecolors_arr, 0, 3);
         CGContextSetRGBStrokeColor(cr, r, g, b, a);
         self->color[0] = r;
         self->color[1] = g;
@@ -1591,10 +1619,10 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
 
     if (Nfacecolors==1)
     {
-        const double r = *(double*)PyArray_GETPTR2(facecolors, 0, 0);
-        const double g = *(double*)PyArray_GETPTR2(facecolors, 0, 1);
-        const double b = *(double*)PyArray_GETPTR2(facecolors, 0, 2);
-        const double a = *(double*)PyArray_GETPTR2(facecolors, 0, 3);
+        const double r = *(double*)PyArray_GETPTR2(facecolors_arr, 0, 0);
+        const double g = *(double*)PyArray_GETPTR2(facecolors_arr, 0, 1);
+        const double b = *(double*)PyArray_GETPTR2(facecolors_arr, 0, 2);
+        const double a = *(double*)PyArray_GETPTR2(facecolors_arr, 0, 3);
         CGContextSetRGBFillColor(cr, r, g, b, a);
     }
 
@@ -1674,10 +1702,10 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
         if (Nedgecolors > 1)
         {
             npy_intp fi = i % Nedgecolors;
-            const double r = *(double*)PyArray_GETPTR2(edgecolors, fi, 0);
-            const double g = *(double*)PyArray_GETPTR2(edgecolors, fi, 1);
-            const double b = *(double*)PyArray_GETPTR2(edgecolors, fi, 2);
-            const double a = *(double*)PyArray_GETPTR2(edgecolors, fi, 3);
+            const double r = *(double*)PyArray_GETPTR2(edgecolors_arr, fi, 0);
+            const double g = *(double*)PyArray_GETPTR2(edgecolors_arr, fi, 1);
+            const double b = *(double*)PyArray_GETPTR2(edgecolors_arr, fi, 2);
+            const double a = *(double*)PyArray_GETPTR2(edgecolors_arr, fi, 3);
             CGContextSetRGBStrokeColor(cr, r, g, b, a);
         }
 
@@ -1686,10 +1714,10 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
         if (Nfacecolors > 1)
         {
             npy_intp fi = i % Nfacecolors;
-            const double r = *(double*)PyArray_GETPTR2(facecolors, fi, 0);
-            const double g = *(double*)PyArray_GETPTR2(facecolors, fi, 1);
-            const double b = *(double*)PyArray_GETPTR2(facecolors, fi, 2);
-            const double a = *(double*)PyArray_GETPTR2(facecolors, fi, 3);
+            const double r = *(double*)PyArray_GETPTR2(facecolors_arr, fi, 0);
+            const double g = *(double*)PyArray_GETPTR2(facecolors_arr, fi, 1);
+            const double b = *(double*)PyArray_GETPTR2(facecolors_arr, fi, 2);
+            const double a = *(double*)PyArray_GETPTR2(facecolors_arr, fi, 3);
             CGContextSetRGBFillColor(cr, r, g, b, a);
             if (Nedgecolors > 0) CGContextDrawPath(cr, kCGPathFillStroke);
             else CGContextFillPath(cr);
@@ -1718,8 +1746,8 @@ GraphicsContext_draw_path_collection (GraphicsContext* self, PyObject* args)
 
 exit:
     CGContextRestoreGState(cr);
-    Py_XDECREF(facecolors);
-    Py_XDECREF(edgecolors);
+    Py_XDECREF(facecolors_arr);
+    Py_XDECREF(edgecolors_arr);
     if (pattern) CGPatternRelease(pattern);
     if (patternSpace) CGColorSpaceRelease(patternSpace);
     if (transforms) free(transforms);
@@ -1745,11 +1773,15 @@ GraphicsContext_draw_quad_mesh (GraphicsContext* self, PyObject* args)
     int meshWidth;
     int meshHeight;
     PyObject* coordinates;
+    PyArrayObject* coordinates_arr = 0;
     PyObject* offsets;
+    PyArrayObject* offsets_arr = 0;
     CGAffineTransform offset_transform;
     PyObject* facecolors;
+    PyArrayObject* facecolors_arr = 0;
     int antialiased;
     PyObject* edgecolors;
+    PyArrayObject* edgecolors_arr = 0;
 
     CGPoint *toffsets = NULL;
 
@@ -1777,9 +1809,9 @@ GraphicsContext_draw_quad_mesh (GraphicsContext* self, PyObject* args)
 
     /* ------------------- Check coordinates array ------------------------ */
 
-    coordinates = PyArray_FromObject(coordinates, NPY_DOUBLE, 3, 3);
-    if (!coordinates ||
-        PyArray_NDIM(coordinates) != 3 || PyArray_DIM(coordinates, 2) != 2)
+    coordinates_arr = (PyArrayObject*) PyArray_FromObject(coordinates, NPY_DOUBLE, 3, 3);
+    if (!coordinates_arr ||
+        PyArray_NDIM(coordinates_arr) != 3 || PyArray_DIM(coordinates_arr, 2) != 2)
     {
         PyErr_SetString(PyExc_ValueError, "Invalid coordinates array");
         ok = 0;
@@ -1788,43 +1820,43 @@ GraphicsContext_draw_quad_mesh (GraphicsContext* self, PyObject* args)
 
     /* ------------------- Check offsets array ---------------------------- */
 
-    offsets = PyArray_FromObject(offsets, NPY_DOUBLE, 0, 2);
+    offsets_arr = (PyArrayObject*) PyArray_FromObject(offsets, NPY_DOUBLE, 0, 2);
 
-    if (!offsets ||
-        (PyArray_NDIM(offsets)==2 && PyArray_DIM(offsets, 1)!=2) ||
-        (PyArray_NDIM(offsets)==1 && PyArray_DIM(offsets, 0)!=0))
+    if (!offsets_arr ||
+        (PyArray_NDIM(offsets_arr)==2 && PyArray_DIM(offsets_arr, 1)!=2) ||
+        (PyArray_NDIM(offsets_arr)==1 && PyArray_DIM(offsets_arr, 0)!=0))
     {
-        Py_XDECREF(offsets);
+        Py_XDECREF(offsets_arr);
         PyErr_SetString(PyExc_ValueError, "Offsets array must be Nx2");
         ok = 0;
         goto exit;
     }
-    const Py_ssize_t Noffsets = PyArray_DIM(offsets, 0);
+    const Py_ssize_t Noffsets = PyArray_DIM(offsets_arr, 0);
     if (Noffsets > 0) {
         int i;
         toffsets = malloc(Noffsets*sizeof(CGPoint));
         if (!toffsets)
         {
-            Py_DECREF(offsets);
+            Py_DECREF(offsets_arr);
             ok = 0;
             goto exit;
         }
         CGPoint point;
         for (i = 0; i < Noffsets; i++)
         {
-            point.x = (CGFloat) (*(double*)PyArray_GETPTR2(offsets, i, 0));
-            point.y = (CGFloat) (*(double*)PyArray_GETPTR2(offsets, i, 1));
+            point.x = (CGFloat) (*(double*)PyArray_GETPTR2(offsets_arr, i, 0));
+            point.y = (CGFloat) (*(double*)PyArray_GETPTR2(offsets_arr, i, 1));
             toffsets[i] = CGPointApplyAffineTransform(point, offset_transform);
         }
     }
-    Py_DECREF(offsets);
+    Py_DECREF(offsets_arr);
 
     /* ------------------- Check facecolors array ------------------------- */
 
-    facecolors = PyArray_FromObject(facecolors, NPY_DOUBLE, 1, 2);
-    if (!facecolors ||
-        (PyArray_NDIM(facecolors)==1 && PyArray_DIM(facecolors, 0)!=0) ||
-        (PyArray_NDIM(facecolors)==2 && PyArray_DIM(facecolors, 1)!=4))
+    facecolors_arr = (PyArrayObject*) PyArray_FromObject(facecolors, NPY_DOUBLE, 1, 2);
+    if (!facecolors_arr ||
+        (PyArray_NDIM(facecolors_arr)==1 && PyArray_DIM(facecolors_arr, 0)!=0) ||
+        (PyArray_NDIM(facecolors_arr)==2 && PyArray_DIM(facecolors_arr, 1)!=4))
     {
         PyErr_SetString(PyExc_ValueError, "facecolors must by a Nx4 numpy array or empty");
         ok = 0;
@@ -1833,10 +1865,10 @@ GraphicsContext_draw_quad_mesh (GraphicsContext* self, PyObject* args)
 
     /* ------------------- Check edgecolors array ------------------------- */
 
-    edgecolors = PyArray_FromObject(edgecolors, NPY_DOUBLE, 1, 2);
-    if (!edgecolors ||
-        (PyArray_NDIM(edgecolors)==1 && PyArray_DIM(edgecolors, 0)!=0) ||
-        (PyArray_NDIM(edgecolors)==2 && PyArray_DIM(edgecolors, 1)!=4))
+    edgecolors_arr = (PyArrayObject*) PyArray_FromObject(edgecolors, NPY_DOUBLE, 1, 2);
+    if (!edgecolors_arr ||
+        (PyArray_NDIM(edgecolors_arr)==1 && PyArray_DIM(edgecolors_arr, 0)!=0) ||
+        (PyArray_NDIM(edgecolors_arr)==2 && PyArray_DIM(edgecolors_arr, 1)!=4))
     {
         PyErr_SetString(PyExc_ValueError, "edgecolors must by a Nx4 numpy array or empty");
         ok = 0;
@@ -1846,8 +1878,8 @@ GraphicsContext_draw_quad_mesh (GraphicsContext* self, PyObject* args)
     /* ------------------- Check the other arguments ---------------------- */
 
     size_t Npaths      = meshWidth * meshHeight;
-    size_t Nfacecolors = (size_t) PyArray_DIM(facecolors, 0);
-    size_t Nedgecolors = (size_t) PyArray_DIM(edgecolors, 0);
+    size_t Nfacecolors = (size_t) PyArray_DIM(facecolors_arr, 0);
+    size_t Nedgecolors = (size_t) PyArray_DIM(edgecolors_arr, 0);
     if ((Nfacecolors == 0 && Nedgecolors == 0) || Npaths == 0)
     {
         /* Nothing to do here */
@@ -1863,10 +1895,10 @@ GraphicsContext_draw_quad_mesh (GraphicsContext* self, PyObject* args)
 
     if (Nfacecolors==1)
     {
-        const double r = *(double*)PyArray_GETPTR2(facecolors, 0, 0);
-        const double g = *(double*)PyArray_GETPTR2(facecolors, 0, 1);
-        const double b = *(double*)PyArray_GETPTR2(facecolors, 0, 2);
-        const double a = *(double*)PyArray_GETPTR2(facecolors, 0, 3);
+        const double r = *(double*)PyArray_GETPTR2(facecolors_arr, 0, 0);
+        const double g = *(double*)PyArray_GETPTR2(facecolors_arr, 0, 1);
+        const double b = *(double*)PyArray_GETPTR2(facecolors_arr, 0, 2);
+        const double a = *(double*)PyArray_GETPTR2(facecolors_arr, 0, 3);
         CGContextSetRGBFillColor(cr, r, g, b, a);
         if (antialiased && Nedgecolors==0)
         {
@@ -1875,10 +1907,10 @@ GraphicsContext_draw_quad_mesh (GraphicsContext* self, PyObject* args)
     }
     if (Nedgecolors==1)
     {
-        const double r = *(double*)PyArray_GETPTR2(edgecolors, 0, 0);
-        const double g = *(double*)PyArray_GETPTR2(edgecolors, 0, 1);
-        const double b = *(double*)PyArray_GETPTR2(edgecolors, 0, 2);
-        const double a = *(double*)PyArray_GETPTR2(edgecolors, 0, 3);
+        const double r = *(double*)PyArray_GETPTR2(edgecolors_arr, 0, 0);
+        const double g = *(double*)PyArray_GETPTR2(edgecolors_arr, 0, 1);
+        const double b = *(double*)PyArray_GETPTR2(edgecolors_arr, 0, 2);
+        const double a = *(double*)PyArray_GETPTR2(edgecolors_arr, 0, 3);
         CGContextSetRGBStrokeColor(cr, r, g, b, a);
     }
 
@@ -1890,26 +1922,26 @@ GraphicsContext_draw_quad_mesh (GraphicsContext* self, PyObject* args)
         {
             CGPoint points[4];
 
-            x = *(double*)PyArray_GETPTR3(coordinates, ih, iw, 0);
-            y = *(double*)PyArray_GETPTR3(coordinates, ih, iw, 1);
+            x = *(double*)PyArray_GETPTR3(coordinates_arr, ih, iw, 0);
+            y = *(double*)PyArray_GETPTR3(coordinates_arr, ih, iw, 1);
             if (isnan(x) || isnan(y)) continue;
             points[0].x = (CGFloat)x;
             points[0].y = (CGFloat)y;
 
-            x = *(double*)PyArray_GETPTR3(coordinates, ih, iw+1, 0);
-            y = *(double*)PyArray_GETPTR3(coordinates, ih, iw+1, 1);
+            x = *(double*)PyArray_GETPTR3(coordinates_arr, ih, iw+1, 0);
+            y = *(double*)PyArray_GETPTR3(coordinates_arr, ih, iw+1, 1);
             if (isnan(x) || isnan(y)) continue;
             points[1].x = (CGFloat)x;
             points[1].y = (CGFloat)y;
 
-            x = *(double*)PyArray_GETPTR3(coordinates, ih+1, iw+1, 0);
-            y = *(double*)PyArray_GETPTR3(coordinates, ih+1, iw+1, 1);
+            x = *(double*)PyArray_GETPTR3(coordinates_arr, ih+1, iw+1, 0);
+            y = *(double*)PyArray_GETPTR3(coordinates_arr, ih+1, iw+1, 1);
             if (isnan(x) || isnan(y)) continue;
             points[2].x = (CGFloat)x;
             points[2].y = (CGFloat)y;
 
-            x = *(double*)PyArray_GETPTR3(coordinates, ih+1, iw, 0);
-            y = *(double*)PyArray_GETPTR3(coordinates, ih+1, iw, 1);
+            x = *(double*)PyArray_GETPTR3(coordinates_arr, ih+1, iw, 0);
+            y = *(double*)PyArray_GETPTR3(coordinates_arr, ih+1, iw, 1);
             if (isnan(x) || isnan(y)) continue;
             points[3].x = (CGFloat)x;
             points[3].y = (CGFloat)y;
@@ -1932,10 +1964,10 @@ GraphicsContext_draw_quad_mesh (GraphicsContext* self, PyObject* args)
             if (Nfacecolors > 1)
             {
                 npy_intp fi = i % Nfacecolors;
-                const double r = *(double*)PyArray_GETPTR2(facecolors, fi, 0);
-                const double g = *(double*)PyArray_GETPTR2(facecolors, fi, 1);
-                const double b = *(double*)PyArray_GETPTR2(facecolors, fi, 2);
-                const double a = *(double*)PyArray_GETPTR2(facecolors, fi, 3);
+                const double r = *(double*)PyArray_GETPTR2(facecolors_arr, fi, 0);
+                const double g = *(double*)PyArray_GETPTR2(facecolors_arr, fi, 1);
+                const double b = *(double*)PyArray_GETPTR2(facecolors_arr, fi, 2);
+                const double a = *(double*)PyArray_GETPTR2(facecolors_arr, fi, 3);
                 CGContextSetRGBFillColor(cr, r, g, b, a);
                 if (antialiased && Nedgecolors==0)
                 {
@@ -1945,10 +1977,10 @@ GraphicsContext_draw_quad_mesh (GraphicsContext* self, PyObject* args)
             if (Nedgecolors > 1)
             {
                 npy_intp fi = i % Nedgecolors;
-                const double r = *(double*)PyArray_GETPTR2(edgecolors, fi, 0);
-                const double g = *(double*)PyArray_GETPTR2(edgecolors, fi, 1);
-                const double b = *(double*)PyArray_GETPTR2(edgecolors, fi, 2);
-                const double a = *(double*)PyArray_GETPTR2(edgecolors, fi, 3);
+                const double r = *(double*)PyArray_GETPTR2(edgecolors_arr, fi, 0);
+                const double g = *(double*)PyArray_GETPTR2(edgecolors_arr, fi, 1);
+                const double b = *(double*)PyArray_GETPTR2(edgecolors_arr, fi, 2);
+                const double a = *(double*)PyArray_GETPTR2(edgecolors_arr, fi, 3);
                 CGContextSetRGBStrokeColor(cr, r, g, b, a);
             }
 
@@ -1977,8 +2009,9 @@ GraphicsContext_draw_quad_mesh (GraphicsContext* self, PyObject* args)
 exit:
     CGContextRestoreGState(cr);
     if (toffsets) free(toffsets);
-    Py_XDECREF(facecolors);
-    Py_XDECREF(coordinates);
+    Py_XDECREF(facecolors_arr);
+    Py_XDECREF(edgecolors_arr);
+    Py_XDECREF(coordinates_arr);
 
     if (!ok) return NULL;
 
@@ -2256,7 +2289,9 @@ GraphicsContext_draw_gouraud_triangle (GraphicsContext* self, PyObject* args)
 
 {
     PyObject* coordinates;
+    PyArrayObject* coordinates_arr = 0;
     PyObject* colors;
+    PyArrayObject* colors_arr = 0;
 
     CGPoint points[3];
     CGFloat intensity[3];
@@ -2274,30 +2309,30 @@ GraphicsContext_draw_gouraud_triangle (GraphicsContext* self, PyObject* args)
 
     /* ------------------- Check coordinates array ------------------------ */
 
-    coordinates = PyArray_FromObject(coordinates, NPY_DOUBLE, 2, 2);
-    if (!coordinates ||
-        PyArray_DIM(coordinates, 0) != 3 || PyArray_DIM(coordinates, 1) != 2)
+    coordinates_arr = (PyArrayObject*) PyArray_FromObject(coordinates, NPY_DOUBLE, 2, 2);
+    if (!coordinates_arr ||
+        PyArray_DIM(coordinates_arr, 0) != 3 || PyArray_DIM(coordinates_arr, 1) != 2)
     {
         PyErr_SetString(PyExc_ValueError, "Invalid coordinates array");
-        Py_XDECREF(coordinates);
+        Py_XDECREF(coordinates_arr);
         return NULL;
     }
-    points[0].x = *((double*)(PyArray_GETPTR2(coordinates, 0, 0)));
-    points[0].y = *((double*)(PyArray_GETPTR2(coordinates, 0, 1)));
-    points[1].x = *((double*)(PyArray_GETPTR2(coordinates, 1, 0)));
-    points[1].y = *((double*)(PyArray_GETPTR2(coordinates, 1, 1)));
-    points[2].x = *((double*)(PyArray_GETPTR2(coordinates, 2, 0)));
-    points[2].y = *((double*)(PyArray_GETPTR2(coordinates, 2, 1)));
+    points[0].x = *((double*)(PyArray_GETPTR2(coordinates_arr, 0, 0)));
+    points[0].y = *((double*)(PyArray_GETPTR2(coordinates_arr, 0, 1)));
+    points[1].x = *((double*)(PyArray_GETPTR2(coordinates_arr, 1, 0)));
+    points[1].y = *((double*)(PyArray_GETPTR2(coordinates_arr, 1, 1)));
+    points[2].x = *((double*)(PyArray_GETPTR2(coordinates_arr, 2, 0)));
+    points[2].y = *((double*)(PyArray_GETPTR2(coordinates_arr, 2, 1)));
 
     /* ------------------- Check colors array ----------------------------- */
 
-    colors = PyArray_FromObject(colors, NPY_DOUBLE, 2, 2);
-    if (!colors ||
-        PyArray_DIM(colors, 0) != 3 || PyArray_DIM(colors, 1) != 4)
+    colors_arr = (PyArrayObject*) PyArray_FromObject(colors, NPY_DOUBLE, 2, 2);
+    if (!colors_arr ||
+        PyArray_DIM(colors_arr, 0) != 3 || PyArray_DIM(colors_arr, 1) != 4)
     {
         PyErr_SetString(PyExc_ValueError, "colors must by a 3x4 array");
-        Py_DECREF(coordinates);
-        Py_XDECREF(colors);
+        Py_DECREF(coordinates_arr);
+        Py_XDECREF(colors_arr);
         return NULL;
     }
 
@@ -2307,25 +2342,25 @@ GraphicsContext_draw_gouraud_triangle (GraphicsContext* self, PyObject* args)
     CGContextAddLineToPoint(cr, points[1].x, points[1].y);
     CGContextAddLineToPoint(cr, points[2].x, points[2].y);
     CGContextClip(cr);
-    intensity[0] = *((double*)(PyArray_GETPTR2(colors, 0, 3)));
-    intensity[1] = *((double*)(PyArray_GETPTR2(colors, 1, 3)));
-    intensity[2] = *((double*)(PyArray_GETPTR2(colors, 2, 3)));
+    intensity[0] = *((double*)(PyArray_GETPTR2(colors_arr, 0, 3)));
+    intensity[1] = *((double*)(PyArray_GETPTR2(colors_arr, 1, 3)));
+    intensity[2] = *((double*)(PyArray_GETPTR2(colors_arr, 2, 3)));
     if (_shade_alpha(cr, intensity, points)!=-1) {
         CGContextBeginTransparencyLayer(cr, NULL);
         CGContextSetBlendMode(cr, kCGBlendModeScreen);
         for (i = 0; i < 3; i++)
         {
-            intensity[0] = *((double*)(PyArray_GETPTR2(colors, 0, i)));
-            intensity[1] = *((double*)(PyArray_GETPTR2(colors, 1, i)));
-            intensity[2] = *((double*)(PyArray_GETPTR2(colors, 2, i)));
+            intensity[0] = *((double*)(PyArray_GETPTR2(colors_arr, 0, i)));
+            intensity[1] = *((double*)(PyArray_GETPTR2(colors_arr, 1, i)));
+            intensity[2] = *((double*)(PyArray_GETPTR2(colors_arr, 2, i)));
             if (!_shade_one_color(cr, intensity, points, i)) break;
         }
         CGContextEndTransparencyLayer(cr);
     }
     CGContextRestoreGState(cr);
 
-    Py_DECREF(coordinates);
-    Py_DECREF(colors);
+    Py_DECREF(coordinates_arr);
+    Py_DECREF(colors_arr);
 
     if (i < 3) /* break encountered */
     {
@@ -2589,7 +2624,7 @@ setfont(CGContextRef cr, PyObject* family, float size, const char weight[],
 #endif
         CFRelease(string);
     }
-    if (font == NULL)
+    if (!font)
     {
         PyErr_SetString(PyExc_ValueError, "Could not load font");
     }
@@ -2617,7 +2652,6 @@ GraphicsContext_draw_text (GraphicsContext* self, PyObject* args)
     const char* italic;
     float angle;
     CTFontRef font;
-    CGColorRef color;
     CGFloat descent;
 #if PY33
     const char* text;
@@ -2666,22 +2700,16 @@ GraphicsContext_draw_text (GraphicsContext* self, PyObject* args)
         return NULL;
     }
 
-    color = CGColorCreateGenericRGB(self->color[0],
-                                    self->color[1],
-                                    self->color[2],
-                                    self->color[3]);
-
     keys[0] = kCTFontAttributeName;
-    keys[1] = kCTForegroundColorAttributeName;
+    keys[1] = kCTForegroundColorFromContextAttributeName;
     values[0] = font;
-    values[1] = color;
+    values[1] = kCFBooleanTrue;
     CFDictionaryRef attributes = CFDictionaryCreate(kCFAllocatorDefault,
                                         (const void**)&keys,
                                         (const void**)&values,
                                         2,
                                         &kCFTypeDictionaryKeyCallBacks,
                                         &kCFTypeDictionaryValueCallBacks);
-    CGColorRelease(color);
     CFRelease(font);
 
     CFAttributedStringRef string = CFAttributedStringCreate(kCFAllocatorDefault,
@@ -2737,18 +2765,37 @@ GraphicsContext_get_text_width_height_descent(GraphicsContext* self, PyObject* a
     const UniChar* text;
 #endif
 
-    CGFloat ascent;
-    CGFloat descent;
-    double width;
+    float descent;
+    float width;
+    float height;
+
     CGRect rect;
+    CGPoint point;
 
     CTFontRef font;
+
+    char data[8];
 
     CGContextRef cr = self->cr;
     if (!cr)
     {
-        PyErr_SetString(PyExc_RuntimeError, "CGContextRef is NULL");
-        return NULL;
+        CGColorSpaceRef colorspace = CGColorSpaceCreateDeviceGray();
+        if (!colorspace) {
+            PyErr_SetString(PyExc_MemoryError, "Failed to create color space");
+            goto exit;
+        }
+        cr = CGBitmapContextCreate(data,
+                                   1,
+                                   1,
+                                   8,
+                                   1,
+                                   colorspace,
+                                   0);
+        CGColorSpaceRelease(colorspace);
+        if (!cr) {
+            PyErr_SetString(PyExc_MemoryError, "Failed to create bitmap context");
+            goto exit;
+        }
     }
 
 #if PY33
@@ -2758,7 +2805,7 @@ GraphicsContext_get_text_width_height_descent(GraphicsContext* self, PyObject* a
                                 &family,
                                 &size,
                                 &weight,
-                                &italic)) return NULL;
+                                &italic)) goto exit;
     CFStringRef s = CFStringCreateWithCString(kCFAllocatorDefault, text, kCFStringEncodingUTF8);
 #else
     if(!PyArg_ParseTuple(args, "u#Ofss",
@@ -2774,7 +2821,7 @@ GraphicsContext_get_text_width_height_descent(GraphicsContext* self, PyObject* a
     if (!(font = setfont(cr, family, size, weight, italic)))
     {
         CFRelease(s);
-        return NULL;
+        goto exit;
     };
 
     CFStringRef keys[1];
@@ -2803,15 +2850,22 @@ GraphicsContext_get_text_width_height_descent(GraphicsContext* self, PyObject* a
     {
         PyErr_SetString(PyExc_RuntimeError,
                         "CTLineCreateWithAttributedString failed");
-        return NULL;
+        goto exit;
     }
 
-    width = CTLineGetTypographicBounds(line, &ascent, &descent, NULL);
+    point = CGContextGetTextPosition(cr);
     rect = CTLineGetImageBounds(line, cr);
-
     CFRelease(line);
+    if (!self->cr) CGContextRelease(cr);
 
-    return Py_BuildValue("fff", width, rect.size.height, descent);
+    width = rect.size.width;
+    height = rect.size.height;
+    descent = point.y - rect.origin.y;
+
+    return Py_BuildValue("fff", width, height, descent);
+exit:
+    if (cr && !self->cr) CGContextRelease(cr);
+    return NULL;
 }
 
 #else // Text drawing for OSX versions <10.5
@@ -2924,20 +2978,35 @@ GraphicsContext_get_text_width_height_descent(GraphicsContext* self, PyObject* a
     const char* italic;
 
     ATSFontRef atsfont;
+    Rect rect;
+
+    char data[8];
 
     CGContextRef cr = self->cr;
     if (!cr)
     {
-        PyErr_SetString(PyExc_RuntimeError, "CGContextRef is NULL");
-        return NULL;
+        CGColorSpaceRef colorspace = CGColorSpaceCreateDeviceGray();
+        if (!colorspace) {
+            PyErr_SetString(PyExc_MemoryError, "Failed to create color space");
+            goto exit;
+        }
+        cr = CGBitmapContextCreate(data,
+                                   1,
+                                   1,
+                                   8,
+                                   1,
+                                   colorspace,
+                                   0);
+        CGColorSpaceRelease(colorspace);
+        if (!cr) {
+            PyErr_SetString(PyExc_MemoryError, "Failed to create bitmap context");
+            goto exit;
+        }
     }
 
-    if(!PyArg_ParseTuple(args, "u#Ofss", &text, &n, &family, &size, &weight, &italic)) return NULL;
+    if(!PyArg_ParseTuple(args, "u#Ofss", &text, &n, &family, &size, &weight, &italic)) goto exit;
 
-    if (!(atsfont = setfont(cr, family, size, weight, italic)))
-    {
-        return NULL;
-    }
+    if (!(atsfont = setfont(cr, family, size, weight, italic))) goto exit;
 
     OSStatus status = noErr;
     ATSUAttributeTag tags[] = {kATSUFontTag,
@@ -2957,7 +3026,7 @@ GraphicsContext_get_text_width_height_descent(GraphicsContext* self, PyObject* a
     if (status!=noErr)
     {
         PyErr_SetString(PyExc_RuntimeError, "ATSUSetAttributes failed");
-        return NULL;
+        goto exit;
     }
 
     status = ATSUSetTextPointerLocation(layout,
@@ -2969,7 +3038,7 @@ GraphicsContext_get_text_width_height_descent(GraphicsContext* self, PyObject* a
     {
         PyErr_SetString(PyExc_RuntimeError,
                         "ATSUCreateTextLayoutWithTextPtr failed");
-        return NULL;
+        goto exit;
     }
 
     status = ATSUSetRunStyle(layout,
@@ -2979,7 +3048,7 @@ GraphicsContext_get_text_width_height_descent(GraphicsContext* self, PyObject* a
     if (status!=noErr)
     {
         PyErr_SetString(PyExc_RuntimeError, "ATSUSetRunStyle failed");
-        return NULL;
+        goto exit;
     }
 
     ATSUAttributeTag tag = kATSUCGContextTag;
@@ -2989,26 +3058,26 @@ GraphicsContext_get_text_width_height_descent(GraphicsContext* self, PyObject* a
     if (status!=noErr)
     {
         PyErr_SetString(PyExc_RuntimeError, "ATSUSetLayoutControls failed");
-        return NULL;
+        goto exit;
     }
 
-    ATSUTextMeasurement before;
-    ATSUTextMeasurement after;
-    ATSUTextMeasurement ascent;
-    ATSUTextMeasurement descent;
-    status = ATSUGetUnjustifiedBounds(layout,
-                                      kATSUFromTextBeginning, kATSUToTextEnd,
-                                      &before, &after, &ascent, &descent);
+    status = ATSUMeasureTextImage(layout,
+                                  kATSUFromTextBeginning, kATSUToTextEnd,
+                                  0, 0, &rect);
     if (status!=noErr)
     {
-        PyErr_SetString(PyExc_RuntimeError, "ATSUGetUnjustifiedBounds failed");
-        return NULL;
+        PyErr_SetString(PyExc_RuntimeError, "ATSUMeasureTextImage failed");
+        goto exit;
     }
 
-    const float width = FixedToFloat(after-before);
-    const float height = FixedToFloat(ascent-descent);
+    const float width = rect.right-rect.left;
+    const float height = rect.bottom-rect.top;
+    const float descent = rect.bottom;
 
-    return Py_BuildValue("fff", width, height, FixedToFloat(descent));
+    return Py_BuildValue("fff", width, height, descent);
+exit:
+    if (cr && !self->cr) CGContextRelease(cr);
+    return NULL;
 }
 #endif
 
@@ -3182,13 +3251,15 @@ GraphicsContext_draw_image(GraphicsContext* self, PyObject* args)
                                             data,
                                             n,
                                             _data_provider_release);
+
+    CGBitmapInfo bitmapInfo = kCGBitmapByteOrderDefault | kCGImageAlphaLast;
     CGImageRef bitmap = CGImageCreate (ncols,
                                        nrows,
                                        bitsPerComponent,
                                        bitsPerPixel,
                                        bytesPerRow,
                                        colorspace,
-                                       kCGImageAlphaLast,
+                                       bitmapInfo,
                                        provider,
                                        NULL,
                                        false,
@@ -3204,8 +3275,14 @@ GraphicsContext_draw_image(GraphicsContext* self, PyObject* args)
 
     CGFloat deviceScale = _get_device_scale(cr);
 
-    CGContextDrawImage(cr, CGRectMake(x, y, ncols/deviceScale, nrows/deviceScale), bitmap);
+    CGContextSaveGState(cr);
+    CGContextTranslateCTM(cr, 0, y + nrows/deviceScale);
+    CGContextScaleCTM(cr, 1.0, -1.0);
+
+    CGContextDrawImage(cr, CGRectMake(x, 0, ncols/deviceScale, nrows/deviceScale), bitmap);
     CGImageRelease(bitmap);
+
+    CGContextRestoreGState(cr);
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -3699,7 +3776,7 @@ FigureCanvas_start_event_loop(FigureCanvas* self, PyObject* args, PyObject* keyw
         sigint_socket = CFSocketCreateWithNative(kCFAllocatorDefault,
                                                  channel[0],
                                                  kCFSocketReadCallBack,
-                                                 _callback,
+                                                 _sigint_callback,
                                                  &context);
         if (sigint_socket)
         {
@@ -3911,7 +3988,6 @@ FigureManager_init(FigureManager *self, PyObject *args, PyObject *kwds)
     rect.size.height = height;
     rect.size.width = width;
 
-    NSApp = [NSApplication sharedApplication];
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     self->window = [self->window initWithContentRect: rect
                                          styleMask: NSTitledWindowMask
@@ -3929,8 +4005,6 @@ FigureManager_init(FigureManager *self, PyObject *args, PyObject *kwds)
     [window setDelegate: view];
     [window makeFirstResponder: view];
     [[window contentView] addSubview: view];
-
-    nwin++;
 
     [pool release];
     return 0;
@@ -3969,6 +4043,7 @@ FigureManager_show(FigureManager* self)
     {
         NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
         [window makeKeyAndOrderFront: nil];
+        [window orderFrontRegardless];
         [pool release];
     }
     Py_INCREF(Py_None);
@@ -4528,11 +4603,7 @@ NavigationToolbar_get_active (NavigationToolbar* self)
     {
         if(states[i]==1)
         {
-#if PY3K
             PyList_SET_ITEM(list, j, PyLong_FromLong(i));
-#else
-            PyList_SET_ITEM(list, j, PyInt_FromLong(i));
-#endif
             j++;
         }
     }
@@ -4815,9 +4886,12 @@ NavigationToolbar2_init(NavigationToolbar2 *self, PyObject *args, PyObject *kwds
 
     int i;
     NSRect rect;
+    NSSize size;
+    NSSize scale;
 
     const float gap = 2;
     const int height = 36;
+    const int imagesize = 24;
 
     const char* basedir;
 
@@ -4858,13 +4932,13 @@ NavigationToolbar2_init(NavigationToolbar2 *self, PyObject *args, PyObject *kwds
 
     NSButton* buttons[7];
 
-    NSString* images[7] = {@"home.png",
-                           @"back.png",
-                           @"forward.png",
-                           @"move.png",
-                           @"zoom_to_rect.png",
-                           @"subplots.png",
-                           @"filesave.png"};
+    NSString* images[7] = {@"home.pdf",
+                           @"back.pdf",
+                           @"forward.pdf",
+                           @"move.pdf",
+                           @"zoom_to_rect.pdf",
+                           @"subplots.pdf",
+                           @"filesave.pdf"};
 
     NSString* tooltips[7] = {@"Reset original view",
                              @"Back to  previous view",
@@ -4890,13 +4964,24 @@ NavigationToolbar2_init(NavigationToolbar2 *self, PyObject *args, PyObject *kwds
                                    NSMomentaryLightButton,
                                    NSMomentaryLightButton};
 
+    rect.origin.x = 0;
+    rect.origin.y = 0;
+    rect.size.width = imagesize;
+    rect.size.height = imagesize;
+#ifdef COMPILING_FOR_10_7
+    rect = [window convertRectToBacking: rect];
+#endif
+    size = rect.size;
+    scale.width = imagesize / size.width;
+    scale.height = imagesize / size.height;
+
     rect.size.width = 32;
     rect.size.height = 32;
     rect.origin.x = gap;
     rect.origin.y = 0.5*(height - rect.size.height);
+
     for (i = 0; i < 7; i++)
     {
-        const NSSize size = {24, 24};
         NSString* filename = [dir stringByAppendingPathComponent: images[i]];
         NSImage* image = [[NSImage alloc] initWithContentsOfFile: filename];
         buttons[i] = [[NSButton alloc] initWithFrame: rect];
@@ -4904,6 +4989,7 @@ NavigationToolbar2_init(NavigationToolbar2 *self, PyObject *args, PyObject *kwds
         [buttons[i] setBezelStyle: NSShadowlessSquareBezelStyle];
         [buttons[i] setButtonType: buttontypes[i]];
         [buttons[i] setImage: image];
+        [buttons[i] scaleUnitSquareToSize: scale];
         [buttons[i] setImagePosition: NSImageOnly];
         [buttons[i] setToolTip: tooltips[i]];
         [[window contentView] addSubview: buttons[i]];
@@ -5056,7 +5142,11 @@ choose_save_file(PyObject* unused, PyObject* args)
     result = [panel runModalForDirectory: nil file: ns_default_filename];
 #endif
     [ns_default_filename release];
+#ifdef COMPILING_FOR_10_10
+    if (result == NSModalResponseOK)
+#else
     if (result == NSOKButton)
+#endif
     {
 #ifdef COMPILING_FOR_10_6
         NSURL* url = [panel URL];
@@ -5099,6 +5189,74 @@ set_cursor(PyObject* unused, PyObject* args)
     return Py_None;
 }
 
+@implementation WindowServerConnectionManager
+static WindowServerConnectionManager *sharedWindowServerConnectionManager = nil;
+
++ (WindowServerConnectionManager *)sharedManager
+{
+    if (sharedWindowServerConnectionManager == nil)
+    {
+        sharedWindowServerConnectionManager = [[super allocWithZone:NULL] init];
+    }
+    return sharedWindowServerConnectionManager;
+}
+
++ (id)allocWithZone:(NSZone *)zone
+{
+    return [[self sharedManager] retain];
+}
+
++ (id)copyWithZone:(NSZone *)zone
+{
+    return self;
+}
+
++ (id)retain
+{
+    return self;
+}
+
+- (NSUInteger)retainCount
+{
+    return NSUIntegerMax;  //denotes an object that cannot be released
+}
+
+- (oneway void)release
+{
+    // Don't release a singleton object
+}
+
+- (id)autorelease
+{
+    return self;
+}
+
+- (void)launch:(NSNotification*)notification
+{
+    CFRunLoopRef runloop;
+    CFMachPortRef port;
+    CFRunLoopSourceRef source;
+    NSDictionary* dictionary = [notification userInfo];
+    NSNumber* psnLow = [dictionary valueForKey: @"NSApplicationProcessSerialNumberLow"];
+    NSNumber* psnHigh = [dictionary valueForKey: @"NSApplicationProcessSerialNumberHigh"];
+    ProcessSerialNumber psn;
+    psn.highLongOfPSN = [psnHigh intValue];
+    psn.lowLongOfPSN = [psnLow intValue];
+    runloop = CFRunLoopGetCurrent();
+    port = CGEventTapCreateForPSN(&psn,
+                                  kCGHeadInsertEventTap,
+                                  kCGEventTapOptionListenOnly,
+                                  kCGEventMaskForAllEvents,
+                                  &_eventtap_callback,
+                                  runloop);
+    source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault,
+                                           port,
+                                           0);
+    CFRunLoopAddSource(runloop, source, kCFRunLoopDefaultMode);
+    CFRelease(port);
+}
+@end
+
 @implementation Window
 - (Window*)initWithContentRect:(NSRect)rect styleMask:(unsigned int)mask backing:(NSBackingStoreType)bufferingType defer:(BOOL)deferCreation withManager: (PyObject*)theManager
 {
@@ -5138,8 +5296,11 @@ set_cursor(PyObject* unused, PyObject* args)
 - (void)close
 {
     [super close];
-    nwin--;
-    if(nwin==0) [NSApp stop: self];
+    NSArray *windowsArray = [NSApp windows];
+    if([windowsArray count]==0) [NSApp stop: self];
+    /* This is needed for show(), which should exit from [NSApp run]
+     * after all windows are closed.
+     */
 }
 
 - (void)dealloc
@@ -5876,23 +6037,19 @@ set_cursor(PyObject* unused, PyObject* args)
 }
 @end
 
-
 static PyObject*
 show(PyObject* self)
 {
-    if(nwin > 0)
-    {
-        [NSApp activateIgnoringOtherApps: YES];
-        NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-        NSArray *windowsArray = [NSApp windows];
-        NSEnumerator *enumerator = [windowsArray objectEnumerator];
-        NSWindow *window;
-        while ((window = [enumerator nextObject])) {
-            [window orderFront:nil];
-        }
-        [pool release];
-        [NSApp run];
+    [NSApp activateIgnoringOtherApps: YES];
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSArray *windowsArray = [NSApp windows];
+    NSEnumerator *enumerator = [windowsArray objectEnumerator];
+    NSWindow *window;
+    while ((window = [enumerator nextObject])) {
+        [window orderFront:nil];
     }
+    [pool release];
+    [NSApp run];
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -6103,6 +6260,33 @@ static PyTypeObject TimerType = {
     Timer_new,                 /* tp_new */
 };
 
+static bool verify_framework(void)
+{
+#ifdef COMPILING_FOR_10_6
+    NSRunningApplication* app = [NSRunningApplication currentApplication];
+    NSApplicationActivationPolicy activationPolicy = [app activationPolicy];
+    switch (activationPolicy) {
+        case NSApplicationActivationPolicyRegular:
+        case NSApplicationActivationPolicyAccessory:
+            return true;
+        case NSApplicationActivationPolicyProhibited:
+            break;
+    }
+#else
+    ProcessSerialNumber psn;
+    if (CGMainDisplayID()!=0
+     && GetCurrentProcess(&psn)==noErr
+     && SetFrontProcess(&psn)==noErr) return true;
+#endif
+    PyErr_SetString(PyExc_RuntimeError,
+        "Python is not installed as a framework. The Mac OS X backend will "
+        "not be able to function correctly if Python is not installed as a "
+        "framework. See the Python documentation for more information on "
+        "installing Python as a framework on Mac OS X. Please either reinstall "
+        "Python as a framework, or try one of the other backends.");
+    return false;
+}
+
 static struct PyMethodDef methods[] = {
    {"show",
     (PyCFunction)show,
@@ -6143,8 +6327,6 @@ PyObject* PyInit__macosx(void)
 void init_macosx(void)
 #endif
 {
-
-#ifdef WITH_NEXT_FRAMEWORK
     PyObject *module;
     import_array();
 
@@ -6154,6 +6336,15 @@ void init_macosx(void)
      || PyType_Ready(&NavigationToolbarType) < 0
      || PyType_Ready(&NavigationToolbar2Type) < 0
      || PyType_Ready(&TimerType) < 0)
+#if PY3K
+        return NULL;
+#else
+        return;
+#endif
+
+    NSApp = [NSApplication sharedApplication];
+
+    if (!verify_framework())
 #if PY3K
         return NULL;
 #else
@@ -6186,24 +6377,14 @@ void init_macosx(void)
 
     PyOS_InputHook = wait_for_stdin;
 
+    WindowServerConnectionManager* connectionManager = [WindowServerConnectionManager sharedManager];
+    NSWorkspace* workspace = [NSWorkspace sharedWorkspace];
+    NSNotificationCenter* notificationCenter = [workspace notificationCenter];
+    [notificationCenter addObserver: connectionManager
+                           selector: @selector(launch:)
+                               name: NSWorkspaceDidLaunchApplicationNotification
+                             object: nil];
 #if PY3K
     return module;
-#endif
-#else
-    /* WITH_NEXT_FRAMEWORK is not defined. This means that Python is not
-     * installed as a framework, and therefore the Mac OS X backend will
-     * not interact properly with the window manager.
-     */
-    PyErr_SetString(PyExc_RuntimeError,
-        "Python is not installed as a framework. The Mac OS X backend will "
-        "not be able to function correctly if Python is not installed as a "
-        "framework. See the Python documentation for more information on "
-        "installing Python as a framework on Mac OS X. Please either reinstall "
-        "Python as a framework, or try one of the other backends.");
-#if PY3K
-    return NULL;
-#else
-    return;
-#endif
 #endif
 }

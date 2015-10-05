@@ -1,3 +1,26 @@
+matplotlib (1.5.0~rc2-1) unstable; urgency=medium
+
+  * New upstream release candidate
+    - Lena Söderberg image has been removed; Closes: #794854
+    - include source for minified JS libraries; Closes: #788730
+  * debian/rules
+    - replace JS libraries in all the py3k version of the package; thanks to
+      Barry Warsaw for the report and patch; Closes: #792310
+  * debian/copyright
+    - updated for new upstream code
+  * debian/patches/*
+    - refresh/remove patches for new uptream code
+  * debian/control
+    - add cycler to b-d (bin pkgs depends are detected by dh_python2)
+    - add ipython to b-d, ipython_console_highlighting is required to build doc
+  * debian/patches/10ef9a7e26dc34328b7ec7fd0ed2c2db6104b342.patch
+    - upstream patch to fix Qt4/Qt5 detection (tests failed)
+  * debian/patches/9bc518230684b3a8bb69af60e160f90e1091cd0c.patch
+    - fix encoding for Stéfan van der Walt name, using a single-codepoint
+      encoding (Matplotlib.pdf creation failed)
+
+ -- Sandro Tosi <morph@debian.org>  Mon, 05 Oct 2015 20:24:36 +0100
+
 matplotlib (1.4.3-1) experimental; urgency=medium
 
   * New upstream release

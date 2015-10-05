@@ -13,8 +13,8 @@ multiple axes at drawing time.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
-from six.moves import map
+from matplotlib.externals import six
+from matplotlib.externals.six.moves import map
 
 import matplotlib.transforms as mtransforms
 
@@ -839,7 +839,7 @@ class VBoxDivider(HBoxDivider):
         return mtransforms.Bbox.from_bounds(x1, y1, w1, h1)
 
 
-class LocatableAxesBase:
+class LocatableAxesBase(object):
     def __init__(self, *kl, **kw):
 
         self._axes_class.__init__(self, *kl, **kw)

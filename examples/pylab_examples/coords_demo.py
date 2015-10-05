@@ -6,12 +6,13 @@ to move and click events
 """
 from __future__ import print_function
 import sys
-from pylab import *
+import matplotlib.pyplot as plt
+import numpy as np
 
-t = arange(0.0, 1.0, 0.01)
-s = sin(2*pi*t)
+t = np.arange(0.0, 1.0, 0.01)
+s = np.sin(2*np.pi*t)
 fig, ax = plt.subplots()
-ax.plot(t,s)
+ax.plot(t, s)
 
 
 def on_move(event):
@@ -20,20 +21,21 @@ def on_move(event):
 
     if event.inaxes:
         ax = event.inaxes  # the axes instance
-        print ('data coords %f %f' % (event.xdata, event.ydata))
+        print('data coords %f %f' % (event.xdata, event.ydata))
+
 
 def on_click(event):
     # get the x and y coords, flip y from top to bottom
     x, y = event.x, event.y
-    if event.button==1:
+    if event.button == 1:
         if event.inaxes is not None:
-            print ('data coords %f %f' % (event.xdata, event.ydata))
+            print('data coords %f %f' % (event.xdata, event.ydata))
 
-binding_id = connect('motion_notify_event', on_move)
-connect('button_press_event', on_click)
+binding_id = plt.connect('motion_notify_event', on_move)
+plt.connect('button_press_event', on_click)
 
 if "test_disconnect" in sys.argv:
-    print ("disconnecting console coordinate printout...")
-    disconnect(binding_id)
+    print("disconnecting console coordinate printout...")
+    plt.disconnect(binding_id)
 
-show()
+plt.show()

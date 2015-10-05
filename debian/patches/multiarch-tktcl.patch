@@ -5,7 +5,7 @@ Author: Julian Taylor <jtaylor@ubuntu.com>
 
 --- a/setupext.py
 +++ b/setupext.py
-@@ -1391,13 +1391,16 @@ class BackendTkAgg(OptionalBackendPackag
+@@ -1403,13 +1403,16 @@ class BackendTkAgg(OptionalBackendPackag
          except ImportError:
              return None
  

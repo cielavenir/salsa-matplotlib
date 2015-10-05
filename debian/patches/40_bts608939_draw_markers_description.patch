@@ -3,7 +3,7 @@ Author: Jakub Wilk <jwilk@debian.org>
 
 --- a/doc/api/api_changes.rst
 +++ b/doc/api/api_changes.rst
-@@ -1143,7 +1143,7 @@ New methods:
+@@ -1545,7 +1545,7 @@ New methods:
  
    * :meth:`draw_markers(self, gc, marker_path, marker_trans, path,
      trans, rgbFace)

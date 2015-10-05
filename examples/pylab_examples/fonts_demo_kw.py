@@ -1,84 +1,81 @@
-#!/usr/bin/env python
 """
 Same as fonts_demo using kwargs.  If you prefer a more pythonic, OO
 style of coding, see examples/fonts_demo.py.
 
 """
 from matplotlib.font_manager import FontProperties
-from pylab import *
+import matplotlib.pyplot as plt
+import numpy as np
 
-subplot(111, axisbg='w')
-alignment = {'horizontalalignment':'center', 'verticalalignment':'baseline'}
-###  Show family options
+plt.subplot(111, axisbg='w')
+alignment = {'horizontalalignment': 'center', 'verticalalignment': 'baseline'}
 
-family = ['serif', 'sans-serif', 'cursive', 'fantasy', 'monospace']
+# Show family options
 
-t = text(-0.8, 0.9, 'family', size='large', **alignment)
+families = ['serif', 'sans-serif', 'cursive', 'fantasy', 'monospace']
 
-yp = [0.7, 0.5, 0.3, 0.1, -0.1, -0.3, -0.5]
+t = plt.text(-0.8, 0.9, 'family', size='large', **alignment)
 
-for k in range(5):
-    if k == 2:
-        t = text(-0.8, yp[k], family[k], family=family[k],
-                 name='Script MT', **alignment)
-    else:
-        t = text(-0.8, yp[k], family[k], family=family[k], **alignment)
+yp = [0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2]
 
-###  Show style options
+for k, family in enumerate(families):
+    t = plt.text(-0.8, yp[k], family, family=family, **alignment)
 
-style  = ['normal', 'italic', 'oblique']
+# Show style options
 
-t = text(-0.4, 0.9, 'style', **alignment)
+styles = ['normal', 'italic', 'oblique']
 
-for k in range(3):
-    t = text(-0.4, yp[k], style[k], family='sans-serif', style=style[k],
-             **alignment)
+t = plt.text(-0.4, 0.9, 'style', **alignment)
 
-###  Show variant options
+for k, style in enumerate(styles):
+    t = plt.text(-0.4, yp[k], style, family='sans-serif', style=style,
+                 **alignment)
 
-variant= ['normal', 'small-caps']
+# Show variant options
 
-t = text(0.0, 0.9, 'variant', **alignment)
+variants = ['normal', 'small-caps']
 
-for k in range(2):
-    t = text( 0.0, yp[k], variant[k], family='serif', variant=variant[k],
-              **alignment)
+t = plt.text(0.0, 0.9, 'variant', **alignment)
 
-###  Show weight options
+for k, variant in enumerate(variants):
+    t = plt.text(0.0, yp[k], variant, family='serif', variant=variant,
+                 **alignment)
 
-weight = ['light', 'normal', 'medium', 'semibold', 'bold', 'heavy', 'black']
+# Show weight options
 
-t = text( 0.4, 0.9, 'weight',  **alignment)
+weights = ['light', 'normal', 'medium', 'semibold', 'bold', 'heavy', 'black']
 
-for k in range(7):
-    t = text( 0.4, yp[k], weight[k], weight=weight[k],
-              **alignment)
+t = plt.text(0.4, 0.9, 'weight', **alignment)
 
-###  Show size options
+for k, weight in enumerate(weights):
+    t = plt.text(0.4, yp[k], weight, weight=weight,
+                 **alignment)
 
-size  = ['xx-small', 'x-small', 'small', 'medium', 'large',
+# Show size options
+
+sizes = ['xx-small', 'x-small', 'small', 'medium', 'large',
          'x-large', 'xx-large']
 
-t = text( 0.8, 0.9, 'size', **alignment)
+t = plt.text(0.8, 0.9, 'size', **alignment)
 
-for k in range(7):
-    t = text( 0.8, yp[k], size[k], size=size[k],
+for k, size in enumerate(sizes):
+    t = plt.text(0.8, yp[k], size, size=size,
+                 **alignment)
+
+x = -0.4
+# Show bold italic
+t = plt.text(x, 0.1, 'bold italic', style='italic',
+             weight='bold', size='x-small',
              **alignment)
 
-x = 0
-###  Show bold italic
-t = text(x, 0.1, 'bold italic', style='italic',
-         weight='bold', size='x-small',
-         **alignment)
+t = plt.text(x, 0.2, 'bold italic',
+             style='italic', weight='bold', size='medium',
+             **alignment)
 
-t = text(x, 0.2, 'bold italic',
-         style = 'italic', weight='bold', size='medium',
-         **alignment)
+t = plt.text(x, 0.3, 'bold italic',
+             style='italic', weight='bold', size='x-large',
+             **alignment)
 
-t = text(x, 0.3, 'bold italic',
-         style='italic', weight='bold', size='x-large',
-         **alignment)
+plt.axis([-1, 1, 0, 1])
 
-axis([-1, 1, 0, 1])
-
-show()
+plt.show()

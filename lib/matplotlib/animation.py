@@ -20,13 +20,16 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
-from six.moves import xrange, zip
+from matplotlib.externals import six
+from matplotlib.externals.six.moves import xrange, zip
 
+import os
 import platform
 import sys
 import itertools
+import base64
 import contextlib
+import tempfile
 from matplotlib.cbook import iterable, is_string_like
 from matplotlib.compat import subprocess
 from matplotlib import verbose
@@ -238,6 +241,7 @@ class MovieWriter(object):
     def cleanup(self):
         'Clean-up and collect the process used to write the movie file.'
         out, err = self._proc.communicate()
+        self._frame_sink().close()
         verbose.report('MovieWriter -- '
                        'Command stdout:\n%s' % out, level='debug')
         verbose.report('MovieWriter -- '
@@ -382,7 +386,6 @@ class FileMovieWriter(MovieWriter):
 
         # Delete temporary files
         if self.clear_temp:
-            import os
             verbose.report(
                 'MovieWriter: clearing temporary fnames=%s' %
                 str(self._temp_names),
@@ -393,7 +396,7 @@ class FileMovieWriter(MovieWriter):
 
 # Base class of ffmpeg information. Has the config keys and the common set
 # of arguments that controls the *output* side of things.
-class FFMpegBase:
+class FFMpegBase(object):
     exec_key = 'animation.ffmpeg_path'
     args_key = 'animation.ffmpeg_args'
 
@@ -463,7 +466,7 @@ class AVConvFileWriter(AVConvBase, FFMpegFileWriter):
 
 # Base class of mencoder information. Contains configuration key information
 # as well as arguments for controlling *output*
-class MencoderBase:
+class MencoderBase(object):
     exec_key = 'animation.mencoder_path'
     args_key = 'animation.mencoder_args'
 
@@ -524,7 +527,7 @@ class MencoderFileWriter(FileMovieWriter, MencoderBase):
 
 
 # Base class for animated GIFs with convert utility
-class ImageMagickBase:
+class ImageMagickBase(object):
     exec_key = 'animation.convert_path'
     args_key = 'animation.convert_args'
 
@@ -587,9 +590,6 @@ class Animation(object):
         self.frame_seq = self.new_frame_seq()
         self.event_source = event_source
 
-        # Clear the initial frame
-        self._init_draw()
-
         # Instead of starting the event source now, we connect to the figure's
         # draw_event, so that we only start once the figure has been drawn.
         self._first_draw_id = fig.canvas.mpl_connect('draw_event', self._start)
@@ -606,13 +606,17 @@ class Animation(object):
         Starts interactive animation. Adds the draw frame command to the GUI
         handler, calls show to start the event loop.
         '''
-        # On start, we add our callback for stepping the animation and
-        # actually start the event_source. We also disconnect _start
-        # from the draw_events
-        self.event_source.add_callback(self._step)
-        self.event_source.start()
+        # First disconnect our draw event handler
         self._fig.canvas.mpl_disconnect(self._first_draw_id)
         self._first_draw_id = None  # So we can check on save
+
+        # Now do any initial draw
+        self._init_draw()
+
+        # Add our callback for stepping the animation and
+        # actually start the event_source.
+        self.event_source.add_callback(self._step)
+        self.event_source.start()
 
     def _stop(self, *args):
         # On stop we disconnect all of our events.
@@ -692,7 +696,7 @@ class Animation(object):
                       "'savefig_kwargs' as it is only currently supported "
                       "with the writers 'ffmpeg_file' and 'mencoder_file' "
                       "(writer used: "
-                      "'{}').".format(
+                      "'{0}').".format(
                           writer if isinstance(writer, six.string_types)
                           else writer.__class__.__name__))
                 savefig_kwargs.pop('bbox_inches')
@@ -759,6 +763,9 @@ class Animation(object):
         # since GUI widgets are gone. Either need to remove extra code to
         # allow for this non-existant use case or find a way to make it work.
         with writer.saving(self._fig, filename, dpi):
+            for anim in all_anim:
+                # Clear the initial frame
+                anim._init_draw()
             for data in zip(*[a.new_saved_frame_seq()
                               for a in all_anim]):
                 for anim, d in zip(all_anim, data):
@@ -884,6 +891,59 @@ class Animation(object):
         self._resize_id = self._fig.canvas.mpl_connect('resize_event',
                                                        self._handle_resize)
 
+    def to_html5_video(self):
+        r'''Returns animation as an HTML5 video tag.
+
+        This saves the animation as an h264 video, encoded in base64
+        directly into the HTML5 video tag. This respects the rc parameters
+        for the writer as well as the bitrate. This also makes use of the
+        ``interval`` to control the speed, and uses the ``repeat``
+        paramter to decide whether to loop.
+        '''
+        VIDEO_TAG = r'''<video {size} {options}>
+  <source type="video/mp4" src="data:video/mp4;base64,{video}">
+  Your browser does not support the video tag.
+</video>'''
+        # Cache the the rendering of the video as HTML
+        if not hasattr(self, '_base64_video'):
+            # First write the video to a tempfile. Set delete to False
+            # so we can re-open to read binary data.
+            with tempfile.NamedTemporaryFile(suffix='.m4v',
+                                             delete=False) as f:
+                # We create a writer manually so that we can get the
+                # appropriate size for the tag
+                Writer = writers[rcParams['animation.writer']]
+                writer = Writer(codec='h264',
+                                bitrate=rcParams['animation.bitrate'],
+                                fps=1000. / self._interval)
+                self.save(f.name, writer=writer)
+
+            # Now open and base64 encode
+            with open(f.name, 'rb') as video:
+                vid64 = base64.encodebytes(video.read())
+                self._base64_video = vid64.decode('ascii')
+                self._video_size = 'width="{0}" height="{1}"'.format(
+                        *writer.frame_size)
+
+            # Now we can remove
+            os.remove(f.name)
+
+        # Default HTML5 options are to autoplay and to display video controls
+        options = ['controls', 'autoplay']
+
+        # If we're set to repeat, make it loop
+        if self.repeat:
+            options.append('loop')
+        return VIDEO_TAG.format(video=self._base64_video,
+                                size=self._video_size,
+                                options=' '.join(options))
+
+    def _repr_html_(self):
+        r'IPython display hook for rendering.'
+        fmt = rcParams['animation.html']
+        if fmt == 'html5':
+            return self.to_html5_video()
+
 
 class TimedAnimation(Animation):
     '''
@@ -970,17 +1030,18 @@ class ArtistAnimation(TimedAnimation):
 
     def _init_draw(self):
         # Make all the artists involved in *any* frame invisible
-        axes = []
+        figs = set()
         for f in self.new_frame_seq():
             for artist in f:
                 artist.set_visible(False)
+                artist.set_animated(self._blit)
                 # Assemble a list of unique axes that need flushing
-                if artist.axes not in axes:
-                    axes.append(artist.axes)
+                if artist.axes.figure not in figs:
+                    figs.add(artist.axes.figure)
 
         # Flush the needed axes
-        for ax in axes:
-            ax.figure.canvas.draw()
+        for fig in figs:
+            fig.canvas.draw_idle()
 
     def _pre_draw(self, framedata, blit):
         '''
@@ -1079,7 +1140,10 @@ class FuncAnimation(TimedAnimation):
         # no saved frames, generate a new frame sequence and take the first
         # save_count entries in it.
         if self._save_seq:
-            return iter(self._save_seq)
+            # While iterating we are going to update _save_seq
+            # so make a copy to safely iterate over
+            self._old_saved_seq = list(self._save_seq)
+            return iter(self._old_saved_seq)
         else:
             return itertools.islice(self.new_frame_seq(), self.save_count)
 
@@ -1092,6 +1156,9 @@ class FuncAnimation(TimedAnimation):
             self._draw_frame(next(self.new_frame_seq()))
         else:
             self._drawn_artists = self._init_func()
+            if self._blit:
+                for a in self._drawn_artists:
+                    a.set_animated(self._blit)
 
     def _draw_frame(self, framedata):
         # Save the data for potential saving of movies.
@@ -1104,3 +1171,6 @@ class FuncAnimation(TimedAnimation):
         # Call the func with framedata and args. If blitting is desired,
         # func needs to return a sequence of any artists that were modified.
         self._drawn_artists = self._func(framedata, *self._args)
+        if self._blit:
+            for a in self._drawn_artists:
+                a.set_animated(self._blit)

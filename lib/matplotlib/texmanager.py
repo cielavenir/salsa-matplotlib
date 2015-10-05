@@ -37,7 +37,7 @@ or include these two lines in your script::
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
+from matplotlib.externals import six
 
 import copy
 import glob
@@ -74,7 +74,7 @@ def dvipng_hack_alpha():
     except OSError:
         mpl.verbose.report('No dvipng was found', 'helpful')
         return False
-    lines = stdout.decode('ascii').split('\n')
+    lines = stdout.decode(sys.getdefaultencoding()).split('\n')
     for line in lines:
         if line.startswith('dvipng '):
             version = line.split()[-1]
@@ -86,7 +86,7 @@ def dvipng_hack_alpha():
     return False
 
 
-class TexManager:
+class TexManager(object):
     """
     Convert strings to dvi files using TeX, caching the results to a
     working dir
@@ -203,6 +203,11 @@ Could not rename old TeX cache dir "%s": a suitable configuration
                                    'default.' % ff, 'helpful')
                 setattr(self, font_family_attr, self.font_info[font_family])
             fontconfig.append(getattr(self, font_family_attr)[0])
+        # Add a hash of the latex preamble to self._fontconfig so that the
+        # correct png is selected for strings rendered with same font and dpi
+        # even if the latex preamble changes within the session
+        preamble_bytes = six.text_type(self.get_custom_preamble()).encode('utf-8')
+        fontconfig.append(md5(preamble_bytes).hexdigest())
         self._fontconfig = ''.join(fontconfig)
 
         # The following packages and commands need to be included in the latex

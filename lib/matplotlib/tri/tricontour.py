@@ -1,7 +1,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
+from matplotlib.externals import six
 
 from matplotlib.contour import ContourSet
 from matplotlib.tri.triangulation import Triangulation
@@ -89,7 +89,7 @@ class TriContourSet(ContourSet):
         z = np.asarray(args[0])
         if z.shape != tri.x.shape:
             raise ValueError('z array must have same length as triangulation x'
-                             'and y arrays')
+                             ' and y arrays')
         self.zmax = z.max()
         self.zmin = z.min()
         if self.logscale and self.zmin <= 0:
@@ -257,13 +257,6 @@ class TriContourSet(ContourSet):
 
           *antialiased*: [ *True* | *False* ]
             enable antialiasing
-
-          *nchunk*: [ 0 | integer ]
-            If 0, no subdivision of the domain. Specify a positive integer to
-            divide the domain into subdomains of roughly *nchunk* by *nchunk*
-            points. This may never actually be advantageous, so this option may
-            be removed. Chunking introduces artifacts at the chunk boundaries
-            unless *antialiased* is *False*.
 
         Note: tricontourf fills intervals that are closed at the top; that
         is, for boundaries *z1* and *z2*, the filled region is::

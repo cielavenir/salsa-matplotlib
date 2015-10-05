@@ -3,7 +3,10 @@ Show what matplotlib colormaps look like in grayscale.
 Uses lightness L* as a proxy for grayscale value.
 '''
 
-from skimage import color
+import colorconv as color
+#from skimage import color
+# we are using a local copy of colorconv from scikit-image to reduce dependencies. 
+# You should probably use the one from scikit-image in most cases. 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -22,21 +25,23 @@ mpl.rcParams['mathtext.fallback_to_cm'] = 'True'
 
 # Have colormaps separated into categories: http://matplotlib.org/examples/color/colormaps_reference.html
 
-cmaps = [('Sequential',     ['binary', 'Blues', 'BuGn', 'BuPu', 'gist_yarg',
+cmaps = [('Sequential',     ['Blues', 'BuGn', 'BuPu',
                              'GnBu', 'Greens', 'Greys', 'Oranges', 'OrRd',
                              'PuBu', 'PuBuGn', 'PuRd', 'Purples', 'RdPu',
                              'Reds', 'YlGn', 'YlGnBu', 'YlOrBr', 'YlOrRd']),
-         ('Sequential2', ['afmhot', 'autumn', 'bone', 'cool', 'copper',
-                             'gist_gray', 'gist_heat', 'gray', 'hot', 'pink',
+         ('Sequential (2)', ['afmhot', 'autumn', 'bone', 'cool', 'copper',
+                             'gist_heat', 'gray', 'hot', 'pink',
                              'spring', 'summer', 'winter']),
          ('Diverging',      ['BrBG', 'bwr', 'coolwarm', 'PiYG', 'PRGn', 'PuOr',
-                             'RdBu', 'RdGy', 'RdYlBu', 'RdYlGn', 'seismic']),
-         ('Qualitative',    ['Accent', 'Dark2', 'hsv', 'Paired', 'Pastel1',
-                             'Pastel2', 'Set1', 'Set2', 'Set3', 'spectral']),
-         ('Miscellaneous',  ['gist_earth', 'gist_ncar', 'gist_rainbow',
-                             'gist_stern', 'jet', 'brg', 'CMRmap', 'cubehelix',
-                             'gnuplot', 'gnuplot2', 'ocean', 'rainbow',
-                             'terrain', 'flag', 'prism'])]
+                             'RdBu', 'RdGy', 'RdYlBu', 'RdYlGn', 'Spectral',
+                             'seismic']),
+         ('Qualitative',    ['Accent', 'Dark2', 'Paired', 'Pastel1',
+                             'Pastel2', 'Set1', 'Set2', 'Set3']),
+         ('Miscellaneous',  ['gist_earth', 'terrain', 'ocean', 'gist_stern',
+                             'brg', 'CMRmap', 'cubehelix',
+                             'gnuplot', 'gnuplot2', 'gist_ncar',
+                             'nipy_spectral', 'jet', 'rainbow',
+                             'gist_rainbow', 'hsv', 'flag', 'prism'])]
 
 # indices to step through colormap
 x = np.linspace(0.0, 1.0, 100)
@@ -71,6 +76,7 @@ def plot_color_gradients(cmap_category, cmap_list):
     for ax in axes:
         ax[0].set_axis_off()
         ax[1].set_axis_off()
+    plt.show()
 
 
 for cmap_category, cmap_list in cmaps:

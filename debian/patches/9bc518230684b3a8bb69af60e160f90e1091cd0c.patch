@@ -1,0 +1,23 @@
+From 9bc518230684b3a8bb69af60e160f90e1091cd0c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jouni=20K=2E=20Sepp=C3=A4nen?= <jks@iki.fi>
+Date: Mon, 5 Oct 2015 07:35:34 +0300
+Subject: [PATCH] Fix encoding for LaTeX
+
+Instead of a combining acute accent, use a single-codepoint encoding
+---
+ doc/style_changes.rst | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/doc/style_changes.rst b/doc/style_changes.rst
+index 15da551..6a8e0e0 100644
+--- a/doc/style_changes.rst
++++ b/doc/style_changes.rst
+@@ -10,7 +10,7 @@ upcoming 2.0 release!
+ The new default color map will be 'viridis' (aka `option
+ D <http://bids.github.io/colormap/>`_).  For an introduction to color
+ theory and how 'viridis' was generated watch Nathaniel Smith and
+-Stéfan van der Walt's talk from SciPy2015
++Stéfan van der Walt's talk from SciPy2015
+ 
+ .. raw:: html
+ 

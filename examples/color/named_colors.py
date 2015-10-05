@@ -41,8 +41,7 @@ n = len(sorted_colors)
 ncols = 4
 nrows = int(np.ceil(1. * n / ncols))
 
-fig = plt.figure()
-ax = fig.add_subplot(111)
+fig, ax = plt.subplots()
 
 X, Y = fig.get_dpi() * fig.get_size_inches()
 
@@ -60,12 +59,12 @@ for i, (name, color) in enumerate(sorted_colors):
     xf_line = w * (col + 0.25)
     xi_text = w * (col + 0.3)
 
-    ax.text(xi_text,  y, name, fontsize=(h * 0.8),
+    ax.text(xi_text, y, name, fontsize=(h * 0.8),
             horizontalalignment='left',
             verticalalignment='center')
 
-#     Add extra black line a little bit thicker to make
-#     clear colors more visible.
+    # Add extra black line a little bit thicker to make
+    # clear colors more visible.
     ax.hlines(y, xi_line, xf_line, color='black', linewidth=(h * 0.7))
     ax.hlines(y + h * 0.1, xi_line, xf_line, color=color, linewidth=(h * 0.6))
 

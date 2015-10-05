@@ -35,7 +35,7 @@ analogous to negative indexing of sequences.
 """
 
 
-from matplotlib.pyplot import figure, show
+import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 import numpy as np
 
@@ -43,27 +43,27 @@ import numpy as np
 if 1:
     # if only one location is given, the text and xypoint being
     # annotated are assumed to be the same
-    fig = figure()
-    ax = fig.add_subplot(111, autoscale_on=False, xlim=(-1,5), ylim=(-3,5))
+    fig = plt.figure()
+    ax = fig.add_subplot(111, autoscale_on=False, xlim=(-1, 5), ylim=(-3, 5))
 
     t = np.arange(0.0, 5.0, 0.01)
     s = np.cos(2*np.pi*t)
     line, = ax.plot(t, s, lw=3, color='purple')
 
-    ax.annotate('axes center', xy=(.5, .5),  xycoords='axes fraction',
+    ax.annotate('axes center', xy=(.5, .5), xycoords='axes fraction',
                 horizontalalignment='center', verticalalignment='center')
 
-    ax.annotate('pixels', xy=(20, 20),  xycoords='figure pixels')
+    ax.annotate('pixels', xy=(20, 20), xycoords='figure pixels')
 
-    ax.annotate('points', xy=(100, 300),  xycoords='figure points')
+    ax.annotate('points', xy=(100, 300), xycoords='figure points')
 
-    ax.annotate('offset', xy=(1, 1),  xycoords='data',
+    ax.annotate('offset', xy=(1, 1), xycoords='data',
                 xytext=(-15, 10), textcoords='offset points',
                 arrowprops=dict(facecolor='black', shrink=0.05),
                 horizontalalignment='right', verticalalignment='bottom',
                 )
 
-    ax.annotate('local max', xy=(3, 1),  xycoords='data',
+    ax.annotate('local max', xy=(3, 1), xycoords='data',
                 xytext=(0.8, 0.95), textcoords='axes fraction',
                 arrowprops=dict(facecolor='black', shrink=0.05),
                 horizontalalignment='right', verticalalignment='top',
@@ -93,9 +93,9 @@ if 1:
     # example is placed in the fractional figure coordinate system.
     # Text keyword args like horizontal and vertical alignment are
     # respected
-    fig = figure()
-    ax = fig.add_subplot(111, polar=True)
-    r = np.arange(0,1,0.001)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='polar')
+    r = np.arange(0, 1, 0.001)
     theta = 2*2*np.pi*r
     line, = ax.plot(theta, r, color='#ee8d18', lw=3)
 
@@ -118,9 +118,9 @@ if 1:
     # specify the xycoords and textcoords as 'polar' if you want to
     # use (theta, radius)
 
-    el = Ellipse((0,0), 10, 20, facecolor='r', alpha=0.5)
+    el = Ellipse((0, 0), 10, 20, facecolor='r', alpha=0.5)
 
-    fig = figure()
+    fig = plt.figure()
     ax = fig.add_subplot(111, aspect='equal')
     ax.add_artist(el)
     el.set_clip_box(ax.bbox)
@@ -132,10 +132,10 @@ if 1:
                 arrowprops=dict(facecolor='black', shrink=0.05),
                 horizontalalignment='left',
                 verticalalignment='bottom',
-                clip_on=True, # clip to the axes bounding box
-     )
+                clip_on=True,  # clip to the axes bounding box
+                )
 
     ax.set_xlim(-20, 20)
     ax.set_ylim(-20, 20)
 
-show()
+plt.show()

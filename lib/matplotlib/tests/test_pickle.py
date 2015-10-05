@@ -1,9 +1,9 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
-from six.moves import cPickle as pickle
-from six.moves import xrange
+from matplotlib.externals import six
+from matplotlib.externals.six.moves import cPickle as pickle
+from matplotlib.externals.six.moves import xrange
 
 from io import BytesIO
 
@@ -83,7 +83,6 @@ def recursive_pickle(top_obj):
     objs = sorted(six.itervalues(objs), key=lambda val: (-val[0], val[2]))
 
     for _, obj, location in objs:
-#        print('trying %s' % location)
         try:
             pickle.dump(obj, BytesIO(), pickle.HIGHEST_PROTOCOL)
         except Exception as err:
@@ -127,6 +126,7 @@ def test_simple():
     pickle.dump(fig, BytesIO(), pickle.HIGHEST_PROTOCOL)
 
 
+@cleanup
 @image_comparison(baseline_images=['multi_pickle'],
                   extensions=['png'], remove_text=True)
 def test_complete():
@@ -195,6 +195,7 @@ def test_complete():
     assert_equal(fig.get_label(), 'Figure with a label?')
 
 
+@cleanup
 def test_no_pyplot():
     # tests pickle-ability of a figure not created with pyplot
     from matplotlib.backends.backend_pdf import FigureCanvasPdf as fc
@@ -207,12 +208,14 @@ def test_no_pyplot():
     pickle.dump(fig, BytesIO(), pickle.HIGHEST_PROTOCOL)
 
 
+@cleanup
 def test_renderer():
     from matplotlib.backends.backend_agg import RendererAgg
     renderer = RendererAgg(10, 20, 30)
     pickle.dump(renderer, BytesIO())
 
 
+@cleanup
 def test_image():
     # Prior to v1.4.0 the Image would cache data which was not picklable
     # once it had been drawn.
@@ -225,6 +228,7 @@ def test_image():
     pickle.dump(fig, BytesIO())
 
 
+@cleanup
 def test_grid():
     from matplotlib.backends.backend_agg import new_figure_manager
     manager = new_figure_manager(1000)
@@ -236,6 +240,16 @@ def test_grid():
     manager.canvas.draw()
 
     pickle.dump(ax, BytesIO())
+
+
+@cleanup
+def test_polar():
+    ax = plt.subplot(111, polar=True)
+    fig = plt.gcf()
+    result = BytesIO()
+    pf = pickle.dumps(fig)
+    pickle.loads(pf)
+    plt.draw()
 
 
 if __name__ == '__main__':
