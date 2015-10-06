@@ -1,0 +1,60 @@
+From cdc52bfecb95477972d5345ccff9719c02372f0f Mon Sep 17 00:00:00 2001
+From: Thomas A Caswell <tcaswell@gmail.com>
+Date: Tue, 6 Oct 2015 01:00:36 -0400
+Subject: [PATCH] FIX: be more careful about pyside
+
+If:
+
+ 1. backend is not Qt{4,5}Agg
+ 2. PyQt4 and PySide are installed, PyQt5 is not
+ 3. backend.qt4 == 'PySide'
+
+The fall through will start trying to import PyQt5 (so sip will be
+imported as it is installed for PyQt4).  It will then fall back to Qt4
+using the binding specified in the rcparam ('PySide') which will then
+miss the qt4 import conditionals which means QtCore is never imported
+which means we get name errors from the pyqt / pyside patch up code.
+
+This catches those exceptions and gives pyside a chance to be imported.
+---
+ lib/matplotlib/backends/qt_compat.py | 25 ++++++++++++++-----------
+ 1 file changed, 14 insertions(+), 11 deletions(-)
+
+diff --git a/lib/matplotlib/backends/qt_compat.py b/lib/matplotlib/backends/qt_compat.py
+index 326f0f6..67d0687 100644
+--- a/lib/matplotlib/backends/qt_compat.py
++++ b/lib/matplotlib/backends/qt_compat.py
+@@ -139,19 +139,22 @@ def _getSaveFileName(*args, **kwargs):
+             # call to getapi() can fail in older versions of sip
+             def _getSaveFileName(*args, **kwargs):
+                 return QtGui.QFileDialog.getSaveFileName(*args, **kwargs), None
+-
+-    # Alias PyQt-specific functions for PySide compatibility.
+-    QtCore.Signal = QtCore.pyqtSignal
+     try:
+-        QtCore.Slot = QtCore.pyqtSlot
+-    except AttributeError:
+-        # Not a perfect match but works in simple cases
+-        QtCore.Slot = QtCore.pyqtSignature
+-
+-    QtCore.Property = QtCore.pyqtProperty
+-    __version__ = QtCore.PYQT_VERSION_STR
++        # Alias PyQt-specific functions for PySide compatibility.
++        QtCore.Signal = QtCore.pyqtSignal
++        try:
++            QtCore.Slot = QtCore.pyqtSlot
++        except AttributeError:
++            # Not a perfect match but works in simple cases
++            QtCore.Slot = QtCore.pyqtSignature
++
++        QtCore.Property = QtCore.pyqtProperty
++        __version__ = QtCore.PYQT_VERSION_STR
++    except NameError:
++        # QtCore did not get imported, fall back to pyside
++        QT_API = QT_API_PYSIDE
+ 
+-else:  # try importing pyside
++if QT_API == QT_API_PYSIDE:  # try importing pyside
+     try:
+         from PySide import QtCore, QtGui, __version__, __version_info__
+     except ImportError:
