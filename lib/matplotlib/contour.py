@@ -8,7 +8,7 @@ import matplotlib as mpl
 import numpy as np
 from numpy import ma
 import matplotlib._cntr as _cntr
-import matplotlib.path as path
+import matplotlib.path as mpath
 import matplotlib.ticker as ticker
 import matplotlib.cm as cm
 import matplotlib.colors as colors
@@ -17,6 +17,8 @@ import matplotlib.font_manager as font_manager
 import matplotlib.text as text
 import matplotlib.cbook as cbook
 import matplotlib.mlab as mlab
+import matplotlib.mathtext as mathtext
+import matplotlib.texmanager as texmanager
 
 # Import needed for adding manual selection capability to clabel
 from matplotlib.blocking_input import BlockingContourLabeler
@@ -27,6 +29,21 @@ from matplotlib.blocking_input import BlockingContourLabeler
 # We could use a single polygon collection for filled contours, but it
 # seems better to keep line and filled contours similar, with one collection
 # per level.
+
+
+class ClabelText(text.Text):
+    """
+    Unlike the ordinary text, the get_rotation returns an updated
+    angle in the pixel coordinate assuming that the input rotation is
+    an angle in data coordinate (or whatever transform set).
+    """
+    def get_rotation(self):
+        angle = text.Text.get_rotation(self)
+        trans = self.get_transform()
+        x, y = self.get_position()
+        new_angles = trans.transform_angles(np.array([angle]),
+                                            np.array([[x, y]]))
+        return new_angles[0]
 
 
 class ContourLabeler:
@@ -95,6 +112,12 @@ class ContourLabeler:
             if *True* (default), label rotations will always be plus
             or minus 90 degrees from level.
 
+          *use_clabeltext*:
+            if *True* (default is False), ClabelText class (instead of
+            matplotlib.Text) is used to create labels. ClabelText
+            recalculates rotation angles of texts during the drawing time,
+            therefore this can be used if aspect of the axes changes.
+
         .. plot:: mpl_examples/pylab_examples/contour_demo.py
         """
 
@@ -117,6 +140,8 @@ class ContourLabeler:
         self.labelFmt = kwargs.get('fmt', '%1.3f')
         _colors = kwargs.get('colors', None)
 
+        self._use_clabeltext = kwargs.get('use_clabeltext', False)
+
         # Detect if manual selection is desired and remove from argument list
         self.labelManual=kwargs.get('manual',False)
 
@@ -124,7 +149,7 @@ class ContourLabeler:
 
         if len(args) == 0:
             levels = self.levels
-            indices = range(len(self.levels))
+            indices = range(len(levels))
         elif len(args) == 1:
             levlabs = list(args[0])
             indices, levels = [], []
@@ -245,10 +270,21 @@ class ContourLabeler:
 
     def get_label_width(self, lev, fmt, fsize):
         "get the width of the label in points"
-        if cbook.is_string_like(lev):
-            lw = (len(lev)) * fsize
+        if not cbook.is_string_like(lev):
+            lev = self.get_text(lev, fmt)
+
+        lev, ismath = text.Text.is_math_text(lev)
+        if ismath == 'TeX':
+            if not hasattr(self, '_TeX_manager'):
+                self._TeX_manager = texmanager.TexManager()
+            lw, _, _ = self._TeX_manager.get_text_width_height_descent(lev, fsize)
+        elif ismath:
+            if not hasattr(self, '_mathtext_parser'):
+                self._mathtext_parser = mathtext.MathTextParser('bitmap')
+            img, _ = self._mathtext_parser.parse(lev, dpi=72, prop=self.labelFontProps)
+            lw = img.get_width() # at dpi=72, the units are PostScript points
         else:
-            lw = (len(self.get_text(lev,fmt))) * fsize
+            lw = (len(lev)) * fsize
 
         return lw
 
@@ -307,7 +343,7 @@ class ContourLabeler:
         if xsize == 1:
             ysize = nsize
         else:
-            ysize = labelwidth
+            ysize = int(labelwidth)
 
         XX = np.resize(linecontour[:,0],(xsize, ysize))
         YY = np.resize(linecontour[:,1],(xsize, ysize))
@@ -435,13 +471,29 @@ class ContourLabeler:
 
         return (rotation,nlc)
 
-
-    def add_label(self,x,y,rotation,lev,cvalue):
+    def _get_label_text(self,x,y,rotation):
         dx,dy = self.ax.transData.inverted().transform_point((x,y))
         t = text.Text(dx, dy, rotation = rotation,
                       horizontalalignment='center',
                       verticalalignment='center')
+        return t
 
+    def _get_label_clabeltext(self,x,y,rotation):
+        # x, y, rotation is given in pixel coordinate. Convert them to
+        # the data coordinate and create a label using ClabelText
+        # class. This way, the roation of the clabel is along the
+        # contour line always.
+        transDataInv = self.ax.transData.inverted()
+        dx,dy = transDataInv.transform_point((x,y))
+        drotation = transDataInv.transform_angles(np.array([rotation]),
+                                                  np.array([[x,y]]))
+        t = ClabelText(dx, dy, rotation = drotation[0],
+                       horizontalalignment='center',
+                       verticalalignment='center')
+
+        return t
+
+    def _add_label(self, t, x, y, lev, cvalue):
         color = self.labelMappable.to_rgba(cvalue,alpha=self.alpha)
 
         _text = self.get_text(lev,self.labelFmt)
@@ -453,6 +505,28 @@ class ContourLabeler:
         # Add label to plot here - useful for manual mode label selection
         self.ax.add_artist(t)
 
+    def add_label(self,x,y,rotation,lev,cvalue):
+        """
+        Addd contour label using Text class.
+        """
+
+        t = self._get_label_text(x,y,rotation)
+        self._add_label(t, x, y, lev, cvalue)
+
+    def add_label_clabeltext(self,x,y,rotation,lev,cvalue):
+        """
+        Addd contour label using ClabelText class.
+        """
+        # x, y, rotation is given in pixel coordinate. Convert them to
+        # the data coordinate and create a label using ClabelText
+        # class. This way, the roation of the clabel is along the
+        # contour line always.
+
+        t = self._get_label_clabeltext(x,y,rotation)
+        self._add_label(t, x, y, lev, cvalue)
+
+
+
     def pop_label(self,index=-1):
         '''Defaults to removing last label, but any index can be supplied'''
         self.labelCValues.pop(index)
@@ -460,13 +534,18 @@ class ContourLabeler:
         t.remove()
 
     def labels(self, inline, inline_spacing):
-        trans = self.ax.transData # A bit of shorthand
+
+        if self._use_clabeltext:
+            add_label = self.add_label_clabeltext
+        else:
+            add_label = self.add_label
 
         for icon, lev, fsize, cvalue in zip(
             self.labelIndiceList, self.labelLevelList, self.labelFontSizeList,
             self.labelCValueList ):
 
             con = self.collections[icon]
+            trans = con.get_transform()
             lw = self.get_label_width(lev, self.labelFmt, fsize)
             additions = []
             paths = con.get_paths()
@@ -493,13 +572,13 @@ class ContourLabeler:
                         inline_spacing )
 
                     # Actually add the label
-                    self.add_label(x,y,rotation,lev,cvalue)
+                    add_label(x,y,rotation,lev,cvalue)
 
                     # If inline, add new contours
                     if inline:
                         for n in new:
                             # Add path if not empty or single point
-                            if len(n)>1: additions.append( path.Path(n) )
+                            if len(n)>1: additions.append( mpath.Path(n) )
                 else: # If not adding label, keep old path
                     additions.append(linepath)
 
@@ -511,7 +590,7 @@ class ContourLabeler:
 
 class ContourSet(cm.ScalarMappable, ContourLabeler):
     """
-    Create and store a set of contour lines or filled regions.
+    Store a set of contour lines or filled regions.
 
     User-callable method: clabel
 
@@ -526,17 +605,49 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         same as levels for line contours; half-way between
         levels for filled contours.  See _process_colors method.
     """
-
-
     def __init__(self, ax, *args, **kwargs):
         """
         Draw contour lines or filled regions, depending on
         whether keyword arg 'filled' is False (default) or True.
 
-        The first argument of the initializer must be an axes
-        object.  The remaining arguments and keyword arguments
-        are described in ContourSet.contour_doc.
+        The first three arguments must be:
 
+          *ax*: axes object.
+
+          *levels*: [level0, level1, ..., leveln]
+            A list of floating point numbers indicating the contour
+            levels.
+
+          *allsegs*: [level0segs, level1segs, ...]
+            List of all the polygon segments for all the *levels*.
+            For contour lines len(allsegs) == len(levels), and for
+            filled contour regions len(allsegs) = len(levels)-1.
+
+            level0segs = [polygon0, polygon1, ...]
+
+            polygon0 = array_like [[x0,y0], [x1,y1], ...]
+
+          *allkinds*: None or [level0kinds, level1kinds, ...]
+            Optional list of all the polygon vertex kinds (code types), as
+            described and used in Path.   This is used to allow multiply-
+            connected paths such as holes within filled polygons.
+            If not None, len(allkinds) == len(allsegs).
+
+            level0kinds = [polygon0kinds, ...]
+
+            polygon0kinds = [vertexcode0, vertexcode1, ...]
+
+            If allkinds is not None, usually all polygons for a particular
+            contour level are grouped together so that
+
+            level0segs = [polygon0] and level0kinds = [polygon0kinds].
+
+        Keyword arguments are as described in
+        :class:`~matplotlib.contour.QuadContourSet` object.
+
+        **Examples:**
+
+        .. plot:: mpl_examples/misc/contour_manual.py
         """
         self.ax = ax
         self.levels = kwargs.get('levels', None)
@@ -544,7 +655,7 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         self.linewidths = kwargs.get('linewidths', None)
         self.linestyles = kwargs.get('linestyles', None)
 
-        self.alpha = kwargs.get('alpha', 1.0)
+        self.alpha = kwargs.get('alpha', None)
         self.origin = kwargs.get('origin', None)
         self.extent = kwargs.get('extent', None)
         cmap = kwargs.get('cmap', None)
@@ -571,12 +682,17 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         if self.colors is not None and cmap is not None:
             raise ValueError('Either colors or cmap must be None')
         if self.origin == 'image': self.origin = mpl.rcParams['image.origin']
-        x, y, z = self._contour_args(*args)        # also sets self.levels,
-                                                   #  self.layers
+
+        self._process_args(*args, **kwargs)
+        self._process_levels()
+
         if self.colors is not None:
-            cmap = colors.ListedColormap(self.colors, N=len(self.layers))
+            ncolors = len(self.levels)
+            if self.filled:
+                ncolors -= 1
+            cmap = colors.ListedColormap(self.colors, N=ncolors)
         if self.filled:
-            self.collections = cbook.silent_list('collections.PolyCollection')
+            self.collections = cbook.silent_list('collections.PathCollection')
         else:
             self.collections = cbook.silent_list('collections.LineCollection')
         # label lists must be initialized here
@@ -588,48 +704,119 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             kw['norm'] = norm
         cm.ScalarMappable.__init__(self, **kw) # sets self.cmap;
         self._process_colors()
-        _mask = ma.getmask(z)
-        if _mask is ma.nomask:
-            _mask = None
+
+        self.allsegs, self.allkinds = self._get_allsegs_and_allkinds()
 
         if self.filled:
             if self.linewidths is not None:
                 warnings.warn('linewidths is ignored by contourf')
-            C = _cntr.Cntr(x, y, z.filled(), _mask)
-            lowers = self._levels[:-1]
-            uppers = self._levels[1:]
-            for level, level_upper in zip(lowers, uppers):
-                nlist = C.trace(level, level_upper, points = 0,
-                        nchunk = self.nchunk)
-                col = collections.PolyCollection(nlist,
+
+            # Lower and upper contour levels.
+            lowers, uppers = self._get_lowers_and_uppers()
+
+            # Ensure allkinds can be zipped below.
+            if self.allkinds is None:
+                self.allkinds = [None]*len(self.allsegs)
+
+            for level, level_upper, segs, kinds in \
+                    zip(lowers, uppers, self.allsegs, self.allkinds):
+                paths = self._make_paths(segs, kinds)
+                # Default zorder taken from Collection
+                zorder = kwargs.get('zorder', 1)
+                col = collections.PathCollection(paths,
                                      antialiaseds = (self.antialiased,),
                                      edgecolors= 'none',
-                                     alpha=self.alpha)
+                                     alpha=self.alpha,
+                                     zorder=zorder)
                 self.ax.add_collection(col)
                 self.collections.append(col)
-
         else:
             tlinewidths = self._process_linewidths()
             self.tlinewidths = tlinewidths
             tlinestyles = self._process_linestyles()
-            C = _cntr.Cntr(x, y, z.filled(), _mask)
-            for level, width, lstyle in zip(self.levels, tlinewidths, tlinestyles):
-                nlist = C.trace(level, points = 0)
-                col = collections.LineCollection(nlist,
+            for level, width, lstyle, segs in \
+                    zip(self.levels, tlinewidths, tlinestyles, self.allsegs):
+                # Default zorder taken from LineCollection
+                zorder = kwargs.get('zorder', 2)
+                col = collections.LineCollection(segs,
                                      linewidths = width,
                                      linestyle = lstyle,
-                                     alpha=self.alpha)
-
+                                     alpha=self.alpha,
+                                     zorder=zorder)
                 col.set_label('_nolegend_')
                 self.ax.add_collection(col, False)
                 self.collections.append(col)
         self.changed() # set the colors
-        x0 = ma.minimum(x)
-        x1 = ma.maximum(x)
-        y0 = ma.minimum(y)
-        y1 = ma.maximum(y)
-        self.ax.update_datalim([(x0,y0), (x1,y1)])
-        self.ax.autoscale_view()
+
+    def _process_args(self, *args, **kwargs):
+        """
+        Process args and kwargs; override in derived classes.
+
+        Must set self.levels, self.zmin and self.zmax, and update axes
+        limits.
+        """
+        self.levels = args[0]
+        self.allsegs = args[1]
+        self.allkinds = len(args) > 2 and args[2] or None
+        self.zmax = np.amax(self.levels)
+        self.zmin = np.amin(self.levels)
+        self._auto = False
+
+        # Check lengths of levels and allsegs.
+        if self.filled:
+            if len(self.allsegs) != len(self.levels)-1:
+                raise ValueError('must be one less number of segments as levels')
+        else:
+            if len(self.allsegs) != len(self.levels):
+                raise ValueError('must be same number of segments as levels')
+
+        # Check length of allkinds.
+        if self.allkinds is not None and len(self.allkinds) != len(self.allsegs):
+            raise ValueError('allkinds has different length to allsegs')
+
+        # Determine x,y bounds and update axes data limits.
+        havelimits = False
+        for segs in self.allsegs:
+            for seg in segs:
+                seg = np.asarray(seg)
+                if havelimits:
+                    min = np.minimum(min, seg.min(axis=0))
+                    max = np.maximum(max, seg.max(axis=0))
+                else:
+                    min = seg.min(axis=0)
+                    max = seg.max(axis=0)
+                    havelimits = True
+        if havelimits:
+            self.ax.update_datalim([min, max])
+            self.ax.autoscale_view(tight=True)
+
+    def _get_allsegs_and_allkinds(self):
+        """
+        Override in derived classes to create and return allsegs and allkinds.
+        allkinds can be None.
+        """
+        return self.allsegs, self.allkinds
+
+    def _get_lowers_and_uppers(self):
+        """
+        Return (lowers,uppers) for filled contours.
+        """
+        lowers = self._levels[:-1]
+        if self.zmin == lowers[0]:
+            # Include minimum values in lowest interval
+            lowers = lowers.copy() # so we don't change self._levels
+            if self.logscale:
+                lowers[0] = 0.99 * self.zmin
+            else:
+                lowers[0] -= 1
+        uppers = self._levels[1:]
+        return (lowers, uppers)
+
+    def _make_paths(self, segs, kinds):
+        if kinds is not None:
+            return [mpath.Path(seg,codes=kind) for seg,kind in zip(segs,kinds)]
+        else:
+            return [mpath.Path(seg) for seg in segs]
 
     def changed(self):
         tcolors = [ (tuple(rgba),) for rgba in
@@ -645,7 +832,6 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             label.set_color(self.labelMappable.to_rgba(cv))
         # add label colors
         cm.ScalarMappable.changed(self)
-
 
     def _autolev(self, z, N):
         '''
@@ -668,18 +854,342 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         zmin = self.zmin
         self.locator.set_bounds(zmin, zmax)
         lev = self.locator()
-        zmargin = (zmax - zmin) * 0.000001 # so z < (zmax + zmargin)
-        if zmax >= lev[-1]:
-            lev[-1] += zmargin
-        if zmin <= lev[0]:
-            if self.logscale:
-                lev[0] = 0.99 * zmin
-            else:
-                lev[0] -= zmargin
         self._auto = True
         if self.filled:
             return lev
-        return lev[1:-1]
+        # For line contours, drop levels outside the data range.
+        return lev[(lev > zmin) & (lev < zmax)]
+
+    def _contour_level_args(self, z, args):
+        """
+        Determine the contour levels and store in self.levels.
+        """
+        if self.filled: fn = 'contourf'
+        else:           fn = 'contour'
+        self._auto = False
+        if self.levels is None:
+            if len(args) == 0:
+                lev = self._autolev(z, 7)
+            else:
+                level_arg = args[0]
+                try:
+                    if type(level_arg) == int:
+                        lev = self._autolev(z, level_arg)
+                    else:
+                        lev = np.asarray(level_arg).astype(np.float64)
+                except:
+                    raise TypeError(
+                        "Last %s arg must give levels; see help(%s)" % (fn,fn))
+            if self.filled and len(lev) < 2:
+                raise ValueError("Filled contours require at least 2 levels.")
+            self.levels = lev
+
+    def _process_levels(self):
+        self._levels = list(self.levels)
+        if self.extend in ('both', 'min'):
+            self._levels.insert(0, min(self.levels[0],self.zmin) - 1)
+        if self.extend in ('both', 'max'):
+            self._levels.append(max(self.levels[-1],self.zmax) + 1)
+        self._levels = np.asarray(self._levels)
+        self.vmin = np.amin(self.levels)  # alternative would be self.layers
+        self.vmax = np.amax(self.levels)
+        if self.extend in ('both', 'min'):
+            self.vmin = 2 * self.levels[0] - self.levels[1]
+        if self.extend in ('both', 'max'):
+            self.vmax = 2 * self.levels[-1] - self.levels[-2]
+        if self.filled:
+            self.layers = 0.5 * (self._levels[:-1] + self._levels[1:])
+            if self.extend in ('both', 'min'):
+                self.layers[0] = 0.5 * (self.vmin + self._levels[1])
+            if self.extend in ('both', 'max'):
+                self.layers[-1] = 0.5 * (self.vmax + self._levels[-2])
+        else:
+            self.layers = self.levels # contour: a line is a thin layer
+                         #  Use only original levels--no extended levels
+
+    def _process_colors(self):
+        """
+        Color argument processing for contouring.
+
+        Note that we base the color mapping on the contour levels,
+        not on the actual range of the Z values.  This means we
+        don't have to worry about bad values in Z, and we always have
+        the full dynamic range available for the selected levels.
+
+        The color is based on the midpoint of the layer, except for
+        an extended end layers.
+        """
+        self.monochrome = self.cmap.monochrome
+        if self.colors is not None:
+            i0, i1 = 0, len(self.levels)
+            if self.filled:
+                i1 -= 1
+            if self.extend in ('both', 'min'):
+                i0 = -1
+            if self.extend in ('both', 'max'):
+                i1 += 1
+            self.cvalues = range(i0, i1)
+            self.set_norm(colors.NoNorm())
+        else:
+            self.cvalues = self.layers
+        if not self.norm.scaled():
+            self.set_clim(self.vmin, self.vmax)
+        if self.extend in ('both', 'max', 'min'):
+            self.norm.clip = False
+        self.set_array(self.layers)
+        # self.tcolors are set by the "changed" method
+
+    def _process_linewidths(self):
+        linewidths = self.linewidths
+        Nlev = len(self.levels)
+        if linewidths is None:
+            tlinewidths = [(mpl.rcParams['lines.linewidth'],)] * Nlev
+        else:
+            if not cbook.iterable(linewidths):
+                linewidths = [linewidths] * Nlev
+            else:
+                linewidths = list(linewidths)
+                if len(linewidths) < Nlev:
+                    nreps = int(np.ceil(Nlev/len(linewidths)))
+                    linewidths = linewidths * nreps
+                if len(linewidths) > Nlev:
+                    linewidths = linewidths[:Nlev]
+            tlinewidths = [(w,) for w in linewidths]
+        return tlinewidths
+
+    def _process_linestyles(self):
+        linestyles = self.linestyles
+        Nlev = len(self.levels)
+        if linestyles is None:
+            tlinestyles = ['solid'] * Nlev
+            if self.monochrome:
+                neg_ls = mpl.rcParams['contour.negative_linestyle']
+                eps = - (self.zmax - self.zmin) * 1e-15
+                for i, lev in enumerate(self.levels):
+                    if lev < eps:
+                        tlinestyles[i] = neg_ls
+        else:
+            if cbook.is_string_like(linestyles):
+                tlinestyles = [linestyles] * Nlev
+            elif cbook.iterable(linestyles):
+                tlinestyles = list(linestyles)
+                if len(tlinestyles) < Nlev:
+                    nreps = int(np.ceil(Nlev/len(linestyles)))
+                    tlinestyles = tlinestyles * nreps
+                if len(tlinestyles) > Nlev:
+                    tlinestyles = tlinestyles[:Nlev]
+            else:
+                raise ValueError("Unrecognized type for linestyles kwarg")
+        return tlinestyles
+
+    def get_alpha(self):
+        '''returns alpha to be applied to all ContourSet artists'''
+        return self.alpha
+
+    def set_alpha(self, alpha):
+        '''sets alpha for all ContourSet artists'''
+        self.alpha = alpha
+        self.changed()
+
+    def find_nearest_contour( self, x, y, indices=None, pixel=True ):
+        """
+        Finds contour that is closest to a point.  Defaults to
+        measuring distance in pixels (screen space - useful for manual
+        contour labeling), but this can be controlled via a keyword
+        argument.
+
+        Returns a tuple containing the contour, segment, index of
+        segment, x & y of segment point and distance to minimum point.
+
+        Call signature::
+
+          conmin,segmin,imin,xmin,ymin,dmin = find_nearest_contour(
+                     self, x, y, indices=None, pixel=True )
+
+        Optional keyword arguments::
+
+        *indices*:
+           Indexes of contour levels to consider when looking for
+           nearest point.  Defaults to using all levels.
+
+        *pixel*:
+           If *True*, measure distance in pixel space, if not, measure
+           distance in axes space.  Defaults to *True*.
+
+        """
+
+        # This function uses a method that is probably quite
+        # inefficient based on converting each contour segment to
+        # pixel coordinates and then comparing the given point to
+        # those coordinates for each contour.  This will probably be
+        # quite slow for complex contours, but for normal use it works
+        # sufficiently well that the time is not noticeable.
+        # Nonetheless, improvements could probably be made.
+
+        if indices==None:
+            indices = range(len(self.levels))
+
+        dmin = 1e10
+        conmin = None
+        segmin = None
+        xmin = None
+        ymin = None
+
+        for icon in indices:
+            con = self.collections[icon]
+            trans = con.get_transform()
+            paths = con.get_paths()
+            for segNum, linepath in enumerate(paths):
+                lc = linepath.vertices
+
+                # transfer all data points to screen coordinates if desired
+                if pixel:
+                    lc = trans.transform(lc)
+
+                ds = (lc[:,0]-x)**2 + (lc[:,1]-y)**2
+                d = min( ds )
+                if d < dmin:
+                    dmin = d
+                    conmin = icon
+                    segmin = segNum
+                    imin = mpl.mlab.find( ds == d )[0]
+                    xmin = lc[imin,0]
+                    ymin = lc[imin,1]
+
+        return (conmin,segmin,imin,xmin,ymin,dmin)
+
+
+class QuadContourSet(ContourSet):
+    """
+    Create and store a set of contour lines or filled regions.
+
+    User-callable method: clabel
+
+    Useful attributes:
+      ax:
+        the axes object in which the contours are drawn
+      collections:
+        a silent_list of LineCollections or PolyCollections
+      levels:
+        contour levels
+      layers:
+        same as levels for line contours; half-way between
+        levels for filled contours.  See _process_colors method.
+    """
+    def __init__(self, ax, *args, **kwargs):
+        """
+        Calculate and draw contour lines or filled regions, depending
+        on whether keyword arg 'filled' is False (default) or True.
+
+        The first argument of the initializer must be an axes
+        object.  The remaining arguments and keyword arguments
+        are described in QuadContourSet.contour_doc.
+        """
+        ContourSet.__init__(self, ax, *args, **kwargs)
+
+    def _process_args(self, *args, **kwargs):
+        """
+        Process args and kwargs.
+        """
+        if isinstance(args[0], QuadContourSet):
+            C = args[0].Cntr
+            if self.levels is None:
+                self.levels = args[0].levels
+            self.zmin = args[0].zmin
+            self.zmax = args[0].zmax
+        else:
+            x, y, z = self._contour_args(args, kwargs)
+
+            x0 = ma.minimum(x)
+            x1 = ma.maximum(x)
+            y0 = ma.minimum(y)
+            y1 = ma.maximum(y)
+            self.ax.update_datalim([(x0,y0), (x1,y1)])
+            self.ax.autoscale_view(tight=True)
+            _mask = ma.getmask(z)
+            if _mask is ma.nomask:
+                _mask = None
+            C = _cntr.Cntr(x, y, z.filled(), _mask)
+        self.Cntr = C
+
+    def _get_allsegs_and_allkinds(self):
+        """
+        Create and return allsegs and allkinds by calling underlying C code.
+        """
+        allsegs = []
+        if self.filled:
+            lowers, uppers = self._get_lowers_and_uppers()
+            allkinds = []
+            for level, level_upper in zip(lowers, uppers):
+                nlist = self.Cntr.trace(level, level_upper, nchunk = self.nchunk)
+                nseg = len(nlist)//2
+                segs = nlist[:nseg]
+                kinds = nlist[nseg:]
+                allsegs.append(segs)
+                allkinds.append(kinds)
+        else:
+            allkinds = None
+            for level in self.levels:
+                nlist = self.Cntr.trace(level)
+                nseg = len(nlist)//2
+                segs = nlist[:nseg]
+                allsegs.append(segs)
+        return allsegs, allkinds
+
+    def _contour_args(self, args, kwargs):
+        if self.filled: fn = 'contourf'
+        else:           fn = 'contour'
+        Nargs = len(args)
+        if Nargs <= 2:
+            z = ma.asarray(args[0], dtype=np.float64)
+            x, y = self._initialize_x_y(z)
+            args = args[1:]
+        elif Nargs <=4:
+            x,y,z = self._check_xyz(args[:3], kwargs)
+            args = args[3:]
+        else:
+            raise TypeError("Too many arguments to %s; see help(%s)" % (fn,fn))
+        z = ma.masked_invalid(z, copy=False)
+        self.zmax = ma.maximum(z)
+        self.zmin = ma.minimum(z)
+        if self.logscale and self.zmin <= 0:
+            z = ma.masked_where(z <= 0, z)
+            warnings.warn('Log scale: values of z <= 0 have been masked')
+            self.zmin = z.min()
+        self._contour_level_args(z, args)
+        return (x, y, z)
+
+    def _check_xyz(self, args, kwargs):
+        '''
+        For functions like contour, check that the dimensions
+        of the input arrays match; if x and y are 1D, convert
+        them to 2D using meshgrid.
+
+        Possible change: I think we should make and use an ArgumentError
+        Exception class (here and elsewhere).
+        '''
+        x, y = args[:2]
+        self.ax._process_unit_info(xdata=x, ydata=y, kwargs=kwargs)
+        x = self.ax.convert_xunits(x)
+        y = self.ax.convert_yunits(y)
+
+        x = np.asarray(x, dtype=np.float64)
+        y = np.asarray(y, dtype=np.float64)
+        z = ma.asarray(args[2], dtype=np.float64)
+        if z.ndim != 2:
+            raise TypeError("Input z must be a 2D array.")
+        else: Ny, Nx = z.shape
+        if x.shape == z.shape and y.shape == z.shape:
+            return x,y,z
+        if x.ndim != 1 or y.ndim != 1:
+            raise TypeError("Inputs x and y must be 1D or 2D.")
+        nx, = x.shape
+        ny, = y.shape
+        if nx != Nx or ny != Ny:
+            raise TypeError("Length of x must be number of columns in z,\n" +
+                            "and length of y must be number of rows.")
+        x,y = np.meshgrid(x,y)
+        return x,y,z
 
     def _initialize_x_y(self, z):
         '''
@@ -719,194 +1229,15 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             y = y[::-1]
         return np.meshgrid(x,y)
 
-    def _check_xyz(self, args):
-        '''
-        For functions like contour, check that the dimensions
-        of the input arrays match; if x and y are 1D, convert
-        them to 2D using meshgrid.
-
-        Possible change: I think we should make and use an ArgumentError
-        Exception class (here and elsewhere).
-        '''
-        # We can strip away the x and y units
-        x = self.ax.convert_xunits( args[0] )
-        y = self.ax.convert_yunits( args[1] )
-
-        x = np.asarray(x, dtype=np.float64)
-        y = np.asarray(y, dtype=np.float64)
-        z = ma.asarray(args[2], dtype=np.float64)
-        if z.ndim != 2:
-            raise TypeError("Input z must be a 2D array.")
-        else: Ny, Nx = z.shape
-        if x.shape == z.shape and y.shape == z.shape:
-            return x,y,z
-        if x.ndim != 1 or y.ndim != 1:
-            raise TypeError("Inputs x and y must be 1D or 2D.")
-        nx, = x.shape
-        ny, = y.shape
-        if nx != Nx or ny != Ny:
-            raise TypeError("Length of x must be number of columns in z,\n" +
-                            "and length of y must be number of rows.")
-        x,y = np.meshgrid(x,y)
-        return x,y,z
-
-
-
-    def _contour_args(self, *args):
-        if self.filled: fn = 'contourf'
-        else:           fn = 'contour'
-        Nargs = len(args)
-        if Nargs <= 2:
-            z = ma.asarray(args[0], dtype=np.float64)
-            x, y = self._initialize_x_y(z)
-        elif Nargs <=4:
-            x,y,z = self._check_xyz(args[:3])
-        else:
-            raise TypeError("Too many arguments to %s; see help(%s)" % (fn,fn))
-        z = ma.masked_invalid(z, copy=False)
-        self.zmax = ma.maximum(z)
-        self.zmin = ma.minimum(z)
-        if self.logscale and self.zmin <= 0:
-            z = ma.masked_where(z <= 0, z)
-            warnings.warn('Log scale: values of z <=0 have been masked')
-            self.zmin = z.min()
-        self._auto = False
-        if self.levels is None:
-            if Nargs == 1 or Nargs == 3:
-                lev = self._autolev(z, 7)
-            else:   # 2 or 4 args
-                level_arg = args[-1]
-                try:
-                    if type(level_arg) == int:
-                        lev = self._autolev(z, level_arg)
-                    else:
-                        lev = np.asarray(level_arg).astype(np.float64)
-                except:
-                    raise TypeError(
-                        "Last %s arg must give levels; see help(%s)" % (fn,fn))
-            if self.filled and len(lev) < 2:
-                raise ValueError("Filled contours require at least 2 levels.")
-            # Workaround for cntr.c bug wrt masked interior regions:
-            #if filled:
-            #    z = ma.masked_array(z.filled(-1e38))
-            # It's not clear this is any better than the original bug.
-            self.levels = lev
-        #if self._auto and self.extend in ('both', 'min', 'max'):
-        #    raise TypeError("Auto level selection is inconsistent "
-        #                             + "with use of 'extend' kwarg")
-        self._levels = list(self.levels)
-        if self.extend in ('both', 'min'):
-            self._levels.insert(0, min(self.levels[0],self.zmin) - 1)
-        if self.extend in ('both', 'max'):
-            self._levels.append(max(self.levels[-1],self.zmax) + 1)
-        self._levels = np.asarray(self._levels)
-        self.vmin = np.amin(self.levels)  # alternative would be self.layers
-        self.vmax = np.amax(self.levels)
-        if self.extend in ('both', 'min'):
-            self.vmin = 2 * self.levels[0] - self.levels[1]
-        if self.extend in ('both', 'max'):
-            self.vmax = 2 * self.levels[-1] - self.levels[-2]
-        self.layers = self._levels # contour: a line is a thin layer
-        if self.filled:
-            self.layers = 0.5 * (self._levels[:-1] + self._levels[1:])
-            if self.extend in ('both', 'min'):
-                self.layers[0] = 0.5 * (self.vmin + self._levels[1])
-            if self.extend in ('both', 'max'):
-                self.layers[-1] = 0.5 * (self.vmax + self._levels[-2])
-
-        return (x, y, z)
-
-    def _process_colors(self):
-        """
-        Color argument processing for contouring.
-
-        Note that we base the color mapping on the contour levels,
-        not on the actual range of the Z values.  This means we
-        don't have to worry about bad values in Z, and we always have
-        the full dynamic range available for the selected levels.
-
-        The color is based on the midpoint of the layer, except for
-        an extended end layers.
-        """
-        self.monochrome = self.cmap.monochrome
-        if self.colors is not None:
-            i0, i1 = 0, len(self.layers)
-            if self.extend in ('both', 'min'):
-                i0 = -1
-            if self.extend in ('both', 'max'):
-                i1 = i1 + 1
-            self.cvalues = range(i0, i1)
-            self.set_norm(colors.NoNorm())
-        else:
-            self.cvalues = self.layers
-        if not self.norm.scaled():
-            self.set_clim(self.vmin, self.vmax)
-        if self.extend in ('both', 'max', 'min'):
-            self.norm.clip = False
-        self.set_array(self.layers)
-        # self.tcolors are set by the "changed" method
-
-    def _process_linewidths(self):
-        linewidths = self.linewidths
-        Nlev = len(self.levels)
-        if linewidths is None:
-            tlinewidths = [(mpl.rcParams['lines.linewidth'],)] * Nlev
-        else:
-            if not cbook.iterable(linewidths):
-                linewidths = [linewidths] * Nlev
-            else:
-                linewidths = list(linewidths)
-                if len(linewidths) < Nlev:
-                    nreps = int(np.ceil(Nlev/len(linewidths)))
-                    linewidths = linewidths * nreps
-                if len(linewidths) > Nlev:
-                    linewidths = linewidths[:Nlev]
-            tlinewidths = [(w,) for w in linewidths]
-        return tlinewidths
-
-    def _process_linestyles(self):
-        linestyles = self.linestyles
-        Nlev = len(self.levels)
-        if linestyles is None:
-            tlinestyles = ['solid'] * Nlev
-            if self.monochrome:
-                neg_ls = mpl.rcParams['contour.negative_linestyle']
-                for i, lev in enumerate(self.levels):
-                    if lev < 0.0:
-                        tlinestyles[i] = neg_ls
-        else:
-            if cbook.is_string_like(linestyles):
-                tlinestyles = [linestyles] * Nlev
-            elif cbook.iterable(linestyles):
-                tlinestyles = list(linestyles)
-                if len(tlinestyles) < Nlev:
-                    nreps = int(np.ceil(Nlev/len(linestyles)))
-                    tlinestyles = tlinestyles * nreps
-                if len(tlinestyles) > Nlev:
-                    tlinestyles = tlinestyles[:Nlev]
-            else:
-                raise ValueError("Unrecognized type for linestyles kwarg")
-        return tlinestyles
-
-    def get_alpha(self):
-        '''returns alpha to be applied to all ContourSet artists'''
-        return self.alpha
-
-    def set_alpha(self, alpha):
-        '''sets alpha for all ContourSet artists'''
-        self.alpha = alpha
-        self.changed()
-
     contour_doc = """
         :func:`~matplotlib.pyplot.contour` and
         :func:`~matplotlib.pyplot.contourf` draw contour lines and
         filled contours, respectively.  Except as noted, function
         signatures and return values are the same for both versions.
 
-        :func:`~matplotlib.pyplot.contourf` differs from the Matlab
-        (TM) version in that it does not draw the polygon edges,
-        because the contouring engine yields simply connected regions
-        with branch cuts.  To draw the edges, add line contours with
+        :func:`~matplotlib.pyplot.contourf` differs from the MATLAB
+        version in that it does not draw the polygon edges.
+        To draw edges, add line contours with
         calls to :func:`~matplotlib.pyplot.contour`.
 
 
@@ -956,7 +1287,7 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         handle internal masked regions correctly.
 
         ``C = contour(...)`` returns a
-        :class:`~matplotlib.contour.ContourSet` object.
+        :class:`~matplotlib.contour.QuadContourSet` object.
 
         Optional keyword arguments:
 
@@ -982,6 +1313,11 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             A :class:`matplotlib.colors.Normalize` instance for
             scaling data values to colors. If *norm* is *None* and
             *colors* is *None*, the default linear scaling is used.
+
+          *levels* [level0, level1, ..., leveln]
+            A list of floating point numbers indicating the level
+            curves to draw; eg to draw just the zero contour pass
+            ``levels=[0]``
 
           *origin*: [ None | 'upper' | 'lower' | 'image' ]
             If *None*, the first value of *Z* will correspond to the
@@ -1015,8 +1351,13 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             are included. These added ranges are then mapped to the
             special colormap values which default to the ends of the
             colormap range, but can be set via
-            :meth:`matplotlib.cm.Colormap.set_under` and
-            :meth:`matplotlib.cm.Colormap.set_over` methods.
+            :meth:`matplotlib.colors.Colormap.set_under` and
+            :meth:`matplotlib.colors.Colormap.set_over` methods.
+
+          *xunits*, *yunits*: [ None | registered units ]
+            Override axis units by specifying an instance of a
+            :class:`matplotlib.units.ConversionInterface`.
+
 
         contour-only keyword arguments:
 
@@ -1054,74 +1395,18 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             be removed. Chunking introduces artifacts at the chunk boundaries
             unless *antialiased* is *False*.
 
-        **Example:**
+        Note: contourf fills intervals that are closed at the top; that
+        is, for boundaries *z1* and *z2*, the filled region is::
+
+            z1 < z <= z2
+
+        There is one exception: if the lowest boundary coincides with
+        the minimum value of the *z* array, then that minimum value
+        will be included in the lowest interval.
+
+        **Examples:**
 
         .. plot:: mpl_examples/pylab_examples/contour_demo.py
+
+        .. plot:: mpl_examples/pylab_examples/contourf_demo.py
         """
-
-    def find_nearest_contour( self, x, y, indices=None, pixel=True ):
-        """
-        Finds contour that is closest to a point.  Defaults to
-        measuring distance in pixels (screen space - useful for manual
-        contour labeling), but this can be controlled via a keyword
-        argument.
-
-        Returns a tuple containing the contour, segment, index of
-        segment, x & y of segment point and distance to minimum point.
-
-        Call signature::
-
-          conmin,segmin,imin,xmin,ymin,dmin = find_nearest_contour(
-                     self, x, y, indices=None, pixel=True )
-
-        Optional keyword arguments::
-
-        *indices*:
-           Indexes of contour levels to consider when looking for
-           nearest point.  Defaults to using all levels.
-
-        *pixel*:
-           If *True*, measure distance in pixel space, if not, measure
-           distance in axes space.  Defaults to *True*.
-
-        """
-
-        # This function uses a method that is probably quite
-        # inefficient based on converting each contour segment to
-        # pixel coordinates and then comparing the given point to
-        # those coordinates for each contour.  This will probably be
-        # quite slow for complex contours, but for normal use it works
-        # sufficiently well that the time is not noticeable.
-        # Nonetheless, improvements could probably be made.
-
-        if indices==None:
-            indices = range(len(self.levels))
-
-        dmin = 1e10
-        conmin = None
-        segmin = None
-        xmin = None
-        ymin = None
-
-        for icon in indices:
-            con = self.collections[icon]
-            paths = con.get_paths()
-            for segNum, linepath in enumerate(paths):
-                lc = linepath.vertices
-
-                # transfer all data points to screen coordinates if desired
-                if pixel:
-                    lc = self.ax.transData.transform(lc)
-
-                ds = (lc[:,0]-x)**2 + (lc[:,1]-y)**2
-                d = min( ds )
-                if d < dmin:
-                    dmin = d
-                    conmin = icon
-                    segmin = segNum
-                    imin = mpl.mlab.find( ds == d )[0]
-                    xmin = lc[imin,0]
-                    ymin = lc[imin,1]
-
-        return (conmin,segmin,imin,xmin,ymin,dmin)
-

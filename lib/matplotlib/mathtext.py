@@ -82,6 +82,14 @@ Type1 symbol name (i.e. 'phi').
 TeX/Type1 symbol"""%locals()
         raise ValueError, message
 
+def unichr_safe(index):
+    """Return the Unicode character corresponding to the index,
+or the replacement character if this is a narrow build of Python
+and the requested character is outside the BMP."""
+    try:
+        return unichr(index)
+    except ValueError:
+        return unichr(0xFFFD)
 
 class MathtextBackend(object):
     """
@@ -222,7 +230,10 @@ class MathtextBackendAggRender(MathtextBackend):
                 self.fonts_object.get_used_characters())
 
     def get_hinting_type(self):
-        return LOAD_FORCE_AUTOHINT
+        if rcParams['text.hinting']:
+            return LOAD_FORCE_AUTOHINT
+        else:
+            return LOAD_NO_HINTING
 
 def MathtextBackendAgg():
     return MathtextBackendBbox(MathtextBackendAggRender())
@@ -318,7 +329,8 @@ class MathtextBackendSvg(MathtextBackend):
 
     def render_glyph(self, ox, oy, info):
         oy = self.height - oy + info.offset
-        thetext = unichr(info.num)
+        thetext = unichr_safe(info.num)
+
         self.svg_glyphs.append(
             (info.font, info.fontsize, thetext, ox, oy, info.metrics))
 
@@ -336,6 +348,34 @@ class MathtextBackendSvg(MathtextBackend):
                 svg_elements,
                 self.fonts_object.get_used_characters())
 
+class MathtextBackendPath(MathtextBackend):
+    """
+    Store information to write a mathtext rendering to the Cairo
+    backend.
+    """
+
+    def __init__(self):
+        self.glyphs = []
+        self.rects = []
+
+    def render_glyph(self, ox, oy, info):
+        oy = self.height - oy + info.offset
+        thetext = unichr_safe(info.num)
+        self.glyphs.append(
+            (info.font, info.fontsize, thetext, ox, oy))
+
+    def render_rect_filled(self, x1, y1, x2, y2):
+        self.rects.append(
+            (x1, self.height-y2 , x2 - x1, y2 - y1))
+
+    def get_results(self, box):
+        ship(0, -self.depth, box)
+        return (self.width,
+                self.height + self.depth,
+                self.depth,
+                self.glyphs,
+                self.rects)
+
 class MathtextBackendCairo(MathtextBackend):
     """
     Store information to write a mathtext rendering to the Cairo
@@ -348,7 +388,7 @@ class MathtextBackendCairo(MathtextBackend):
 
     def render_glyph(self, ox, oy, info):
         oy = oy - info.offset - self.height
-        thetext = unichr(info.num)
+        thetext = unichr_safe(info.num)
         self.glyphs.append(
             (info.font, info.fontsize, thetext, ox, oy))
 
@@ -557,7 +597,7 @@ class TruetypeFonts(Fonts):
 
         cached_font = self._fonts.get(basename)
         if cached_font is None:
-            font = FT2Font(basename)
+            font = FT2Font(str(basename))
             cached_font = self.CachedFont(font)
             self._fonts[basename] = cached_font
             self._fonts[font.postscript_name] = cached_font
@@ -809,11 +849,11 @@ class UnicodeFonts(TruetypeFonts):
         fontname, uniindex = self._map_virtual_font(
             fontname, font_class, uniindex)
 
+        new_fontname = fontname
+
         # Only characters in the "Letter" class should be italicized in 'it'
         # mode.  Greek capital letters should be Roman.
         if found_symbol:
-            new_fontname = fontname
-
             if fontname == 'it':
                 if uniindex < 0x10000:
                     unistring = unichr(uniindex)
@@ -843,8 +883,8 @@ class UnicodeFonts(TruetypeFonts):
             else:
                 if fontname in ('it', 'regular') and isinstance(self, StixFonts):
                     return self._get_glyph('rm', font_class, sym, fontsize)
-                warn("Font '%s' does not have a glyph for '%s'" %
-                     (fontname, sym.encode('ascii', 'backslashreplace')),
+                warn("Font '%s' does not have a glyph for '%s' [U%x]" %
+                     (new_fontname, sym.encode('ascii', 'backslashreplace'), uniindex),
                      MathTextWarning)
                 warn("Substituting with a dummy symbol.", MathTextWarning)
                 fontname = 'rm'
@@ -883,11 +923,11 @@ class StixFonts(UnicodeFonts):
                  'nonunibf' : 'STIXNonUnicode:weight=bold',
 
                  0 : 'STIXGeneral',
-                 1 : 'STIXSize1',
-                 2 : 'STIXSize2',
-                 3 : 'STIXSize3',
-                 4 : 'STIXSize4',
-                 5 : 'STIXSize5'
+                 1 : 'STIXSizeOneSym',
+                 2 : 'STIXSizeTwoSym',
+                 3 : 'STIXSizeThreeSym',
+                 4 : 'STIXSizeFourSym',
+                 5 : 'STIXSizeFiveSym'
                  }
     use_cmex = False
     cm_fallback = False
@@ -966,7 +1006,12 @@ class StixFonts(UnicodeFonts):
             cached_font = self._get_font(i)
             glyphindex = cached_font.charmap.get(uniindex)
             if glyphindex is not None:
-                alternatives.append((i, unichr(uniindex)))
+                alternatives.append((i, unichr_safe(uniindex)))
+
+        # The largest size of the radical symbol in STIX has incorrect
+        # metrics that cause it to be disconnected from the stem.
+        if sym == r'\__sqrt__':
+            alternatives = alternatives[:-1]
 
         self._size_alternatives[sym] = alternatives
         return alternatives
@@ -1001,7 +1046,11 @@ class StandardPsFonts(Fonts):
         self.glyphd = {}
         self.fonts = {}
 
-        filename = findfont(default_font_prop, fontext='afm')
+        filename = findfont(default_font_prop, fontext='afm',
+                            directory=self.basepath)
+        if filename is None:
+            filename = findfont('Helvetica', fontext='afm',
+                                directory=self.basepath)
         default_font = AFM(file(filename, 'r'))
         default_font.fname = filename
 
@@ -1151,7 +1200,7 @@ SHRINK_FACTOR   = 0.7
 GROW_FACTOR     = 1.0 / SHRINK_FACTOR
 # The number of different sizes of chars to use, beyond which they will not
 # get any smaller
-NUM_SIZE_LEVELS = 4
+NUM_SIZE_LEVELS = 6
 # Percentage of x-height of additional horiz. space after sub/superscripts
 SCRIPT_SPACE    = 0.2
 # Percentage of x-height that sub/superscripts drop below the baseline
@@ -1613,9 +1662,10 @@ class Hrule(Rule):
     """
     Convenience class to create a horizontal rule.
     """
-    def __init__(self, state):
-        thickness = state.font_output.get_underline_thickness(
-            state.font, state.fontsize, state.dpi)
+    def __init__(self, state, thickness=None):
+        if thickness is None:
+            thickness = state.font_output.get_underline_thickness(
+                state.font, state.fontsize, state.dpi)
         height = depth = thickness * 0.5
         Rule.__init__(self, inf, height, depth, state)
 
@@ -2167,6 +2217,41 @@ class Parser(object):
                         | Error(r"Expected \frac{num}{den}"))
                      ).setParseAction(self.frac).setName("frac")
 
+        stackrel     = Group(
+                       Suppress(Literal(r"\stackrel"))
+                     + ((group + group)
+                        | Error(r"Expected \stackrel{num}{den}"))
+                     ).setParseAction(self.stackrel).setName("stackrel")
+
+
+        binom        = Group(
+                       Suppress(Literal(r"\binom"))
+                     + ((group + group)
+                        | Error(r"Expected \binom{num}{den}"))
+                     ).setParseAction(self.binom).setName("binom")
+
+        ambiDelim    = oneOf(list(self._ambiDelim))
+        leftDelim    = oneOf(list(self._leftDelim))
+        rightDelim   = oneOf(list(self._rightDelim))
+        rightDelimSafe = oneOf(list(self._rightDelim - set(['}'])))
+        genfrac      = Group(
+                       Suppress(Literal(r"\genfrac"))
+                     + ((Suppress(Literal('{')) +
+                         oneOf(list(self._ambiDelim | self._leftDelim | set(['']))) +
+                         Suppress(Literal('}')) +
+                         Suppress(Literal('{')) +
+                         oneOf(list(self._ambiDelim |
+                                    (self._rightDelim - set(['}'])) |
+                                    set(['', r'\}']))) +
+                         Suppress(Literal('}')) +
+                         Suppress(Literal('{')) +
+                         Regex("[0-9]*(\.?[0-9]*)?") +
+                         Suppress(Literal('}')) +
+                         group + group + group)
+                        | Error(r"Expected \genfrac{ldelim}{rdelim}{rulesize}{style}{num}{den}"))
+                     ).setParseAction(self.genfrac).setName("genfrac")
+
+
         sqrt         = Group(
                        Suppress(Literal(r"\sqrt"))
                      + Optional(
@@ -2183,6 +2268,9 @@ class Parser(object):
                      ^ accent
                      ^ group
                      ^ frac
+                     ^ stackrel
+                     ^ binom
+                     ^ genfrac
                      ^ sqrt
                      )
 
@@ -2204,14 +2292,12 @@ class Parser(object):
                        | placeable
                      )
 
-        ambiDelim    = oneOf(list(self._ambiDelim))
-        leftDelim    = oneOf(list(self._leftDelim))
-        rightDelim   = oneOf(list(self._rightDelim))
         autoDelim   <<(Suppress(Literal(r"\left"))
                      + ((leftDelim | ambiDelim) | Error("Expected a delimiter"))
                      + Group(
-                         autoDelim
-                       ^ OneOrMore(simple))
+                         OneOrMore(
+                            autoDelim
+                          ^ simple))
                      + Suppress(Literal(r"\right"))
                      + ((rightDelim | ambiDelim) | Error("Expected a delimiter"))
                      )
@@ -2591,9 +2677,9 @@ class Parser(object):
                 hlist = HCentered([sub])
                 hlist.hpack(width, 'exactly')
                 vlist.extend([Kern(rule_thickness * 3.0), hlist])
-                shift = hlist.height + hlist.depth + rule_thickness * 2.0
+                shift = hlist.height
             vlist = Vlist(vlist)
-            vlist.shift_amount = shift + nucleus.depth * 0.5
+            vlist.shift_amount = shift + nucleus.depth
             result = Hlist([vlist])
             return [result]
 
@@ -2642,39 +2728,77 @@ class Parser(object):
         result = Hlist([nucleus, x])
         return [result]
 
-    def frac(self, s, loc, toks):
-        assert(len(toks)==1)
-        assert(len(toks[0])==2)
+    def _genfrac(self, ldelim, rdelim, rule, style, num, den):
         state = self.get_state()
         thickness = state.font_output.get_underline_thickness(
             state.font, state.fontsize, state.dpi)
 
-        num, den = toks[0]
+        rule = float(rule)
         num.shrink()
         den.shrink()
         cnum = HCentered([num])
         cden = HCentered([den])
-        width = max(num.width, den.width) + thickness * 10.
+        width = max(num.width, den.width)
         cnum.hpack(width, 'exactly')
         cden.hpack(width, 'exactly')
         vlist = Vlist([cnum,                      # numerator
                        Vbox(0, thickness * 2.0),  # space
-                       Hrule(state),              # rule
-                       Vbox(0, thickness * 4.0),  # space
+                       Hrule(state, rule),        # rule
+                       Vbox(0, thickness * 2.0),  # space
                        cden                       # denominator
                        ])
 
         # Shift so the fraction line sits in the middle of the
         # equals sign
         metrics = state.font_output.get_metrics(
-            state.font, rcParams['mathtext.default'], '=', state.fontsize, state.dpi)
+            state.font, rcParams['mathtext.default'],
+            '=', state.fontsize, state.dpi)
         shift = (cden.height -
                  ((metrics.ymax + metrics.ymin) / 2 -
                   thickness * 3.0))
         vlist.shift_amount = shift
 
-        hlist = Hlist([vlist, Hbox(thickness * 2.)])
-        return [hlist]
+        result = [Hlist([vlist, Hbox(thickness * 2.)])]
+        if ldelim or rdelim:
+            if ldelim == '':
+                ldelim = '.'
+            if rdelim == '':
+                rdelim = '.'
+            elif rdelim == r'\}':
+                rdelim = '}'
+            return self._auto_sized_delimiter(ldelim, result, rdelim)
+        return result
+
+    def genfrac(self, s, loc, toks):
+        assert(len(toks)==1)
+        assert(len(toks[0])==6)
+
+        return self._genfrac(*tuple(toks[0]))
+
+    def frac(self, s, loc, toks):
+        assert(len(toks)==1)
+        assert(len(toks[0])==2)
+        state = self.get_state()
+
+        thickness = state.font_output.get_underline_thickness(
+            state.font, state.fontsize, state.dpi)
+        num, den = toks[0]
+
+        return self._genfrac('', '', thickness, '', num, den)
+
+    def stackrel(self, s, loc, toks):
+        assert(len(toks)==1)
+        assert(len(toks[0])==2)
+        num, den = toks[0]
+
+        return self._genfrac('', '', 0.0, '', num, den)
+
+    def binom(self, s, loc, toks):
+        assert(len(toks)==1)
+        assert(len(toks[0])==2)
+        num, den = toks[0]
+
+        return self._genfrac('(', ')', 0.0, '', num, den)
 
     def sqrt(self, s, loc, toks):
         #~ print "sqrt", toks
@@ -2721,9 +2845,7 @@ class Parser(object):
                        rightside])               # Body
         return [hlist]
 
-    def auto_sized_delimiter(self, s, loc, toks):
-        #~ print "auto_sized_delimiter", toks
-        front, middle, back = toks
+    def _auto_sized_delimiter(self, front, middle, back):
         state = self.get_state()
         height = max([x.height for x in middle])
         depth = max([x.depth for x in middle])
@@ -2731,11 +2853,18 @@ class Parser(object):
         # \left. and \right. aren't supposed to produce any symbols
         if front != '.':
             parts.append(AutoHeightChar(front, height, depth, state))
-        parts.extend(middle.asList())
+        parts.extend(middle)
         if back != '.':
             parts.append(AutoHeightChar(back, height, depth, state))
         hlist = Hlist(parts)
         return hlist
+
+
+    def auto_sized_delimiter(self, s, loc, toks):
+        #~ print "auto_sized_delimiter", toks
+        front, middle, back = toks
+
+        return self._auto_sized_delimiter(front, middle.asList(), back)
 
 ###
 
@@ -2751,6 +2880,7 @@ class MathTextParser(object):
         'ps'    : MathtextBackendPs,
         'pdf'   : MathtextBackendPdf,
         'svg'   : MathtextBackendSvg,
+        'path'   : MathtextBackendPath,
         'cairo' : MathtextBackendCairo,
         'macosx': MathtextBackendAgg,
         }
@@ -2904,7 +3034,6 @@ class MathTextParser(object):
         Returns the offset of the baseline from the bottom of the
         image in pixels.
         """
-
         rgba, depth = self.to_rgba(texstr, color=color, dpi=dpi, fontsize=fontsize)
         numrows, numcols, tmp = rgba.shape
         _png.write_png(rgba.tostring(), numcols, numrows, filename)

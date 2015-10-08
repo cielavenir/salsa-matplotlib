@@ -29,16 +29,15 @@
 #ifndef AGG_RASTERIZER_CELLS_AA_INCLUDED
 #define AGG_RASTERIZER_CELLS_AA_INCLUDED
 
+#include "CXX/Exception.hxx"
 #include <exception>
 #include <string.h>
 #include <math.h>
 #include "agg_math.h"
 #include "agg_array.h"
 
-
 namespace agg
 {
-
     //-----------------------------------------------------rasterizer_cells_aa
     // An internal class that implements the main rasterization algorithm.
     // Used in the rasterizer. Should not be used direcly.
@@ -185,10 +184,8 @@ namespace agg
             if((m_num_cells & cell_block_mask) == 0)
             {
                 if(m_num_blocks >= cell_block_limit) {
-                    /* If this exception is thrown too often, one can
-                       increase cell_block_limit */
-                    throw "Agg rendering complexity exceeded. "
-                        "Consider downsampling or decimating your data.";
+                    throw Py::OverflowError(
+                            "Agg rendering complexity exceeded. Consider downsampling or decimating your data.");
                 }
                 allocate_block();
             }

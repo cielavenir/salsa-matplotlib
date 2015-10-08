@@ -4,10 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cbook as cbook
 
-from  mpl_toolkits.axes_grid.grid_helper_curvelinear import GridHelperCurveLinear
-from mpl_toolkits.axes_grid.axislines import Subplot
+from  mpl_toolkits.axisartist.grid_helper_curvelinear import GridHelperCurveLinear
+from mpl_toolkits.axisartist import Subplot
 
-from mpl_toolkits.axes_grid.parasite_axes import SubplotHost, \
+from mpl_toolkits.axisartist import SubplotHost, \
      ParasiteAxesAuxTrans
 
 
@@ -42,11 +42,13 @@ def curvelinear_test1(fig):
     ax1.set_xlim(0, 10.)
     ax1.set_ylim(0, 10.)
 
+    ax1.axis["t"]=ax1.new_floating_axis(0, 3.)
+    ax1.axis["t2"]=ax1.new_floating_axis(1, 7.)
     ax1.grid(True)
 
 
 
-import  mpl_toolkits.axes_grid.angle_helper as angle_helper
+import  mpl_toolkits.axisartist.angle_helper as angle_helper
 from matplotlib.projections import PolarAxes
 from matplotlib.transforms import Affine2D
 

@@ -207,6 +207,14 @@ def validate_color(s):
 
     raise ValueError('%s does not look like a color arg%s'%(s, msg))
 
+def validate_colorlist(s):
+    'return a list of colorspecs'
+    if type(s) is str:
+        return [validate_color(c.strip()) for c in s.split(',')]
+    else:
+        assert type(s) in [list, tuple]
+        return [validate_color(c) for c in s]
+
 def validate_stringlist(s):
     'return a list'
     if type(s) is str:
@@ -289,6 +297,11 @@ def validate_negative_linestyle_legacy(s):
         warnings.warn("Deprecated negative_linestyle specification; use 'solid' or 'dashed'")
         return (0, dashes)  # (offset, (solid, blank))
 
+def validate_tkpythoninspect(s):
+    # Introduced 2010/07/05
+    warnings.warn("tk.pythoninspect is obsolete, and has no effect")
+    return validate_bool(s)
+
 validate_legend_loc = ValidateInStrings('legend_loc',[
   'best',
   'upper right',
@@ -334,8 +347,8 @@ class ValidateInterval:
 defaultParams = {
     'backend'           : ['Agg', validate_backend], # agg is certainly present
     'backend_fallback'  : [True, validate_bool], # agg is certainly present
-    'numerix'           : ['obsolete', validate_numerix],
-    'maskedarray'       : ['obsolete', validate_maskedarray], #to be removed
+    #'numerix'           : ['obsolete', validate_numerix],
+    #'maskedarray'       : ['obsolete', validate_maskedarray], #to be removed
     'toolbar'           : ['toolbar2', validate_toolbar],
     'datapath'          : [None, validate_path_exists],   # handled by _get_data_path_cached
     'units'             : [False, validate_bool],
@@ -372,7 +385,7 @@ defaultParams = {
     'font.variant'      : ['normal', str],           #
     'font.stretch'      : ['normal', str],           #
     'font.weight'       : ['normal', str],           #
-    'font.size'         : [12.0, validate_float], #
+    'font.size'         : [12, validate_float],      # Base font size in points
     'font.serif'        : [['Bitstream Vera Serif', 'DejaVu Serif',
                             'New Century Schoolbook', 'Century Schoolbook L',
                             'Utopia', 'ITC Bookman', 'Bookman',
@@ -399,11 +412,15 @@ defaultParams = {
     'text.latex.preamble' : [[''], validate_stringlist],
     'text.latex.preview' : [False, validate_bool],
     'text.dvipnghack'     : [None, validate_bool_maybe_none],
-    'text.fontstyle'      : ['normal', str],
-    'text.fontangle'      : ['normal', str],
-    'text.fontvariant'    : ['normal', str],
-    'text.fontweight'     : ['normal', str],
-    'text.fontsize'       : ['medium', validate_fontsize],
+    'text.hinting'        : [True, validate_bool],
+
+    # The following are deprecated and replaced by, e.g., 'font.style'
+    #'text.fontstyle'      : ['normal', str],
+    #'text.fontangle'      : ['normal', str],
+    #'text.fontvariant'    : ['normal', str],
+    #'text.fontweight'     : ['normal', str],
+    #'text.fontsize'       : ['medium', validate_fontsize],
+
 
     'mathtext.cal'        : ['cursive', validate_font_properties],
     'mathtext.rm'         : ['serif', validate_font_properties],
@@ -439,6 +456,9 @@ defaultParams = {
                                # of the axis range is smaller than the
                                # first or larger than the second
     'axes.unicode_minus'        : [True, validate_bool],
+    'axes.color_cycle'      : [['b','g','r','c','m','y','k'],
+                                    validate_colorlist], # cycle of plot
+                                                         # line colors
 
     'polaraxes.grid'        : [True, validate_bool],   # display polar grid or not
     'axes3d.grid'           : [True, validate_bool],   # display 3d grid
@@ -465,9 +485,6 @@ defaultParams = {
     'legend.markerscale' : [1.0, validate_float], # the relative size of legend markers vs. original
 
     'legend.shadow'        : [False, validate_bool],
-
-
-
 
     # tick properties
     'xtick.major.size' : [4, validate_float],      # major xtick size in points
@@ -510,10 +527,11 @@ defaultParams = {
     'savefig.facecolor'   : ['w', validate_color],  # facecolor; white
     'savefig.edgecolor'   : ['w', validate_color],  # edgecolor; white
     'savefig.orientation' : ['portrait', validate_orientation],  # edgecolor; white
+    'savefig.extension'   : ['auto', str],          # what to add to extensionless filenames
 
     'cairo.format'       : ['png', validate_cairo_format],
     'tk.window_focus'    : [False, validate_bool],  # Maintain shell focus for TkAgg
-    'tk.pythoninspect'   : [False, validate_bool],  # Set PYTHONINSPECT
+    'tk.pythoninspect'   : [False, validate_tkpythoninspect],  # obsolete
     'ps.papersize'       : ['letter', validate_ps_papersize], # Set the papersize/type
     'ps.useafm'          : [False, validate_bool],  # Set PYTHONINSPECT
     'ps.usedistiller'    : [False, validate_ps_distiller], # use ghostscript or xpdf to distill ps output
@@ -533,9 +551,27 @@ defaultParams = {
 
     'path.simplify' : [True, validate_bool],
     'path.simplify_threshold' : [1.0 / 9.0, ValidateInterval(0.0, 1.0)],
-    'agg.path.chunksize' : [0, validate_int]       # 0 to disable chunking;
-                                                   # recommend about 20000 to
-                                                   # enable. Experimental.
+    'path.snap' : [True, validate_bool],
+    'agg.path.chunksize' : [0, validate_int],       # 0 to disable chunking;
+                                                    # recommend about 20000 to
+                                                    # enable. Experimental.
+    # key-mappings
+    'keymap.fullscreen' : ['f', validate_stringlist],
+    'keymap.home' : [['h', 'r', 'home'], validate_stringlist],
+    'keymap.back' : [['left', 'c', 'backspace'], validate_stringlist],
+    'keymap.forward' : [['right', 'v'], validate_stringlist],
+    'keymap.pan' : ['p', validate_stringlist],
+    'keymap.zoom' : ['o', validate_stringlist],
+    'keymap.save' : ['s', validate_stringlist],
+    'keymap.grid' : ['g', validate_stringlist],
+    'keymap.yscale' : ['l', validate_stringlist],
+    'keymap.xscale' : [['k', 'L'], validate_stringlist],
+    'keymap.all_axes' : ['a', validate_stringlist],
+
+    # sample data
+    'examples.download' : [True, validate_bool],
+    'examples.directory' : ['', str],
+
 }
 
 if __name__ == '__main__':

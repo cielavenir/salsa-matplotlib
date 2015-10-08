@@ -2,6 +2,7 @@ from __future__ import division
 import re, warnings
 import matplotlib
 import matplotlib.cbook as cbook
+from matplotlib import docstring, rcParams
 from transforms import Bbox, IdentityTransform, TransformedBbox, TransformedPath
 from path import Path
 
@@ -36,7 +37,15 @@ def allow_rasterization(draw):
         if artist.get_rasterized():
             renderer.start_rasterizing()
 
+        if artist.get_agg_filter() is not None:
+            renderer.start_filter()
+
+
     def after(artist, renderer):
+
+        if artist.get_agg_filter() is not None:
+            renderer.stop_filter(artist.get_agg_filter())
+
         if artist.get_rasterized():
             renderer.stop_rasterizing()
 
@@ -69,7 +78,7 @@ class Artist(object):
         self._transformSet = False
         self._visible = True
         self._animated = False
-        self._alpha = 1.0
+        self._alpha = None
         self.clipbox = None
         self._clippath = None
         self._clipon = True
@@ -78,6 +87,7 @@ class Artist(object):
         self._picker = None
         self._contains = None
         self._rasterized = None
+        self._agg_filter = None
 
         self.eventson = False  # fire events only if eventson
         self._oid = 0  # an observer id
@@ -310,7 +320,11 @@ class Artist(object):
         for a in self.get_children():
             # make sure the event happened in the same axes
             ax = getattr(a, 'axes', None)
-            if mouseevent.inaxes==ax:
+            if mouseevent.inaxes is None or mouseevent.inaxes==ax:
+                # we need to check if mouseevent.inaxes is None
+                # because some objects associated with an axes (eg a
+                # tick label) can be outside the bounding box of the
+                # axes and inaxes will be None
                 a.pick(mouseevent)
 
     def set_picker(self, picker):
@@ -398,9 +412,12 @@ class Artist(object):
           * None: (auto) If the path contains only rectilinear line
             segments, round to the nearest pixel center
 
-        Only supported by the Agg backends.
+        Only supported by the Agg and MacOSX backends.
         """
-        return self._snap
+        if rcParams['path.snap']:
+            return self._snap
+        else:
+            return False
 
     def set_snap(self, snap):
         """
@@ -413,7 +430,7 @@ class Artist(object):
           * None: (auto) If the path contains only rectilinear line
             segments, round to the nearest pixel center
 
-        Only supported by the Agg backends.
+        Only supported by the Agg and MacOSX backends.
         """
         self._snap = snap
 
@@ -553,6 +570,7 @@ class Artist(object):
             gc.set_clip_path(None)
 
     def get_rasterized(self):
+        "return True if the artist is to be rasterized"
         return self._rasterized
 
     def set_rasterized(self, rasterized):
@@ -567,6 +585,17 @@ class Artist(object):
             warnings.warn("Rasterization of '%s' will be ignored" % self)
 
         self._rasterized = rasterized
+
+    def get_agg_filter(self):
+        "return filter function to be used for agg filter"
+        return self._agg_filter
+
+    def set_agg_filter(self, filter_func):
+        """
+        set agg_filter fuction.
+
+        """
+        self._agg_filter = filter_func
 
     def draw(self, renderer, *args, **kwargs):
         'Derived classes drawing method'
@@ -797,7 +826,7 @@ class ArtistInspector:
         for a line that begins with ACCEPTS:
 
         Eg., for a line linestyle, return
-        [ '-' | '--' | '-.' | ':' | 'steps' | 'None' ]
+        "[ ``'-'`` | ``'--'`` | ``'-.'`` | ``':'`` | ``'steps'`` | ``'None'`` ]"
         """
 
         name = 'set_%s'%attr
@@ -1053,25 +1082,25 @@ class ArtistInspector:
 
 
 
-def getp(o, property=None):
+def getp(obj, property=None):
     """
-    Return the value of handle property.  property is an optional string
+    Return the value of object's property.  *property* is an optional string
     for the property you want to return
 
     Example usage::
 
-        getp(o)  # get all the object properties
-        getp(o, 'linestyle')  # get the linestyle property
+        getp(obj)  # get all the object properties
+        getp(obj, 'linestyle')  # get the linestyle property
 
-    *o* is a :class:`Artist` instance, eg
+    *obj* is a :class:`Artist` instance, eg
     :class:`~matplotllib.lines.Line2D` or an instance of a
     :class:`~matplotlib.axes.Axes` or :class:`matplotlib.text.Text`.
     If the *property* is 'somename', this function returns
 
-      o.get_somename()
+      obj.get_somename()
 
     :func:`getp` can be used to query all the gettable properties with
-    ``getp(o)``. Many properties have aliases for shorter typing, e.g.
+    ``getp(obj)``. Many properties have aliases for shorter typing, e.g.
     'lw' is an alias for 'linewidth'.  In the output, aliases and full
     property names will be listed as:
 
@@ -1082,21 +1111,20 @@ def getp(o, property=None):
       linewidth or lw = 2
     """
 
-    insp = ArtistInspector(o)
 
     if property is None:
+        insp = ArtistInspector(obj)
         ret = insp.pprint_getters()
         print '\n'.join(ret)
         return
 
-    func = getattr(o, 'get_' + property)
-
+    func = getattr(obj, 'get_' + property)
     return func()
 
 # alias
 get = getp
 
-def setp(h, *args, **kwargs):
+def setp(obj, *args, **kwargs):
     """
     matplotlib supports the use of :func:`setp` ("set property") and
     :func:`getp` to set and get object properties, as well as to do
@@ -1131,15 +1159,15 @@ def setp(h, *args, **kwargs):
       >>> lines = plot(x, y1, x, y2)
       >>> setp(lines, linewidth=2, color='r')
 
-    :func:`setp` works with the matlab(TM) style string/value pairs or
+    :func:`setp` works with the MATLAB style string/value pairs or
     with python kwargs.  For example, the following are equivalent::
 
-      >>> setp(lines, 'linewidth', 2, 'color', r')  # matlab style
+      >>> setp(lines, 'linewidth', 2, 'color', r')  # MATLAB style
 
       >>> setp(lines, linewidth=2, color='r')       # python style
     """
 
-    insp = ArtistInspector(h)
+    insp = ArtistInspector(obj)
 
     if len(kwargs)==0 and len(args)==0:
         print '\n'.join(insp.pprint_setters())
@@ -1149,8 +1177,10 @@ def setp(h, *args, **kwargs):
         print insp.pprint_setters(prop=args[0])
         return
 
-    if not cbook.iterable(h): h = [h]
-    else: h = cbook.flatten(h)
+    if not cbook.iterable(obj):
+        objs = [obj]
+    else:
+        objs = cbook.flatten(obj)
 
 
     if len(args)%2:
@@ -1162,11 +1192,11 @@ def setp(h, *args, **kwargs):
     funcvals.extend(kwargs.items())
 
     ret = []
-    for o in h:
+    for o in objs:
         for s, val in funcvals:
             s = s.lower()
             funcName = "set_%s"%s
-            func = getattr(o,funcName)
+            func = getattr(o, funcName)
             ret.extend( [func(val)] )
     return [x for x in cbook.flatten(ret)]
 
@@ -1177,5 +1207,4 @@ def kwdoc(a):
     else:
         return '\n'.join(ArtistInspector(a).pprint_setters(leadingspace=2))
 
-kwdocd = dict()
-kwdocd['Artist'] = kwdoc(Artist)
+docstring.interpd.update(Artist=kwdoc(Artist))

@@ -38,8 +38,8 @@
 #ifndef __PyCXX_wrap_python_hxx__
 #define __PyCXX_wrap_python_hxx__
 
-// pull in python definitions
-#include <Python.h>
+/* Python API mandates Python.h is included *first* */
+#include "Python.h"
 
 // On some platforms we have to include time.h to get select defined
 #if !defined(__WIN32__) && !defined(WIN32) && !defined(_WIN32) && !defined(_WIN64)

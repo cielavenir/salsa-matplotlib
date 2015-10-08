@@ -1,9 +1,9 @@
 """
 
-Numerical python functions written for compatability with matlab(TM)
+Numerical python functions written for compatability with MATLAB
 commands with the same names.
 
-Matlab(TM) compatible functions
+MATLAB compatible functions
 -------------------------------
 
 :func:`cohere`
@@ -41,10 +41,10 @@ Matlab(TM) compatible functions
 Miscellaneous functions
 -------------------------
 
-Functions that don't exist in matlab(TM), but are useful anyway:
+Functions that don't exist in MATLAB, but are useful anyway:
 
 :meth:`cohere_pairs`
-    Coherence over all pairs.  This is not a matlab function, but we
+    Coherence over all pairs.  This is not a MATLAB function, but we
     compute coherence a lot in my lab, and we compute it for a lot of
     pairs.  This function is optimized to do this efficiently by
     caching the direct FFTs.
@@ -90,6 +90,9 @@ A collection of helper methods for numpyrecord arrays
 
 :meth:`rec_join`
     join two record arrays on sequence of fields
+
+:meth:`recs_join`
+    a simple join of multiple recarrays using a single column as a key
 
 :meth:`rec_groupby`
     summarize data by groups (similar to SQL GROUP BY)
@@ -139,7 +142,7 @@ care--function signatures may differ):
 """
 
 from __future__ import division
-import csv, warnings, copy, os
+import csv, warnings, copy, os, operator
 
 import numpy as np
 ma = np.ma
@@ -147,6 +150,7 @@ from matplotlib import verbose
 
 import matplotlib.nxutils as nxutils
 import matplotlib.cbook as cbook
+from matplotlib import docstring
 
 
 def logspace(xmin,xmax,N):
@@ -241,7 +245,7 @@ def _spectral_helper(x, y, NFFT=256, Fs=2, detrend=detrend_none,
         raise ValueError("sides must be one of: 'default', 'onesided', or "
             "'twosided'")
 
-    # Matlab divides by the sampling frequency so that density function
+    # MATLAB divides by the sampling frequency so that density function
     # has units of dB/Hz and can be integrated by the plotted frequency
     # values. Perform the same scaling here.
     if scale_by_freq:
@@ -273,18 +277,18 @@ def _spectral_helper(x, y, NFFT=256, Fs=2, detrend=detrend_none,
         Pxy[:,i] = np.conjugate(fx[:numFreqs]) * fy[:numFreqs]
 
     # Scale the spectrum by the norm of the window to compensate for
-    # windowing loss; see Bendat & Piersol Sec 11.5.2. 
+    # windowing loss; see Bendat & Piersol Sec 11.5.2.
     Pxy *= 1 / (np.abs(windowVals)**2).sum()
 
     # Also include scaling factors for one-sided densities and dividing by the
     # sampling frequency, if desired. Scale everything, except the DC component
-    # and the NFFT/2 component:    
+    # and the NFFT/2 component:
     Pxy[1:-1] *= scaling_factor
 
-    #But do scale those components by Fs, if required    
+    #But do scale those components by Fs, if required
     if scale_by_freq:
-        Pxy[[0,-1]] /= Fs 
-    
+        Pxy[[0,-1]] /= Fs
+
     t = 1./Fs * (ind + NFFT / 2.)
     freqs = float(Fs) / pad_to * np.arange(numFreqs)
 
@@ -296,8 +300,7 @@ def _spectral_helper(x, y, NFFT=256, Fs=2, detrend=detrend_none,
     return Pxy, freqs, t
 
 #Split out these keyword docs so that they can be used elsewhere
-kwdocd = dict()
-kwdocd['PSD'] ="""
+docstring.interpd.update(PSD=cbook.dedent("""
     Keyword arguments:
 
       *NFFT*: integer
@@ -312,7 +315,7 @@ kwdocd['PSD'] ="""
       *detrend*: callable
           The function applied to each segment before fft-ing,
           designed to remove the mean or linear trend.  Unlike in
-          matlab, where the *detrend* parameter is a vector, in
+          MATLAB, where the *detrend* parameter is a vector, in
           matplotlib is it a function.  The :mod:`~matplotlib.pylab`
           module defines :func:`~matplotlib.pylab.detrend_none`,
           :func:`~matplotlib.pylab.detrend_mean`, and
@@ -353,9 +356,10 @@ kwdocd['PSD'] ="""
           Specifies whether the resulting density values should be scaled
           by the scaling frequency, which gives density in units of Hz^-1.
           This allows for integration over the returned frequency values.
-          The default is True for MatLab compatibility.
-"""
+          The default is True for MATLAB compatibility.
+"""))
 
+@docstring.dedent_interpd
 def psd(x, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
         noverlap=0, pad_to=None, sides='default', scale_by_freq=None):
     """
@@ -385,8 +389,7 @@ def psd(x, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
         scale_by_freq)
     return Pxx.real,freqs
 
-psd.__doc__ = psd.__doc__ % kwdocd
-
+@docstring.dedent_interpd
 def csd(x, y, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
         noverlap=0, pad_to=None, sides='default', scale_by_freq=None):
     """
@@ -419,8 +422,7 @@ def csd(x, y, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
         Pxy = Pxy.mean(axis=1)
     return Pxy, freqs
 
-csd.__doc__ = csd.__doc__ % kwdocd
-
+@docstring.dedent_interpd
 def specgram(x, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
         noverlap=128, pad_to=None, sides='default', scale_by_freq=None):
     """
@@ -461,11 +463,10 @@ def specgram(x, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
 
     return Pxx, freqs, t
 
-specgram.__doc__ = specgram.__doc__ % kwdocd
-
 _coh_error = """Coherence is calculated by averaging over *NFFT*
 length segments.  Your signal is too short for your choice of *NFFT*.
 """
+@docstring.dedent_interpd
 def cohere(x, y, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
         noverlap=0, pad_to=None, sides='default', scale_by_freq=None):
     """
@@ -505,8 +506,6 @@ def cohere(x, y, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
     Cxy = np.divide(np.absolute(Pxy)**2, Pxx*Pyy)
     Cxy.shape = (len(f),)
     return Cxy, f
-
-cohere.__doc__ = cohere.__doc__ % kwdocd
 
 
 def donothing_callback(*args):
@@ -768,6 +767,9 @@ def longest_ones(x):
 
 def prepca(P, frac=0):
     """
+
+    WARNING: this function is deprecated -- please see class PCA instead
+
     Compute the principal components of *P*.  *P* is a (*numVars*,
     *numObs*) array.  *frac* is the minimum fraction of variance that a
     component must contain to be included.
@@ -783,10 +785,11 @@ def prepca(P, frac=0):
       - *fracVar* : the fraction of the variance accounted for by each
          component returned
 
-    A similar function of the same name was in the Matlab (TM)
+    A similar function of the same name was in the MATLAB
     R13 Neural Network Toolbox but is not found in later versions;
     its successor seems to be called "processpcs".
     """
+    warnings.warn('This function is deprecated -- see class PCA instead')
     U,s,v = np.linalg.svd(P)
     varEach = s**2/P.shape[1]
     totVar = varEach.sum()
@@ -798,6 +801,108 @@ def prepca(P, frac=0):
     Pcomponents = np.dot(Trans,P)
     return Pcomponents, Trans, fracVar[ind]
 
+
+class PCA:
+    def __init__(self, a):
+        """
+        compute the SVD of a and store data for PCA.  Use project to
+        project the data onto a reduced set of dimensions
+
+        Inputs:
+
+          *a*: a numobservations x numdims array
+
+        Attrs:
+
+          *a* a centered unit sigma version of input a
+
+          *numrows*, *numcols*: the dimensions of a
+
+          *mu* : a numdims array of means of a
+
+          *sigma* : a numdims array of atandard deviation of a
+
+          *fracs* : the proportion of variance of each of the principal components
+
+          *Wt* : the weight vector for projecting a numdims point or array into PCA space
+
+          *Y* : a projected into PCA space
+
+
+        The factor loadings are in the Wt factor, ie the factor
+        loadings for the 1st principal component are given by Wt[0]
+
+        """
+        n, m = a.shape
+        if n<m:
+            raise RuntimeError('we assume data in a is organized with numrows>numcols')
+
+        self.numrows, self.numcols = n, m
+        self.mu = a.mean(axis=0)
+        self.sigma = a.std(axis=0)
+
+        a = self.center(a)
+
+        self.a = a
+
+        U, s, Vh = np.linalg.svd(a, full_matrices=False)
+
+
+        Y = np.dot(Vh, a.T).T
+
+        vars = s**2/float(len(s))
+        self.fracs = vars/vars.sum()
+
+
+        self.Wt = Vh
+        self.Y = Y
+
+
+    def project(self, x, minfrac=0.):
+        'project x onto the principle axes, dropping any axes where fraction of variance<minfrac'
+        x = np.asarray(x)
+
+        ndims = len(x.shape)
+
+        if (x.shape[-1]!=self.numcols):
+            raise ValueError('Expected an array with dims[-1]==%d'%self.numcols)
+
+
+        Y = np.dot(self.Wt, self.center(x).T).T
+        mask = self.fracs>=minfrac
+        if ndims==2:
+            Yreduced = Y[:,mask]
+        else:
+            Yreduced = Y[mask]
+        return Yreduced
+
+
+
+    def center(self, x):
+        'center the data using the mean and sigma from training set a'
+        return (x - self.mu)/self.sigma
+
+
+
+    @staticmethod
+    def _get_colinear():
+        c0 = np.array([
+            0.19294738,  0.6202667 ,  0.45962655,  0.07608613,  0.135818  ,
+            0.83580842,  0.07218851,  0.48318321,  0.84472463,  0.18348462,
+            0.81585306,  0.96923926,  0.12835919,  0.35075355,  0.15807861,
+            0.837437  ,  0.10824303,  0.1723387 ,  0.43926494,  0.83705486])
+
+        c1 = np.array([
+            -1.17705601, -0.513883  , -0.26614584,  0.88067144,  1.00474954,
+            -1.1616545 ,  0.0266109 ,  0.38227157,  1.80489433,  0.21472396,
+            -1.41920399, -2.08158544, -0.10559009,  1.68999268,  0.34847107,
+            -0.4685737 ,  1.23980423, -0.14638744, -0.35907697,  0.22442616])
+
+        c2 = c0 + 2*c1
+        c3 = -3*c0 + 4*c1
+        a = np.array([c3, c0, c1, c2]).T
+        return a
+
 def prctile(x, p = (0.0, 25.0, 50.0, 75.0, 100.0)):
     """
     Return the percentiles of *x*.  *p* can either be a sequence of
@@ -807,18 +912,38 @@ def prctile(x, p = (0.0, 25.0, 50.0, 75.0, 100.0)):
     the *p* percentage point in the sequence is returned.
     """
 
+    # This implementation derived from scipy.stats.scoreatpercentile
+    def _interpolate(a, b, fraction):
+        """Returns the point at the given fraction between a and b, where
+        'fraction' must be between 0 and 1.
+        """
+        return a + (b - a)*fraction
 
-    x = np.array(x).ravel()  # we need a copy
-    x.sort()
-    Nx = len(x)
+    scalar = True
+    if cbook.iterable(p):
+        scalar = False
+    per = np.array(p)
+    values = np.array(x).ravel()  # copy
+    values.sort()
 
-    if not cbook.iterable(p):
-        return x[int(p*Nx/100.0)]
+    idxs = per /100. * (values.shape[0] - 1)
+    ai = idxs.astype(np.int)
+    bi = ai + 1
+    frac = idxs % 1
 
-    p = np.asarray(p)* Nx/100.0
-    ind = p.astype(int)
-    ind = np.where(ind>=Nx, Nx-1, ind)
-    return x.take(ind)
+    # handle cases where attempting to interpolate past last index
+    cond = bi >= len(values)
+    if scalar:
+        if cond:
+            ai -= 1
+            bi -= 1
+            frac += 1
+    else:
+        ai[cond] -= 1
+        bi[cond] -= 1
+        frac[cond] += 1
+
+    return _interpolate(values[ai],values[bi],frac)
 
 def prctile_rank(x, p):
     """
@@ -1607,7 +1732,7 @@ def ispower2(n):
 
 def isvector(X):
     """
-    Like the Matlab (TM) function with the same name, returns *True*
+    Like the MATLAB function with the same name, returns *True*
     if the supplied numpy array or matrix *X* looks like a vector,
     meaning it has a one non-singleton axis (i.e., it can have
     multiple axes, but all must have length 1, except for one of
@@ -1902,6 +2027,60 @@ def rec_join(key, r1, r2, jointype='inner', defaults=None, r1postfix='1', r2post
 
     return newrec
 
+def recs_join(key, name, recs, jointype='outer', missing=0., postfixes=None):
+    """
+    Join a sequence of record arrays on single column key.
+
+    This function only joins a single column of the multiple record arrays
+
+    *key*
+      is the column name that acts as a key
+
+    *name*
+      is the name of the column that we want to join
+
+    *recs*
+      is a list of record arrays to join
+
+    *jointype*
+      is a string 'inner' or 'outer'
+
+    *missing*
+      is what any missing field is replaced by
+
+    *postfixes*
+      if not None, a len recs sequence of postfixes
+
+    returns a record array with columns [rowkey, name0, name1, ... namen-1].
+    or if postfixes [PF0, PF1, ..., PFN-1] are supplied,
+      [rowkey, namePF0, namePF1, ... namePFN-1].
+
+    Example::
+
+      r = recs_join("date", "close", recs=[r0, r1], missing=0.)
+
+    """
+    results = []
+    aligned_iters = cbook.align_iterators(operator.attrgetter(key), *[iter(r) for r in recs])
+
+    def extract(r):
+        if r is None: return missing
+        else: return r[name]
+
+
+    if jointype == "outer":
+        for rowkey, row in aligned_iters:
+            results.append([rowkey] + map(extract, row))
+    elif jointype == "inner":
+        for rowkey, row in aligned_iters:
+            if None not in row: # throw out any Nones
+                results.append([rowkey] + map(extract, row))
+
+    if postfixes is None:
+        postfixes = ['%d'%i for i in range(len(recs))]
+    names = ",".join([key] + ["%s%s" % (name, postfix) for postfix in postfixes])
+    return np.rec.fromrecords(results, names=names)
+
 
 def csv2rec(fname, comments='#', skiprows=0, checkrows=0, delimiter=',',
             converterd=None, names=None, missing='', missingd=None,
@@ -1929,7 +2108,7 @@ def csv2rec(fname, comments='#', skiprows=0, checkrows=0, delimiter=',',
     - *checkrows*: is the number of rows to check to validate the column
       data type.  When set to zero all rows are validated.
 
-    - *converted*: if not *None*, is a dictionary mapping column number or
+    - *converterd*: if not *None*, is a dictionary mapping column number or
       munged column name to a converter function.
 
     - *names*: if not None, is a list of header names.  In this case, no
@@ -2130,11 +2309,11 @@ def csv2rec(fname, comments='#', skiprows=0, checkrows=0, delimiter=',',
 
     if needheader:
         while 1:
-	    # skip past any comments and consume one line of column header
-	    row = reader.next()
-	    if len(row) and row[0].startswith(comments):
-	        continue
-	    break
+            # skip past any comments and consume one line of column header
+            row = reader.next()
+            if len(row) and row[0].startswith(comments):
+                continue
+            break
 
     # iterate over the remaining rows and convert the data to date
     # objects, ints, or floats as approriate
@@ -2425,6 +2604,10 @@ def rec2csv(r, fname, delimiter=',', formatd=None, missing='',
     *withheader*: if withheader is False, do not write the attribute
       names in the first row
 
+    for formatd type FormatFloat, we override the precision to store
+    full precision floats in the CSV file
+
+
     .. seealso::
 
         :func:`csv2rec`
@@ -2442,6 +2625,9 @@ def rec2csv(r, fname, delimiter=',', formatd=None, missing='',
             else:
                 return func(val)
         return newfunc
+
+    if r.ndim != 1:
+        raise ValueError('rec2csv only operates on 1 dimensional recarrays')
 
     formatd = get_formatd(r, formatd)
     funcs = []
@@ -2532,9 +2718,11 @@ def griddata(x,y,z,xi,yi,interp='nn'):
         raise TypeError("inputs x,y,z must all be 1D arrays of the same length")
     # remove masked points.
     if hasattr(z,'mask'):
-        x = x.compress(z.mask == False)
-        y = y.compress(z.mask == False)
-        z = z.compressed()
+        # make sure mask is not a scalar boolean array.
+        if z.mask.ndim:
+            x = x.compress(z.mask == False)
+            y = y.compress(z.mask == False)
+            z = z.compressed()
     if _use_natgrid: # use natgrid toolkit if available.
         if interp != 'nn':
             raise ValueError("only natural neighor interpolation"

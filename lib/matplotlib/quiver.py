@@ -22,6 +22,7 @@ import matplotlib.transforms as transforms
 import matplotlib.text as mtext
 import matplotlib.artist as martist
 from matplotlib.artist import allow_rasterization
+from matplotlib import docstring
 import matplotlib.font_manager as font_manager
 from matplotlib.cbook import delete_masked_points
 from matplotlib.patches import CirclePolygon
@@ -63,7 +64,7 @@ supported at present.
 
 Keyword arguments:
 
-  *units*: ['width' | 'height' | 'dots' | 'inches' | 'x' | 'y' ]
+  *units*: ['width' | 'height' | 'dots' | 'inches' | 'x' | 'y' | 'xy']
     arrow units; the arrow dimensions *except for length* are in
     multiples of this unit.
 
@@ -71,7 +72,7 @@ Keyword arguments:
 
     * 'dots' or 'inches': pixels or inches, based on the figure dpi
 
-    * 'x' or 'y': *X* or *Y* data units
+    * 'x', 'y', or 'xy': *X*, *Y*, or sqrt(X^2+Y^2) data units
 
     The arrows scale differently depending on the units.  For
     'x' or 'y', the arrows get larger as one zooms in; for other
@@ -79,6 +80,7 @@ Keyword arguments:
     'width or 'height', the arrow size increases with the width and
     height of the axes, respectively, when the the window is resized;
     for 'dots' or 'inches', resizing does not change the arrows.
+
 
    *angles*: ['uv' | 'xy' | array]
     With the default 'uv', the arrow aspect ratio is 1, so that
@@ -89,10 +91,20 @@ Keyword arguments:
     of values in degrees, CCW from the *x*-axis.
 
   *scale*: [ None | float ]
-    data units per arrow unit, e.g. m/s per plot width; a smaller
+    data units per arrow length unit, e.g. m/s per plot width; a smaller
     scale parameter makes the arrow longer.  If *None*, a simple
     autoscaling algorithm is used, based on the average vector length
-    and the number of vectors.
+    and the number of vectors.  The arrow length unit is given by
+    the *scale_units* parameter
+
+   *scale_units*: None, or any of the *units* options. For example,
+    if *scale_units* is 'inches', *scale* is 2.0, and (u,v) = (1,0),
+    then the vector will be 0.5 inches long.  If *scale_units* is
+    'width', then the vector will be half the width of the axes.
+    If *scale_units* is 'x' then the vector will be 0.5 x-axis
+    units.  To plot vectors in the x-y plane, with u and v having
+    the same units as x and y, use
+    "angles='xy', scale_units='xy', scale=1".
 
   *width*:
     shaft width in arrow units; default depends on choice of units,
@@ -139,7 +151,7 @@ outlines. Additional :class:`~matplotlib.collections.PolyCollection`
 keyword arguments:
 
 %(PolyCollection)s
-""" % martist.kwdocd
+""" % docstring.interpd.params
 
 _quiverkey_doc = """
 Add a key to a quiver plot.
@@ -368,7 +380,14 @@ class Quiver(collections.PolyCollection):
     should be no performance penalty from putting the calculations
     in the draw() method.
     """
+
+    @docstring.Substitution(_quiver_doc)
     def __init__(self, ax, *args, **kw):
+        """
+        The constructor takes one required argument, an Axes
+        instance, followed by the args and kwargs described
+        by the following pylab interface documentation:
+        %s"""
         self.ax = ax
         X, Y, U, V, C = _parse_args(*args)
         self.X = X
@@ -382,6 +401,7 @@ class Quiver(collections.PolyCollection):
         self.minshaft = kw.pop('minshaft', 1)
         self.minlength = kw.pop('minlength', 1)
         self.units = kw.pop('units', 'width')
+        self.scale_units = kw.pop('scale_units', None)
         self.angles = kw.pop('angles', 'uv')
         self.width = kw.pop('width', None)
         self.color = kw.pop('color', 'k')
@@ -409,14 +429,9 @@ class Quiver(collections.PolyCollection):
         self.ax.figure.callbacks.connect('dpi_changed', on_dpi_change)
 
 
-    __init__.__doc__ = """
-        The constructor takes one required argument, an Axes
-        instance, followed by the args and kwargs described
-        by the following pylab interface documentation:
-        %s""" % _quiver_doc
-
     def _init(self):
-        """initialization delayed until first draw;
+        """
+        Initialization delayed until first draw;
         allow time for axes setup.
         """
         # It seems that there are not enough event notifications
@@ -427,14 +442,15 @@ class Quiver(collections.PolyCollection):
             sx, sy = trans.inverted().transform_point(
                                             (ax.bbox.width, ax.bbox.height))
             self.span = sx
-            sn = max(8, min(25, math.sqrt(self.N)))
             if self.width is None:
+                sn = max(8, min(25, math.sqrt(self.N)))
                 self.width = 0.06 * self.span / sn
 
     @allow_rasterization
     def draw(self, renderer):
         self._init()
-        if self._new_UV or self.angles == 'xy':
+        if (self._new_UV or self.angles == 'xy'
+                or self.scale_units in ['x','y', 'xy']):
             verts = self._make_verts(self.U, self.V)
             self.set_verts(verts, closed=False)
             self._new_UV = False
@@ -458,42 +474,78 @@ class Quiver(collections.PolyCollection):
             self.set_array(C)
         self._new_UV = True
 
-    def _set_transform(self):
+    def _dots_per_unit(self, units):
+        """
+        Return a scale factor for converting from units to pixels
+        """
         ax = self.ax
-        if self.units in ('x', 'y'):
-            if self.units == 'x':
+        if units in ('x', 'y', 'xy'):
+            if units == 'x':
                 dx0 = ax.viewLim.width
                 dx1 = ax.bbox.width
-            else:
+            elif units == 'y':
                 dx0 = ax.viewLim.height
                 dx1 = ax.bbox.height
+            else: # 'xy' is assumed
+                dxx0 = ax.viewLim.width
+                dxx1 = ax.bbox.width
+                dyy0 = ax.viewLim.height
+                dyy1 = ax.bbox.height
+                dx1 = np.sqrt(dxx1*dxx1+dyy1*dyy1)
+                dx0 = np.sqrt(dxx0*dxx0+dyy0*dyy0)
             dx = dx1/dx0
         else:
-            if self.units == 'width':
+            if units == 'width':
                 dx = ax.bbox.width
-            elif self.units == 'height':
+            elif units == 'height':
                 dx = ax.bbox.height
-            elif self.units == 'dots':
+            elif units == 'dots':
                 dx = 1.0
-            elif self.units == 'inches':
+            elif units == 'inches':
                 dx = ax.figure.dpi
             else:
                 raise ValueError('unrecognized units')
+        return dx
+
+    def _set_transform(self):
+        """
+        Sets the PolygonCollection transform to go
+        from arrow width units to pixels.
+        """
+        dx = self._dots_per_unit(self.units)
+        self._trans_scale = dx # pixels per arrow width unit
         trans = transforms.Affine2D().scale(dx)
         self.set_transform(trans)
         return trans
 
-    def _angles(self, U, V, eps=0.001):
+    def _angles_lengths(self, U, V, eps=1):
         xy = self.ax.transData.transform(self.XY)
         uv = np.hstack((U[:,np.newaxis], V[:,np.newaxis]))
         xyp = self.ax.transData.transform(self.XY + eps * uv)
         dxy = xyp - xy
-        ang = np.arctan2(dxy[:,1], dxy[:,0])
-        return ang
+        angles = np.arctan2(dxy[:,1], dxy[:,0])
+        lengths = np.absolute(dxy[:,0] + dxy[:,1]*1j) / eps
+        return angles, lengths
+
+
 
     def _make_verts(self, U, V):
         uv = (U+V*1j)
-        a = np.absolute(uv)
+        if self.angles == 'xy' and self.scale_units == 'xy':
+            # Here eps is 1 so that if we get U, V by diffing
+            # the X, Y arrays, the vectors will connect the
+            # points, regardless of the axis scaling (including log).
+            angles, lengths = self._angles_lengths(U, V, eps=1)
+        elif self.angles == 'xy' or self.scale_units == 'xy':
+            # Calculate eps based on the extents of the plot
+            # so that we don't end up with roundoff error from
+            # adding a small number to a large.
+            angles, lengths = self._angles_lengths(U, V,
+                eps=np.abs(self.ax.dataLim.extents).max() * 0.001)
+        if self.scale_units == 'xy':
+            a = lengths
+        else:
+            a = np.absolute(uv)
         if self.scale is None:
             sn = max(10, math.sqrt(self.N))
             if self.Umask is not ma.nomask:
@@ -501,11 +553,24 @@ class Quiver(collections.PolyCollection):
             else:
                 amean = a.mean()
             scale = 1.8 * amean * sn / self.span # crude auto-scaling
-            self.scale = scale
-        length = a/(self.scale*self.width)
+                # scale is typical arrow length as a multiple
+                # of the arrow width
+        if self.scale_units is None:
+            if self.scale is None:
+                self.scale = scale
+            widthu_per_lenu = 1.0
+        else:
+            if self.scale_units == 'xy':
+                dx = 1
+            else:
+                dx = self._dots_per_unit(self.scale_units)
+            widthu_per_lenu = dx/self._trans_scale
+            if self.scale is None:
+                self.scale = scale * widthu_per_lenu
+        length = a * (widthu_per_lenu / (self.scale * self.width))
         X, Y = self._h_arrows(length)
         if self.angles == 'xy':
-            theta = self._angles(U, V)
+            theta = angles
         elif self.angles == 'uv':
             theta = np.angle(uv)
         else:
@@ -718,7 +783,9 @@ Additional :class:`~matplotlib.collections.PolyCollection` keyword
 arguments:
 
 %(PolyCollection)s
-""" % martist.kwdocd
+""" % docstring.interpd.params
+
+docstring.interpd.update(barbs_doc=_barbs_doc)
 
 class Barbs(collections.PolyCollection):
     '''
@@ -737,7 +804,13 @@ class Barbs(collections.PolyCollection):
     #This may be an abuse of polygons here to render what is essentially maybe
     #1 triangle and a series of lines.  It works fine as far as I can tell
     #however.
+    @docstring.interpd
     def __init__(self, ax, *args, **kw):
+        """
+        The constructor takes one required argument, an Axes
+        instance, followed by the args and kwargs described
+        by the following pylab interface documentation:
+        %(barbs_doc)s"""
         self._pivot = kw.pop('pivot', 'tip')
         self._length = kw.pop('length', 7)
         barbcolor = kw.pop('barbcolor', None)
@@ -778,12 +851,6 @@ class Barbs(collections.PolyCollection):
         self.set_transform(transforms.IdentityTransform())
 
         self.set_UVC(u, v, c)
-
-    __init__.__doc__ = """
-        The constructor takes one required argument, an Axes
-        instance, followed by the args and kwargs described
-        by the following pylab interface documentation:
-        %s""" % _barbs_doc
 
     def _find_tails(self, mag, rounding=True, half=5, full=10, flag=50):
         '''

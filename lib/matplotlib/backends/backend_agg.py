@@ -22,7 +22,7 @@ TODO:
 """
 from __future__ import division
 
-import numpy as npy
+import numpy as np
 
 from matplotlib import verbose, rcParams
 from matplotlib.backend_bases import RendererBase,\
@@ -30,7 +30,7 @@ from matplotlib.backend_bases import RendererBase,\
 from matplotlib.cbook import is_string_like, maxdict
 from matplotlib.figure import Figure
 from matplotlib.font_manager import findfont
-from matplotlib.ft2font import FT2Font, LOAD_FORCE_AUTOHINT
+from matplotlib.ft2font import FT2Font, LOAD_FORCE_AUTOHINT, LOAD_NO_HINTING
 from matplotlib.mathtext import MathTextParser
 from matplotlib.path import Path
 from matplotlib.transforms import Bbox, BboxBase
@@ -57,20 +57,39 @@ class RendererAgg(RendererBase):
         self.height = height
         if __debug__: verbose.report('RendererAgg.__init__ width=%s, height=%s'%(width, height), 'debug-annoying')
         self._renderer = _RendererAgg(int(width), int(height), dpi, debug=False)
+        self._filter_renderers = []
+
         if __debug__: verbose.report('RendererAgg.__init__ _RendererAgg done',
                                      'debug-annoying')
-        #self.draw_path = self._renderer.draw_path  # see below
-        self.draw_markers = self._renderer.draw_markers
-        self.draw_path_collection = self._renderer.draw_path_collection
-        self.draw_quad_mesh = self._renderer.draw_quad_mesh
-        self.draw_image = self._renderer.draw_image
-        self.copy_from_bbox = self._renderer.copy_from_bbox
-        self.tostring_rgba_minimized = self._renderer.tostring_rgba_minimized
+
+        self._update_methods()
         self.mathtext_parser = MathTextParser('Agg')
 
         self.bbox = Bbox.from_bounds(0, 0, self.width, self.height)
         if __debug__: verbose.report('RendererAgg.__init__ done',
                                      'debug-annoying')
+
+    def _get_hinting_flag(self):
+        if rcParams['text.hinting']:
+            return LOAD_FORCE_AUTOHINT
+        else:
+            return LOAD_NO_HINTING
+
+    def draw_markers(self, *kl, **kw):
+        # for filtering to work with rastrization, methods needs to be wrapped.
+        # maybe there is better way to do it.
+        return self._renderer.draw_markers(*kl, **kw)
+
+    def _update_methods(self):
+        #self.draw_path = self._renderer.draw_path  # see below
+        #self.draw_markers = self._renderer.draw_markers
+        self.draw_path_collection = self._renderer.draw_path_collection
+        self.draw_quad_mesh = self._renderer.draw_quad_mesh
+        self.draw_gouraud_triangle = self._renderer.draw_gouraud_triangle
+        self.draw_gouraud_triangles = self._renderer.draw_gouraud_triangles
+        self.draw_image = self._renderer.draw_image
+        self.copy_from_bbox = self._renderer.copy_from_bbox
+        self.tostring_rgba_minimized = self._renderer.tostring_rgba_minimized
 
     def draw_path(self, gc, path, transform, rgbFace=None):
         """
@@ -80,10 +99,10 @@ class RendererAgg(RendererBase):
         npts = path.vertices.shape[0]
         if (nmax > 100 and npts > nmax and path.should_simplify and
             rgbFace is None and gc.get_hatch() is None):
-            nch = npy.ceil(npts/float(nmax))
-            chsize = int(npy.ceil(npts/nch))
-            i0 = npy.arange(0, npts, chsize)
-            i1 = npy.zeros_like(i0)
+            nch = np.ceil(npts/float(nmax))
+            chsize = int(np.ceil(npts/nch))
+            i0 = np.arange(0, npts, chsize)
+            i1 = np.zeros_like(i0)
             i1[:-1] = i0[1:] - 1
             i1[-1] = npts
             for ii0, ii1 in zip(i0, i1):
@@ -119,17 +138,18 @@ class RendererAgg(RendererBase):
         if ismath:
             return self.draw_mathtext(gc, x, y, s, prop, angle)
 
+        flags = self._get_hinting_flag()
         font = self._get_agg_font(prop)
         if font is None: return None
         if len(s) == 1 and ord(s) > 127:
-            font.load_char(ord(s), flags=LOAD_FORCE_AUTOHINT)
+            font.load_char(ord(s), flags=flags)
         else:
             # We pass '0' for angle here, since it will be rotated (in raster
             # space) in the following call to draw_text_image).
-            font.set_text(s, 0, flags=LOAD_FORCE_AUTOHINT)
+            font.set_text(s, 0, flags=flags)
         font.draw_glyphs_to_bitmap()
 
-        #print x, y, int(x), int(y)
+        #print x, y, int(x), int(y), s
 
         self._renderer.draw_text_image(font.get_image(), int(x), int(y) + 1, angle, gc)
 
@@ -142,7 +162,7 @@ class RendererAgg(RendererBase):
         # texmanager more efficient.  It is not meant to be used
         # outside the backend
         """
-        if ismath=='TeX':
+        if rcParams['text.usetex']:
             # todo: handle props
             size = prop.get_size_in_points()
             texmanager = self.get_texmanager()
@@ -155,14 +175,17 @@ class RendererAgg(RendererBase):
             ox, oy, width, height, descent, fonts, used_characters = \
                 self.mathtext_parser.parse(s, self.dpi, prop)
             return width, height, descent
+
+        flags = self._get_hinting_flag()
         font = self._get_agg_font(prop)
-        font.set_text(s, 0.0, flags=LOAD_FORCE_AUTOHINT)  # the width and height of unrotated string
+        font.set_text(s, 0.0, flags=flags)  # the width and height of unrotated string
         w, h = font.get_width_height()
         d = font.get_descent()
         w /= 64.0  # convert from subpixels
         h /= 64.0
         d /= 64.0
         return w, h, d
+
 
     def draw_tex(self, gc, x, y, s, prop, angle):
         # todo, handle props, angle, origins
@@ -173,7 +196,7 @@ class RendererAgg(RendererBase):
         im = self.texd.get(key)
         if im is None:
             Z = texmanager.get_grey(s, size, self.dpi)
-            Z = npy.array(Z * 255.0, npy.uint8)
+            Z = np.array(Z * 255.0, np.uint8)
 
         self._renderer.draw_text_image(Z, x, y, angle, gc)
 
@@ -238,19 +261,25 @@ class RendererAgg(RendererBase):
         # with the Agg backend
         return True
 
+    def option_scale_image(self):
+        """
+        agg backend support arbitrary scaling of image.
+        """
+        return True
+
     def restore_region(self, region, bbox=None, xy=None):
         """
-        restore the saved region. if bbox (instance of BboxBase, or
+        Restore the saved region. If bbox (instance of BboxBase, or
         its extents) is given, only the region specified by the bbox
         will be restored. *xy* (a tuple of two floasts) optionally
-        specify the new position (of the LLC of the originally region,
-        not the LLC of the bbox) that the region will be restored.
+        specifies the new position (the LLC of the original region,
+        not the LLC of the bbox) where the region will be restored.
 
         >>> region = renderer.copy_from_bbox()
         >>> x1, y1, x2, y2 = region.get_extents()
         >>> renderer.restore_region(region, bbox=(x1+dx, y1, x2, y2),
                                     xy=(x1-dx, y1))
-        
+
         """
         if bbox is not None or xy is not None:
             if bbox is None:
@@ -269,6 +298,57 @@ class RendererAgg(RendererBase):
 
         else:
             self._renderer.restore_region(region)
+
+    def start_filter(self):
+        """
+        Start filtering. It simply create a new canvas (the old one is saved).
+        """
+        self._filter_renderers.append(self._renderer)
+        self._renderer = _RendererAgg(int(self.width), int(self.height),
+                                      self.dpi)
+        self._update_methods()
+
+    def stop_filter(self, post_processing):
+        """
+        Save the plot in the current canvas as a image and apply
+        the *post_processing* function.
+
+           def post_processing(image, dpi):
+             # ny, nx, depth = image.shape
+             # image (numpy array) has RGBA channels and has a depth of 4.
+             ...
+             # create a new_image (numpy array of 4 channels, size can be
+             # different). The resulting image may have offsets from
+             # lower-left corner of the original image
+             return new_image, offset_x, offset_y
+
+        The saved renderer is restored and the returned image from
+        post_processing is plotted (using draw_image) on it.
+        """
+
+        from matplotlib._image import fromarray
+
+        width, height = int(self.width), int(self.height)
+
+        buffer, bounds = self._renderer.tostring_rgba_minimized()
+
+        l, b, w, h = bounds
+
+
+        self._renderer = self._filter_renderers.pop()
+        self._update_methods()
+
+        if w > 0 and h > 0:
+            img = np.fromstring(buffer, np.uint8)
+            img, ox, oy = post_processing(img.reshape((h, w, 4)) / 255.,
+                                          self.dpi)
+            image = fromarray(img, 1)
+            image.flipud_out()
+
+            gc = self.new_gc()
+            self._renderer.draw_image(gc,
+                                      l+ox, height - b - h +oy,
+                                      image)
 
 
 def new_figure_manager(num, *args, **kwargs):
@@ -365,4 +445,3 @@ class FigureCanvasAgg(FigureCanvasBase):
                        renderer.width, renderer.height,
                        filename_or_obj, self.figure.dpi)
         renderer.dpi = original_dpi
-

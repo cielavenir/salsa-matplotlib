@@ -30,7 +30,7 @@ def html():
     check_build()
     shutil.copy('../lib/matplotlib/mpl-data/matplotlibrc', '_static/matplotlibrc')
     if small_docs:
-        options = "-D plot_formats=\"['png']\""
+        options = "-D plot_formats=\"[('png', 80)]\""
     else:
         options = ''
     if os.system('sphinx-build %s -P -b html -d build/doctrees . build/html' % options):
@@ -52,12 +52,8 @@ def latex():
         # Produce pdf.
         os.chdir('build/latex')
 
-        # Copying the makefile produced by sphinx...
-        if (os.system('pdflatex Matplotlib.tex') or
-            os.system('pdflatex Matplotlib.tex') or
-            os.system('makeindex -s python.ist Matplotlib.idx') or
-            os.system('makeindex -s python.ist modMatplotlib.idx') or
-            os.system('pdflatex Matplotlib.tex')):
+        # Call the makefile produced by sphinx...
+        if os.system('make'):
             raise SystemExit("Rendering LaTeX failed.")
 
         os.chdir('../..')
@@ -65,9 +61,8 @@ def latex():
         print 'latex build has not been tested on windows'
 
 def clean():
-    for dirpath in ['build', 'examples']:
-        if os.path.exists(dirpath):
-            shutil.rmtree(dirpath)
+    shutil.rmtree("build", ignore_errors=True)
+    shutil.rmtree("examples", ignore_errors=True)
     for pattern in ['mpl_examples/api/*.png',
                     'mpl_examples/pylab_examples/*.png',
                     'mpl_examples/pylab_examples/*.pdf',

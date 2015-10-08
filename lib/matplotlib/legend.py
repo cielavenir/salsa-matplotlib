@@ -33,9 +33,33 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, Rectangle, Shadow, FancyBboxPatch
 from matplotlib.collections import LineCollection, RegularPolyCollection, \
      CircleCollection
-from matplotlib.transforms import Bbox, BboxBase, TransformedBbox, BboxTransformTo
+from matplotlib.transforms import Bbox, BboxBase, TransformedBbox, BboxTransformTo, BboxTransformFrom
 
-from matplotlib.offsetbox import HPacker, VPacker, TextArea, DrawingArea
+from matplotlib.offsetbox import HPacker, VPacker, TextArea, DrawingArea, DraggableOffsetBox
+
+
+class DraggableLegend(DraggableOffsetBox):
+    def __init__(self, legend, use_blit=False):
+        self.legend=legend
+        DraggableOffsetBox.__init__(self, legend, legend._legend_box,
+                                    use_blit=use_blit)
+
+    def artist_picker(self, legend, evt):
+        return self.legend.legendPatch.contains(evt)
+
+    def finalize_offset(self):
+        loc_in_canvas = self.get_loc_in_canvas()
+
+        bbox = self.legend.get_bbox_to_anchor()
+
+        # if bbox has zero width or height, the transformation is
+        # ill-defined. Fall back to the defaul bbox_to_anchor.
+        if bbox.width ==0 or bbox.height ==0:
+            self.legend.set_bbox_to_anchor(None)
+            bbox = self.legend.get_bbox_to_anchor()
+            
+        _bbox_transform = BboxTransformFrom(bbox)
+        self.legend._loc = tuple(_bbox_transform.transform_point(loc_in_canvas))
 
 
 class Legend(Artist):
@@ -115,6 +139,7 @@ class Legend(Artist):
                  title = None, # set a title for the legend
                  bbox_to_anchor = None, # bbox that the legend will be anchored.
                  bbox_transform = None, # transform for the bbox
+                 frameon = True, # draw frame
                  ):
         """
         - *parent* : the artist that contains the legend
@@ -132,6 +157,7 @@ class Legend(Artist):
         numpoints          the number of points in the legend for line
         scatterpoints      the number of points in the legend for scatter plot
         scatteryoffsets    a list of yoffsets for scatter symbols in legend
+        frameon            if True, draw a frame (default is True)
         fancybox           if True, draw a frame with a round fancybox.  If None, use rc
         shadow             if True, draw a shadow behind legend
         ncol               number of columns
@@ -146,8 +172,10 @@ class Legend(Artist):
         bbox_transform     the transform for the bbox. transAxes if None.
         ================   ==================================================================
 
-The dimensions of pad and spacing are given as a fraction of the
-_fontsize. Values from rcParams will be used if None.
+
+The pad and spacing parameters are measure in font-size units.  E.g.,
+a fontsize of 10 points and a handlelength=5 implies a handlelength of
+50 points.  Values from rcParams will be used if None.
 
 Users can specify any arbitrary location for the legend using the
 *bbox_to_anchor* keyword argument. bbox_to_anchor can be an instance
@@ -176,6 +204,10 @@ in the normalized axes coordinate.
 
         propnames=['numpoints', 'markerscale', 'shadow', "columnspacing",
                    "scatterpoints"]
+
+        self.texts = []
+        self.legendHandles = []
+        self._legend_title_box = None
 
         localdict = locals()
 
@@ -230,7 +262,7 @@ in the normalized axes coordinate.
             self._scatteryoffsets = np.array([3./8., 4./8., 2.5/8.])
         else:
             self._scatteryoffsets = np.asarray(scatteryoffsets)
-        reps =  int(self.numpoints / len(self._scatteryoffsets)) + 1
+        reps =  int(self.scatterpoints / len(self._scatteryoffsets)) + 1
         self._scatteryoffsets = np.tile(self._scatteryoffsets, reps)[:self.scatterpoints]
 
         # _legend_box is an OffsetBox instance that contains all
@@ -240,6 +272,7 @@ in the normalized axes coordinate.
 
         if isinstance(parent,Axes):
             self.isaxes = True
+            self.set_axes(parent)
             self.set_figure(parent.figure)
         elif isinstance(parent,Figure):
             self.isaxes = False
@@ -271,15 +304,16 @@ in the normalized axes coordinate.
                           'Falling back on "upper right".')
             loc = 1
 
-        self._loc = loc
         self._mode = mode
         self.set_bbox_to_anchor(bbox_to_anchor, bbox_transform)
 
         # We use FancyBboxPatch to draw a legend frame. The location
         # and size of the box will be updated during the drawing time.
+
         self.legendPatch = FancyBboxPatch(
             xy=(0.0, 0.0), width=1., height=1.,
-            facecolor='w', edgecolor='k',
+            facecolor=rcParams["axes.facecolor"],
+            edgecolor=rcParams["axes.edgecolor"],
             mutation_scale=self._fontsize,
             snap=True
             )
@@ -298,27 +332,50 @@ in the normalized axes coordinate.
 
         self._set_artist_props(self.legendPatch)
 
-        self._drawFrame = True
+        self._drawFrame = frameon
 
         # init with null renderer
         self._init_legend_box(handles, labels)
+
+        self._loc = loc
 
         self.set_title(title)
 
         self._last_fontsize_points = self._fontsize
 
+        self._draggable = None
 
     def _set_artist_props(self, a):
         """
         set the boilerplate props for artists added to axes
         """
         a.set_figure(self.figure)
-
-        for c in self.get_children():
-            c.set_figure(self.figure)
-
+        if self.isaxes:
+            a.set_axes(self.axes)
         a.set_transform(self.get_transform())
 
+
+    def _set_loc(self, loc):
+        # find_offset function will be provided to _legend_box and
+        # _legend_box will draw itself at the location of the return
+        # value of the find_offset.
+        self._loc_real = loc
+        if loc == 0:
+            _findoffset = self._findoffset_best
+        else:
+            _findoffset = self._findoffset_loc
+
+        #def findoffset(width, height, xdescent, ydescent):
+        #    return _findoffset(width, height, xdescent, ydescent, renderer)
+
+        self._legend_box.set_offset(_findoffset)
+
+        self._loc_real = loc
+
+    def _get_loc(self):
+        return self._loc_real
+
+    _loc = property(_get_loc, _set_loc)
 
     def _findoffset_best(self, width, height, xdescent, ydescent, renderer):
         "Helper function to locate the legend at its best position"
@@ -347,19 +404,6 @@ in the normalized axes coordinate.
 
         renderer.open_group('legend')
 
-
-        # find_offset function will be provided to _legend_box and
-        # _legend_box will draw itself at the location of the return
-        # value of the find_offset.
-        if self._loc == 0:
-            _findoffset = self._findoffset_best
-        else:
-            _findoffset = self._findoffset_loc
-
-        def findoffset(width, height, xdescent, ydescent):
-            return _findoffset(width, height, xdescent, ydescent, renderer)
-
-        self._legend_box.set_offset(findoffset)
 
         fontsize = renderer.points_to_pixels(self._fontsize)
 
@@ -427,13 +471,6 @@ in the normalized axes coordinate.
                           )
 
         labelboxes = []
-
-        for l in labels:
-            textbox = TextArea(l, textprops=label_prop,
-                               multilinebaseline=True, minimumdescent=True)
-            text_list.append(textbox._text)
-            labelboxes.append(textbox)
-
         handleboxes = []
 
 
@@ -451,7 +488,8 @@ in the normalized axes coordinate.
         # default trasnform (eg, Collections), you need to
         # manually set their transform to the self.get_transform().
 
-        for handle in handles:
+
+        for handle, lab in zip(handles, labels):
             if isinstance(handle, RegularPolyCollection) or \
                    isinstance(handle, CircleCollection):
                 npoints = self.scatterpoints
@@ -487,6 +525,9 @@ in the normalized axes coordinate.
                 legline_marker.set_clip_box(None)
                 legline_marker.set_clip_path(None)
                 legline_marker.set_linestyle('None')
+                if self.markerscale !=1:
+                    newsz = legline_marker.get_markersize()*self.markerscale
+                    legline_marker.set_markersize(newsz)
                 # we don't want to add this to the return list because
                 # the texts and handles are assumed to be in one-to-one
                 # correpondence.
@@ -522,11 +563,8 @@ in the normalized axes coordinate.
                 #ydata = self._scatteryoffsets
                 ydata = height*self._scatteryoffsets
 
-                size_max, size_min = max(handle.get_sizes()),\
-                                     min(handle.get_sizes())
-                # we may need to scale these sizes by "markerscale"
-                # attribute. But other handle types does not seem
-                # to care about this attribute and it is currently ignored.
+                size_max, size_min = max(handle.get_sizes())*self.markerscale**2,\
+                                     min(handle.get_sizes())*self.markerscale**2
                 if self.scatterpoints < 4:
                     sizes = [.5*(size_max+size_min), size_max,
                              size_min]
@@ -550,11 +588,8 @@ in the normalized axes coordinate.
 
                 ydata = height*self._scatteryoffsets
 
-                size_max, size_min = max(handle.get_sizes()),\
-                                     min(handle.get_sizes())
-                # we may need to scale these sizes by "markerscale"
-                # attribute. But other handle types does not seem
-                # to care about this attribute and it is currently ignored.
+                size_max, size_min = max(handle.get_sizes())*self.markerscale**2,\
+                                     min(handle.get_sizes())*self.markerscale**2
                 if self.scatterpoints < 4:
                     sizes = [.5*(size_max+size_min), size_max,
                              size_min]
@@ -572,38 +607,54 @@ in the normalized axes coordinate.
                 p.set_clip_path(None)
                 handle_list.append(p)
             else:
+                handle_type = type(handle)
+                warnings.warn("Legend does not support %s\nUse proxy artist instead.\n\nhttp://matplotlib.sourceforge.net/users/legend_guide.html#using-proxy-artist\n" % (str(handle_type),))
                 handle_list.append(None)
 
-            handlebox = DrawingArea(width=self.handlelength*fontsize,
-                                    height=height,
-                                    xdescent=0., ydescent=descent)
+
 
             handle = handle_list[-1]
-            handlebox.add_artist(handle)
+            if handle is not None: # handle is None is the artist is not supproted
+                textbox = TextArea(lab, textprops=label_prop,
+                                   multilinebaseline=True, minimumdescent=True)
+                text_list.append(textbox._text)
 
-            # special case for collection instances
-            if isinstance(handle, RegularPolyCollection) or \
-                   isinstance(handle, CircleCollection):
-                handle._transOffset = handlebox.get_transform()
-                handle.set_transform(None)
+                labelboxes.append(textbox)
 
-            if hasattr(handle, "_legmarker"):
-                handlebox.add_artist(handle._legmarker)
-            handleboxes.append(handlebox)
+                handlebox = DrawingArea(width=self.handlelength*fontsize,
+                                        height=height,
+                                        xdescent=0., ydescent=descent)
+
+                handlebox.add_artist(handle)
+
+                # special case for collection instances
+                if isinstance(handle, RegularPolyCollection) or \
+                       isinstance(handle, CircleCollection):
+                    handle._transOffset = handlebox.get_transform()
+                    handle.set_transform(None)
 
 
-        # We calculate number of lows in each column. The first
-        # (num_largecol) columns will have (nrows+1) rows, and remaing
-        # (num_smallcol) columns will have (nrows) rows.
-        ncol = min(self._ncol, len(handleboxes))
-        nrows, num_largecol = divmod(len(handleboxes), ncol)
-        num_smallcol = ncol-num_largecol
+                if hasattr(handle, "_legmarker"):
+                    handlebox.add_artist(handle._legmarker)
+                handleboxes.append(handlebox)
 
-        # starting index of each column and number of rows in it.
-        largecol = safezip(range(0, num_largecol*(nrows+1), (nrows+1)),
-                           [nrows+1] * num_largecol)
-        smallcol = safezip(range(num_largecol*(nrows+1), len(handleboxes), nrows),
-                           [nrows] * num_smallcol)
+
+        if len(handleboxes) > 0:
+
+            # We calculate number of lows in each column. The first
+            # (num_largecol) columns will have (nrows+1) rows, and remaing
+            # (num_smallcol) columns will have (nrows) rows.
+            ncol = min(self._ncol, len(handleboxes))
+            nrows, num_largecol = divmod(len(handleboxes), ncol)
+            num_smallcol = ncol-num_largecol
+
+            # starting index of each column and number of rows in it.
+            largecol = safezip(range(0, num_largecol*(nrows+1), (nrows+1)),
+                               [nrows+1] * num_largecol)
+            smallcol = safezip(range(num_largecol*(nrows+1), len(handleboxes), nrows),
+                               [nrows] * num_smallcol)
+        else:
+            largecol, smallcol = [], []
 
         handle_label = safezip(handleboxes, labelboxes)
         columnbox = []
@@ -690,13 +741,20 @@ in the normalized axes coordinate.
 
     def draw_frame(self, b):
         'b is a boolean.  Set draw frame to b'
-        self._drawFrame = b
+        self.set_frame_on(b)
 
     def get_children(self):
         'return a list of child artists'
         children = []
         if self._legend_box:
             children.append(self._legend_box)
+        children.extend(self.get_lines())
+        children.extend(self.get_patches())
+        children.extend(self.get_texts())
+        children.append(self.get_frame())
+
+        if self._legend_title_box:
+            children.append(self.get_title())
         return children
 
     def get_frame(self):
@@ -732,6 +790,20 @@ in the normalized axes coordinate.
         'return a extent of the the legend'
         return self.legendPatch.get_window_extent()
 
+
+    def get_frame_on(self):
+        """
+        Get whether the legend box patch is drawn
+        """
+        return self._drawFrame
+
+    def set_frame_on(self, b):
+        """
+        Set whether the legend box patch is drawn
+
+        ACCEPTS: [ *True* | *False* ]
+        """
+        self._drawFrame = b
 
     def get_bbox_to_anchor(self):
         """
@@ -859,3 +931,32 @@ in the normalized axes coordinate.
         return ox, oy
 
 
+    def draggable(self, state=None, use_blit=False):
+        """
+        Set the draggable state -- if state is
+
+          * None : toggle the current state
+
+          * True : turn draggable on
+
+          * False : turn draggable off
+
+        If draggable is on, you can drag the legend on the canvas with
+        the mouse.  The DraggableLegend helper instance is returned if
+        draggable is on.
+        """
+        is_draggable = self._draggable is not None
+
+        # if state is None we'll toggle
+        if state is None:
+            state = not is_draggable
+
+        if state:
+            if self._draggable is None:
+                self._draggable = DraggableLegend(self, use_blit)
+        else:
+            if self._draggable is not None:
+                self._draggable.disconnect()
+            self._draggable = None
+
+        return self._draggable

@@ -115,6 +115,8 @@ class Path(object):
             codes = np.asarray(codes, self.code_type)
             assert codes.ndim == 1
             assert len(codes) == len(vertices)
+            if len(codes):
+                assert codes[0] == self.MOVETO
 
         assert vertices.ndim == 2
         assert vertices.shape[1] == 2
@@ -186,7 +188,8 @@ class Path(object):
         return len(self.vertices)
 
     def iter_segments(self, transform=None, remove_nans=True, clip=None,
-                      quantize=False, simplify=None, curves=True):
+                      snap=False, stroke_width=1.0, simplify=None,
+                      curves=True):
         """
         Iterates over all of the curve segments in the path.  Each
         iteration returns a 2-tuple (*vertices*, *code*), where
@@ -205,8 +208,12 @@ class Path(object):
         *clip*: if not None, must be a four-tuple (x1, y1, x2, y2)
          defining a rectangle in which to clip the path.
 
-        *quantize*: if None, auto-quantize.  If True, force quantize,
-         and if False, don't quantize.
+        *snap*: if None, auto-snap to pixels, to reduce
+         fuzziness of rectilinear lines.  If True, force snapping, and
+         if False, don't snap.
+
+        *stroke_width*: the width of the stroke being drawn.  Needed
+         as a hint for the snapping algorithm.
 
         *simplify*: if True, perform simplification, to remove
          vertices that do not affect the appearance of the path.  If
@@ -230,7 +237,7 @@ class Path(object):
         STOP         = self.STOP
 
         vertices, codes = cleanup_path(self, transform, remove_nans, clip,
-                                       quantize, simplify, curves)
+                                       snap, stroke_width, simplify, curves)
         len_vertices = len(vertices)
 
         i = 0
@@ -290,9 +297,13 @@ class Path(object):
         control points appropriately.
         """
         from transforms import Bbox
+        path = self
         if transform is not None:
             transform = transform.frozen()
-        return Bbox(get_path_extents(self, transform))
+            if not transform.is_affine:
+                path = self.transformed(transform)
+                transform = None
+        return Bbox(get_path_extents(path, transform))
 
     def intersects_path(self, other, filled=True):
         """
@@ -373,7 +384,8 @@ class Path(object):
         """
         if cls._unit_rectangle is None:
             cls._unit_rectangle = \
-                cls([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.0, 0.0]])
+                cls([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.0, 0.0]],
+                    [cls.MOVETO, cls.LINETO, cls.LINETO, cls.LINETO, cls.CLOSEPOLY])
         return cls._unit_rectangle
 
     _unit_regular_polygons = WeakValueDictionary()
@@ -396,8 +408,13 @@ class Path(object):
             # "points-up"
             theta += np.pi / 2.0
             verts = np.concatenate((np.cos(theta), np.sin(theta)), 1)
-            path = cls(verts)
-            cls._unit_regular_polygons[numVertices] = path
+            codes = np.empty((numVertices + 1,))
+            codes[0] = cls.MOVETO
+            codes[1:-1] = cls.LINETO
+            codes[-1] = cls.CLOSEPOLY
+            path = cls(verts, codes)
+            if numVertices <= 16:
+                cls._unit_regular_polygons[numVertices] = path
         return path
 
     _unit_regular_stars = WeakValueDictionary()
@@ -422,8 +439,13 @@ class Path(object):
             r = np.ones(ns2 + 1)
             r[1::2] = innerCircle
             verts = np.vstack((r*np.cos(theta), r*np.sin(theta))).transpose()
-            path = cls(verts)
-            cls._unit_regular_polygons[(numVertices, innerCircle)] = path
+            codes = np.empty((ns2 + 1,))
+            codes[0] = cls.MOVETO
+            codes[1:-1] = cls.LINETO
+            codes[-1] = cls.CLOSEPOLY
+            path = cls(verts, codes)
+            if numVertices <= 16:
+                cls._unit_regular_polygons[(numVertices, innerCircle)] = path
         return path
 
     @classmethod
@@ -497,6 +519,54 @@ class Path(object):
 
             cls._unit_circle = cls(vertices, codes)
         return cls._unit_circle
+
+    _unit_circle_righthalf = None
+
+    @classmethod
+    def unit_circle_righthalf(cls):
+        """
+        (staticmethod) Returns a :class:`Path` of the right half
+        of a unit circle. The circle is approximated using cubic Bezier
+        curves.  This uses 4 splines around the circle using the approach
+        presented here:
+
+          Lancaster, Don.  `Approximating a Circle or an Ellipse Using Four
+          Bezier Cubic Splines <http://www.tinaja.com/glib/ellipse4.pdf>`_.
+        """
+        if cls._unit_circle_righthalf is None:
+            MAGIC = 0.2652031
+            SQRTHALF = np.sqrt(0.5)
+            MAGIC45 = np.sqrt((MAGIC*MAGIC) / 2.0)
+
+            vertices = np.array(
+                [[0.0, -1.0],
+
+                 [MAGIC, -1.0],
+                 [SQRTHALF-MAGIC45, -SQRTHALF-MAGIC45],
+                 [SQRTHALF, -SQRTHALF],
+
+                 [SQRTHALF+MAGIC45, -SQRTHALF+MAGIC45],
+                 [1.0, -MAGIC],
+                 [1.0, 0.0],
+
+                 [1.0, MAGIC],
+                 [SQRTHALF+MAGIC45, SQRTHALF-MAGIC45],
+                 [SQRTHALF, SQRTHALF],
+
+                 [SQRTHALF-MAGIC45, SQRTHALF+MAGIC45],
+                 [MAGIC, 1.0],
+                 [0.0, 1.0],
+
+                 [0.0, -1.0]],
+
+                np.float_)
+
+            codes = cls.CURVE4 * np.ones(14)
+            codes[0] = cls.MOVETO
+            codes[-1] = cls.CLOSEPOLY
+
+            cls._unit_circle_righthalf = cls(vertices, codes)
+        return cls._unit_circle_righthalf
 
     @classmethod
     def arc(cls, theta1, theta2, n=None, is_wedge=False):

@@ -1,7 +1,13 @@
 import matplotlib.pyplot as plt
-from demo_image import get_demo_image
-from mpl_toolkits.axes_grid import AxesGrid
+from mpl_toolkits.axes_grid1 import AxesGrid
 
+def get_demo_image():
+    import numpy as np
+    from matplotlib.cbook import get_sample_data
+    f = get_sample_data("axes_grid/bivariate_normal.npy", asfileobj=False)
+    z = np.load(f)
+    # z is a numpy array of 15x15
+    return z, (-3,4,-4,3)
 
 def demo_simple_grid(fig):
     """
@@ -32,15 +38,19 @@ def demo_grid_with_single_cbar(fig):
                     axes_pad = 0.0,
                     share_all=True,
                     label_mode = "L",
+                    cbar_location = "top",
                     cbar_mode="single",
                     )
 
     Z, extent = get_demo_image()
     for i in range(4):
         im = grid[i].imshow(Z, extent=extent, interpolation="nearest")
-    plt.colorbar(im, cax = grid.cbar_axes[0])
+    #plt.colorbar(im, cax = grid.cbar_axes[0])
     grid.cbar_axes[0].colorbar(im)
 
+    for cax in grid.cbar_axes:
+        cax.toggle_label(False)
+        
     # This affects all axes as share_all = True.
     grid.axes_llc.set_xticks([-2, 0, 2])
     grid.axes_llc.set_yticks([-2, 0, 2])
@@ -66,14 +76,16 @@ def demo_grid_with_each_cbar(fig):
         im = grid[i].imshow(Z, extent=extent, interpolation="nearest")
         grid.cbar_axes[i].colorbar(im)
 
+    for cax in grid.cbar_axes:
+        cax.toggle_label(False)
+
     # This affects all axes because we set share_all = True.
     grid.axes_llc.set_xticks([-2, 0, 2])
     grid.axes_llc.set_yticks([-2, 0, 2])
 
 
 
-if __name__ == "__main__":
-
+if 1:
     F = plt.figure(1, (5.5, 2.5))
 
     F.subplots_adjust(left=0.05, right=0.98)

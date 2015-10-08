@@ -16,7 +16,7 @@ import numpy as np
 import artist
 from artist import Artist, allow_rasterization
 from axes import Axes, SubplotBase, subplot_class_factory
-from cbook import flatten, allequal, Stack, iterable, dedent
+from cbook import flatten, allequal, Stack, iterable, is_string_like
 import _image
 import colorbar as cbar
 from image import FigureImage
@@ -31,7 +31,11 @@ from projections import projection_factory, get_projection_names, \
 from matplotlib.blocking_input import BlockingMouseInput, BlockingKeyMouseInput
 
 import matplotlib.cbook as cbook
+from matplotlib import docstring
 
+from operator import itemgetter
+
+docstring.interpd.update(projection_names = get_projection_names())
 
 class SubplotParams:
     """
@@ -336,12 +340,13 @@ class Figure(Artist):
     def figimage(self, X,
                  xo=0,
                  yo=0,
-                 alpha=1.0,
+                 alpha=None,
                  norm=None,
                  cmap=None,
                  vmin=None,
                  vmax=None,
-                 origin=None):
+                 origin=None,
+                 **kwargs):
         """
         call signatures::
 
@@ -375,7 +380,7 @@ class Figure(Artist):
                       None, the min and max of the luminance values will be
                       used.  Note if you pass a norm instance, the settings for
                       *vmin* and *vmax* will be ignored.
-          alpha       the alpha blending value, default is 1.0
+          alpha       the alpha blending value, default is None
           origin      [ 'upper' | 'lower' ] Indicates where the [0,0] index of
                       the array is in the upper left or lower left corner of
                       the axes. Defaults to the rc image.origin value
@@ -391,22 +396,20 @@ class Figure(Artist):
 
         .. plot:: mpl_examples/pylab_examples/figimage_demo.py
 
+
+        Additional kwargs are Artist kwargs passed on to
+        :class:`~matplotlib.image.FigureImage`
         """
 
         if not self._hold: self.clf()
 
-        im = FigureImage(self, cmap, norm, xo, yo, origin)
+        im = FigureImage(self, cmap, norm, xo, yo, origin, **kwargs)
         im.set_array(X)
         im.set_alpha(alpha)
         if norm is None:
             im.set_clim(vmin, vmax)
         self.images.append(im)
         return im
-
-    def set_figsize_inches(self, *args, **kwargs):
-        import warnings
-        warnings.warn('Use set_size_inches instead!', DeprecationWarning)
-        self.set_size_inches(*args, **kwargs)
 
     def set_size_inches(self, *args, **kwargs):
         """
@@ -422,9 +425,6 @@ class Figure(Artist):
         optional kwarg *forward=True* will cause the canvas size to be
         automatically updated; eg you can resize the figure window
         from the shell
-
-        WARNING: forward=True is broken on all backends except GTK*
-        and WX*
 
         ACCEPTS: a w,h tuple with w,h in inches
         """
@@ -554,6 +554,7 @@ class Figure(Artist):
         key = fixlist(args), fixitems(kwargs.items())
         return key
 
+    @docstring.dedent_interpd
     def add_axes(self, *args, **kwargs):
         """
         Add an a axes with axes rect [*left*, *bottom*, *width*,
@@ -563,7 +564,7 @@ class Figure(Artist):
         sets the projection type of the axes.  (For backward
         compatibility, ``polar=True`` may also be provided, which is
         equivalent to ``projection='polar'``).  Valid values for
-        *projection* are: %(list)s.  Some of these projections support
+        *projection* are: %(projection_names)s.  Some of these projections support
         additional kwargs, which may be provided to :meth:`add_axes`::
 
             rect = l,b,w,h
@@ -623,10 +624,7 @@ class Figure(Artist):
         self._seen[key] = a
         return a
 
-    add_axes.__doc__ = dedent(add_axes.__doc__) % \
-        {'list': (", ".join(get_projection_names())),
-         'Axes': artist.kwdocd['Axes']}
-
+    @docstring.dedent_interpd
     def add_subplot(self, *args, **kwargs):
         """
         Add a subplot.  Examples:
@@ -641,7 +639,7 @@ class Figure(Artist):
         *projection*, which chooses a projection type for the axes.
         (For backward compatibility, *polar=True* may also be
         provided, which is equivalent to *projection='polar'*). Valid
-        values for *projection* are: %(list)s.  Some of these projections
+        values for *projection* are: %(projection_names)s.  Some of these projections
         support additional *kwargs*, which may be provided to
         :meth:`add_axes`.
 
@@ -692,13 +690,13 @@ class Figure(Artist):
         self._axstack.push(a)
         self.sca(a)
         return a
-    add_subplot.__doc__ = dedent(add_subplot.__doc__) % {
-        'list': ", ".join(get_projection_names()),
-        'Axes': artist.kwdocd['Axes']}
 
-    def clf(self):
+    def clf(self, keep_observers=False):
         """
-        Clear the figure
+        Clear the figure.
+
+        Set *keep_observers* to True if, for example,
+        a gui widget is tracking the axes in the figure.
         """
         self.suppressComposite = None
         self.callbacks = cbook.CallbackRegistry(('dpi_changed', ))
@@ -718,7 +716,8 @@ class Figure(Artist):
         self.texts=[]
         self.images = []
         self.legends = []
-        self._axobservers = []
+        if not keep_observers:
+            self._axobservers = []
 
     def clear(self):
         """
@@ -738,20 +737,28 @@ class Figure(Artist):
 
         if self.frameon: self.patch.draw(renderer)
 
-        # todo: respect zorder
-        for p in self.patches: p.draw(renderer)
-        for l in self.lines: l.draw(renderer)
-        for a in self.artists: a.draw(renderer)
+        # a list of (zorder, func_to_call, list_of_args)
+        dsu = []
+
+        for a in self.patches:
+            dsu.append( (a.get_zorder(), a.draw, [renderer]))
+
+        for a in self.lines:
+            dsu.append( (a.get_zorder(), a.draw, [renderer]))
+
+        for a in self.artists:
+            dsu.append( (a.get_zorder(), a.draw, [renderer]))
 
         # override the renderer default if self.suppressComposite
         # is not None
-        composite = renderer.option_image_nocomposite()
+        not_composite = renderer.option_image_nocomposite()
         if self.suppressComposite is not None:
-            composite = self.suppressComposite
+            not_composite = self.suppressComposite
 
-        if len(self.images)<=1 or composite or not allequal([im.origin for im in self.images]):
-            for im in self.images:
-                im.draw(renderer)
+        if len(self.images)<=1 or not_composite or \
+                not allequal([im.origin for im in self.images]):
+            for a in self.images:
+                dsu.append( (a.get_zorder(), a.draw, [renderer]))
         else:
             # make a composite image blending alpha
             # list of (_image.Image, ox, oy)
@@ -765,18 +772,30 @@ class Figure(Artist):
 
             im.is_grayscale = False
             l, b, w, h = self.bbox.bounds
-            clippath, affine = self.get_transformed_clip_path_and_affine()
-            renderer.draw_image(l, b, im, self.bbox,
-                                clippath, affine)
+
+            def draw_composite():
+                gc = renderer.new_gc()
+                gc.set_clip_rectangle(self.bbox)
+                gc.set_clip_path(self.get_clip_path())
+                renderer.draw_image(gc, l, b, im)
+                gc.restore()
+
+            dsu.append((self.images[0].get_zorder(), draw_composite, []))
 
         # render the axes
-        for a in self.axes: a.draw(renderer)
+        for a in self.axes:
+            dsu.append( (a.get_zorder(), a.draw, [renderer]))
 
         # render the figure text
-        for t in self.texts: t.draw(renderer)
+        for a in self.texts:
+            dsu.append( (a.get_zorder(), a.draw, [renderer]))
 
-        for legend in self.legends:
-            legend.draw(renderer)
+        for a in self.legends:
+            dsu.append( (a.get_zorder(), a.draw, [renderer]))
+
+        dsu.sort(key=itemgetter(0))
+        for zorder, func, args in dsu:
+            func(*args)
 
         renderer.close_group('figure')
 
@@ -889,6 +908,7 @@ class Figure(Artist):
         self.legends.append(l)
         return l
 
+    @docstring.dedent_interpd
     def text(self, x, y, s, *args, **kwargs):
         """
         Call signature::
@@ -913,13 +933,13 @@ class Figure(Artist):
         self._set_artist_props(t)
         self.texts.append(t)
         return t
-    text.__doc__ = dedent(text.__doc__) % artist.kwdocd
 
     def _set_artist_props(self, a):
         if a!= self:
             a.set_figure(self)
         a.set_transform(self.transFigure)
 
+    @docstring.dedent_interpd
     def gca(self, **kwargs):
         """
         Return the current axes, creating one if necessary
@@ -943,13 +963,23 @@ class Figure(Artist):
             if isinstance(ax, projection_class):
                 return ax
         return self.add_subplot(111, **kwargs)
-    gca.__doc__ = dedent(gca.__doc__) % artist.kwdocd
 
     def sca(self, a):
         'Set the current axes to be a and return a'
         self._axstack.bubble(a)
         for func in self._axobservers: func(self)
         return a
+
+    def _gci(self):
+        """
+        helper for :func:`~matplotlib.pyplot.gci`;
+        do not use elsewhere.
+        """
+        for ax in reversed(self._axstack):
+            im = ax._gci()
+            if im is not None:
+                return im
+        return None
 
     def add_axobserver(self, func):
         'whenever the axes state change, func(self) will be called'
@@ -962,7 +992,7 @@ class Figure(Artist):
 
           savefig(fname, dpi=None, facecolor='w', edgecolor='w',
                   orientation='portrait', papertype=None, format=None,
-                  transparent=False):
+                  transparent=False, bbox_inches=None, pad_inches=0.1):
 
         Save the current figure.
 
@@ -971,10 +1001,18 @@ class Figure(Artist):
         Arguments:
 
           *fname*:
-            A string containing a path to a filename, or a Python file-like object.
+            A string containing a path to a filename, or a Python file-like object,
+            or possibly some backend-dependent object such as
+            :class:`~matplotlib.backends.backend_pdf.PdfPages`.
 
             If *format* is *None* and *fname* is a string, the output
-            format is deduced from the extension of the filename.
+            format is deduced from the extension of the filename. If
+            the filename has no extension, the value of the rc parameter
+            ``savefig.extension`` is used. If that value is 'auto',
+            the backend determines the extension.
+
+            If *fname* is not a string, remember to specify *format* to
+            ensure that the correct backend is used.
 
         Keyword arguments:
 
@@ -998,8 +1036,10 @@ class Figure(Artist):
             backend.  Most backends support png, pdf, ps, eps and svg.
 
           *transparent*:
-            If *True*, the figure patch and axes patches will all be
-            transparent.  This is useful, for example, for displaying
+            If *True*, the axes patches will all be transparent; the
+            figure patch will also be transparent unless facecolor
+            and/or edgecolor are specified via kwargs.
+            This is useful, for example, for displaying
             a plot on top of a colored background on a web page.  The
             transparency of these patches will be restored to their
             original values upon exit of this function.
@@ -1013,30 +1053,49 @@ class Figure(Artist):
             Amount of padding around the figure when bbox_inches is
             'tight'.
 
+          *bbox_extra_artists*:
+            A list of extra artists that will be considered when the
+            tight bbox is calculated.
+
         """
 
-        for key in ('dpi', 'facecolor', 'edgecolor'):
-            if key not in kwargs:
-                kwargs[key] = rcParams['savefig.%s'%key]
+        kwargs.setdefault('dpi', rcParams['savefig.dpi'])
+
+        extension = rcParams['savefig.extension']
+        if args and is_string_like(args[0]) and '.' not in args[0] and extension != 'auto':
+            fname = args[0] + '.' + extension
+            args = (fname,) + args[1:]
 
         transparent = kwargs.pop('transparent', False)
         if transparent:
-            original_figure_alpha = self.patch.get_alpha()
-            self.patch.set_alpha(0.0)
-            original_axes_alpha = []
+            kwargs.setdefault('facecolor', 'none')
+            kwargs.setdefault('edgecolor', 'none')
+            original_axes_colors = []
             for ax in self.axes:
                 patch = ax.patch
-                original_axes_alpha.append(patch.get_alpha())
-                patch.set_alpha(0.0)
+                original_axes_colors.append((patch.get_facecolor(),
+                                             patch.get_edgecolor()))
+                patch.set_facecolor('none')
+                patch.set_edgecolor('none')
+        else:
+            kwargs.setdefault('facecolor', rcParams['savefig.facecolor'])
+            kwargs.setdefault('edgecolor', rcParams['savefig.edgecolor'])
 
         self.canvas.print_figure(*args, **kwargs)
 
         if transparent:
-            self.patch.set_alpha(original_figure_alpha)
-            for ax, alpha in zip(self.axes, original_axes_alpha):
-                ax.patch.set_alpha(alpha)
+            for ax, cc in zip(self.axes, original_axes_colors):
+                ax.patch.set_facecolor(cc[0])
+                ax.patch.set_edgecolor(cc[1])
 
+    @docstring.dedent_interpd
     def colorbar(self, mappable, cax=None, ax=None, **kw):
+        """
+        Create a colorbar for a ScalarMappable instance.
+
+        Documentation for the pylab thin wrapper:
+        %(colorbar_doc)s
+        """
         if ax is None:
             ax = self.gca()
         if cax is None:
@@ -1048,19 +1107,12 @@ class Figure(Artist):
             #print 'calling on changed', m.get_cmap().name
             cb.set_cmap(m.get_cmap())
             cb.set_clim(m.get_clim())
-            cb.update_bruteforce(m)
+            cb.update_normal(m)
 
         self.cbid = mappable.callbacksSM.connect('changed', on_changed)
         mappable.set_colorbar(cb, cax)
         self.sca(ax)
         return cb
-    colorbar.__doc__ =  '''
-        Create a colorbar for a ScalarMappable instance.
-
-        Documentation for the pylab thin wrapper:
-        %s
-
-        '''% cbar.colorbar_doc
 
     def subplots_adjust(self, *args, **kwargs):
         """
@@ -1228,4 +1280,4 @@ def figaspect(arg):
     newsize = np.clip(newsize,figsize_min,figsize_max)
     return newsize
 
-artist.kwdocd['Figure'] = artist.kwdoc(Figure)
+docstring.interpd.update(Figure=artist.kwdoc(Figure))
