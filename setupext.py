@@ -1813,7 +1813,6 @@ class BackendGtk3Agg(OptionalBackendPackage):
     def check_requirements(self):
         if 'TRAVIS' in os.environ:
             raise CheckFailed("Can't build with Travis")
-
         # yoh: Builds of Debian packages often lead to a dead-lock here
         #      As a workaround forcing build manually without a check
         BackendAgg.force = True
