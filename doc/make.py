@@ -16,19 +16,30 @@ def check_build():
 
 def sf():
     'push a copy to the sf site'
-    os.system('cd build; rsync -avz html jdh2358@matplotlib.sf.net:/home/groups/m/ma/matplotlib/htdocs/doc/ -essh')
+    shutil.copy('../CHANGELOG', 'build/html/_static/CHANGELOG')
+    os.system('cd build/html; rsync -avz . jdh2358,matplotlib@web.sf.net:/home/groups/m/ma/matplotlib/htdocs/ -essh --cvs-exclude')
 
 def sfpdf():
     'push a copy to the sf site'
-    os.system('cd build/latex; scp Matplotlib.pdf jdh2358@matplotlib.sf.net:/home/groups/m/ma/matplotlib/htdocs/doc/')
+    os.system('cd build/latex; scp Matplotlib.pdf jdh2358,matplotlib@web.sf.net:/home/groups/m/ma/matplotlib/htdocs/')
 
 def figs():
     os.system('cd users/figures/ && python make.py')
 
+def examples():
+    'make the rest examples'
+
+    os.system('cd examples; svn-clean; python gen_rst.py')
+    #pass
+
 def html():
     check_build()
-    #figs()
-    if os.system('sphinx-build -b html -d build/doctrees . build/html'):
+    shutil.copy('../lib/matplotlib/mpl-data/matplotlibrc', '_static/matplotlibrc')
+    if small_docs:
+        options = "-D plot_formats=\"['png']\""
+    else:
+        options = ''
+    if os.system('sphinx-build %s -P -b html -d build/doctrees . build/html' % options):
         raise SystemExit("Building HTML failed.")
 
     figures_dest_path = 'build/html/pyplots'
@@ -60,33 +71,39 @@ def latex():
         print 'latex build has not been tested on windows'
 
 def clean():
-    if os.path.exists('build'):
-        shutil.rmtree('build')
-    for fname in glob.glob('pyplots/*.png') + glob.glob('pyplots/*.pdf'):
-        os.remove(fname)
+    os.system('svn-clean')
 
 def all():
     #figs()
+    examples()
     html()
     latex()
 
 
-funcd = {'figs':figs,
-         'html':html,
-         'latex':latex,
-         'clean':clean,
-         'sf':sf,
-         'sfpdf':sfpdf,
-         'all':all,
-         }
+funcd = {
+    'figs'     : figs,
+    'html'     : html,
+    'latex'    : latex,
+    'clean'    : clean,
+    'sf'       : sf,
+    'sfpdf'    : sfpdf,
+    'examples' : examples,
+    'all'      : all,
+    }
 
 
 if len(sys.argv)>1:
+    if '--small' in sys.argv[1:]:
+        small_docs = True
+        sys.argv.remove('--small')
+    else:
+        small_docs = False
     for arg in sys.argv[1:]:
         func = funcd.get(arg)
         if func is None:
-            raise SystemExit('Do not know how to handle %s; valid args are'%(
+            raise SystemExit('Do not know how to handle %s; valid args are %s'%(
                     arg, funcd.keys()))
         func()
 else:
+    small_docs = False
     all()

@@ -16,6 +16,7 @@ import matplotlib.collections as collections
 import matplotlib.font_manager as font_manager
 import matplotlib.text as text
 import matplotlib.cbook as cbook
+import matplotlib.mlab as mlab
 
 # Import needed for adding manual selection capability to clabel
 from matplotlib.blocking_input import BlockingContourLabeler
@@ -52,8 +53,6 @@ class ContourLabeler:
           *fontsize*:
             See http://matplotlib.sf.net/fonts.html
 
-        .. TODO: Update this link to new fonts document
-
           *colors*:
             - if *None*, the color of each label matches the color of
               the corresponding contour
@@ -87,8 +86,12 @@ class ContourLabeler:
             add a label, click the second button (or potentially both
             mouse buttons at once) to finish adding labels.  The third
             button can be used to remove the last label added, but
-            only if labels are not inline.
+            only if labels are not inline.  Alternatively, the keyboard
+            can be used to select label locations (enter to end label
+            placement, delete or backspace act like the third mouse button,
+            and any other key will select a label location).
 
+        .. plot:: mpl_examples/pylab_examples/contour_demo.py
         """
 
         """
@@ -96,16 +99,8 @@ class ContourLabeler:
 
         clabel basically takes the input arguments and uses them to
         add a list of "label specific" attributes to the ContourSet
-        object.  These attributes currently include: label_indices,
-        label_levels, label_cvalues, fp (font properties), fslist
-        (fontsize list), label_mappable, cl (list of text objects of
-        labels), cl_xy (coordinates of labels), cl_cvalues (color
-        values of the actual labels).
-
-        Note that these property names do not conform to the standards
-        set for coding matplotlib and I (DMK) eventually plan on
-        changing them so that they are clearer and conform to
-        standards.
+        object.  These attributes are all of the form label* and names
+        should be fairly self explanatory.
 
         Once these attributes are set, clabel passes control to the
         labels method (case of automatic label placement) or
@@ -181,7 +176,7 @@ class ContourLabeler:
             self.labels(inline,inline_spacing)
 
         # Hold on to some old attribute names.  These are depricated and will
-        # be moved in the near future (sometime after 2008-08-01), but keeping
+        # be removed in the near future (sometime after 2008-08-01), but keeping
         # for now for backwards compatibility
         self.cl = self.labelTexts
         self.cl_xy = self.labelXYs
@@ -339,7 +334,7 @@ class ContourLabeler:
         not empty (lc defaults to the empty list if None).  *spacing*
         is the space around the label in pixels to leave empty.
 
-        Do both of these tasks at once to avoid calling cbook.path_length
+        Do both of these tasks at once to avoid calling mlab.path_length
         multiple times, which is relatively costly.
 
         The method used here involves calculating the path length
@@ -353,7 +348,7 @@ class ContourLabeler:
         hlw = lw/2.0
 
         # Check if closed and, if so, rotate contour so label is at edge
-        closed = cbook.is_closed_polygon(slc)
+        closed = mlab.is_closed_polygon(slc)
         if closed:
             slc = np.r_[ slc[ind:-1], slc[:ind+1] ]
 
@@ -363,7 +358,7 @@ class ContourLabeler:
             ind = 0
 
         # Path length in pixel space
-        pl = cbook.path_length(slc)
+        pl = mlab.path_length(slc)
         pl = pl-pl[ind]
 
         # Use linear interpolation to get points around label
@@ -373,7 +368,7 @@ class ContourLabeler:
         else:
             dp = np.zeros_like(xi)
 
-        ll = cbook.less_simple_linear_interpolation( pl, slc, dp+xi,
+        ll = mlab.less_simple_linear_interpolation( pl, slc, dp+xi,
                                                      extrap=True )
 
         # get vector in pixel space coordinates from one point to other
@@ -399,16 +394,16 @@ class ContourLabeler:
             xi = dp + xi + np.array([-spacing,spacing])
 
             # Get indices near points of interest
-            I = cbook.less_simple_linear_interpolation(
+            I = mlab.less_simple_linear_interpolation(
                 pl, np.arange(len(pl)), xi, extrap=False )
 
             # If those indices aren't beyond contour edge, find x,y
             if (not np.isnan(I[0])) and int(I[0])<>I[0]:
-                xy1 = cbook.less_simple_linear_interpolation(
+                xy1 = mlab.less_simple_linear_interpolation(
                     pl, lc, [ xi[0] ] )
 
             if (not np.isnan(I[1])) and int(I[1])<>I[1]:
-                xy2 = cbook.less_simple_linear_interpolation(
+                xy2 = mlab.less_simple_linear_interpolation(
                     pl, lc, [ xi[1] ] )
 
             # Make integer
@@ -476,12 +471,12 @@ class ContourLabeler:
                 # zero in print_label and locate_label.  Other than these
                 # functions, this is not necessary and should probably be
                 # eventually removed.
-                if cbook.is_closed_polygon( lc ):
+                if mlab.is_closed_polygon( lc ):
                     slc = np.r_[ slc0, slc0[1:2,:] ]
                 else:
                     slc = slc0
 
-                if self.print_label(slc,lw):
+                if self.print_label(slc,lw): # Check if long enough for a label
                     x,y,ind  = self.locate_label(slc, lw)
 
                     if inline: lcarg = lc
@@ -498,6 +493,8 @@ class ContourLabeler:
                         for n in new:
                             # Add path if not empty or single point
                             if len(n)>1: additions.append( path.Path(n) )
+                else: # If not adding label, keep old path
+                    additions.append(linepath)
 
             # After looping over all segments on a contour, remove old
             # paths and add new ones if inlining
@@ -628,8 +625,7 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         y0 = ma.minimum(y)
         y1 = ma.maximum(y)
         self.ax.update_datalim([(x0,y0), (x1,y1)])
-        self.ax.set_xlim((x0, x1))
-        self.ax.set_ylim((y0, y1))
+        self.ax.autoscale_view()
 
     def changed(self):
         tcolors = [ (tuple(rgba),) for rgba in
@@ -726,8 +722,12 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         Possible change: I think we should make and use an ArgumentError
         Exception class (here and elsewhere).
         '''
-        x = np.asarray(args[0], dtype=np.float64)
-        y = np.asarray(args[1], dtype=np.float64)
+        # We can strip away the x and y units
+        x = self.ax.convert_xunits( args[0] )
+        y = self.ax.convert_yunits( args[1] )
+
+        x = np.asarray(x, dtype=np.float64)
+        y = np.asarray(y, dtype=np.float64)
         z = ma.asarray(args[2], dtype=np.float64)
         if z.ndim != 2:
             raise TypeError("Input z must be a 2D array.")
@@ -998,12 +998,25 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
 
           *linewidths*: [ None | number | tuple of numbers ]
             If *linewidths* is *None*, the default width in
-            ``lines.linewidth`` in ``matplotlibrc`` is used
+            ``lines.linewidth`` in ``matplotlibrc`` is used.
 
             If a number, all levels will be plotted with this linewidth.
 
             If a tuple, different levels will be plotted with different
             linewidths in the order specified
+
+          *linestyles*: [None | 'solid' | 'dashed' | 'dashdot' | 'dotted' ]
+            If *linestyles* is *None*, the 'solid' is used.
+
+            *linestyles* can also be an iterable of the above strings
+            specifying a set of linestyles to be used. If this
+            iterable is shorter than the number of contour levels
+            it will be repeated as necessary.
+
+            If contour is using a monochrome colormap and the contour
+            level is less than 0, then the linestyle specified
+            in ``contour.negative_linestyle`` in ``matplotlibrc``
+            will be used.
 
         contourf-only keyword arguments:
 
@@ -1019,7 +1032,7 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
 
         **Example:**
 
-        .. plot:: contour_demo.py
+        .. plot:: mpl_examples/pylab_examples/contour_demo.py
         """
 
     def find_nearest_contour( self, x, y, indices=None, pixel=True ):
@@ -1034,8 +1047,8 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
 
         Call signature::
 
-        conmin,segmin,imin,xmin,ymin,dmin = find_nearest_contour(
-                   self, x, y, indices=None, pixel=True )
+          conmin,segmin,imin,xmin,ymin,dmin = find_nearest_contour(
+                     self, x, y, indices=None, pixel=True )
 
         Optional keyword arguments::
 

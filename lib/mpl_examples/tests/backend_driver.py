@@ -25,80 +25,153 @@ all_backends.extend(['cairo.png', 'cairo.ps', 'cairo.pdf', 'cairo.svg'])
 
 pylab_dir = os.path.join('..', 'pylab_examples')
 pylab_files = [
+
+
+    'accented_text.py',
     'alignment_test.py',
+    'annotation_demo.py',
+    'annotation_demo.py',
+    'annotation_demo2.py',
+    'annotation_demo2.py',
+    'anscombe.py',
     'arctest.py',
     'arrow_demo.py',
-    'auto_layout.py',
     'axes_demo.py',
+    'axes_props.py',
     'axhspan_demo.py',
+    'axis_equal_demo.py',
     'bar_stacked.py',
-    'barchart_demo.py',
     'barb_demo.py',
+    'barchart_demo.py',
     'barcode_demo.py',
+    'barh_demo.py',
     'boxplot_demo.py',
     'broken_barh.py',
-    'barh_demo.py',
-    'color_demo.py',
+    'clippedline.py',
     'cohere_demo.py',
+    'color_by_yvalue.py',
+    'color_demo.py',
+    'colorbar_tick_labelling_demo.py',
     'contour_demo.py',
+    'contour_image.py',
     'contour_label_demo.py',
     'contourf_demo.py',
-    'geo_demo.py',
-    'griddata_demo.py',
+    'contourf_log.py',
+    'coords_demo.py',
+    'coords_report.py',
     'csd_demo.py',
+    'cursor_demo.py',
+    'custom_cmap.py',
+    'custom_figure_class.py',
     'custom_ticker1.py',
     'customize_rc.py',
+    'dash_control.py',
+    'dashpointlabel.py',
     'date_demo1.py',
     'date_demo2.py',
+    'date_demo_convert.py',
+    'date_demo_rrule.py',
+    'date_index_formatter.py',
+    'dolphin.py',
+    'ellipse_collection.py',
+    'ellipse_demo.py',
+    'ellipse_rotated.py',
     'equal_aspect_ratio.py',
+    'errorbar_demo.py',
     'errorbar_limits.py',
+    'fancyarrow_demo.py',
+    'fancybox_demo.py',
+    'fancybox_demo2.py',
+    'fancytextbox_demo.py',
     'figimage_demo.py',
     'figlegend_demo.py',
     'figure_title.py',
+    'fill_between.py',
     'fill_demo.py',
+    'fill_demo2.py',
+    'fill_spiral.py',
     'finance_demo.py',
+    'findobj_demo.py',
+    'fonts_demo.py',
     'fonts_demo_kw.py',
+    'ganged_plots.py',
+    'geo_demo.py',
+    'gradient_bar.py',
+    'griddata_demo.py',
+    'hatch_demo.py',
     'hexbin_demo.py',
     'hexbin_demo2.py',
+    'hist_colormapped.py',
     'histogram_demo.py',
+    'histogram_demo_extended.py',
     'hline_demo.py',
+
+    'image_clip_path.py',
     'image_demo.py',
     'image_demo2.py',
+    'image_demo3.py',
+    'image_interp.py',
     'image_masked.py',
+    'image_nonuniform.py',
     'image_origin.py',
+    'image_slices_viewer.py',
+    'integral_demo.py',
+    'interp_demo.py',
     'invert_axes.py',
     'layer_images.py',
     'legend_auto.py',
     'legend_demo.py',
     'legend_demo2.py',
+    'legend_demo3.py',
+    'legend_scatter.py',
     'line_collection.py',
     'line_collection2.py',
     'line_styles.py',
+    'log_bar.py',
     'log_demo.py',
     'log_test.py',
     'major_minor_demo1.py',
     'major_minor_demo2.py',
+    'manual_axis.py',
     'masked_demo.py',
     'mathtext_demo.py',
+    'mathtext_examples.py',
+    'matplotlib_icon.py',
+    'matshow.py',
+    'mri_demo.py',
     'mri_with_eeg.py',
-    'multiple_figs_demo.py',
     'multi_image.py',
+    'multiline.py',
+    'multiple_figs_demo.py',
     'nan_test.py',
+    'newscalarformatter_demo.py',
     'pcolor_demo.py',
     'pcolor_demo2.py',
+    'pcolor_log.py',
     'pcolor_small.py',
     'pie_demo.py',
+    'plotfile_demo.py',
+    'polar_bar.py',
     'polar_demo.py',
+    'polar_legend.py',
     'polar_scatter.py',
+    'poormans_contour.py',
     'psd_demo.py',
+    'psd_demo2.py',
+    'psd_demo3.py',
     'quadmesh_demo.py',
     'quiver_demo.py',
+    'scatter_custom_symbol.py',
     'scatter_demo.py',
     'scatter_demo2.py',
+    'scatter_masked.py',
+    'scatter_profile.py',
     'scatter_star_poly.py',
-    'shared_axis_demo.py',
+    #'set_and_get.py',
     'shared_axis_across_figures.py',
+    'shared_axis_demo.py',
     'simple_plot.py',
+    'simplification_clipping_test.py',
     'specgram_demo.py',
     'spy_demos.py',
     'stem_plot.py',
@@ -106,15 +179,16 @@ pylab_files = [
     'stix_fonts_demo.py',
     'stock_demo.py',
     'subplot_demo.py',
+    'subplots_adjust.py',
     'symlog_demo.py',
-    #    'set_and_get.py',
     'table_demo.py',
     'text_handles.py',
     'text_rotation.py',
+    'text_rotation_relative_to_line.py',
     'text_themes.py',
-#    'tex_demo.py',
-    'two_scales.py',
+    'transoffset.py',
     'unicode_demo.py',
+    'vertical_ticklabels.py',
     'vline_demo.py',
     'xcorr_demo.py',
     'zorder_demo.py',
@@ -123,8 +197,33 @@ pylab_files = [
 
 api_dir = os.path.join('..', 'api')
 api_files = [
-    'colorbar_only.py',
+    'agg_oo.py',
+    'barchart_demo.py',
+    'bbox_intersect.py',
+    'collections_demo.py',
     'color_cycle.py',
+    'colorbar_only.py',
+    'custom_projection_example.py',
+    'custom_scale_example.py',
+    'date_demo.py',
+    'date_index_formatter.py',
+    'donut_demo.py',
+    'font_family_rc.py',
+    'histogram_demo.py',
+    'image_zcoord.py',
+    'legend_demo.py',
+    'line_with_text.py',
+    'logo2.py',
+    'mathtext_asarray.py',
+    'patch_collection.py',
+    'path_patch_demo.py',
+    'quad_bezier.py',
+    'scatter_piecharts.py',
+    'span_regions.py',
+    'two_scales.py',
+    'unicode_minus.py',
+    'watermark_image.py',
+    'watermark_text.py',
 ]
 
 units_dir = os.path.join('..', 'units')
@@ -168,16 +267,22 @@ report_missing(pylab_dir, pylab_files)
 report_missing(api_dir, api_files)
 report_missing(units_dir, units_files)
 
-files = [os.path.join(pylab_dir, fname) for fname in pylab_files] +\
-    [os.path.join(api_dir, fname) for fname in api_files] +\
+files = (
+    [os.path.join(api_dir, fname) for fname in api_files] +
+    [os.path.join(pylab_dir, fname) for fname in pylab_files] +
     [os.path.join(units_dir, fname) for fname in units_files]
+     )
 
 # tests known to fail on a given backend
 
 
 failbackend = dict(
-    SVG = ('tex_demo.py,'),
+    svg = ('tex_demo.py', ),
+    agg = ('hyperlinks.py', ),
+    pdf = ('hyperlinks.py', ),
+    ps = ('hyperlinks.py', ),
     )
+
 
 try:
     import subprocess
@@ -203,7 +308,7 @@ def drive(backend, python=['python'], switches = []):
             os.unlink(os.path.join(path,fname))
     else:
         os.mkdir(backend)
-
+    failures = []
     for fullpath in files:
 
         print ('\tdriving %-40s' % (fullpath)),
@@ -246,7 +351,7 @@ def drive(backend, python=['python'], switches = []):
         if backend in rcsetup.interactive_bk:
             tmpfile.write('show()')
         else:
-            tmpfile.write('savefig("%s", dpi=150)' % outfile)
+            tmpfile.write('\nsavefig("%s", dpi=150)' % outfile)
 
         tmpfile.close()
         start_time = time.time()
@@ -256,10 +361,14 @@ def drive(backend, python=['python'], switches = []):
         print (end_time - start_time), ret
         #os.system('%s %s %s' % (python, tmpfile_name, switchstring))
         os.remove(tmpfile_name)
+        if ret:
+            failures.append(fullpath)
+    return failures
 
 
 if __name__ == '__main__':
     times = {}
+    failures = {}
     default_backends = ['agg', 'ps', 'svg', 'pdf', 'template']
     if len(sys.argv)==2 and sys.argv[1]=='--clean':
         localdirs = [d for d in glob.glob('*') if os.path.isdir(d)]
@@ -298,13 +407,16 @@ if __name__ == '__main__':
         switchstring = ' '.join(switches)
         print 'testing %s %s' % (backend, switchstring)
         t0 = time.time()
-        drive(backend, python, switches)
+        failures[backend] = drive(backend, python, switches)
         t1 = time.time()
         times[backend] = (t1-t0)/60.0
 
     # print times
     for backend, elapsed in times.items():
         print 'Backend %s took %1.2f minutes to complete' % ( backend, elapsed)
+        failed = failures[backend]
+        if failed:
+            print '  Failures: ', failed
         if 'Template' in times:
             print '\ttemplate ratio %1.3f, template residual %1.3f' % (
                 elapsed/times['Template'], elapsed-times['Template'])

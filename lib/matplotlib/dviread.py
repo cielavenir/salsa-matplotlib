@@ -17,11 +17,12 @@ Interface::
 
 """
 
+import errno
 import matplotlib
 import matplotlib.cbook as mpl_cbook
 import numpy as np
-import os
 import struct
+import subprocess
 
 _dvistate = mpl_cbook.Bunch(pre=0, outer=1, inpage=2, post_post=3, finale=4)
 
@@ -394,8 +395,12 @@ class DviFont(object):
         self._scale, self._tfm, self.texname, self._vf = \
             scale, tfm, texname, vf
         self.size = scale * (72.0 / (72.27 * 2**16))
+        try:
+            nchars = max(tfm.width.iterkeys())
+        except ValueError:
+            nchars = 0
         self.widths = [ (1000*tfm.width.get(char, 0)) >> 20
-                        for char in range(0, max(tfm.width)) ]
+                        for char in range(nchars) ]
 
     def __eq__(self, other):
         return self.__class__ == other.__class__ and \
@@ -685,7 +690,9 @@ class Encoding(object):
     def __init__(self, filename):
         file = open(filename, 'rt')
         try:
+            matplotlib.verbose.report('Parsing TeX encoding ' + filename, 'debug-annoying')
             self.encoding = self._parse(file)
+            matplotlib.verbose.report('Result: ' + `self.encoding`, 'debug-annoying')
         finally:
             file.close()
 
@@ -735,21 +742,29 @@ def find_tex_file(filename, format=None):
     doesn't use kpathsea, so what do we do? (TODO)
     """
 
-    cmd = 'kpsewhich '
+    cmd = ['kpsewhich']
     if format is not None:
-        assert "'" not in format
-        cmd += "--format='" + format + "' "
-    assert "'" not in filename
-    cmd += "'" + filename + "'"
-
-    pipe = os.popen(cmd, 'r')
-    result = pipe.readline().rstrip()
-    pipe.close()
-
-    matplotlib.verbose.report('find_tex_file: %s -> %s' \
-                                  % (filename, result),
+        cmd += ['--format=' + format]
+    cmd += [filename]
+    
+    matplotlib.verbose.report('find_tex_file(%s): %s' \
+                                  % (filename,cmd), 'debug')
+    pipe = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    result = pipe.communicate()[0].rstrip()
+    matplotlib.verbose.report('find_tex_file result: %s' % result,
                               'debug')
     return result
+
+def _read_nointr(pipe, bufsize=-1):
+    while True:
+        try:
+            return pipe.read(bufsize)
+        except OSError, e:
+            if e.errno == errno.EINTR:
+                continue
+            else:
+                raise
+        
 
 # With multiple text objects per figure (e.g. tick labels) we may end
 # up reading the same tfm and vf files many times, so we implement a

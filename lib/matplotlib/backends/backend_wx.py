@@ -92,10 +92,11 @@ Examples which work on this release:
  (3) - Clipping seems to be broken.
 """
 
-cvs_id = '$Id: backend_wx.py 5935 2008-07-31 14:10:18Z mdboom $'
+cvs_id = '$Id: backend_wx.py 6484 2008-12-03 18:38:03Z jdh2358 $'
 
 
 import sys, os, os.path, math, StringIO, weakref, warnings
+import numpy as npy
 
 # Debugging settings here...
 # Debug level set here. If the debug level is less than 5, information
@@ -112,8 +113,7 @@ try:
     import wx
     backend_version = wx.VERSION_STRING
 except:
-    print >>sys.stderr, "Matplotlib backend_wx requires wxPython be installed"
-    sys.exit()
+    raise ImportError("Matplotlib backend_wx requires wxPython be installed")
 
 #!!! this is the call that is causing the exception swallowing !!!
 #wx.InitAllImageHandlers()
@@ -174,6 +174,9 @@ from matplotlib import rcParams
 # the True dots per inch on the screen; should be display dependent
 # see http://groups.google.com/groups?q=screen+dpi+x11&hl=en&lr=&ie=UTF-8&oe=UTF-8&safe=off&selm=7077.26e81ad5%40swift.cs.tcd.ie&rnum=5 for some info about screen dpi
 PIXELS_PER_INCH = 75
+
+# Delay time for idle checks
+IDLE_DELAY = 5
 
 def error_msg_wx(msg, parent=None):
     """
@@ -331,6 +334,23 @@ class RendererWx(RendererBase):
             gfx_ctx.StrokePath(wxpath)
         gc.unselect()
 
+    def draw_image(self, x, y, im, bbox, clippath=None, clippath_trans=None):
+        if bbox != None:
+            l,b,w,h = bbox.bounds
+        else:
+            l=0
+            b=0,
+            w=self.width
+            h=self.height
+        rows, cols, image_str = im.as_rgba_str()
+        image_array = npy.fromstring(image_str, npy.uint8)
+        image_array.shape = rows, cols, 4
+        bitmap = wx.BitmapFromBufferRGBA(cols,rows,image_array)
+        gc = self.get_gc()
+        gc.select()
+        gc.gfx_ctx.DrawBitmap(bitmap,int(l),int(b),int(w),int(h))
+        gc.unselect()
+
     def draw_text(self, gc, x, y, s, prop, angle, ismath):
         """
         Render the matplotlib.text.Text instance
@@ -480,7 +500,7 @@ class GraphicsContextWx(GraphicsContextBase):
         """
 
         if sys.platform=='win32':
-            self.SelectObject(self.bitmap)
+            self.dc.SelectObject(self.bitmap)
             self.IsSelected = True
 
     def unselect(self):
@@ -488,7 +508,7 @@ class GraphicsContextWx(GraphicsContextBase):
         Select a Null bitmasp into this wxDC instance
         """
         if sys.platform=='win32':
-            self.SelectObject(wx.NullBitmap)
+            self.dc.SelectObject(wx.NullBitmap)
             self.IsSelected = False
 
     def set_foreground(self, fg, isRGB=None):
@@ -723,6 +743,7 @@ class FigureCanvasWx(FigureCanvasBase, wx.Panel):
         bind(self, wx.EVT_LEFT_UP, self._onLeftButtonUp)
         bind(self, wx.EVT_MOTION, self._onMotion)
         bind(self, wx.EVT_LEAVE_WINDOW, self._onLeave)
+        bind(self, wx.EVT_ENTER_WINDOW, self._onEnter)
         bind(self, wx.EVT_IDLE, self._onIdle)
         self.SetBackgroundStyle(wx.BG_STYLE_CUSTOM)
 
@@ -896,15 +917,15 @@ The current aspect ration will be kept."""
         # alternative approach, binding to wx.EVT_IDLE,
         # doesn't behave as nicely.
         if hasattr(self,'_idletimer'):
-            self._idletimer.Restart(50)
+            self._idletimer.Restart(IDLE_DELAY)
         else:
-            self._idletimer = wx.FutureCall(50,self._onDrawIdle)
+            self._idletimer = wx.FutureCall(IDLE_DELAY,self._onDrawIdle)
             # FutureCall is a backwards-compatible alias;
             # CallLater became available in 2.7.1.1.
 
     def _onDrawIdle(self, *args, **kwargs):
         if wx.GetApp().Pending():
-            self._idletimer.Restart(50, *args, **kwargs)
+            self._idletimer.Restart(IDLE_DELAY, *args, **kwargs)
         else:
             del self._idletimer
             # GUI event or explicit draw call may already
@@ -1139,7 +1160,7 @@ The current aspect ration will be kept."""
     def _get_key(self, evt):
 
         keyval = evt.m_keyCode
-        if self.keyvald.has_key(keyval):
+        if keyval in self.keyvald:
             key = self.keyvald[keyval]
         elif keyval <256:
             key = chr(keyval)
@@ -1243,10 +1264,14 @@ The current aspect ration will be kept."""
         FigureCanvasBase.motion_notify_event(self, x, y, guiEvent=evt)
 
     def _onLeave(self, evt):
-        """Mouse has left the window; fake a motion event."""
+        """Mouse has left the window."""
 
         evt.Skip()
-        FigureCanvasBase.motion_notify_event(self, -1, -1, guiEvent=evt)
+        FigureCanvasBase.leave_notify_event(self, guiEvent = evt)
+
+    def _onEnter(self, evt):
+        """Mouse has entered the window."""
+        FigureCanvasBase.enter_notify_event(self, guiEvent = evt)
 
 
 ########################################################################
@@ -2106,7 +2131,7 @@ class PrintoutWx(wx.Printout):
 
         # restore original figure  resolution
         self.canvas.figure.set_facecolor(bgcolor)
-        self.canvas.figure.dpi.set(fig_dpi)
+        self.canvas.figure.dpi = fig_dpi
         self.canvas.draw()
         return True
 #>

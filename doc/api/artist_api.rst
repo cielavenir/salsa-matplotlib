@@ -1,3 +1,5 @@
+.. _artist-api:
+
 *******************
 matplotlib artists
 *******************
@@ -9,6 +11,14 @@ matplotlib artists
 =============================
 
 .. automodule:: matplotlib.artist
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+:mod:`matplotlib.legend`
+=============================
+
+.. automodule:: matplotlib.legend
    :members:
    :undoc-members:
    :show-inheritance:

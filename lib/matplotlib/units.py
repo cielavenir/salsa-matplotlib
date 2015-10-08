@@ -43,6 +43,7 @@ datetime objects
     units.registry[datetime.date] = DateConverter()
 
 """
+import numpy as np
 from matplotlib.cbook import iterable, is_numlike
 
 class AxisInfo:
@@ -127,12 +128,14 @@ class Registry(dict):
             converter = self.get(classx)
 
         if converter is None and iterable(x):
-            for thisx in x:
-                classx = getattr(thisx, '__class__', None)
-                break
-            if classx is not None:
-                converter = self.get(classx)
+            # if this is anything but an object array, we'll assume
+            # there are no custom units
+            if isinstance(x, np.ndarray) and x.dtype != np.object:
+                return None
 
+            for thisx in x:
+                converter = self.get_converter( thisx )
+                return converter
 
         #DISABLED self._cached[idx] = converter
         return converter

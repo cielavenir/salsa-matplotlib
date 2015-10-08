@@ -1,7 +1,9 @@
 """
 Some examples of how to annotate points in figures.  You specify an
 annotation point xy=(x,y) and a text point xytext=(x,y) for the
-annotated points and text location, respectively.  Optionally, you can specify the coordinate system of xy and xytext with one of the following strings for xycoords and textcoords (default is 'data')
+annotated points and text location, respectively.  Optionally, you can
+specify the coordinate system of xy and xytext with one of the
+following strings for xycoords and textcoords (default is 'data')
 
 
   'figure points'   : points from the lower left corner of the figure
@@ -80,7 +82,6 @@ if 1:
                 horizontalalignment='right', verticalalignment='bottom',
                 fontsize=20)
 
-    fig.savefig('annotation_coords')
 
 if 1:
     # you can specify the xypoint and the xytext in different
@@ -109,7 +110,7 @@ if 1:
                 horizontalalignment='left',
                 verticalalignment='bottom',
                 )
-    fig.savefig('annotation_polar')
+
 
 if 1:
     # You can also use polar notation on a catesian axes.  Here the
@@ -136,9 +137,5 @@ if 1:
 
     ax.set_xlim(-20, 20)
     ax.set_ylim(-20, 20)
-    fig.savefig('annotation_ellipse')
 
-
-
-#fig.savefig('annotation_demo.png')
 show()

@@ -89,12 +89,13 @@ host of others.
 """
 from __future__ import generators
 
-__version__  = '0.98.3'
-__revision__ = '$Revision: 5941 $'
-__date__     = '$Date: 2008-07-31 15:08:08 -0400 (Thu, 31 Jul 2008) $'
+__version__  = '0.98.5.2'
+__revision__ = '$Revision: 6660 $'
+__date__     = '$Date: 2008-12-18 04:10:51 -0800 (Thu, 18 Dec 2008) $'
 
-import md5, os, re, shutil, sys, warnings
+import os, re, shutil, subprocess, sys, warnings
 import distutils.sysconfig
+import distutils.version
 
 
 NEWCONFIG = False
@@ -131,12 +132,9 @@ from rcsetup import validate_cairo_format
 major, minor1, minor2, s, tmp = sys.version_info
 _python24 = major>=2 and minor1>=4
 
-try:
-    import datetime
-    import dateutil
-    import pytz
-except ImportError: _havedate = False
-else: _havedate = True
+# the havedate check was a legacy from old matplotlib which preceeded
+# datetime support
+_havedate = True
 
 #try:
 #    import pkg_resources # pkg_resources is part of setuptools
@@ -144,12 +142,12 @@ else: _havedate = True
 #else: _have_pkg_resources = True
 
 if not _python24:
-    raise SystemExit('matplotlib requires Python 2.4 or later')
+    raise ImportError('matplotlib requires Python 2.4 or later')
 
 import numpy
 nn = numpy.__version__.split('.')
 if not (int(nn[0]) >= 1 and int(nn[1]) >= 1):
-    raise SystemExit(
+    raise ImportError(
             'numpy 1.1 or later is required; you have %s' % numpy.__version__)
 
 def is_string_like(obj):
@@ -237,7 +235,7 @@ class Verbose:
         if always is True, the report will occur on every function
         call; otherwise only on the first time the function is called
         """
-        assert(callable, func)
+        assert callable(func)
         def wrapper(*args, **kwargs):
             ret = func(*args, **kwargs)
 
@@ -259,58 +257,56 @@ verbose=Verbose()
 
 def checkdep_dvipng():
     try:
-        stdin, stdout = os.popen4('dvipng -version')
-        line = stdout.readlines()[1]
+        s = subprocess.Popen(['dvipng','-version'], stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        line = s.stdout.readlines()[1]
         v = line.split()[-1]
-        float(v)
         return v
-    except (IndexError, ValueError):
+    except (IndexError, ValueError, OSError):
         return None
 
 def checkdep_ghostscript():
     try:
         if sys.platform == 'win32':
-            command = 'gswin32c --version'
+            command_args = ['gswin32c', '--version']
         else:
-            command = 'gs --version'
-        stdin, stdout = os.popen4(command)
-        v = stdout.read()[:-1]
-        vtest = '.'.join(v.split('.')[:2]) # deal with version numbers like '7.07.1'
-        float(vtest)
-        return vtest
-    except (IndexError, ValueError):
+            command_args = ['gs', '--version']
+        s = subprocess.Popen(command_args, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        v = s.stdout.read()[:-1]
+        return v
+    except (IndexError, ValueError, OSError):
         return None
 
 def checkdep_tex():
     try:
-        stdin, stdout = os.popen4('tex -version')
-        line = stdout.readlines()[0]
+        s = subprocess.Popen(['tex','-version'], stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        line = s.stdout.readlines()[0]
         pattern = '3\.1\d+'
         match = re.search(pattern, line)
         v = match.group(0)
-        float(v)
         return v
-    except (IndexError, ValueError, AttributeError):
+    except (IndexError, ValueError, AttributeError, OSError):
         return None
 
 def checkdep_pdftops():
     try:
-        stdin, stdout = os.popen4('pdftops -v')
-        for line in stdout.readlines():
+        s = subprocess.Popen(['pdftops','-v'], stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        for line in s.stderr:
             if 'version' in line:
                 v = line.split()[-1]
-        float(v)
         return v
-    except (IndexError, ValueError, UnboundLocalError):
+    except (IndexError, ValueError, UnboundLocalError, OSError):
         return None
 
 def compare_versions(a, b):
-    "return True if a is greater than b"
+    "return True if a is greater than or equal to b"
     if a:
-        a = [int(i) for i in a.split('.')]
-        b = [int(i) for i in b.split('.')]
-        if a[0]>b[0]: return True
-        elif (a[0]==b[0]) and (a[1]>=b[1]): return True
+        a = distutils.version.LooseVersion(a)
+        b = distutils.version.LooseVersion(b)
+        if a>=b: return True
         else: return False
     else: return False
 
@@ -333,8 +329,13 @@ def checkdep_ps_distiller(s):
 
     if s == 'xpdf':
         pdftops_req = '3.0'
+        pdftops_req_alt = '0.9' # poppler version numbers, ugh
         pdftops_v = checkdep_pdftops()
-        if compare_versions(pdftops_v, pdftops_req): pass
+        if compare_versions(pdftops_v, pdftops_req):
+            pass
+        elif compare_versions(pdftops_v, pdftops_req_alt) and not \
+            compare_versions(pdftops_v, '1.0'):
+            pass
         else:
             flag = False
             warnings.warn(('matplotlibrc ps.usedistiller can not be set to '
@@ -446,7 +447,7 @@ get_configdir = verbose.wrap('CONFIGDIR=%s', _get_configdir, always=False)
 def _get_data_path():
     'get the path to matplotlib data'
 
-    if os.environ.has_key('MATPLOTLIBDATA'):
+    if 'MATPLOTLIBDATA' in os.environ:
         path = os.environ['MATPLOTLIBDATA']
         if not os.path.isdir(path):
             raise RuntimeError('Path in environment MATPLOTLIBDATA not a directory')
@@ -484,6 +485,22 @@ def _get_data_path_cached():
 
 get_data_path = verbose.wrap('matplotlib data path %s', _get_data_path_cached,
                              always=False)
+
+
+def get_example_data(fname):
+    """
+    return a filehandle to one of the example files in mpl-data/example
+
+    *fname*
+        the name of one of the files in mpl-data/example
+    """
+    datadir = os.path.join(get_data_path(), 'example')
+    fullpath = os.path.join(datadir, fname)
+    if not os.path.exists(fullpath):
+        raise IOError('could not find matplotlib example file "%s" in data directory "%s"'%(
+            fname, datadir))
+    return file(fullpath, 'rb')
+
 
 def get_py2exe_datafiles():
     datapath = get_data_path()
@@ -538,7 +555,7 @@ WARNING: Old rc filename "%s" found and renamed to
     fname = os.path.join( os.getcwd(), 'matplotlibrc')
     if os.path.exists(fname): return fname
 
-    if os.environ.has_key('MATPLOTLIBRC'):
+    if 'MATPLOTLIBRC' in os.environ:
         path =  os.environ['MATPLOTLIBRC']
         if os.path.exists(path):
             fname = os.path.join(path, 'matplotlibrc')
@@ -640,7 +657,7 @@ def rc_params(fail_on_error=False):
     verbose.set_fileo(ret['verbose.fileo'])
 
     for key, (val, line, cnt) in rc_temp.iteritems():
-        if defaultParams.has_key(key):
+        if key in defaultParams:
             if fail_on_error:
                 ret[key] = val # try to convert to proper type or raise
             else:
@@ -653,7 +670,7 @@ def rc_params(fail_on_error=False):
 Bad key "%s" on line %d in
 %s.
 You probably need to get an updated matplotlibrc file from
-http://matplotlib.sf.net/matplotlibrc or from the matplotlib source
+http://matplotlib.sf.net/_static/matplotlibrc or from the matplotlib source
 distribution""" % (key, cnt, fname)
 
     if ret['datapath'] is None:
@@ -748,7 +765,7 @@ def rc(group, **kwargs):
         for k,v in kwargs.items():
             name = aliases.get(k) or k
             key = '%s.%s' % (g, name)
-            if not rcParams.has_key(key):
+            if key not in rcParams:
                 raise KeyError('Unrecognized key "%s" for group "%s" and name "%s"' %
                                (key, g, name))
 

@@ -13,7 +13,10 @@ from matplotlib.figure import Figure
 from matplotlib.mathtext import MathTextParser
 from matplotlib.widgets import SubplotTool
 
-from PyQt4 import QtCore, QtGui, Qt
+try:
+    from PyQt4 import QtCore, QtGui, Qt
+except ImportError:
+    raise ImportError("Qt4 backend requires that PyQt4 is installed.")
 
 backend_version = "0.9.1"
 def fn_name(): return sys._getframe(1).f_code.co_name
@@ -103,6 +106,12 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
         # hide until we can test and fix
         self.mpl_idle_event(event)
 
+    def enterEvent(self, event):
+        FigureCanvasBase.enter_notify_event(self, event)
+
+    def leaveEvent(self, event):
+        FigureCanvasBase.leave_notify_event(self, event)
+
     def mousePressEvent( self, event ):
         x = event.pos().x()
         # flipy so y=0 is bottom of canvas
@@ -171,7 +180,7 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
     def _get_key( self, event ):
         if event.key() < 256:
             key = str(event.text())
-        elif self.keyvald.has_key( event.key() ):
+        elif event.key() in self.keyvald:
             key = self.keyvald[ event.key() ]
         else:
             key = None

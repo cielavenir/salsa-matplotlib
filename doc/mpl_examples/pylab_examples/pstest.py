@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- noplot -*-
 import matplotlib
 matplotlib.use('PS')
 from pylab import *
@@ -24,6 +25,6 @@ l = plot(t1, f(t1), 'k>')
 
 ylabel('Signal 2', fontsize=12)
 xlabel('time (s)', fontsize=12)
-#savefig('pstest')
+
 show()
 

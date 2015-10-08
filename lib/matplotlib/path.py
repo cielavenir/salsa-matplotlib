@@ -15,8 +15,8 @@ from matplotlib.cbook import simple_linear_interpolation
 
 class Path(object):
     """
-    Path represents a series of possibly disconnected, possibly
-    closed, line and curve segments.
+    :class:`Path` represents a series of possibly disconnected,
+    possibly closed, line and curve segments.
 
     The underlying storage is made up of two parallel numpy arrays:
       - *vertices*: an Nx2 float array of vertices
@@ -56,6 +56,11 @@ class Path(object):
     :class:`Path` objects, as an optimization, do not store a *codes*
     at all, but have a default one provided for them by
     :meth:`iter_segments`.
+
+    Note also that the vertices and codes arrays should be treated as
+    immutable -- there are a number of optimizations and assumptions
+    made up front in the constructor that will not change when the
+    data changes.
     """
 
     # Path codes
@@ -84,46 +89,29 @@ class Path(object):
         dimension.
 
         If *codes* is None, *vertices* will be treated as a series of
-        line segments.  If *vertices* contains masked values, the
-        resulting path will be compressed, with ``MOVETO`` codes
-        inserted in the correct places to jump over the masked
-        regions.
+        line segments.
+
+        If *vertices* contains masked values, they will be converted
+        to NaNs which are then handled correctly by the Agg
+        PathIterator and other consumers of path data, such as
+        :meth:`iter_segments`.
         """
         if ma.isMaskedArray(vertices):
-            is_mask = True
-            mask = ma.getmask(vertices)
+            vertices = vertices.astype(np.float_).filled(np.nan)
         else:
-            is_mask = False
             vertices = np.asarray(vertices, np.float_)
-            mask = ma.nomask
 
         if codes is not None:
             codes = np.asarray(codes, self.code_type)
             assert codes.ndim == 1
             assert len(codes) == len(vertices)
 
-        # The path being passed in may have masked values.  However,
-        # the backends (and any affine transformations in matplotlib
-        # itself), are not expected to deal with masked arrays, so we
-        # must remove them from the array (using compressed), and add
-        # MOVETO commands to the codes array accordingly.
-        if is_mask:
-            if mask is not ma.nomask:
-                mask1d = np.logical_or.reduce(mask, axis=1)
-                gmask1d = np.invert(mask1d)
-                if codes is None:
-                    codes = np.empty((len(vertices)), self.code_type)
-                    codes.fill(self.LINETO)
-                    codes[0] = self.MOVETO
-                vertices = vertices[gmask1d].filled() # ndarray
-                codes[np.roll(mask1d, 1)] = self.MOVETO
-                codes = codes[gmask1d] # np.compress is much slower
-            else:
-                vertices = np.asarray(vertices, np.float_)
-
         assert vertices.ndim == 2
         assert vertices.shape[1] == 2
 
+        self.should_simplify = (len(vertices) >= 128 and
+                                (codes is None or np.all(codes <= Path.LINETO)))
+        self.has_nonfinite = not np.isfinite(vertices).all()
         self.codes = codes
         self.vertices = vertices
 
@@ -157,12 +145,23 @@ class Path(object):
     def __len__(self):
         return len(self.vertices)
 
-    def iter_segments(self):
+    def iter_segments(self, simplify=None):
         """
         Iterates over all of the curve segments in the path.  Each
         iteration returns a 2-tuple (*vertices*, *code*), where
         *vertices* is a sequence of 1 - 3 coordinate pairs, and *code* is
         one of the :class:`Path` codes.
+
+        If *simplify* is provided, it must be a tuple (*width*,
+        *height*) defining the size of the figure, in native units
+        (e.g. pixels or points).  Simplification implies both removing
+        adjacent line segments that are very close to parallel, and
+        removing line segments outside of the figure.  The path will
+        be simplified *only* if :attr:`should_simplify` is True, which
+        is determined in the constructor by this criteria:
+
+           - No curves
+           - More than 128 vertices
         """
         vertices = self.vertices
         if not len(vertices):
@@ -170,8 +169,7 @@ class Path(object):
 
         codes        = self.codes
         len_vertices = len(vertices)
-        isnan        = np.isnan
-        any          = np.any
+        isfinite     = np.isfinite
 
         NUM_VERTICES = self.NUM_VERTICES
         MOVETO       = self.MOVETO
@@ -179,14 +177,25 @@ class Path(object):
         CLOSEPOLY    = self.CLOSEPOLY
         STOP         = self.STOP
 
-        if codes is None:
-            next_code = MOVETO
-            for v in vertices:
-                if any(isnan(v)):
-                    next_code = MOVETO
-                else:
-                    yield v, next_code
-                    next_code = LINETO
+        if simplify is not None and self.should_simplify:
+            polygons = self.to_polygons(None, *simplify)
+            for vertices in polygons:
+                yield vertices[0], MOVETO
+                for v in vertices[1:]:
+                    yield v, LINETO
+        elif codes is None:
+            if self.has_nonfinite:
+                next_code = MOVETO
+                for v in vertices:
+                    if np.isfinite(v).all():
+                        yield v, next_code
+                        next_code = LINETO
+                    else:
+                        next_code = MOVETO
+            else:
+                yield vertices[0], MOVETO
+                for v in vertices[1:]:
+                    yield v, LINETO
         else:
             i = 0
             was_nan = False
@@ -200,7 +209,7 @@ class Path(object):
                 else:
                     num_vertices = NUM_VERTICES[int(code)]
                     curr_vertices = vertices[i:i+num_vertices].flatten()
-                    if any(isnan(curr_vertices)):
+                    if not isfinite(curr_vertices).all():
                         was_nan = True
                     elif was_nan:
                         yield curr_vertices[-2:], MOVETO
@@ -213,9 +222,11 @@ class Path(object):
         """
         Return a transformed copy of the path.
 
-        See :class:`matplotlib.transforms.TransformedPath` for a path
-        that will cache the transformed result and automatically
-        update when the transform changes.
+        .. seealso::
+            :class:`matplotlib.transforms.TransformedPath`:
+                A specialized path class that will cache the
+                transformed result and automatically update when the
+                transform changes.
         """
         return Path(transform.transform(self.vertices), self.codes)
 
@@ -255,21 +266,29 @@ class Path(object):
             transform = transform.frozen()
         return Bbox(get_path_extents(self, transform))
 
-    def intersects_path(self, other):
+    def intersects_path(self, other, filled=True):
         """
         Returns *True* if this path intersects another given path.
-        """
-        return path_intersects_path(self, other)
 
-    def intersects_bbox(self, bbox):
+        *filled*, when True, treats the paths as if they were filled.
+        That is, if one path completely encloses the other,
+        :meth:`intersects_path` will return True.
+        """
+        return path_intersects_path(self, other, filled)
+
+    def intersects_bbox(self, bbox, filled=True):
         """
         Returns *True* if this path intersects a given
         :class:`~matplotlib.transforms.Bbox`.
+
+        *filled*, when True, treats the path as if it was filled.
+        That is, if one path completely encloses the other,
+        :meth:`intersects_path` will return True.
         """
         from transforms import BboxTransformTo
         rectangle = self.unit_rectangle().transformed(
             BboxTransformTo(bbox))
-        result = self.intersects_path(rectangle)
+        result = self.intersects_path(rectangle, filled)
         return result
 
     def interpolated(self, steps):

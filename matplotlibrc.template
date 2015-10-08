@@ -4,26 +4,29 @@
 # of it on your system in
 # site-packages/matplotlib/mpl-data/matplotlibrc.  If you edit it
 # there, please note that it will be overridden in your next install.
-# If you want to keep a permanent local bopy that will not be
+# If you want to keep a permanent local copy that will not be
 # over-written, place it in HOME/.matplotlib/matplotlibrc (unix/linux
 # like systems) and C:\Documents and Settings\yourname\.matplotlib
 # (win32 systems).
 #
 # This file is best viewed in a editor which supports python mode
-# syntax highlighting # Blank lines, or lines starting with a comment
+# syntax highlighting. Blank lines, or lines starting with a comment
 # symbol, are ignored, as are trailing comments.  Other lines must
-# have the format # key : val # optional comment # Colors: for the
-# color values below, you can either use - a matplotlib color string,
-# such as r, k, or b - an rgb tuple, such as (1.0, 0.5, 0.0) - a hex
-# string, such as ff00ff or #ff00ff - a scalar grayscale intensity
-# such as 0.75 - a legal html color name, eg red, blue, darkslategray
+# have the format
+#    key : val # optional comment
+#
+# Colors: for the color values below, you can either use - a
+# matplotlib color string, such as r, k, or b - an rgb tuple, such as
+# (1.0, 0.5, 0.0) - a hex string, such as ff00ff or #ff00ff - a scalar
+# grayscale intensity such as 0.75 - a legal html color name, eg red,
+# blue, darkslategray
 
 #### CONFIGURATION BEGINS HERE
 
 # the default backend; one of GTK GTKAgg GTKCairo CocoaAgg FltkAgg
-# QtAgg Qt4Agg TkAgg WX WXAgg Agg Cairo GDK PS PDF SVG Template You
-# can also deploy your own backend outside of matplotlib by referring
-# to the module name (which must be in the PYTHONPATH) as
+# MacOSX QtAgg Qt4Agg TkAgg WX WXAgg Agg Cairo GDK PS PDF SVG Template
+# You can also deploy your own backend outside of matplotlib by
+# referring to the module name (which must be in the PYTHONPATH) as
 # 'module://my_backend'
 backend      : %(backend)s
 
@@ -202,6 +205,8 @@ numerix      : %(numerix)s  # numpy, Numeric or numarray
 #axes.formatter.limits : -7, 7 # use scientific notation if log10
                                # of the axis range is smaller than the
                                # first or larger than the second
+#axes.unicode_minus  : True    # use unicode for the minus symbol
+                               # rather than hypen.  See http://en.wikipedia.org/wiki/Plus_sign#Plus_sign
 
 #polaraxes.grid      : True    # display grid on polar axes
 
@@ -230,10 +235,13 @@ numerix      : %(numerix)s  # numpy, Numeric or numarray
 #grid.linewidth   :   0.5     # in points
 
 ### Legend
+#legend.fancybox      : False  # if True, use a rounded box for the
+                               # legend, else a rectangle
 #legend.isaxes        : True
 #legend.numpoints     : 2      # the number of points in the legend line
 #legend.fontsize      : large
-#legend.pad           : 0.2    # the fractional whitespace inside the legend border
+#legend.pad           : 0.0    # deprecated; the fractional whitespace inside the legend border
+#legend.borderpad     : 0.5    # border whitspace in fontsize units
 #legend.markerscale   : 1.0    # the relative size of legend markers vs. original
 # the following dimensions are in axes coords
 #legend.labelsep      : 0.010  # the vertical space between the legend entries
@@ -251,12 +259,12 @@ numerix      : %(numerix)s  # numpy, Numeric or numarray
 
 # The figure subplot parameters.  All dimensions are fraction of the
 # figure width or height
-#figure.subplot.left  : 0.125  # the left side of the subplots of the figure
-#figure.subplot.right : 0.9    # the right side of the subplots of the figure
-#figure.subplot.bottom : 0.1   # the bottom of the subplots of the figure
-#figure.subplot.top : 0.9      # the top of the subplots of the figure
-#figure.subplot.wspace : 0.2   # the amount of width reserved for blank space between subplots
-#figure.subplot.hspace : 0.2   # the amount of height reserved for white space between subplots
+#figure.subplot.left	: 0.125  # the left side of the subplots of the figure
+#figure.subplot.right	: 0.9    # the right side of the subplots of the figure
+#figure.subplot.bottom	: 0.1    # the bottom of the subplots of the figure
+#figure.subplot.top	: 0.9    # the top of the subplots of the figure
+#figure.subplot.wspace	: 0.2    # the amount of width reserved for blank space between subplots
+#figure.subplot.hspace	: 0.2    # the amount of height reserved for white space between subplots
 
 ### IMAGES
 #image.aspect : equal             # equal | auto | a number
@@ -264,13 +272,25 @@ numerix      : %(numerix)s  # numpy, Numeric or numarray
 #image.cmap   : jet               # gray | jet etc...
 #image.lut    : 256               # the size of the colormap lookup table
 #image.origin : upper             # lower | upper
-
+#image.resample  : False
 
 ### CONTOUR PLOTS
 #contour.negative_linestyle :  dashed # dashed | solid
 
+### Agg rendering
+### Warning: experimental, 2008/10/10
+#agg.path.chunksize : 0           # 0 to disable; values in the range
+                                  # 10000 to 100000 can improve speed slightly
+                                  # and prevent an Agg rendering failure
+                                  # when plotting very large data sets,
+                                  # especially if they are very gappy.
+                                  # It may cause minor artifacts, though.
+                                  # A value of 20000 is probably a good
+                                  # starting point.
 ### SAVING FIGURES
-# the default savefig params can be different for the GUI backends.
+#path.simplify : False  # When True, simplify paths in vector backends, such as PDF, PS and SVG
+
+# the default savefig params can be different from the display params
 # Eg, you may want a higher resolution, or to make the figure
 # background white
 #savefig.dpi       : 100      # figure dots per inch
@@ -303,15 +323,18 @@ numerix      : %(numerix)s  # numpy, Numeric or numarray
 #svg.image_noscale : False     # suppress scaling of raster data embedded in SVG
 #svg.embed_char_paths : True       # embed character outlines in the SVG file
 
+# docstring params
+#docstring.hardcopy = False  # set this when you want to generate hardcopy docstring
+
 # Set the verbose flags.  This controls how much information
 # matplotlib gives you at runtime and where it goes.  The verbosity
 # levels are: silent, helpful, debug, debug-annoying.  Any level is
-# inclusive of all the levels below it.  If you setting is debug,
+# inclusive of all the levels below it.  If your setting is "debug",
 # you'll get all the debug and helpful messages.  When submitting
-# problems to the mailing-list, please set verbose to helpful or debug
+# problems to the mailing-list, please set verbose to "helpful" or "debug"
 # and paste the output into your report.
 #
-# The fileo gives the destination for any calls to verbose.report.
+# The "fileo" gives the destination for any calls to verbose.report.
 # These objects can a filename, or a filehandle like sys.stdout.
 #
 # You can override the rc default verbosity from the command line by

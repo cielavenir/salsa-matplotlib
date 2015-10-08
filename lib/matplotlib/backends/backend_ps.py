@@ -21,6 +21,7 @@ from matplotlib.backend_bases import RendererBase, GraphicsContextBase,\
 
 from matplotlib.cbook import is_string_like, get_realpath_and_stat, \
     is_writable_file_like, maxdict
+from matplotlib.mlab import quad2cubic
 from matplotlib.figure import Figure
 
 from matplotlib.font_manager import findfont, is_opentype_cff_font
@@ -35,7 +36,10 @@ from matplotlib.transforms import IdentityTransform
 import numpy as npy
 import binascii
 import re
-from sets import Set
+try:
+    set
+except NameError:
+    from sets import Set as set
 
 if sys.platform.startswith('win'): cmd_split = '&'
 else: cmd_split = ';'
@@ -101,6 +105,7 @@ def quote_ps_string(s):
     s=s.replace("(", "\\(")
     s=s.replace(")", "\\)")
     s=s.replace("'", "\\251")
+    s=s.replace("`", "\\301")
     s=re.sub(r"[^ -~\n]", lambda x: r"\%03o"%ord(x.group()), s)
     return s
 
@@ -145,6 +150,10 @@ class RendererPS(RendererBase):
             self.textcnt = 0
             self.psfrag = []
         self.imagedpi = imagedpi
+        if rcParams['path.simplify']:
+            self.simplify = (width * imagedpi, height * imagedpi)
+        else:
+            self.simplify = None
 
         # current renderer state (None=uninitialised)
         self.color = None
@@ -167,14 +176,14 @@ class RendererPS(RendererBase):
         each font."""
         realpath, stat_key = get_realpath_and_stat(font.fname)
         used_characters = self.used_characters.setdefault(
-            stat_key, (realpath, Set()))
+            stat_key, (realpath, set()))
         used_characters[1].update([ord(x) for x in s])
 
     def merge_used_characters(self, other):
-        for stat_key, (realpath, set) in other.items():
+        for stat_key, (realpath, charset) in other.items():
             used_characters = self.used_characters.setdefault(
-                stat_key, (realpath, Set()))
-            used_characters[1].update(set)
+                stat_key, (realpath, set()))
+            used_characters[1].update(charset)
 
     def set_color(self, r, g, b, store=1):
         if (r,g,b) != self.color:
@@ -444,26 +453,27 @@ grestore
         # unflip
         im.flipud_out()
 
-    def _convert_path(self, path, transform):
+    def _convert_path(self, path, transform, simplify=None):
         path = transform.transform_path(path)
 
         ps = []
-        for points, code in path.iter_segments():
+        last_points = None
+        for points, code in path.iter_segments(simplify):
             if code == Path.MOVETO:
                 ps.append("%g %g m" % tuple(points))
             elif code == Path.LINETO:
                 ps.append("%g %g l" % tuple(points))
             elif code == Path.CURVE3:
+                points = quad2cubic(*(list(last_points[-2:]) + list(points)))
                 ps.append("%g %g %g %g %g %g c" %
-                          (points[0], points[1],
-                           points[0], points[1],
-                           points[2], points[3]))
+                          tuple(points[2:]))
             elif code == Path.CURVE4:
                 ps.append("%g %g %g %g %g %g c" % tuple(points))
             elif code == Path.CLOSEPOLY:
                 ps.append("cl")
-        ps = "\n".join(ps)
+            last_points = points
 
+        ps = "\n".join(ps)
         return ps
 
     def _get_clip_path(self, clippath, clippath_transform):
@@ -481,7 +491,7 @@ grestore
         """
         Draws a Path instance using the given affine transform.
         """
-        ps = self._convert_path(path, transform)
+        ps = self._convert_path(path, transform, self.simplify)
         self._draw_ps(ps, gc, rgbFace)
 
     def draw_markers(self, gc, marker_path, marker_trans, path, trans, rgbFace=None):
@@ -510,8 +520,10 @@ grestore
         ps_cmd.extend(['stroke', 'grestore', '} bind def'])
 
         tpath = trans.transform_path(path)
-        for x, y in tpath.vertices:
-            ps_cmd.append("%g %g o" % (x, y))
+        for vertices, code in tpath.iter_segments():
+            if len(vertices):
+                x, y = vertices[-2:]
+                ps_cmd.append("%g %g o" % (x, y))
 
         ps = '\n'.join(ps_cmd)
         self._draw_ps(ps, gc, rgbFace, fill=False, stroke=False)
@@ -519,7 +531,7 @@ grestore
     def draw_path_collection(self, master_transform, cliprect, clippath,
                              clippath_trans, paths, all_transforms, offsets,
                              offsetTrans, facecolors, edgecolors, linewidths,
-                             linestyles, antialiaseds):
+                             linestyles, antialiaseds, urls):
         write = self._pswriter.write
 
         path_codes = []
@@ -536,7 +548,7 @@ grestore
         for xo, yo, path_id, gc, rgbFace in self._iter_collection(
             path_codes, cliprect, clippath, clippath_trans,
             offsets, offsetTrans, facecolors, edgecolors,
-            linewidths, linestyles, antialiaseds):
+            linewidths, linestyles, antialiaseds, urls):
 
             ps = "%g %g %s" % (xo, yo, path_id)
             self._draw_ps(ps, gc, rgbFace)
@@ -657,7 +669,8 @@ grestore
             fontsize = prop.get_size_in_points()
             scale = 0.001*fontsize
 
-            thisx, thisy = 0, 0
+            thisx = 0
+            thisy = font.get_str_bbox_and_descent(s)[4] * scale
             last_name = None
             lines = []
             for c in s:
@@ -693,16 +706,18 @@ grestore
 
         else:
             font = self._get_font_ttf(prop)
+            font.set_text(s, 0, flags=LOAD_NO_HINTING)
+            self.track_characters(font, s)
 
             self.set_color(*gc.get_rgb())
             self.set_font(font.get_sfnt()[(1,0,0,6)], prop.get_size_in_points())
-            self.track_characters(font, s)
 
             cmap = font.get_charmap()
             lastgind = None
             #print 'text', s
             lines = []
-            thisx, thisy = 0,0
+            thisx = 0
+            thisy = font.get_descent() / 64.0
             for c in s:
                 ccode = ord(c)
                 gind = cmap.get(ccode)
@@ -727,11 +742,11 @@ grestore
 
             thetext = '\n'.join(lines)
             ps = """gsave
-    %(x)f %(y)f translate
-    %(angle)f rotate
-    %(thetext)s
-    grestore
-    """ % locals()
+%(x)f %(y)f translate
+%(angle)f rotate
+%(thetext)s
+grestore
+""" % locals()
             self._pswriter.write(ps)
 
     def draw_mathtext(self, gc,
@@ -798,10 +813,6 @@ grestore
         write(ps.strip())
         write("\n")
 
-        hatch = gc.get_hatch()
-        if hatch:
-            self.set_hatch(hatch)
-
         if fill:
             if stroke:
                 write("gsave\n")
@@ -810,6 +821,11 @@ grestore
             else:
                 self.set_color(store=0, *rgbFace[:3])
                 write("fill\n")
+
+        hatch = gc.get_hatch()
+        if hatch:
+            self.set_hatch(hatch)
+
         if stroke:
             write("stroke\n")
 

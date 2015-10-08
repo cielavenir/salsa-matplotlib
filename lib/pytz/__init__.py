@@ -9,10 +9,10 @@ on how to use these modules.
 '''
 
 # The Olson database has historically been updated about 4 times a year
-OLSON_VERSION = '2007g'
+OLSON_VERSION = '2008c'
 VERSION = OLSON_VERSION
 #VERSION = OLSON_VERSION + '.2'
-__version__ = OLSON_VERSION+'-mpl'
+__version__ = OLSON_VERSION
 
 OLSEN_VERSION = OLSON_VERSION # Old releases had this misspelling
 
@@ -510,6 +510,7 @@ common_timezones = \
  'America/Maceio',
  'America/Managua',
  'America/Manaus',
+ 'America/Marigot',
  'America/Martinique',
  'America/Mazatlan',
  'America/Mendoza',
@@ -548,6 +549,7 @@ common_timezones = \
  'America/Sao_Paulo',
  'America/Scoresbysund',
  'America/Shiprock',
+ 'America/St_Barthelemy',
  'America/St_Johns',
  'America/St_Kitts',
  'America/St_Lucia',
@@ -605,6 +607,7 @@ common_timezones = \
  'Asia/Dushanbe',
  'Asia/Gaza',
  'Asia/Harbin',
+ 'Asia/Ho_Chi_Minh',
  'Asia/Hong_Kong',
  'Asia/Hovd',
  'Asia/Irkutsk',
@@ -617,6 +620,7 @@ common_timezones = \
  'Asia/Karachi',
  'Asia/Kashgar',
  'Asia/Katmandu',
+ 'Asia/Kolkata',
  'Asia/Krasnoyarsk',
  'Asia/Kuala_Lumpur',
  'Asia/Kuching',
@@ -908,6 +912,7 @@ all_timezones = \
  'America/Argentina/Mendoza',
  'America/Argentina/Rio_Gallegos',
  'America/Argentina/San_Juan',
+ 'America/Argentina/San_Luis',
  'America/Argentina/Tucuman',
  'America/Argentina/Ushuaia',
  'America/Aruba',
@@ -985,6 +990,7 @@ all_timezones = \
  'America/Maceio',
  'America/Managua',
  'America/Manaus',
+ 'America/Marigot',
  'America/Martinique',
  'America/Mazatlan',
  'America/Mendoza',
@@ -1025,6 +1031,7 @@ all_timezones = \
  'America/Sao_Paulo',
  'America/Scoresbysund',
  'America/Shiprock',
+ 'America/St_Barthelemy',
  'America/St_Johns',
  'America/St_Kitts',
  'America/St_Lucia',
@@ -1082,6 +1089,7 @@ all_timezones = \
  'Asia/Dushanbe',
  'Asia/Gaza',
  'Asia/Harbin',
+ 'Asia/Ho_Chi_Minh',
  'Asia/Hong_Kong',
  'Asia/Hovd',
  'Asia/Irkutsk',
@@ -1094,6 +1102,7 @@ all_timezones = \
  'Asia/Karachi',
  'Asia/Kashgar',
  'Asia/Katmandu',
+ 'Asia/Kolkata',
  'Asia/Krasnoyarsk',
  'Asia/Kuala_Lumpur',
  'Asia/Kuching',

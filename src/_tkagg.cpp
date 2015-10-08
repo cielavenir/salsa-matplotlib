@@ -1,6 +1,6 @@
 /*
  * The Python Imaging Library.
- * $Id: _tkagg.cpp 5210 2008-05-21 13:03:36Z mdboom $
+ * $Id: _tkagg.cpp 6341 2008-10-28 12:51:39Z mdboom $
  *
  */
 
@@ -54,7 +54,7 @@ PyAggImagePhoto(ClientData clientdata, Tcl_Interp* interp,
     agg::int8u *destbuffer;
     double l,b,r,t;
     int destx, desty, destwidth, destheight, deststride;
-    unsigned long tmp_ptr;
+    //unsigned long tmp_ptr;
 
     long mode;
     long nval;
@@ -131,7 +131,7 @@ PyAggImagePhoto(ClientData clientdata, Tcl_Interp* interp,
       renderer_base destrb(destpf);
 
       agg::rect_base<int> region(destx, desty, (int)r, srcheight-(int)b);
-      destrb.copy_from(*aggRenderer->renderingBuffer, &region,
+      destrb.copy_from(aggRenderer->renderingBuffer, &region,
 		       -destx, -desty);
     } else {
       has_bbox = false;

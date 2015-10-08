@@ -8,9 +8,8 @@ Getting started
 ===============
 
 The documentation for matplotlib is generated from ReStructured Text
-using the Sphinx_ documentation generation tool. Sphinx-0.4 or later
-is required. Currently this means we need to install from the svn
-repository by doing::
+using the Sphinx_ documentation generation tool. Sphinx-0.5 or later
+is required. Most developers work from the sphinx subversion repository because it is a rapidly evolving project::
 
   svn co http://svn.python.org/projects/doctools/trunk sphinx
   cd sphinx
@@ -208,20 +207,31 @@ Figures
 Dynamically generated figures
 -----------------------------
 
-The top level :file:`doc` dir has a folder called :file:`pyplots` in
-which you should include any pyplot plotting scripts that you want to
-generate figures for the documentation.  It is not necessary to
-explicitly save the figure in the script, this will be done
-automatically at build time to insure that the code that is included
-runs and produces the advertised figure.  Several figures will be
-saved with the same basnename as the filename when the documentation
-is generated (low and high res PNGs, a PDF).  Matplotlib includes a
-Sphinx extension (:file:`sphinxext/plot_directive.py`) for generating
-the images from the python script and including either a png copy for
-html or a pdf for latex::
+Figures can be automatically generated from scripts and included in
+the docs.  It is not necessary to explicitly save the figure in the
+script, this will be done automatically at build time to ensure that
+the code that is included runs and produces the advertised figure.
+Several figures will be saved with the same basename as the filename
+when the documentation is generated (low and high res PNGs, a PDF).
+Matplotlib includes a Sphinx extension
+(:file:`sphinxext/plot_directive.py`) for generating the images from
+the python script and including either a png copy for html or a pdf
+for latex::
 
-   .. plot:: pyplot_simple.py
+   .. plot:: pyplots/pyplot_simple.py
       :include-source:
+
+If the script produces multiple figures (through multiple calls to
+:func:`pyplot.figure`), each will be given a numbered file name and
+included.
+
+The path should be relative to the ``doc`` directory.  Any plots
+specific to the documentation should be added to the ``doc/pyplots``
+directory and committed to SVN.  Plots from the ``examples`` directory
+may be referenced through the symlink ``mpl_examples`` in the ``doc``
+directory.  eg.::
+
+  .. plot:: mpl_examples/pylab_examples/simple_plot.py
 
 The ``:scale:`` directive rescales the image to some percentage of the
 original size, though we don't recommend using this in most cases
@@ -241,9 +251,19 @@ svn. Please also add a line to the README in doc/pyplots for any additional
 requirements necessary to generate a new figure. Once these steps have been
 taken, these figures can be included in the usual way::
 
-   .. plot:: tex_unicode_demo.py
+   .. plot:: pyplots/tex_unicode_demo.py
       :include-source
 
+Examples
+--------
+
+The source of the files in the ``examples`` directory are
+automatically included in the HTML docs.  An image is generated and
+included for all examples in the ``api`` and ``pylab_examples``
+directories.  To exclude the example from having an image rendered,
+insert the following special comment anywhere in the script::
+
+  # -*- noplot -*-
 
 .. _referring-to-mpl-docs:
 
@@ -251,25 +271,40 @@ Referring to mpl documents
 ==========================
 
 In the documentation, you may want to include to a document in the
-matplotlib src, e.g. a license file, an image file from `mpl-data`, or an
-example.  When you include these files, include them using a symbolic
-link from the documentation parent directory.  This way, if we
-relocate the mpl documentation directory, all of the internal pointers
-to files will not have to change, just the top level symlinks.  For
-example, In the top level doc directory we have symlinks pointing to
-the mpl `examples` and `mpl-data`::
+matplotlib src, e.g. a license file or an image file from `mpl-data`,
+refer to it via a relative path from the document where the rst file
+resides, eg, in :file:`users/navigation_toolbar.rst`, we refer to the
+image icons with::
 
-    home:~/mpl/doc2> ls -l mpl_*
-    mpl_data -> ../lib/matplotlib/mpl-data
-    mpl_examples -> ../examples
-
+    .. image:: ../../lib/matplotlib/mpl-data/images/subplots.png
 
 In the `users` subdirectory, if I want to refer to a file in the mpl-data
 directory, I use the symlink directory.  For example, from
 `customizing.rst`::
 
-   .. literalinclude:: ../mpl_data/matplotlibrc
+    .. literalinclude:: ../../lib/matplotlib/mpl-data/matplotlibrc
 
+On exception to this is when referring to the examples dir.  Relative
+paths are extremely confusing in the sphinx plot extensions, so
+without getting into the dirty details, it is easier to simply include
+a symlink to the files at the top doc level directory.  This way, API
+documents like :meth:`matplotlib.pyplot.plot` can refer to the
+examples in a known location.
+
+In the top level doc directory we have symlinks pointing to
+the mpl `examples`::
+
+    home:~/mpl/doc> ls -l mpl_*
+    mpl_examples -> ../examples
+
+So we can include plots from the examples dir using the symlink::
+
+    .. plot:: mpl_examples/pylab_examples/simple_plot.py
+
+
+We used to use a symlink for :file:`mpl-data` too, but the distro
+becomes very large on platforms that do not support links (eg the font
+files are duplicated and large)
 
 .. _internal-section-refs:
 

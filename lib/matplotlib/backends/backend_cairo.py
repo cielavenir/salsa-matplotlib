@@ -25,10 +25,14 @@ import numpy as npy
 
 def _fn_name(): return sys._getframe(1).f_code.co_name
 
-import cairo
+try:
+   import cairo
+except ImportError:
+   raise ImportError("Cairo backend requires that pycairo is installed.")
+
 _version_required = (1,2,0)
 if cairo.version_info < _version_required:
-   raise SystemExit ("Pycairo %d.%d.%d is installed\n"
+   raise ImportError ("Pycairo %d.%d.%d is installed\n"
                      "Pycairo %d.%d.%d or later is required"
                      % (cairo.version_info + _version_required))
 backend_version = cairo.version

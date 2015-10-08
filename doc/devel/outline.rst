@@ -75,7 +75,7 @@ we can figure out how best to organize the API Reference and continue from
 there.
 
 ====================   ===========   ===================
-Module                 Author        Status             
+Module                 Author        Status
 ====================   ===========   ===================
 backend_agg                          needs conversion
 backend_cairo                        needs conversion
@@ -108,9 +108,9 @@ config/rcsetup         Darren        needs conversion
 config/tconfig         Darren        needs conversion
 config/verbose         Darren        needs conversion
 numerix/__init__                     needs conversion
-projections/__init__                 needs conversion
-projections/geo                      needs conversion
-projections/polar                    needs conversion
+projections/__init__   Mike          converted
+projections/geo        Mike          converted (not included--experimental)
+projections/polar      Mike          converted
 afm                                  converted
 artist                               converted
 axes                                 converted
@@ -126,26 +126,26 @@ dates                  Darren        needs conversion
 dviread                Darren        needs conversion
 figure                 Darren        needs conversion
 finance                Darren        needs conversion
-font_manager           Mike          needs conversion
-fontconfig_pattern     Mike          needs conversion
+font_manager           Mike          converted
+fontconfig_pattern     Mike          converted
 image                                needs conversion
 legend                               needs conversion
-lines                                needs conversion
-mathtext                             needs conversion
-mlab                                 needs conversion
-mpl                                  needs conversion
-patches                              needs conversion
-path                                 needs conversion
-pylab                                needs conversion
+lines                  Mike & ???    converted
+mathtext               Mike          converted
+mlab                   John/Mike     converted
+mpl                                  N/A
+patches                Mike          converted
+path                   Mike          converted
+pylab                                N/A
 pyplot                               converted
 quiver                               needs conversion
 rcsetup                              needs conversion
-scale                                needs conversion
+scale                  Mike          converted
 table                                needs conversion
 texmanager             Darren        needs conversion
-text                   Mike          needs conversion
-ticker                 Mike          needs conversion
-transforms                           needs conversion
+text                   Mike          converted
+ticker                 John          converted
+transforms             Mike          converted
 type1font                            needs conversion
 units                                needs conversion
 widgets                              needs conversion

@@ -184,7 +184,7 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
     """
     call signature::
 
-      figure(num = None, figsize=(8, 6), dpi=80, facecolor='w', edgecolor='k')
+      figure(num=None, figsize=(8, 6), dpi=80, facecolor='w', edgecolor='k')
 
 
     Create a new figure and return a :class:`matplotlib.figure.Figure`
@@ -234,6 +234,9 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
             num = max(allnums) + 1
         else:
             num = 1
+    else:
+        num = int(num)  # crude validation of num argument
+
 
     figManager = _pylab_helpers.Gcf.get_fig_manager(num)
     if figManager is None:
@@ -413,16 +416,17 @@ def figlegend(handles, labels, loc, **kwargs):
       can be a string or an integer specifying the legend
       location
 
+    A :class:`matplotlib.legend.Legend` instance is returned.
+
     Example::
 
       figlegend( (line1, line2, line3),
                  ('label1', 'label2', 'label3'),
                  'upper right' )
 
-    See :func:`~matplotlib.pyplot.legend` for information about the
-    location codes
-
-    A :class:`matplotlib.legend.Legend` instance is returned.
+    .. seealso::
+       :func:`~matplotlib.pyplot.legend`:
+         For information about the location codes
     """
     l = gcf().legend(handles, labels, loc, **kwargs)
     draw_if_interactive()
@@ -584,14 +588,6 @@ def subplot(*args, **kwargs):
 
     ``subplot(111)`` is the default axis.
 
-    The background color of the subplot can be specified via keyword
-    argument *axisbg*, which takes a color string as value, as in::
-
-      subplot(211, axisbg='y')
-
-    See :func:`~matplotlib.pyplot.axes` for additional information on
-    :func:`axes` and :func:`subplot` keyword arguments.
-
     New subplots that overlap old will delete the old axes.  If you do
     not want this behavior, use
     :meth:`matplotlib.figure.Figure.add_subplot` or the
@@ -601,6 +597,34 @@ def subplot(*args, **kwargs):
       plot([1,2,3])  # implicitly creates subplot(111)
       subplot(211)   # overlaps, subplot(111) is killed
       plot(rand(12), rand(12))
+      subplot(212, axisbg='y') # creates 2nd subplot with yellow background
+
+    Keyword arguments:
+
+      *axisbg*:
+        The background color of the subplot, which can be any valid
+        color specifier.  See :mod:`matplotlib.colors` for more
+        information.
+
+      *polar*:
+        A boolean flag indicating whether the subplot plot should be
+        a polar projection.  Defaults to False.
+
+      *projection*:
+        A string giving the name of a custom projection to be used
+        for the subplot. This projection must have been previously
+        registered. See :func:`matplotlib.projections.register_projection`
+
+    .. seealso::
+        :func:`~matplotlib.pyplot.axes`:
+            For additional information on :func:`axes` and
+            :func:`subplot` keyword arguments.
+
+        :file:`examples/pylab_examples/polar_scatter.py`
+
+    **Example:**
+
+    .. plot:: mpl_examples/pylab_examples/subplot_demo.py
 
     """
 
@@ -625,12 +649,14 @@ def twinx(ax=None):
     *None*) sharing the xaxis.  The ticks for *ax2* will be placed on
     the right, and the *ax2* instance is returned.
 
-    See :file:`examples/pylab_examples/two_scales.py`
+    .. seealso::
+       :file:`examples/api_examples/two_scales.py`
     """
     if ax is None:
         ax=gca()
+    ax1 = ax.twinx()
     draw_if_interactive()
-    return ax.twinx()
+    return ax1
 
 
 def twiny(ax=None):
@@ -641,8 +667,9 @@ def twiny(ax=None):
     """
     if ax is None:
         ax=gca()
+    ax1 = ax.twiny()
     draw_if_interactive()
-    return ax.twiny()
+    return ax1
 
 
 
@@ -718,8 +745,9 @@ def title(s, *args, **kwargs):
                   'verticalalignment': 'bottom',
                   'horizontalalignment': 'center'}
 
-    See the :func:`~matplotlib.pyplot.text` docstring for information
-    of how override and the optional args work.
+    .. seealso::
+       :func:`~matplotlib.pyplot.text`:
+           for information on how override and the optional args work.
     """
     l =  gca().set_title(s, *args, **kwargs)
     draw_if_interactive()
@@ -779,10 +807,12 @@ def axis(*v, **kwargs):
 
     if ``len(*v)==0``, you can pass in *xmin*, *xmax*, *ymin*, *ymax*
     as kwargs selectively to alter just those limits without changing
-    the others.  See :func:`xlim` and :func:`ylim` for more information
+    the others.
 
     The xmin, xmax, ymin, ymax tuple is returned
 
+    .. seealso::
+        :func:`xlim`, :func:`ylim`
     """
     ax = gca()
     v = ax.axis(*v, **kwargs)
@@ -801,9 +831,9 @@ def xlabel(s, *args, **kwargs):
           'horizontalalignment' : 'center'
           }
 
-    See :func:`~matplotlib.pyplot.text` for information of how
-    override and the optional args work
-
+    .. seealso::
+        :func:`~matplotlib.pyplot.text`:
+            For information on how override and the optional args work
     """
     l =  gca().set_xlabel(s, *args, **kwargs)
     draw_if_interactive()
@@ -821,9 +851,10 @@ def ylabel(s, *args, **kwargs):
            'horizontalalignment' : 'right',
            'rotation'='vertical' : }
 
-    See :func:`~matplotlib.pyplot.text` for information on how
-    override and the optional args work.
-
+    .. seealso::
+        :func:`~matplotlib.pyplot.text`:
+            For information on how override and the optional args
+            work.
     """
     l = gca().set_ylabel(s, *args, **kwargs)
     draw_if_interactive()
@@ -895,7 +926,7 @@ def xscale(*args, **kwargs):
     draw_if_interactive()
     return ret
 xscale.__doc__ = dedent(xscale.__doc__) % {
-    'scale': ' | '.join([repr(x) for x in get_scale_names()]),
+    'scale': ' | '.join([repr(_x) for _x in get_scale_names()]),
     'scale_docs': get_scale_docs()}
 
 def yscale(*args, **kwargs):
@@ -915,7 +946,7 @@ def yscale(*args, **kwargs):
     draw_if_interactive()
     return ret
 yscale.__doc__ = dedent(yscale.__doc__) % {
-    'scale': ' | '.join([repr(x) for x in get_scale_names()]),
+    'scale': ' | '.join([repr(_x) for _x in get_scale_names()]),
     'scale_docs': get_scale_docs()}
 
 def xticks(*args, **kwargs):
@@ -1107,62 +1138,62 @@ def thetagrids(*args, **kwargs):
 def plotting():
     """
     Plotting commands
-
-    =========   =================================================
-    Command     Description
-    =========   =================================================
-    axes        Create a new axes
-    axis        Set or return the current axis limits
-    bar         make a bar chart
-    boxplot     make a box and whiskers chart
-    cla         clear current axes
-    clabel      label a contour plot
-    clf         clear a figure window
-    close       close a figure window
-    colorbar    add a colorbar to the current figure
-    cohere      make a plot of coherence
-    contour     make a contour plot
-    contourf    make a filled contour plot
-    csd         make a plot of cross spectral density
-    draw        force a redraw of the current figure
-    errorbar    make an errorbar graph
-    figlegend   add a legend to the figure
-    figimage    add an image to the figure, w/o resampling
-    figtext     add text in figure coords
-    figure      create or change active figure
-    fill        make filled polygons
-    gca         return the current axes
-    gcf         return the current figure
-    gci         get the current image, or None
-    getp        get a handle graphics property
-    hist        make a histogram
-    hold        set the hold state on current axes
-    legend      add a legend to the axes
-    loglog      a log log plot
-    imread      load image file into array
-    imshow      plot image data
-    matshow     display a matrix in a new figure preserving aspect
-    pcolor      make a pseudocolor plot
-    plot        make a line plot
-    plotfile    plot data from a flat file
-    psd         make a plot of power spectral density
-    quiver      make a direction field (arrows) plot
-    rc          control the default params
-    savefig     save the current figure
-    scatter     make a scatter plot
-    setp        set a handle graphics property
-    semilogx    log x axis
-    semilogy    log y axis
-    show        show the figures
-    specgram    a spectrogram plot
-    stem        make a stem plot
-    subplot     make a subplot (numrows, numcols, axesnum)
-    table       add a table to the axes
-    text        add some text at location x,y to the current axes
-    title       add a title to the current axes
-    xlabel      add an xlabel to the current axes
-    ylabel      add a ylabel to the current axes
-    =========   =================================================
+    =============== =========================================================
+    Command         Description
+    =============== =========================================================
+    axes            Create a new axes
+    axis            Set or return the current axis limits
+    bar             make a bar chart
+    boxplot         make a box and whiskers chart
+    cla             clear current axes
+    clabel          label a contour plot
+    clf             clear a figure window
+    close           close a figure window
+    colorbar        add a colorbar to the current figure
+    cohere          make a plot of coherence
+    contour         make a contour plot
+    contourf        make a filled contour plot
+    csd             make a plot of cross spectral density
+    draw            force a redraw of the current figure
+    errorbar        make an errorbar graph
+    figlegend       add a legend to the figure
+    figimage        add an image to the figure, w/o resampling
+    figtext         add text in figure coords
+    figure          create or change active figure
+    fill            make filled polygons
+    fill_between    make filled polygons
+    gca             return the current axes
+    gcf             return the current figure
+    gci             get the current image, or None
+    getp            get a handle graphics property
+    hist            make a histogram
+    hold            set the hold state on current axes
+    legend          add a legend to the axes
+    loglog          a log log plot
+    imread          load image file into array
+    imshow          plot image data
+    matshow         display a matrix in a new figure preserving aspect
+    pcolor          make a pseudocolor plot
+    plot            make a line plot
+    plotfile        plot data from a flat file
+    psd             make a plot of power spectral density
+    quiver          make a direction field (arrows) plot
+    rc              control the default params
+    savefig         save the current figure
+    scatter         make a scatter plot
+    setp            set a handle graphics property
+    semilogx        log x axis
+    semilogy        log y axis
+    show            show the figures
+    specgram        a spectrogram plot
+    stem            make a stem plot
+    subplot         make a subplot (numrows, numcols, axesnum)
+    table           add a table to the axes
+    text            add some text at location x,y to the current axes
+    title           add a title to the current axes
+    xlabel          add an xlabel to the current axes
+    ylabel          add a ylabel to the current axes
+    =============== =========================================================
 
     The following commands will set the default colormap accordingly:
 
@@ -1481,7 +1512,6 @@ def plotfile(fname, cols=(0,), plotfuncs=None,
 ## Plotting part 2: autogenerated wrappers for axes methods ##
 
 
-### Do not edit below this point
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 def acorr(*args, **kwargs):
@@ -1858,6 +1888,50 @@ Additional kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
+def fill_between(*args, **kwargs):
+    # allow callers to override the hold state by passing hold=True|False
+    b = ishold()
+    h = kwargs.pop('hold', None)
+    if h is not None:
+        hold(h)
+    try:
+        ret =  gca().fill_between(*args, **kwargs)
+        draw_if_interactive()
+    except:
+        hold(b)
+        raise
+
+    hold(b)
+    return ret
+if Axes.fill_between.__doc__ is not None:
+    fill_between.__doc__ = dedent(Axes.fill_between.__doc__) + """
+
+Additional kwargs: hold = [True|False] overrides default hold state"""
+
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
+def hexbin(*args, **kwargs):
+    # allow callers to override the hold state by passing hold=True|False
+    b = ishold()
+    h = kwargs.pop('hold', None)
+    if h is not None:
+        hold(h)
+    try:
+        ret =  gca().hexbin(*args, **kwargs)
+        draw_if_interactive()
+    except:
+        hold(b)
+        raise
+    gci._current = ret
+    hold(b)
+    return ret
+if Axes.hexbin.__doc__ is not None:
+    hexbin.__doc__ = dedent(Axes.hexbin.__doc__) + """
+
+Additional kwargs: hold = [True|False] overrides default hold state"""
+
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
 def hist(*args, **kwargs):
     # allow callers to override the hold state by passing hold=True|False
     b = ishold()
@@ -2144,28 +2218,6 @@ Additional kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
-def hexbin(*args, **kwargs):
-    # allow callers to override the hold state by passing hold=True|False
-    b = ishold()
-    h = kwargs.pop('hold', None)
-    if h is not None:
-        hold(h)
-    try:
-        ret =  gca().hexbin(*args, **kwargs)
-        draw_if_interactive()
-    except:
-        hold(b)
-        raise
-    gci._current = ret
-    hold(b)
-    return ret
-if Axes.hexbin.__doc__ is not None:
-    hexbin.__doc__ = dedent(Axes.hexbin.__doc__) + """
-
-Additional kwargs: hold = [True|False] overrides default hold state"""
-
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
 def semilogx(*args, **kwargs):
     # allow callers to override the hold state by passing hold=True|False
     b = ishold()
@@ -2354,7 +2406,7 @@ def barbs(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.barbs.__doc__ is not None:
@@ -2426,8 +2478,8 @@ if Axes.annotate.__doc__ is not None:
 # changes will be lost
 def autumn():
     '''
-    Set the default colormap to *autumn* and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to autumn and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='autumn')
     im = gci()
@@ -2441,8 +2493,8 @@ def autumn():
 # changes will be lost
 def bone():
     '''
-    Set the default colormap to bone and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to bone and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='bone')
     im = gci()
@@ -2456,8 +2508,8 @@ def bone():
 # changes will be lost
 def cool():
     '''
-    Set the default colormap to cool and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to cool and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='cool')
     im = gci()
@@ -2471,8 +2523,8 @@ def cool():
 # changes will be lost
 def copper():
     '''
-    Set the default colormap to copper and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to copper and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='copper')
     im = gci()
@@ -2486,8 +2538,8 @@ def copper():
 # changes will be lost
 def flag():
     '''
-    Set the default colormap to flag and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to flag and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='flag')
     im = gci()
@@ -2501,8 +2553,8 @@ def flag():
 # changes will be lost
 def gray():
     '''
-    Set the default colormap to gray and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to gray and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='gray')
     im = gci()
@@ -2516,8 +2568,8 @@ def gray():
 # changes will be lost
 def hot():
     '''
-    Set the default colormap to hot and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to hot and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='hot')
     im = gci()
@@ -2531,8 +2583,8 @@ def hot():
 # changes will be lost
 def hsv():
     '''
-    Set the default colormap to hsv and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to hsv and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='hsv')
     im = gci()
@@ -2546,8 +2598,8 @@ def hsv():
 # changes will be lost
 def jet():
     '''
-    Set the default colormap to jet and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to jet and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='jet')
     im = gci()
@@ -2561,8 +2613,8 @@ def jet():
 # changes will be lost
 def pink():
     '''
-    Set the default colormap to pink and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to pink and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='pink')
     im = gci()
@@ -2576,8 +2628,8 @@ def pink():
 # changes will be lost
 def prism():
     '''
-    Set the default colormap to prism and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to prism and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='prism')
     im = gci()
@@ -2591,8 +2643,8 @@ def prism():
 # changes will be lost
 def spring():
     '''
-    Set the default colormap to spring and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to spring and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='spring')
     im = gci()
@@ -2606,8 +2658,8 @@ def spring():
 # changes will be lost
 def summer():
     '''
-    Set the default colormap to summer and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to summer and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='summer')
     im = gci()
@@ -2621,8 +2673,8 @@ def summer():
 # changes will be lost
 def winter():
     '''
-    Set the default colormap to winter and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to winter and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='winter')
     im = gci()
@@ -2636,8 +2688,8 @@ def winter():
 # changes will be lost
 def spectral():
     '''
-    Set the default colormap to spectral and apply to current image if any.
-    See :func:`colormaps` for more information.
+    set the default colormap to spectral and apply to current image if any.
+    See help(colormaps) for more information
     '''
     rc('image', cmap='spectral')
     im = gci()
@@ -2645,3 +2697,5 @@ def spectral():
     if im is not None:
         im.set_cmap(cm.spectral)
     draw_if_interactive()
+
+

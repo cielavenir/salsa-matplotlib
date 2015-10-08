@@ -20,8 +20,16 @@ Example usage:
 
 """
 import copy
-import numpy as npy
-import pyExcelerator as excel
+import numpy as np
+
+try:
+    import xlwt as excel
+except ImportError:
+    try:
+        import pyExcelerator as excel
+    except ImportError:
+        raise ImportError('You must install xlwt or pyExcelterator to use the exceltools')
+
 import matplotlib.cbook as cbook
 import matplotlib.mlab as mlab
 
@@ -41,8 +49,11 @@ def xlformat_factory(format):
        xlstyle.num_format_str = '0.%s%%;[RED]-0.%s%%'%(zeros, zeros)
        format.scale = 1.
     elif isinstance(format, mlab.FormatFloat):
-        zeros = ''.join(['0']*format.precision)
-        xlstyle.num_format_str = '#,##0.%s;[RED]-#,##0.%s'%(zeros, zeros)
+        if format.precision>0:
+            zeros = ''.join(['0']*format.precision)
+            xlstyle.num_format_str = '#,##0.%s;[RED]-#,##0.%s'%(zeros, zeros)
+        else:
+            xlstyle.num_format_str = '#,##;[RED]-#,##'
     elif isinstance(format, mlab.FormatInt):
         xlstyle.num_format_str = '#,##;[RED]-#,##'
     else:
@@ -52,7 +63,7 @@ def xlformat_factory(format):
 
     return format
 
-def rec2excel(r, ws, formatd=None, rownum=0, colnum=0, nanstr='NaN'):
+def rec2excel(r, ws, formatd=None, rownum=0, colnum=0, nanstr='NaN', infstr='Inf'):
     """
     save record array r to excel pyExcelerator worksheet ws
     starting at rownum.  if ws is string like, assume it is a
@@ -97,25 +108,26 @@ def rec2excel(r, ws, formatd=None, rownum=0, colnum=0, nanstr='NaN'):
     rownum+=1
 
 
-    ind = npy.arange(len(r.dtype.names))
+    ind = np.arange(len(r.dtype.names))
     for row in r:
+
         for i in ind:
             val = row[i]
             format = formats[i]
             val = format.toval(val)
-            if format.xlstyle is None:
+            if mlab.safe_isnan(val):
+                ws.write(rownum, colnum+i, nanstr)
+            elif mlab.safe_isinf(val):
+                sgn = np.sign(val)
+                if sgn<0: s = infstr
+                else: s = '-%s'%infstr
+                ws.write(rownum, colnum+i, s)
+            elif format.xlstyle is None:
                 ws.write(rownum, colnum+i, val)
             else:
-                if mlab.safe_isnan(val):
-                    ws.write(rownum, colnum+i, nanstr)
-                else:
-                    ws.write(rownum, colnum+i, val, format.xlstyle)
+                ws.write(rownum, colnum+i, val, format.xlstyle)
         rownum += 1
 
     if autosave:
         wb.save(filename)
     return rownum
-
-
-
-

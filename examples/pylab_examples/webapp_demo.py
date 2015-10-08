@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- noplot -*-
 # This example shows how to use the agg backend directly to create
 # images, which may be of use to web application developers who want
 # full control over their code without using the pylab interface to
@@ -60,6 +61,6 @@ def make_fig():
         l.set_fontsize(12)
 
     canvas = FigureCanvasAgg(fig)
-    canvas.print_figure('webapp.png', dpi=150)
+    canvas.print_figure('webapp', dpi=150)
 
 make_fig()
