@@ -81,7 +81,7 @@ class Artist(object):
         # TODO: add legend support
 
     def have_units(self):
-        'return True if units are set on the x or y axes'
+        'return *True* if units are set on the x or y axes'
         ax = self.axes
         if ax is None or ax.xaxis is None:
             return False
@@ -89,7 +89,7 @@ class Artist(object):
 
     def convert_xunits(self, x):
         """for artists in an axes, if the xaxis as units support,
-        convert x using xaxis unit type
+        convert *x* using xaxis unit type
         """
         ax = getattr(self, 'axes', None)
         if ax is None or ax.xaxis is None:
@@ -99,7 +99,7 @@ class Artist(object):
 
     def convert_yunits(self, y):
         """for artists in an axes, if the yaxis as units support,
-        convert y using yaxis unit type
+        convert *y* using yaxis unit type
         """
         ax = getattr(self, 'axes', None)
         if ax is None or ax.yaxis is None: return y
@@ -107,14 +107,14 @@ class Artist(object):
 
     def set_axes(self, axes):
         """
-        set the axes instance the artist resides in, if any
+        set the axes instance in which the artist resides, if any
 
         ACCEPTS: an axes instance
         """
         self.axes = axes
 
     def get_axes(self):
-        'return the axes instance the artist resides in, or None'
+        'return the axes instance the artist resides in, or *None*'
         return self.axes
 
     def add_callback(self, func):
@@ -170,7 +170,7 @@ class Artist(object):
             for a in self.get_children(): L.extend(a.hitlist(event))
         return L
 
-    def contains(self,mouseevent):
+    def contains(self, mouseevent):
         """Test whether the artist contains the mouse event.
 
         Returns the truth value and a dictionary of artist specific details of
@@ -189,26 +189,28 @@ class Artist(object):
 
             hit, props = picker(artist, mouseevent)
 
-        If the mouse event is over the artist, return hit=True and props
+        If the mouse event is over the artist, return *hit=True* and *props*
         is a dictionary of properties you want returned with the contains test.
         """
         self._contains = picker
 
     def get_contains(self):
-        'return the _contains test used by the artist, or None for default.'
+        'return the _contains test used by the artist, or *None* for default.'
         return self._contains
 
     def pickable(self):
-        'return True if self is pickable'
+        'return *True* if self is pickable'
         return (self.figure is not None and
                 self.figure.canvas is not None and
                 self._picker is not None)
 
     def pick(self, mouseevent):
         """
-        pick(mouseevent)
+        call signature::
 
-        each child artist will fire a pick event if mouseevent is over
+          pick(mouseevent)
+
+        each child artist will fire a pick event if *mouseevent* is over
         the artist and the artist has picker set
         """
         # Pick self
@@ -229,31 +231,31 @@ class Artist(object):
         """
         set the epsilon for picking used by this artist
 
-        picker can be one of the following:
+        *picker* can be one of the following:
 
-          None -  picking is disabled for this artist (default)
+          * *None*: picking is disabled for this artist (default)
 
-          boolean - if True then picking will be enabled and the
-          artist will fire a pick event if the mouse event is over
-          the artist
+          * A boolean: if *True* then picking will be enabled and the
+            artist will fire a pick event if the mouse event is over
+            the artist
 
-          float - if picker is a number it is interpreted as an
-          epsilon tolerance in points and the the artist will fire
-          off an event if it's data is within epsilon of the mouse
-          event.  For some artists like lines and patch collections,
-          the artist may provide additional data to the pick event
-          that is generated, eg the indices of the data within
-          epsilon of the pick event
+          * A float: if picker is a number it is interpreted as an
+            epsilon tolerance in points and the artist will fire
+            off an event if it's data is within epsilon of the mouse
+            event.  For some artists like lines and patch collections,
+            the artist may provide additional data to the pick event
+            that is generated, e.g. the indices of the data within
+            epsilon of the pick event
 
-          function - if picker is callable, it is a user supplied
-          function which determines whether the artist is hit by the
-          mouse event::
+          * A function: if picker is callable, it is a user supplied
+            function which determines whether the artist is hit by the
+            mouse event::
 
               hit, props = picker(artist, mouseevent)
 
-          to determine the hit test.  if the mouse event is over the
-          artist, return hit=True and props is a dictionary of
-          properties you want added to the PickEvent attributes.
+            to determine the hit test.  if the mouse event is over the
+            artist, return *hit=True* and props is a dictionary of
+            properties you want added to the PickEvent attributes.
 
         ACCEPTS: [None|float|boolean|callable]
         """
@@ -262,7 +264,6 @@ class Artist(object):
     def get_picker(self):
         'return the Pickeration instance used by this artist'
         return self._picker
-
 
     def is_figure_set(self):
         return self.figure is not None
@@ -279,7 +280,7 @@ class Artist(object):
         Set the :class:`~matplotlib.figure.Figure` instance the artist
         belongs to.
 
-        ACCEPTS: a matplotlib.figure.Figure instance
+        ACCEPTS: a :class:`matplotlib.figure.Figure` instance
         """
         self.figure = fig
         self.pchanged()
@@ -288,7 +289,7 @@ class Artist(object):
         """
         Set the artist's clip Bbox
 
-        ACCEPTS: a matplotlib.transform.Bbox instance
+        ACCEPTS: a :class:`matplotlib.transform.Bbox` instance
         """
         self.clipbox = clipbox
         self._clipon = clipbox is not None or self._clippath is not None
@@ -298,21 +299,22 @@ class Artist(object):
         """
         Set the artist's clip path, which may be:
 
-          a) a :class:`~matplotlib.patches.Patch` (or subclass) instance
+          * a :class:`~matplotlib.patches.Patch` (or subclass) instance
 
-          b) a :class:`~matplotlib.path.Path` instance, in which case
+          * a :class:`~matplotlib.path.Path` instance, in which case
              an optional :class:`~matplotlib.transforms.Transform`
              instance may be provided, which will be applied to the
              path before using it for clipping.
 
-          c) *None*, to remove the clipping path
+          * *None*, to remove the clipping path
 
         For efficiency, if the path happens to be an axis-aligned
         rectangle, this method will set the clipping box to the
         corresponding rectangle and set the clipping path to *None*.
 
-        ACCEPTS: a Path instance and a Transform instance, a Patch
-        instance, or None
+        ACCEPTS: a :class:`~matplotlib.path.Path` instance and a
+        :class:`~matplotlib.transforms.Transform` instance, a
+        :class:`~matplotlib.patches.Patch` instance, or *None*.
         """
         from patches import Patch, Rectangle
 
@@ -371,8 +373,9 @@ class Artist(object):
 
     def get_transformed_clip_path_and_affine(self):
         '''
-        Return the clip path with the non-affine part of its transformation applied,
-        and the remaining affine part of its transformation.
+        Return the clip path with the non-affine part of its
+        transformation applied, and the remaining affine part of its
+        transformation.
         '''
         if self._clippath is not None:
             return self._clippath.get_transformed_path_and_affine()
@@ -459,7 +462,7 @@ class Artist(object):
 
     def set_label(self, s):
         """
-        Set the line label to s for auto legend
+        Set the line label to *s* for auto legend
 
         ACCEPTS: any string
         """
@@ -495,7 +498,7 @@ class Artist(object):
 
     def set(self, **kwargs):
         """
-        A tkstyle set command, pass kwargs to set properties
+        A tkstyle set command, pass *kwargs* to set properties
         """
         ret = []
         for k,v in kwargs.items():
@@ -504,6 +507,51 @@ class Artist(object):
             func = getattr(self,funcName)
             ret.extend( [func(v)] )
         return ret
+
+    def findobj(self, match=None):
+        """
+        pyplot signature:
+          findobj(o=gcf(), match=None) 
+
+        recursively find all :class:matplotlib.artist.Artist instances
+        contained in self
+
+        *match* can be
+
+          - None: return all objects contained in artist (including artist)
+
+          - function with signature ``boolean = match(artist)`` used to filter matches
+
+          - class instance: eg Line2D.  Only return artists of class type
+
+        .. plot:: ../mpl_examples/pylab_examples/findobj_demo.py
+        """
+
+        if match is None: # always return True
+            def matchfunc(x): return True
+        elif cbook.issubclass_safe(match, Artist):
+            def matchfunc(x):
+                return isinstance(x, match)
+        elif callable(match):
+            matchfunc = match
+        else:
+            raise ValueError('match must be None, an matplotlib.artist.Artist subclass, or a callable')
+
+
+        artists = []
+        if hasattr(self, 'get_children'):
+            for c in self.get_children():
+                if matchfunc(c):
+                    artists.append(c)
+                artists.extend([thisc for thisc in c.findobj(matchfunc) if matchfunc(thisc)])
+        else:
+            if matchfunc(self):
+                artists.append(self)
+        return artists
+
+
+
+
 
 
 class ArtistInspector:
@@ -526,8 +574,8 @@ class ArtistInspector:
 
     def get_aliases(self):
         """
-        Get a dict mapping *fullname* -> *alias* for each alias in the
-        :class:`~matplotlib.artist.ArtistInspector`.
+        Get a dict mapping *fullname* -> *alias* for each *alias* in
+        the :class:`~matplotlib.artist.ArtistInspector`.
 
         Eg., for lines::
 
@@ -553,7 +601,7 @@ class ArtistInspector:
         """
         Get the legal arguments for the setter associated with *attr*.
 
-        This is done by querying the docstring of the function set_ *attr*
+        This is done by querying the docstring of the function *set_attr*
         for a line that begins with ACCEPTS:
 
         Eg., for a line linestyle, return
@@ -603,11 +651,11 @@ class ArtistInspector:
 
     def aliased_name(self, s):
         """
-        return 'PROPNAME or alias' if s has an alias, else return
+        return 'PROPNAME or alias' if *s* has an alias, else return
         PROPNAME.
 
-        Eg for the line markerfacecolor property, which has an alias,
-        return 'markerfacecolor or mfc' and for the transform
+        E.g. for the line markerfacecolor property, which has an
+        alias, return 'markerfacecolor or mfc' and for the transform
         property, which does not, return 'transform'
         """
         if self.aliasd.has_key(s):
@@ -687,37 +735,85 @@ class ArtistInspector:
         return lines
 
 
-def getp(o, *args):
+
+    def findobj(self, match=None):
+        """
+        recursively find all :class:matplotlib.artist.Artist instances
+        contained in self
+
+        if *match* is not None, it can be
+
+          - function with signature ``boolean = match(artist)``
+
+          - class instance: eg Line2D
+
+        used to filter matches
+        """
+
+        if match is None: # always return True
+            def matchfunc(x): return True
+        elif issubclass(match, Artist):
+            def matchfunc(x):
+                return isinstance(x, match)
+        elif callable(match):
+            matchfunc = func
+        else:
+            raise ValueError('match must be None, an matplotlib.artist.Artist subclass, or a callable')
+
+
+        artists = []
+        if hasattr(self, 'get_children'):
+            for c in self.get_children():
+                if matchfunc(c):
+                    artists.append(c)
+                artists.extend([thisc for thisc in c.findobj(matchfunc) if matchfunc(thisc)])
+        else:
+            if matchfunc(self):
+                artists.append(self)
+        return artists
+
+
+
+
+
+
+def getp(o, property=None):
     """
-    .. TODO: What are 's' and 'h' arguments described below?
+    Return the value of handle property.  property is an optional string
+    for the property you want to return
 
-    Return the value of handle property s
+    Example usage::
 
-    h is an instance of a class, eg a Line2D or an Axes or Text.
-    if s is 'somename', this function returns
+        getp(o)  # get all the object properties
+        getp(o, 'linestyle')  # get the linestyle property
+
+
+    o is a :class:`Artist` instance, eg
+    :class:`~matplotllib.lines.Line2D` or an instance of a
+    :class:`~matplotlib.axes.Axes` or :class:`matplotlib.text.Text`.
+    If the *property* is 'somename', this function returns
 
       o.get_somename()
 
     getp can be used to query all the gettable properties with getp(o)
     Many properties have aliases for shorter typing, eg 'lw' is an
     alias for 'linewidth'.  In the output, aliases and full property
-    names will be listed as
+    names will be listed as::
 
       property or  alias = value
 
-    eg
+    e.g.::
 
       linewidth or lw = 2
     """
 
     insp = ArtistInspector(o)
 
-    if len(args)==0:
+    if property is None:
         print '\n'.join(insp.pprint_getters())
         return
 
-    name = args[0]
-    func = getattr(o, 'get_' + name)
+    func = getattr(o, 'get_' + property)
     return func()
 
 def get(o, *args, **kwargs):
@@ -750,7 +846,7 @@ def setp(h, *args, **kwargs):
     :func:`setp` operates on a single instance or a list of instances.
     If you are in query mode introspecting the possible values, only
     the first instance in the sequence is used.  When actually setting
-    values, all the instances will be set.  Eg., suppose you have a
+    values, all the instances will be set.  E.g., suppose you have a
     list of two lines, the following will make both lines thicker and
     red::
 

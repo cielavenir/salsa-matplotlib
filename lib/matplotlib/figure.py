@@ -6,9 +6,6 @@ contains all the plot elements.  The following classes are defined
 :class:`SubplotParams`
     control the default spacing of the subplots
 
-:class:`BlockingMouseInput`
-    creates a callable object to retrieve mouse clicks in a blocking way for interactive sessions
-
 :class:`Figure`
     top level container for all plot elements
 
@@ -32,6 +29,7 @@ from legend import Legend
 from transforms import Affine2D, Bbox, BboxTransformTo, TransformedBbox
 from projections import projection_factory, get_projection_names, \
     get_projection_class
+from matplotlib.blocking_input import BlockingMouseInput, BlockingKeyMouseInput
 
 import matplotlib.cbook as cbook
 
@@ -117,87 +115,6 @@ class SubplotParams:
 
         setattr(self, s, val)
 
-
-class BlockingMouseInput(object):
-    """
-    Class that creates a callable object to retrieve mouse clicks in a
-    blocking way.
-    """
-    def __init__(self, fig):
-        self.fig = fig
-
-
-    def on_click(self, event):
-        """
-        Event handler that will be passed to the current figure to
-        retrieve clicks.
-        """
-        if event.button == 3:
-            # If it's a right click, pop the last coordinates.
-            if len(self.clicks) > 0:
-                self.clicks.pop()
-                if self.show_clicks:
-                    mark = self.marks.pop()
-                    mark.remove()
-                    self.fig.canvas.draw()
-        elif event.button == 2 and self.n < 0:
-            # If it's a middle click, and we are in infinite mode, finish
-            self.done = True
-        elif event.inaxes:
-            # If it's a valid click, append the coordinates to the list
-            self.clicks.append((event.xdata, event.ydata))
-            if self.verbose:
-                print "input %i: %f,%f" % (len(self.clicks),
-                                    event.xdata, event.ydata)
-            if self.show_clicks:
-                self.marks.extend(
-                    event.inaxes.plot([event.xdata,], [event.ydata,], 'r+') )
-                self.fig.canvas.draw()
-            if self.n > 0 and len(self.clicks) >= self.n:
-                self.done = True
-
-
-    def __call__(self, n=1, timeout=30, verbose=False, show_clicks=True):
-        """
-        Blocking call to retrieve n coordinate pairs through mouse
-        clicks.
-        """
-        self.verbose     = verbose
-        self.done        = False
-        self.clicks      = []
-        self.show_clicks = True
-        self.marks       = []
-
-        assert isinstance(n, int), "Requires an integer argument"
-        self.n = n
-
-        # Ensure that the figure is shown
-        self.fig.show()
-        # connect the click events to the on_click function call
-        self.callback = self.fig.canvas.mpl_connect('button_press_event',
-                                                    self.on_click)
-        # wait for n clicks
-        counter = 0
-        while not self.done:
-            self.fig.canvas.flush_events()
-            time.sleep(0.01)
-
-            # check for a timeout
-            counter += 1
-            if timeout > 0 and counter > timeout/0.01:
-                print "ginput timeout";
-                break;
-
-        # Disconnect the event, clean the figure, and return what we have
-        self.fig.canvas.mpl_disconnect(self.callback)
-        self.callback = None
-        if self.show_clicks:
-            for mark in self.marks:
-                mark.remove()
-            self.fig.canvas.draw()
-        return self.clicks
-
-
 class Figure(Artist):
 
     """
@@ -209,9 +126,10 @@ class Figure(Artist):
 
     The figure patch is drawn by a the attribute
 
-    *figurePatch*
+    *patch*
        a :class:`matplotlib.patches.Rectangle` instance
-    *suppressComposite
+
+    *suppressComposite*
        for multiple figure images, the figure will make composite
        images depending on the renderer option_image_nocomposite
        function.  If suppressComposite is True|False, this will
@@ -264,12 +182,13 @@ class Figure(Artist):
 
         self.transFigure = BboxTransformTo(self.bbox)
 
-        self.figurePatch = Rectangle(
+        # the figurePatch name is deprecated
+        self.patch = self.figurePatch = Rectangle(
             xy=(0,0), width=1, height=1,
             facecolor=facecolor, edgecolor=edgecolor,
             linewidth=linewidth,
             )
-        self._set_artist_props(self.figurePatch)
+        self._set_artist_props(self.patch)
 
         self._hold = rcParams['axes.hold']
         self.canvas = None
@@ -330,7 +249,7 @@ class Figure(Artist):
 
     def get_children(self):
         'get a list of artists contained in the figure'
-        children = [self.figurePatch]
+        children = [self.patch]
         children.extend(self.artists)
         children.extend(self.axes)
         children.extend(self.lines)
@@ -466,6 +385,9 @@ class Figure(Artist):
         :class:`~matplotlib.axes.Axes` with size [0,1,0,1].
 
         An :class:`matplotlib.image.FigureImage` instance is returned.
+
+        .. plot:: ../mpl_examples/pylab_examples/figimage_demo.py
+
         """
 
         if not self._hold: self.clf()
@@ -526,11 +448,11 @@ class Figure(Artist):
 
     def get_edgecolor(self):
         'Get the edge color of the Figure rectangle'
-        return self.figurePatch.get_edgecolor()
+        return self.patch.get_edgecolor()
 
     def get_facecolor(self):
         'Get the face color of the Figure rectangle'
-        return self.figurePatch.get_facecolor()
+        return self.patch.get_facecolor()
 
     def get_figwidth(self):
         'Return the figwidth as a float'
@@ -554,7 +476,7 @@ class Figure(Artist):
 
         ACCEPTS: any matplotlib color - see help(colors)
         """
-        self.figurePatch.set_edgecolor(color)
+        self.patch.set_edgecolor(color)
 
     def set_facecolor(self, color):
         """
@@ -562,7 +484,7 @@ class Figure(Artist):
 
         ACCEPTS: any matplotlib color - see help(colors)
         """
-        self.figurePatch.set_facecolor(color)
+        self.patch.set_facecolor(color)
 
     def set_dpi(self, val):
         """
@@ -631,13 +553,15 @@ class Figure(Artist):
 
     def add_axes(self, *args, **kwargs):
         """
-        Add an a axes with axes rect [left, bottom, width, height] where all
-        quantities are in fractions of figure width and height.  kwargs are
-        legal Axes kwargs plus "projection" which sets the projection type
-        of the axes.  (For backward compatibility, *polar=True* may also be
-        provided, which is equivalent to *projection='polar'*).
-        Valid values for "projection" are: %s.  Some of these projections
-        support additional kwargs, which may be provided to add_axes::
+        Add an a axes with axes rect [*left*, *bottom*, *width*,
+        *height*] where all quantities are in fractions of figure
+        width and height.  kwargs are legal
+        :class:`~matplotlib.axes.Axes` kwargs plus *projection* which
+        sets the projection type of the axes.  (For backward
+        compatibility, ``polar=True`` may also be provided, which is
+        equivalent to ``projection='polar'``).  Valid values for
+        *projection* are: %s.  Some of these projections support
+        additional kwargs, which may be provided to :meth:`add_axes`::
 
             rect = l,b,w,h
             fig.add_axes(rect)
@@ -646,13 +570,14 @@ class Figure(Artist):
             fig.add_axes(rect, projection='polar')
             fig.add_axes(ax)   # add an Axes instance
 
-        If the figure already has an axes with key *args, *kwargs then it will
-        simply make that axes current and return it.  If you do not want this
-        behavior, eg you want to force the creation of a new axes, you must
-        use a unique set of args and kwargs.  The artist "label" attribute has
-        been exposed for this purpose.  Eg, if you want two axes that are
-        otherwise identical to be added to the figure, make sure you give them
-        unique labels::
+        If the figure already has an axes with the same parameters,
+        then it will simply make that axes current and return it.  If
+        you do not want this behavior, eg. you want to force the
+        creation of a new axes, you must use a unique set of args and
+        kwargs.  The axes :attr:`~matplotlib.axes.Axes.label`
+        attribute has been exposed for this purpose.  Eg., if you want
+        two axes that are otherwise identical to be added to the
+        figure, make sure you give them unique labels::
 
             fig.add_axes(rect, label='axes1')
             fig.add_axes(rect, label='axes2')
@@ -660,8 +585,9 @@ class Figure(Artist):
         The :class:`~matplotlib.axes.Axes` instance will be returned.
 
         The following kwargs are supported:
+
         %s
-        """ % (", ".join(get_projection_names()), '%(Axes)s')
+        """
 
         key = self._make_key(*args, **kwargs)
 
@@ -694,6 +620,7 @@ class Figure(Artist):
         self._seen[key] = a
         return a
 
+    add_axes.__doc__ = add_axes.__doc__ % (", ".join(get_projection_names()), '%(Axes)s')
     add_axes.__doc__ = dedent(add_axes.__doc__) % artist.kwdocd
 
     def add_subplot(self, *args, **kwargs):
@@ -771,7 +698,7 @@ class Figure(Artist):
             toolbar.update()
         self._axstack.clear()
         self._seen = {}
-        self.artists = []        
+        self.artists = []
         self.lines = []
         self.patches = []
         self.texts=[]
@@ -794,13 +721,13 @@ class Figure(Artist):
         if not self.get_visible(): return
         renderer.open_group('figure')
 
-        if self.frameon: self.figurePatch.draw(renderer)
+        if self.frameon: self.patch.draw(renderer)
 
         # todo: respect zorder
         for p in self.patches: p.draw(renderer)
         for l in self.lines: l.draw(renderer)
         for a in self.artists: a.draw(renderer)
-        
+
         # override the renderer default if self.suppressComposite
         # is not None
         composite = renderer.option_image_nocomposite()
@@ -910,6 +837,7 @@ class Figure(Artist):
         *axespad*
             the border between the axes and legend edge
 
+        .. plot:: ../mpl_examples/pylab_examples/figlegend_demo.py
         """
         handles = flatten(handles)
         l = Legend(self, handles, labels, *args, **kwargs)
@@ -918,6 +846,10 @@ class Figure(Artist):
 
     def text(self, x, y, s, *args, **kwargs):
         """
+        Call signature::
+
+          figtext(x, y, s, fontdict=None, **kwargs)
+
         Add text to figure at location *x*, *y* (relative 0-1
         coords). See :func:`~matplotlib.pyplot.text` for the meaning
         of the other arguments.
@@ -971,7 +903,8 @@ class Figure(Artist):
         call signature::
 
           savefig(fname, dpi=None, facecolor='w', edgecolor='w',
-                  orientation='portrait', papertype=None, format=None):
+                  orientation='portrait', papertype=None, format=None,
+                  transparent=False):
 
         Save the current figure.
 
@@ -1005,13 +938,35 @@ class Figure(Artist):
           *format*:
             One of the file extensions supported by the active
             backend.  Most backends support png, pdf, ps, eps and svg.
+
+          *transparent*:
+            If *True*, the figure patch and axes patches will all be
+            transparent.  This is useful, for example, for displaying
+            a plot on top of a colored background on a web page.  The
+            transparency of these patches will be restored to their
+            original values upon exit of this function.
         """
 
         for key in ('dpi', 'facecolor', 'edgecolor'):
             if not kwargs.has_key(key):
                 kwargs[key] = rcParams['savefig.%s'%key]
 
+        transparent = kwargs.pop('transparent', False)
+        if transparent:
+            original_figure_alpha = self.patch.get_alpha()
+            self.patch.set_alpha(0.0)
+            original_axes_alpha = []
+            for ax in self.axes:
+                patch = ax.patch
+                original_axes_alpha.append(patch.get_alpha())
+                patch.set_alpha(0.0)
+
         self.canvas.print_figure(*args, **kwargs)
+
+        if transparent:
+            self.patch.set_alpha(original_figure_alpha)
+            for ax, alpha in zip(self.axes, original_axes_alpha):
+                ax.patch.set_alpha(alpha)
 
     def colorbar(self, mappable, cax=None, ax=None, **kw):
         if ax is None:
@@ -1062,11 +1017,11 @@ class Figure(Artist):
                 ax.update_params()
                 ax.set_position(ax.figbox)
 
-    def ginput(self, n=1, timeout=30, verbose=False, show_clicks=True):
+    def ginput(self, n=1, timeout=30, show_clicks=True):
         """
         call signature::
 
-          ginput(self, n=1, timeout=30, verbose=False, show_clicks=True)
+          ginput(self, n=1, timeout=30, show_clicks=True)
 
         Blocking call to interact with the figure.
 
@@ -1083,8 +1038,25 @@ class Figure(Artist):
 
         blocking_mouse_input = BlockingMouseInput(self)
         return blocking_mouse_input(n=n, timeout=timeout,
-                                          verbose=verbose, show_clicks=True)
+                                    show_clicks=show_clicks)
 
+    def waitforbuttonpress(self, timeout=-1):
+        """
+        call signature::
+
+          waitforbuttonpress(self, timeout=-1)
+
+        Blocking call to interact with the figure.
+
+        This will return True is a key was pressed, False if a mouse
+        button was pressed and None if *timeout* was reached without
+        either being pressed.
+
+        If *timeout* is negative, does not timeout.
+        """
+
+        blocking_input = BlockingKeyMouseInput(self)
+        return blocking_input(timeout=timeout)
 
 
 def figaspect(arg):

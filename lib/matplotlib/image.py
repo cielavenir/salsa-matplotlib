@@ -50,6 +50,9 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
 
     interpnames = _interpd.keys()
 
+    def __str__(self):
+        return "AxesImage(%g,%g;%gx%g)" % tuple(self.axes.bbox.bounds)
+
     def __init__(self, ax,
                  cmap = None,
                  norm = None,
@@ -193,7 +196,7 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
         else:
             im = self._imcache
 
-        fc = self.axes.get_frame().get_facecolor()
+        fc = self.axes.patch.get_facecolor()
         bg = mcolors.colorConverter.to_rgba(fc, 0)
         im.set_bg( *bg)
 
@@ -243,11 +246,15 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
         # collection on nonlinear transformed coordinates.
         # TODO: consider returning image coordinates (shouldn't
         # be too difficult given that the image is rectilinear
+        x, y = mouseevent.xdata, mouseevent.ydata
         xmin, xmax, ymin, ymax = self.get_extent()
-        xdata, ydata = mouseevent.xdata, mouseevent.ydata
-        #print xdata, ydata, xmin, xmax, ymin, ymax
-        if xdata is not None and ydata is not None:
-            inside = xdata>=xmin and xdata<=xmax and ydata>=ymin and ydata<=ymax
+        if xmin > xmax:
+            xmin,xmax = xmax,xmin
+        if ymin > ymax:
+            ymin,ymax = ymax,ymin
+        #print x, y, xmin, xmax, ymin, ymax
+        if x is not None and y is not None:
+            inside = x>=xmin and x<=xmax and y>=ymin and y<=ymax
         else:
             inside = False
 
@@ -272,10 +279,11 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
         ACCEPTS: numpy/PIL Image A"""
         # check if data is PIL Image without importing Image
         if hasattr(A,'getpixel'):
-            X = pil_to_array(A)
+            self._A = pil_to_array(A)
+        elif ma.isMA(A):
+            self._A = A
         else:
-            X = ma.asarray(A) # assume array
-        self._A = X
+            self._A = np.asarray(A) # assume array
 
         self._imcache =None
         self._rgbacache = None
@@ -400,7 +408,7 @@ class NonUniformImage(AxesImage):
         im = _image.pcolor(self._Ax, self._Ay, self._A,
                            height, width,
                            (x0, x0+v_width, y0, y0+v_height))
-        fc = self.axes.get_frame().get_facecolor()
+        fc = self.axes.patch.get_facecolor()
         bg = mcolors.colorConverter.to_rgba(fc, 0)
         im.set_bg(*bg)
         return im
@@ -408,7 +416,8 @@ class NonUniformImage(AxesImage):
     def set_data(self, x, y, A):
         x = np.asarray(x,np.float32)
         y = np.asarray(y,np.float32)
-        A = np.asarray(A)
+        if not ma.isMA(A):
+            A = np.asarray(A)
         if len(x.shape) != 1 or len(y.shape) != 1\
            or A.shape[0:2] != (y.shape[0], x.shape[0]):
             raise TypeError("Axes don't match array shape")
@@ -500,7 +509,7 @@ class PcolorImage(martist.Artist, cm.ScalarMappable):
     def make_image(self, magnification=1.0):
         if self._A is None:
             raise RuntimeError('You must first set the image array')
-        fc = self.axes.get_frame().get_facecolor()
+        fc = self.axes.patch.get_facecolor()
         bg = mcolors.colorConverter.to_rgba(fc, 0)
         bg = (np.array(bg)*255).astype(np.uint8)
         l, b, r, t = self.axes.bbox.extents
@@ -535,7 +544,8 @@ class PcolorImage(martist.Artist, cm.ScalarMappable):
 
 
     def set_data(self, x, y, A):
-        A = ma.asarray(A)
+        if not ma.isMA(A):
+            A = np.asarray(A)
         if x is None:
             x = np.arange(0, A.shape[1]+1, dtype=np.float64)
         else:
@@ -635,7 +645,7 @@ class FigureImage(martist.Artist, cm.ScalarMappable):
     def make_image(self, magnification=1.0):
         # had to introduce argument magnification to satisfy the unit test
         # figimage_demo.py. I have no idea, how magnification should be used
-        # within the function. It should be !=1.0 only for non-default DPI
+        # within the function. It should be !=1.0 only for non-default DPI<
         # settings in the PS backend, as introduced by patch #1562394
         # Probably Nicholas Young should look over this code and see, how
         # magnification should be handled correctly.

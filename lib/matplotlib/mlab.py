@@ -14,6 +14,8 @@ commands with the same names.
     * find - Return the indices where some condition is true;
              numpy.nonzero is similar but more general.
 
+    * griddata - interpolate irregularly distributed data to a
+                 regular grid.
 
     * prctile - find the percentiles of a sequence
 
@@ -87,6 +89,7 @@ import csv, warnings, copy, os
 
 import numpy as np
 
+from matplotlib import verbose
 
 import matplotlib.nxutils as nxutils
 import matplotlib.cbook as cbook
@@ -1768,177 +1771,50 @@ def fromfunction_kw(function, dimensions, **kwargs):
 
 ### end fperez numutils code
 
-### begin mlab2 functions
-# From MLab2: http://pdilib.sourceforge.net/MLab2.py
-readme = \
-       """
-MLab2.py, release 1
-
-Created on February 2003 by Thomas Wendler as part of the Emotionis Project.
-This script is supposed to implement Matlab functions that were left out in
-numerix.mlab.py (part of Numeric Python).
-For further information on the Emotionis Project or on this script, please
-contact their authors:
-Rodrigo Benenson, rodrigob at elo dot utfsm dot cl
-Thomas Wendler,   thomasw at elo dot utfsm dot cl
-Look at: http://pdilib.sf.net for new releases.
-"""
-## mlab2 functions numpified and checked 2007/08/04
-_eps_approx = 1e-13
-
-#from numpy import fix
-def fix(x):
-    """
-    Rounds towards zero.
-    x_rounded = fix(x) rounds the elements of x to the nearest integers
-    towards zero.
-    For negative numbers is equivalent to ceil and for positive to floor.
-    """
-    warnings.warn("Use numpy.fix()", DeprecationWarning)
-    return np.fix(x)
 
 def rem(x,y):
     """
-    Remainder after division.
-    rem(x,y) is equivalent to x - y.*fix(x./y) in case y is not zero.
-    By convention (but contrary to numpy), rem(x,0) returns None.
-    This also differs from numpy.remainder, which uses floor instead of
-    fix.
+    Deprecated - see numpy.remainder
     """
-    x,y = np.asarray(x), np.asarray(y)
-    if np.any(y == 0):
-        return None
-    return x - y * np.fix(x/y)
-
+    raise NotImplementedError('Deprecated - see numpy.remainder')
 
 def norm(x,y=2):
     """
-    Norm of a matrix or a vector according to Matlab.
-    The description is taken from Matlab:
-
-        For matrices...
-          NORM(X) is the largest singular value of X, max(svd(X)).
-          NORM(X,2) is the same as NORM(X).
-          NORM(X,1) is the 1-norm of X, the largest column sum,
-                          = max(sum(abs((X)))).
-          NORM(X,inf) is the infinity norm of X, the largest row sum,
-                          = max(sum(abs((X')))).
-          NORM(X,'fro') is the Frobenius norm, sqrt(sum(diag(X'*X))).
-          NORM(X,P) is available for matrix X only if P is 1, 2, inf or 'fro'.
-
-        For vectors...
-          NORM(V,P) = sum(abs(V).^P)^(1/P).
-          NORM(V) = norm(V,2).
-          NORM(V,inf) = max(abs(V)).
-          NORM(V,-inf) = min(abs(V)).
+    Deprecated - see numpy.linalg.norm
     """
-
-    x = np.asarray(x)
-    if x.ndim == 2:
-        if y==2:
-            return np.max(np.linalg.svd(x)[1])
-        elif y==1:
-            return np.max(np.sum(np.absolute((x)), axis=0))
-        elif y=='inf':
-            return np.max(np.sum(np.absolute((np.transpose(x))), axis=0))
-        elif y=='fro':
-            xx = np.dot(x.transpose(), x)
-            return np.sqrt(np.sum(np.diag(xx), axis=0))
-        else:
-            raise ValueError('Second argument not permitted for matrices')
-
-    else:
-        xa = np.absolute(x)
-        if y == 'inf':
-            return np.max(xa)
-        elif y == '-inf':
-            return np.min(xa)
-        else:
-            return np.power(np.sum(np.power(xa,y)),1/float(y))
+    raise NotImplementedError('Deprecated - see numpy.linalg.norm')
 
 
 def orth(A):
     """
-    Orthogonalization procedure by Matlab.
-    The description is taken from its help:
-
-        Q = ORTH(A) is an orthonormal basis for the range of A.
-        That is, Q'*Q = I, the columns of Q span the same space as
-        the columns of A, and the number of columns of Q is the
-        rank of A.
+    Deprecated - needs clean room implementation
     """
-
-    A     = np.asarray(A)
-    U,S,V = np.linalg.svd(A)
-
-    m,n = A.shape
-    if m > 1:
-        s = S
-    elif m == 1:
-        s = S[0]
-    else:
-        s = 0
-
-    tol = max(m,n) * np.max(s) * _eps_approx
-    r = np.sum(s > tol)
-    Q = np.take(U,range(r),1)
-
-    return Q
+    raise NotImplementedError('Deprecated - needs clean room implementation')
 
 def rank(x):
     """
-    Returns the rank of a matrix.
-    The rank is understood here as the an estimation of the number of
-    linearly independent rows or columns (depending on the size of the
-    matrix).
-    Note that numerix.mlab.rank() is not equivalent to Matlab's rank.
-    This function is!
+    Deprecated - see numpy.rank
     """
-    x      = np.asarray(x)
-    s      = np.linalg.svd(x, compute_uv=False)
-    maxabs = np.max(np.absolute(s))
-    maxdim = max(x.shape)
-    tol    = maxabs * maxdim * _eps_approx
-    return np.sum(s > tol)
+    raise NotImplementedError('Deprecated - see numpy.rank')
 
 def sqrtm(x):
     """
-    Returns the square root of a square matrix.
-    This means that s=sqrtm(x) implies dot(s,s) = x.
-    Note that s and x are matrices.
+    Deprecated - needs clean room implementation
     """
-    return mfuncC(np.sqrt, x)
+    raise NotImplementedError('Deprecated - needs clean room implementation')
 
 
 def mfuncC(f, x):
     """
-    mfuncC(f, x) : matrix function with possibly complex eigenvalues.
-    Note: Numeric defines (v,u) = eig(x) => x*u.T = u.T * Diag(v)
-    This function is needed by sqrtm and allows further functions.
+    Deprecated
     """
-
-    x      = np.asarray(x)
-    (v,uT) = np.linalg.eig(x)
-    V      = np.diag(f(v+0j))
-    # todo: warning: this is not exactly what matlab does
-    #       MATLAB "B/A is roughly the same as B*inv(A)"
-    y      = np.dot(uT, np.dot(V, np.linalg.inv(uT)))
-    return approx_real(y)
+    raise NotImplementedError('Deprecated - needs clean room implementation')
 
 def approx_real(x):
-
     """
-    approx_real(x) : returns x.real if |x.imag| < |x.real| * _eps_approx.
-    This function is needed by sqrtm and allows further functions.
+    Deprecated - needs clean room implementation
     """
-    ai = np.absolute(x.imag)
-    ar = np.absolute(x.real)
-    if np.max(ai) <= np.max(ar) * _eps_approx:
-        return x.real
-    else:
-        return x
-
-### end mlab2 functions
+    raise NotImplementedError('Deprecated - needs clean room implementation')
 
 #helpers for loading, saving, manipulating and viewing numpy record arrays
 
@@ -2081,9 +1957,11 @@ def rec_summarize(r, summaryfuncs):
 def rec_join(key, r1, r2, jointype='inner', defaults=None):
     """
     join record arrays r1 and r2 on key; key is a tuple of field
-    names.  if r1 and r2 have equal values on all the keys in the key
+    names. If r1 and r2 have equal values on all the keys in the key
     tuple, then their fields will be merged into a new record array
-    containing the intersection of the fields of r1 and r2
+    containing the intersection of the fields of r1 and r2.
+
+    r1 (also r2) must not have any duplicate keys.
 
     The jointype keyword can be 'inner', 'outer', 'leftouter'.
     To do a rightouter join just reverse r1 and r2.
@@ -2123,9 +2001,6 @@ def rec_join(key, r1, r2, jointype='inner', defaults=None):
         right_ind = np.array([r2d[k] for k in right_keys])
         right_len = len(right_ind)
 
-    r2 = rec_drop_fields(r2, r1.dtype.names)
-
-
     def key_desc(name):
         'if name is a string key, use the larger size of r1 or r2 before merging'
         dt1 = r1.dtype[name]
@@ -2157,21 +2032,18 @@ def rec_join(key, r1, r2, jointype='inner', defaults=None):
                 newrec[k] = v
 
     for field in r1.dtype.names:
-        newrec[field][:common_len] = r1[field][r1ind]
-        if jointype == "outer" or jointype == "leftouter":
+        if common_len:
+            newrec[field][:common_len] = r1[field][r1ind]
+        if (jointype == "outer" or jointype == "leftouter") and left_len:
             newrec[field][common_len:(common_len+left_len)] = r1[field][left_ind]
 
     for field in r2.dtype.names:
-        newrec[field][:common_len] = r2[field][r2ind]
-        if jointype == "outer":
-            newrec[field][-right_len:] = r2[field][right_ind[right_ind.argsort()]]
+        if field not in key and common_len:
+            newrec[field][:common_len] = r2[field][r2ind]
+        if jointype == "outer" and right_len:
+            newrec[field][-right_len:] = r2[field][right_ind]
 
-    # sort newrec using the same order as r1
-    sort_indices = r1ind.copy()
-    if jointype == "outer" or jointype == "leftouter":
-        sort_indices = np.append(sort_indices, left_ind)
-    newrec[:(common_len+left_len)] = newrec[sort_indices.argsort()]
-
+    newrec.sort(order=key)
 
     return newrec.view(np.recarray)
 
@@ -2380,6 +2252,10 @@ def csv2rec(fname, comments='#', skiprows=0, checkrows=0, delimiter=',',
             else:
                 names.append(item)
             seen[item] = cnt+1
+
+    else:
+        if cbook.is_string_like(names):
+            names = [n.strip() for n in names.split(',')]
 
     # get the converter functions by inspecting checkrows
     converters = get_converters(reader)
@@ -2692,3 +2568,88 @@ def rec2csv(r, fname, delimiter=',', formatd=None, missing='',
                          in zip(funcs, row, rowmask, mvals)])
     if opened:
         fh.close()
+
+def griddata(x,y,z,xi,yi):
+    """
+    zi = griddata(x,y,z,xi,yi) fits a surface of the form z = f(x,y)
+    to the data in the (usually) nonuniformly spaced vectors (x,y,z).
+    griddata interpolates this surface at the points specified by (xi,yi)
+    to produce zi. xi and yi must describe a regular grid, can be
+    either 1D or 2D, but must be monotonically increasing.
+
+    A masked array is returned if any grid points are outside convex
+    hull defined by input data (no extrapolation is done).
+
+    Uses natural neighbor interpolation based on Delaunay triangulation.
+    By default, this algorithm is provided by the matplotlib.delaunay
+    package, written by Robert Kern.  The triangulation algorithm in this
+    package is known to fail on some nearly pathological cases. For
+    this reason, a separate toolkit (mpl_tookits.natgrid) has been created
+    that provides a more robust algorithm fof triangulation and interpolation.
+    This toolkit is based on the NCAR natgrid library, which contains code
+    that is not redistributable under a BSD-compatible license.  When installed,
+    this function will use the mpl_toolkits.natgrid algorithm, otherwise it
+    will use the built-in matplotlib.delaunay package.
+
+    The natgrid matplotlib toolkit can be downloaded from
+    http://sourceforge.net/project/showfiles.php?group_id=80706&package_id=142792
+    """
+    try:
+        from mpl_toolkits.natgrid import _natgrid, __version__
+        _use_natgrid = True
+    except ImportError:
+        import matplotlib.delaunay as delaunay
+        from matplotlib.delaunay import  __version__
+        _use_natgrid = False
+    if not griddata._reported:
+        if _use_natgrid:
+            verbose.report('using natgrid version %s' % __version__)
+        else:
+            verbose.report('using delaunay version %s' % __version__)
+        griddata._reported = True
+    if xi.ndim != yi.ndim:
+        raise TypeError("inputs xi and yi must have same number of dimensions (1 or 2)")
+    if xi.ndim != 1 and xi.ndim != 2:
+        raise TypeError("inputs xi and yi must be 1D or 2D.")
+    if not len(x)==len(y)==len(z):
+        raise TypeError("inputs x,y,z must all be 1D arrays of the same length")
+    # remove masked points.
+    if hasattr(z,'mask'):
+        x = x.compress(z.mask == False)
+        y = y.compress(z.mask == False)
+        z = z.compressed()
+    if _use_natgrid: # use natgrid toolkit if available.
+        if xi.ndim == 2:
+            xi = xi[0,:]
+            yi = yi[:,0]
+        # override default natgrid internal parameters.
+        _natgrid.seti('ext',0)
+        _natgrid.setr('nul',np.nan)
+        # cast input arrays to doubles (this makes a copy)
+        x = x.astype(np.float)
+        y = y.astype(np.float)
+        z = z.astype(np.float)
+        xo = xi.astype(np.float)
+        yo = yi.astype(np.float)
+        if min(xo[1:]-xo[0:-1]) < 0 or min(yo[1:]-yo[0:-1]) < 0:
+            raise ValueError, 'output grid defined by xi,yi must be monotone increasing'
+        # allocate array for output (buffer will be overwritten by nagridd)
+        zo = np.empty((yo.shape[0],xo.shape[0]), np.float)
+        _natgrid.natgridd(x,y,z,xo,yo,zo)
+    else: # use Robert Kern's delaunay package from scikits (default)
+        if xi.ndim != yi.ndim:
+            raise TypeError("inputs xi and yi must have same number of dimensions (1 or 2)")
+        if xi.ndim != 1 and xi.ndim != 2:
+            raise TypeError("inputs xi and yi must be 1D or 2D.")
+        if xi.ndim == 1:
+            xi,yi = np.meshgrid(xi,yi)
+        # triangulate data
+        tri = delaunay.Triangulation(x,y)
+        # interpolate data
+        interp = tri.nn_interpolator(z)
+        zo = interp(xi,yi)
+    # mask points on grid outside convex hull of input data.
+    if np.any(np.isnan(zo)):
+        zo = np.ma.masked_where(np.isnan(zo),zo)
+    return zo
+griddata._reported = False

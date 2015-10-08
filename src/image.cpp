@@ -708,8 +708,12 @@ _image_module::from_images(const Py::Tuple& args) {
 
   args.verify_length(3);
 
-  size_t numrows = Py::Int(args[0]);
-  size_t numcols = Py::Int(args[1]);
+  size_t numrows = (size_t)Py::Int(args[0]);
+  size_t numcols = (size_t)Py::Int(args[1]);
+
+  if (numrows > 1 << 15 || numcols > 1 << 15) {
+    throw Py::RuntimeError("numrows and numcols must both be less than 32768");
+  }
 
   Py::SeqBase<Py::Object> tups = args[2];
   size_t N = tups.length();
@@ -739,10 +743,7 @@ _image_module::from_images(const Py::Tuple& args) {
   renderer_base rb(pixf);
 
 
-  //clear the background of the rendering buffer with alpha 1 and the
-  //gtkagg screen noise problem in figimage_demo.py goes away -- see
-  //comment backend_gtkagg.py _render_figure method JDH
-  //rb.clear(agg::rgba(1, 1, 1, 1));
+  rb.clear(agg::rgba(1, 1, 1, 1));
 
   for (size_t imnum=0; imnum< N; imnum++) {
     tup = Py::Tuple(tups[imnum]);
@@ -1084,8 +1085,13 @@ _image_module::frombuffer(const Py::Tuple& args) {
   args.verify_length(4);
 
   PyObject *bufin = new_reference_to(args[0]);
-  int x = Py::Int(args[1]);
-  int y = Py::Int(args[2]);
+  size_t x = Py::Int(args[1]);
+  size_t y = Py::Int(args[2]);
+
+  if (x > 1 << 15 || y > 1 << 15) {
+    throw Py::ValueError("x and y must both be less than 32768");
+  }
+
   int isoutput = Py::Int(args[3]);
 
   if (PyObject_CheckReadBuffer(bufin) != 1)
@@ -1154,6 +1160,10 @@ _image_module::pcolor(const Py::Tuple& args) {
   unsigned int rows = Py::Int(args[3]);
   unsigned int cols = Py::Int(args[4]);
   Py::Tuple bounds = args[5];
+
+  if (rows > 1 << 15 || cols > 1 << 15) {
+    throw Py::ValueError("rows and cols must both be less than 32768");
+  }
 
   if (bounds.length() !=4)
       throw Py::TypeError("Incorrect number of bounds (4 expected)");
@@ -1390,6 +1400,10 @@ _image_module::pcolor2(const Py::Tuple& args) {
     int cols = Py::Int(args[4]);
     Py::Tuple bounds = args[5];
     Py::Object bgp = args[6];
+
+    if (rows > 1 << 15 || cols > 1 << 15) {
+      throw Py::ValueError("rows and cols must both be less than 32768");
+    }
 
     if (bounds.length() !=4)
         throw Py::TypeError("Incorrect number of bounds (4 expected)");

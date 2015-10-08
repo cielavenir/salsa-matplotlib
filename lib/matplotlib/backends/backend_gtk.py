@@ -67,7 +67,8 @@ def show(mainloop=True):
     for manager in Gcf.get_all_fig_managers():
         manager.window.show()
 
-    if mainloop and gtk.main_level() == 0:
+    if mainloop and gtk.main_level() == 0 and \
+                            len(Gcf.get_all_fig_managers())>0:
         gtk.main()
 
 def new_figure_manager(num, *args, **kwargs):
@@ -172,6 +173,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         self.set_flags(gtk.CAN_FOCUS)
         self._renderer_init()
 
+        gobject.idle_add(self.idle_event)
 
     def scroll_event(self, widget, event):
         if _debug: print 'FigureCanvasGTK.%s' % fn_name()
@@ -179,10 +181,10 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         # flipy so y=0 is bottom of canvas
         y = self.allocation.height - event.y
         if event.direction==gdk.SCROLL_UP:
-            direction = 'up'
+            step = 1
         else:
-            direction = 'down'
-        FigureCanvasBase.scroll_event(self, x, y, direction)
+            step = -1
+        FigureCanvasBase.scroll_event(self, x, y, step)
         return False  # finish event propagation?
 
     def button_press_event(self, widget, event):
@@ -394,6 +396,14 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         gtk.gdk.flush()
         gtk.gdk.threads_leave()
 
+    def start_event_loop(self,timeout):
+        FigureCanvasBase.start_event_loop_default(self,timeout)
+    start_event_loop.__doc__=FigureCanvasBase.start_event_loop_default.__doc__
+
+    def stop_event_loop(self):
+        FigureCanvasBase.stop_event_loop_default(self)
+    stop_event_loop.__doc__=FigureCanvasBase.stop_event_loop_default.__doc__
+
 class FigureManagerGTK(FigureManagerBase):
     """
     Public attributes
@@ -458,6 +468,7 @@ class FigureManagerGTK(FigureManagerBase):
                not matplotlib.is_interactive() and \
                gtk.main_level() >= 1:
             gtk.main_quit()
+
 
     def show(self):
         # show the figure window

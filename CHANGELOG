@@ -1,3 +1,116 @@
+=================================================================
+2008-08-03 Released 0.98.3 at svn r5947
+
+2008-08-01 Backported memory leak fixes in _ttconv.cpp - MGD
+
+2008-07-31 Added masked array support to griddata. - JSW
+
+2008-07-26 Added optional C and reduce_C_function arguments to
+	   axes.hexbin().  This allows hexbin to accumulate the values
+	   of C based on the x,y coordinates and display in hexagonal
+	   bins. - ADS
+
+2008-07-24 Deprecated (raise NotImplementedError) all the mlab2
+           functions from matplotlib.mlab out of concern that some of
+           them were not clean room implementations. JDH
+
+2008-07-24 Rewrite of a significant portion of the clabel code (class
+	   ContourLabeler) to improve inlining. - DMK
+
+2008-07-22 Added Barbs polygon collection (similar to Quiver) for plotting
+           wind barbs.  Added corresponding helpers to Axes and pyplot as
+           well. (examples/pylab_examples/barb_demo.py shows it off.) - RMM
+
+2008-07-21 Added scikits.delaunay as matplotlib.delaunay.  Added griddata
+           function in matplotlib.mlab, with example (griddata_demo.py) in
+           pylab_examples. griddata function will use mpl_toolkits._natgrid
+           if installed.  - JSW
+
+2008-07-21 Re-introduced offset_copy that works in the context of the
+           new transforms. - MGD
+
+2008-07-21 Committed patch by Ryan May to add get_offsets and
+           set_offsets to Collections base class - EF
+
+2008-07-21 Changed the "asarray" strategy in image.py so that
+           colormapping of masked input should work for all
+           image types (thanks Klaus Zimmerman) - EF
+
+2008-07-20 Rewrote cbook.delete_masked_points and corresponding
+           unit test to support rgb color array inputs, datetime
+           inputs, etc. - EF
+
+2008-07-20 Renamed unit/axes_unit.py to cbook_unit.py and modified
+           in accord with Ryan's move of delete_masked_points from
+           axes to cbook. - EF
+
+2008-07-18 Check for nan and inf in axes.delete_masked_points().
+           This should help hexbin and scatter deal with nans. - ADS
+
+2008-07-17 Added ability to manually select contour label locations.
+           Also added a waitforbuttonpress function. - DMK
+
+2008-07-17 Fix bug with NaNs at end of path (thanks, Andrew Straw for
+           the report) - MGD
+
+2008-07-16 Improve error handling in texmanager, thanks to Ian Henry
+           for reporting - DSD
+
+2008-07-12 Added support for external backends with the
+           "module://my_backend" syntax - JDH
+
+2008-07-11 Fix memory leak related to shared axes.  Grouper should
+           store weak references. - MGD
+
+2008-07-10 Bugfix: crash displaying fontconfig pattern - MGD
+
+2008-07-10 Bugfix: [ 2013963 ] update_datalim_bounds in Axes not works - MGD
+
+2008-07-10 Bugfix: [ 2014183 ] multiple imshow() causes gray edges - MGD
+
+2008-07-09 Fix rectangular axes patch on polar plots bug - MGD
+
+2008-07-09 Improve mathtext radical rendering - MGD
+
+2008-07-08 Improve mathtext superscript placement - MGD
+
+2008-07-07 Fix custom scales in pcolormesh (thanks Matthew Turk) - MGD
+
+2008-07-03 Implemented findobj method for artist and pyplot - see
+           examples/pylab_examples/findobj_demo.py - JDH
+
+2008-06-30 Another attempt to fix TextWithDash - DSD
+
+2008-06-30 Removed Qt4 NavigationToolbar2.destroy -- it appears to
+           have been unnecessary and caused a bug reported by P.
+           Raybaut - DSD
+
+2008-06-27 Fixed tick positioning bug - MM
+
+2008-06-27 Fix dashed text bug where text was at the wrong end of the
+           dash - MGD
+
+2008-06-26 Fix mathtext bug for expressions like $x_{\leftarrow}$ - MGD
+
+2008-06-26 Fix direction of horizontal/vertical hatches - MGD
+
+2008-06-25 Figure.figurePatch renamed Figure.patch, Axes.axesPatch
+           renamed Axes.patch, Axes.axesFrame renamed Axes.frame,
+           Axes.get_frame, which returns Axes.patch, is deprecated.
+           Examples and users guide updated - JDH
+
+2008-06-25 Fix rendering quality of pcolor - MGD
+
+=================================================================
+2008-06-24 Released 0.98.2 at svn r5667 - (source only for debian) JDH
+
+2008-06-24 Added "transparent" kwarg to savefig. - MGD
+
+2008-06-24 Applied Stefan's patch to draw a sinle centered marker over
+           a line with numpoints==1 - JDH
+
+2008-06-23 Use splines to render circles in scatter plots - MGD
+
 ===============================================================
 2008-06-22 Released 0.98.1 at revision 5637
 

@@ -38,6 +38,7 @@ _Plotting commands
   figtext   - add text in figure coords
   figure   - create or change active figure
   fill     - make filled polygons
+  findobj  - recursively find all objects matching some criteria
   gca      - return the current axes
   gcf      - return the current figure
   gci      - get the current image, or None
@@ -183,6 +184,7 @@ _Dates
 _Other
 
   angle     - the angle of a complex array
+  griddata - interpolate irregularly distributed data to a regular grid
   load     - load ASCII data into array
   polyfit   - fit x, y to an n-th order polynomial
   polyval   - evaluate an n-th order polynomial
@@ -218,8 +220,8 @@ import matplotlib.dates
 
 from matplotlib.mlab import  window_hanning, window_none,\
         conv, detrend, detrend_mean, detrend_none, detrend_linear,\
-        polyfit, polyval, entropy, normpdf,\
-        levypdf, find, trapz, prepca, fix, rem, norm, orth, rank,\
+        polyfit, polyval, entropy, normpdf, griddata,\
+        levypdf, find, trapz, prepca, rem, norm, orth, rank,\
         sqrtm, prctile, center_matrix, rk4, exp_safe, amap,\
         sum_flat, mean_flat, rms_flat, l1norm, l2norm, norm, frange,\
         diagonal_matrix, base_repr, binary_repr, log2, ispower2,\

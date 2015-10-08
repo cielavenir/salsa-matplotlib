@@ -3,9 +3,11 @@ A collection of utility functions and classes.  Many (but not all)
 from the Python Cookbook -- hence the name cbook
 """
 from __future__ import generators
-import re, os, errno, sys, StringIO, traceback, locale
+import re, os, errno, sys, StringIO, traceback, locale, threading, types
 import time, datetime
 import numpy as np
+import numpy.ma as ma
+from weakref import ref
 
 major, minor1, minor2, s, tmp = sys.version_info
 
@@ -152,6 +154,64 @@ class CallbackRegistry:
             func(*args, **kwargs)
 
 
+class Scheduler(threading.Thread):
+    """
+    Base class for timeout and idle scheduling
+    """
+    idlelock = threading.Lock()
+    id = 0
+
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self.id = Scheduler.id
+        self._stopped = False
+        Scheduler.id += 1
+        self._stopevent = threading.Event()
+
+    def stop(self):
+        if self._stopped: return
+        self._stopevent.set()
+        self.join()
+        self._stopped = True
+
+class Timeout(Scheduler):
+    """
+    Schedule recurring events with a wait time in seconds
+    """
+    def __init__(self, wait, func):
+        Scheduler.__init__(self)
+        self.wait = wait
+        self.func = func
+
+    def run(self):
+
+        while not self._stopevent.isSet():
+            self._stopevent.wait(self.wait)
+            Scheduler.idlelock.acquire()
+            b = self.func(self)
+            Scheduler.idlelock.release()
+            if not b: break
+
+class Idle(Scheduler):
+    """
+    Schedule callbacks when scheduler is idle
+    """
+    # the prototype impl is a bit of a poor man's idle handler.  It
+    # just implements a short wait time.  But it will provide a
+    # placeholder for a proper impl ater
+    waittime = 0.05
+    def __init__(self, func):
+        Scheduler.__init__(self)
+        self.func = func
+
+    def run(self):
+
+        while not self._stopevent.isSet():
+            self._stopevent.wait(Idle.waittime)
+            Scheduler.idlelock.acquire()
+            b = self.func(self)
+            Scheduler.idlelock.release()
+            if not b: break
 
 class silent_list(list):
     """
@@ -211,13 +271,23 @@ def is_string_like(obj):
     except (TypeError, ValueError): return 0
     return 1
 
+def is_sequence_of_strings(obj):
+    """
+    Returns true if *obj* is iterable and contains strings
+    """
+    if not iterable(obj): return False
+    if is_string_like(obj): return False
+    for o in obj:
+        if not is_string_like(o): return False
+    return True
+
 def is_writable_file_like(obj):
     'return true if *obj* looks like a file object with a *write* method'
     return hasattr(obj, 'write') and callable(obj.write)
 
 def is_scalar(obj):
     'return true if *obj* is not string like and is not iterable'
-    return is_string_like(obj) or not iterable(obj)
+    return not is_string_like(obj) and not iterable(obj)
 
 def is_numlike(obj):
     'return true if *obj* looks like a number'
@@ -673,6 +743,8 @@ def popd(d, *args):
       val = popd(d, key, default)
 
     """
+    warnings.warn("Use native python dict.pop method", DeprecationWarning)
+    # warning added 2008/07/22
     if len(args)==1:
         key = args[0]
         val = d[key]
@@ -828,6 +900,13 @@ def safezip(*args):
             raise ValueError(_safezip_msg % (Nx, i+1, len(arg)))
     return zip(*args)
 
+def issubclass_safe(x, klass):
+    'return issubclass(x, klass) and return False on a TypeError'
+
+    try:
+        return issubclass(x, klass)
+    except TypeError:
+        return False
 
 class MemoryMonitor:
     def __init__(self, nmax=20000):
@@ -965,7 +1044,7 @@ class Grouper(object):
     >>> g.join('a', 'b')
     >>> g.join('b', 'c')
     >>> g.join('d', 'e')
-    >>> list(g.get())
+    >>> list(g)
     [['a', 'b', 'c'], ['d', 'e']]
     >>> g.joined('a', 'b')
     True
@@ -977,10 +1056,20 @@ class Grouper(object):
     def __init__(self, init=[]):
         mapping = self._mapping = {}
         for x in init:
-            mapping[x] = [x]
+            mapping[ref(x)] = [ref(x)]
 
     def __contains__(self, item):
-        return item in self._mapping
+        return ref(item) in self._mapping
+
+    def clean(self):
+        """
+        Clean dead weak references from the dictionary
+        """
+        mapping = self._mapping
+        for key, val in mapping.items():
+            if key() is None:
+                del mapping[key]
+                val.remove(key)
 
     def join(self, a, *args):
         """
@@ -988,13 +1077,13 @@ class Grouper(object):
         arguments.
         """
         mapping = self._mapping
-        set_a = mapping.setdefault(a, [a])
+        set_a = mapping.setdefault(ref(a), [ref(a)])
 
         for arg in args:
-            set_b = mapping.get(arg)
+            set_b = mapping.get(ref(arg))
             if set_b is None:
-                set_a.append(arg)
-                mapping[arg] = set_a
+                set_a.append(ref(arg))
+                mapping[ref(arg)] = set_a
             elif set_b is not set_a:
                 if len(set_b) > len(set_a):
                     set_a, set_b = set_b, set_a
@@ -1002,31 +1091,51 @@ class Grouper(object):
                 for elem in set_b:
                     mapping[elem] = set_a
 
+        self.clean()
+
     def joined(self, a, b):
         """
         Returns True if *a* and *b* are members of the same set.
         """
+        self.clean()
+
         mapping = self._mapping
         try:
-            return mapping[a] is mapping[b]
+            return mapping[ref(a)] is mapping[ref(b)]
         except KeyError:
             return False
 
     def __iter__(self):
         """
-        Returns an iterator yielding each of the disjoint sets as a list.
+        Iterate over each of the disjoint sets as a list.
+
+        The iterator is invalid if interleaved with calls to join().
         """
-        seen = set()
-        for elem, group in self._mapping.iteritems():
-            if elem not in seen:
-                yield group
-                seen.update(group)
+        self.clean()
+
+        class Token: pass
+        token = Token()
+
+        # Mark each group as we come across if by appending a token,
+        # and don't yield it twice
+        for group in self._mapping.itervalues():
+            if not group[-1] is token:
+                yield [x() for x in group]
+                group.append(token)
+
+        # Cleanup the tokens
+        for group in self._mapping.itervalues():
+            if group[-1] is token:
+                del group[-1]
 
     def get_siblings(self, a):
         """
         Returns all of the items joined with *a*, including itself.
         """
-        return self._mapping.get(a, [a])
+        self.clean()
+
+        siblings = self._mapping.get(ref(a), [ref(a)])
+        return [x() for x in siblings]
 
 
 def simple_linear_interpolation(a, steps):
@@ -1047,6 +1156,47 @@ def simple_linear_interpolation(a, steps):
 
     return result
 
+def less_simple_linear_interpolation( x, y, xi, extrap=False ):
+    """
+    This function provides simple (but somewhat less so than
+    simple_linear_interpolation) linear interpolation.
+    simple_linear_interpolation will give a list of point between a
+    start and an end, while this does true linear interpolation at an
+    arbitrary set of points.
+
+    This is very inefficient linear interpolation meant to be used
+    only for a small number of points in relatively non-intensive use
+    cases.
+    """
+    if is_scalar(xi): xi = [xi]
+
+    x = np.asarray(x)
+    y = np.asarray(y)
+    xi = np.asarray(xi)
+
+    s = list(y.shape)
+    s[0] = len(xi)
+    yi = np.tile( np.nan, s )
+
+    for ii,xx in enumerate(xi):
+        bb = x == xx
+        if np.any(bb):
+            jj, = np.nonzero(bb)
+            yi[ii] = y[jj[0]]
+        elif xx<x[0]:
+            if extrap:
+                yi[ii] = y[0]
+        elif xx>x[-1]:
+            if extrap:
+                yi[ii] = y[-1]
+        else:
+            jj, = np.nonzero(x<xx)
+            jj = max(jj)
+
+            yi[ii] = y[jj] + (xx-x[jj])/(x[jj+1]-x[jj]) * (y[jj+1]-y[jj])
+
+    return yi
+
 def recursive_remove(path):
     if os.path.isdir(path):
         for fname in glob.glob(os.path.join(path, '*')) + glob.glob(os.path.join(path, '.*')):
@@ -1059,7 +1209,185 @@ def recursive_remove(path):
     else:
         os.remove(path)
 
+def delete_masked_points(*args):
+    """
+    Find all masked and/or non-finite points in a set of arguments,
+    and return the arguments with only the unmasked points remaining.
 
+    Arguments can be in any of 5 categories:
+
+    1) 1-D masked arrays
+    2) 1-D ndarrays
+    3) ndarrays with more than one dimension
+    4) other non-string iterables
+    5) anything else
+
+    The first argument must be in one of the first four categories;
+    any argument with a length differing from that of the first
+    argument (and hence anything in category 5) then will be
+    passed through unchanged.
+
+    Masks are obtained from all arguments of the correct length
+    in categories 1, 2, and 4; a point is bad if masked in a masked
+    array or if it is a nan or inf.  No attempt is made to
+    extract a mask from categories 2, 3, and 4 if :meth:`np.isfinite`
+    does not yield a Boolean array.
+
+    All input arguments that are not passed unchanged are returned
+    as ndarrays after removing the points or rows corresponding to
+    masks in any of the arguments.
+
+    A vastly simpler version of this function was originally
+    written as a helper for Axes.scatter().
+
+    """
+    if not len(args):
+        return ()
+    if (is_string_like(args[0]) or not iterable(args[0])):
+        raise ValueError("First argument must be a sequence")
+    nrecs = len(args[0])
+    margs = []
+    seqlist = [False] * len(args)
+    for i, x in enumerate(args):
+        if (not is_string_like(x)) and iterable(x) and len(x) == nrecs:
+            seqlist[i] = True
+            if ma.isMA(x):
+                if x.ndim > 1:
+                    raise ValueError("Masked arrays must be 1-D")
+            else:
+                x = np.asarray(x)
+        margs.append(x)
+    masks = []    # list of masks that are True where good
+    for i, x in enumerate(margs):
+        if seqlist[i]:
+            if x.ndim > 1:
+                continue  # Don't try to get nan locations unless 1-D.
+            if ma.isMA(x):
+                masks.append(~ma.getmaskarray(x))  # invert the mask
+                xd = x.data
+            else:
+                xd = x
+            try:
+                mask = np.isfinite(xd)
+                if isinstance(mask, np.ndarray):
+                    masks.append(mask)
+            except: #Fixme: put in tuple of possible exceptions?
+                pass
+    if len(masks):
+        mask = reduce(np.logical_and, masks)
+        igood = mask.nonzero()[0]
+        if len(igood) < nrecs:
+            for i, x in enumerate(margs):
+                if seqlist[i]:
+                    margs[i] = x.take(igood, axis=0)
+    for i, x in enumerate(margs):
+        if seqlist[i] and ma.isMA(x):
+            margs[i] = x.filled()
+    return margs
+
+def unmasked_index_ranges(mask, compressed = True):
+    '''
+    Find index ranges where *mask* is *False*.
+
+    *mask* will be flattened if it is not already 1-D.
+
+    Returns Nx2 :class:`numpy.ndarray` with each row the start and stop
+    indices for slices of the compressed :class:`numpy.ndarray`
+    corresponding to each of *N* uninterrupted runs of unmasked
+    values.  If optional argument *compressed* is *False*, it returns
+    the start and stop indices into the original :class:`numpy.ndarray`,
+    not the compressed :class:`numpy.ndarray`.  Returns *None* if there
+    are no unmasked values.
+
+    Example::
+
+      y = ma.array(np.arange(5), mask = [0,0,1,0,0])
+      ii = unmasked_index_ranges(ma.getmaskarray(y))
+      # returns array [[0,2,] [2,4,]]
+
+      y.compressed()[ii[1,0]:ii[1,1]]
+      # returns array [3,4,]
+
+      ii = unmasked_index_ranges(ma.getmaskarray(y), compressed=False)
+      # returns array [[0, 2], [3, 5]]
+
+      y.filled()[ii[1,0]:ii[1,1]]
+      # returns array [3,4,]
+
+    Prior to the transforms refactoring, this was used to support
+    masked arrays in Line2D.
+
+    '''
+    mask = mask.reshape(mask.size)
+    m = np.concatenate(((1,), mask, (1,)))
+    indices = np.arange(len(mask) + 1)
+    mdif = m[1:] - m[:-1]
+    i0 = np.compress(mdif == -1, indices)
+    i1 = np.compress(mdif == 1, indices)
+    assert len(i0) == len(i1)
+    if len(i1) == 0:
+        return None  # Maybe this should be np.zeros((0,2), dtype=int)
+    if not compressed:
+        return np.concatenate((i0[:, np.newaxis], i1[:, np.newaxis]), axis=1)
+    seglengths = i1 - i0
+    breakpoints = np.cumsum(seglengths)
+    ic0 = np.concatenate(((0,), breakpoints[:-1]))
+    ic1 = breakpoints
+    return np.concatenate((ic0[:, np.newaxis], ic1[:, np.newaxis]), axis=1)
+
+def isvector(X):
+    """
+    Like the Matlab (TM) function with the same name, returns true if
+    the supplied numpy array or matrix looks like a vector, meaning it
+    has a one non-singleton axis (i.e., it can have multiple axes, but
+    all must have length 1, except for one of them).
+
+    If you just want to see if the array has 1 axis, use X.ndim==1
+
+    """
+    return np.prod(X.shape)==np.max(X.shape)
+
+def vector_lengths( X, P=2., axis=None ):
+    """
+    Finds the length of a set of vectors in n dimensions.  This is
+    like the numpy norm function for vectors, but has the ability to
+    work over a particular axis of the supplied array or matrix.
+
+    Computes (sum((x_i)^P))^(1/P) for each {x_i} being the elements of X along
+    the given axis.  If *axis* is *None*, compute over all elements of X.
+    """
+    X = np.asarray(X)
+    return (np.sum(X**(P),axis=axis))**(1./P)
+
+def distances_along_curve( X ):
+    """
+    Computes the distance between a set of successive points in N dimensions.
+
+    where X is an MxN array or matrix.  The distances between successive rows
+    is computed.  Distance is the standard Euclidean distance.
+    """
+    X = np.diff( X, axis=0 )
+    return vector_lengths(X,axis=1)
+
+def path_length(X):
+    """
+    Computes the distance travelled along a polygonal curve in N dimensions.
+
+
+    where X is an MxN array or matrix.  Returns an array of length M consisting
+    of the distance along the curve at each point (i.e., the rows of X).
+    """
+    X = distances_along_curve(X)
+    return np.concatenate( (np.zeros(1), np.cumsum(X)) )
+
+def is_closed_polygon(X):
+    """
+    Tests whether first and last object in a sequence are the same.  These are
+    presumably coordinates on a polygonal curve, in which case this function
+    tests if that curve is closed.
+
+    """
+    return np.all(X[0] == X[-1])
 
 # a dict to cross-map linestyle arguments
 _linestyles = [('-', 'solid'),

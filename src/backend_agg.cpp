@@ -90,6 +90,20 @@ Py::Object BufferRegion::to_string(const Py::Tuple &args) {
   return Py::String(PyString_FromStringAndSize((const char*)data, height*stride), true);
 }
 
+Py::Object BufferRegion::set_x(const Py::Tuple &args) {
+    args.verify_length(1);
+    size_t x = Py::Int( args[0] );
+    rect.x1 = x;
+    return Py::Object();
+}
+
+Py::Object BufferRegion::set_y(const Py::Tuple &args) {
+    args.verify_length(1);
+    size_t y = Py::Int( args[0] );
+    rect.y1 = y;
+    return Py::Object();
+}
+
 Py::Object BufferRegion::to_string_argb(const Py::Tuple &args) {
   // owned=true to prevent memory leak
   Py_ssize_t length;
@@ -1597,16 +1611,39 @@ Py::Object _backend_agg_module::new_renderer (const Py::Tuple &args,
   if ( kws.hasKey("debug") ) debug = Py::Int( kws["debug"] );
   else debug=0;
 
-  int width = Py::Int(args[0]);
-  int height = Py::Int(args[1]);
+  unsigned int width = (unsigned int)Py::Int(args[0]);
+  unsigned int height = (unsigned int)Py::Int(args[1]);
   double dpi = Py::Float(args[2]);
-  return Py::asObject(new RendererAgg(width, height, dpi, debug));
+
+  if (width > 1 << 15 || height > 1 << 15) {
+    throw Py::ValueError("width and height must each be below 32768");
+  }
+
+  if (dpi <= 0.0) {
+    throw Py::ValueError("dpi must be positive");
+  }
+
+  RendererAgg* renderer = NULL;
+  try {
+    renderer = new RendererAgg(width, height, dpi, debug);
+  } catch (std::bad_alloc) {
+    throw Py::RuntimeError("Could not allocate memory for image");
+  }
+
+  return Py::asObject(renderer);
 }
 
 
 void BufferRegion::init_type() {
   behaviors().name("BufferRegion");
   behaviors().doc("A wrapper to pass agg buffer objects to and from the python level");
+
+
+  add_varargs_method("set_x", &BufferRegion::set_x,
+		     "set_x(x)");
+
+  add_varargs_method("set_y", &BufferRegion::set_y,
+		     "set_y(y)");
 
   add_varargs_method("to_string", &BufferRegion::to_string,
 		     "to_string()");

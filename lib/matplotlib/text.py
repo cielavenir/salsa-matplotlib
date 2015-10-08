@@ -83,7 +83,7 @@ class Text(Artist):
     """
     zorder = 3
     def __str__(self):
-        return "Text(%g,%g,%s)"%(self._y,self._y,self._text)
+        return "Text(%g,%g,%s)"%(self._y,self._y,repr(self._text))
 
     def __init__(self,
                  x=0, y=0, text='',
@@ -135,17 +135,17 @@ class Text(Artist):
         """
         if callable(self._contains): return self._contains(self,mouseevent)
 
-        try:
-            l,b,w,h = self.get_window_extent().get_bounds()
-        except:
-            # TODO: why does this error occur
-            #print str(self),"error looking at get_window_extent"
+        if not self.get_visible() or self._renderer is None:
             return False,{}
+
+        l,b,w,h = self.get_window_extent().bounds
+
         r = l+w
         t = b+h
         xyverts = (l,b), (l, t), (r, t), (r, b)
         x, y = mouseevent.x, mouseevent.y
         inside = nxutils.pnpoly(x, y, xyverts)
+
         return inside,{}
 
     def _get_xy_display(self):
@@ -298,7 +298,12 @@ class Text(Artist):
 
         bbox, info = self._get_layout(renderer)
         trans = self.get_transform()
-        posx, posy = self.get_position()
+
+        # don't use self.get_position here, which refers to text position
+        # in Text, and dash position in TextWithDash:
+        posx = float(self.convert_xunits(self._x))
+        posy = float(self.convert_yunits(self._y))
+
         posx, posy = trans.transform_point((posx, posy))
         canvasw, canvash = renderer.get_canvas_width_height()
 
@@ -395,7 +400,7 @@ class Text(Artist):
         return (x, y, self._text, self._color,
                 self._verticalalignment, self._horizontalalignment,
                 hash(self._fontproperties), self._rotation,
-                self._renderer.dpi, id(self._renderer)
+                self.figure.dpi, id(self._renderer)
                 )
 
     def get_text(self):
@@ -698,7 +703,7 @@ class TextWithDash(Text):
     __name__ = 'textwithdash'
 
     def __str__(self):
-        return "TextWithDash(%g,%g,%s)"%(self._x,self._y,self._text)
+        return "TextWithDash(%g,%g,%s)"%(self._x,self._y,repr(self._text))
     def __init__(self,
                  x=0, y=0, text='',
                  color=None,          # defaults to rc params
@@ -981,7 +986,7 @@ class Annotation(Text):
     :class:`~matplotlib.patches.Rectangle`, etc., easier.
     """
     def __str__(self):
-        return "Annotation(%g,%g,%s)"%(self.xy[0],self.xy[1],self._text)
+        return "Annotation(%g,%g,%s)"%(self.xy[0],self.xy[1],repr(self._text))
     def __init__(self, s, xy,
                  xytext=None,
                  xycoords='data',

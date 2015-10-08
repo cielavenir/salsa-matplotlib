@@ -3,8 +3,13 @@ A PostScript backend, which can produce both PostScript .ps and .eps
 """
 
 from __future__ import division
-import glob, math, md5, os, shutil, sys, time
+import glob, math, os, shutil, sys, time
 def _fn_name(): return sys._getframe(1).f_code.co_name
+
+try:
+    from hashlib import md5
+except ImportError:
+    from md5 import md5 #Deprecated in 2.5
 
 from tempfile import gettempdir
 from cStringIO import StringIO
@@ -126,7 +131,12 @@ class RendererPS(RendererBase):
     fontd = maxdict(50)
     afmfontd = maxdict(50)
 
-    def __init__(self, width, height, pswriter, dpi=72):
+    def __init__(self, width, height, pswriter, imagedpi=72):
+        """
+        Although postscript itself is dpi independent, we need to
+        imform the image code about a requested dpi to generate high
+        res images and them scale them before embeddin them
+        """
         RendererBase.__init__(self)
         self.width = width
         self.height = height
@@ -134,7 +144,7 @@ class RendererPS(RendererBase):
         if rcParams['text.usetex']:
             self.textcnt = 0
             self.psfrag = []
-        self.dpi = dpi
+        self.imagedpi = imagedpi
 
         # current renderer state (None=uninitialised)
         self.color = None
@@ -145,7 +155,7 @@ class RendererPS(RendererBase):
         self.fontname = None
         self.fontsize = None
         self.hatch = None
-        self.image_magnification = dpi/72.0
+        self.image_magnification = imagedpi/72.0
         self._clip_paths = {}
         self._path_collection_id = 0
 
@@ -258,8 +268,8 @@ class RendererPS(RendererBase):
   grestore
  """ % (angle, 12/density)
         self._pswriter.write("gsave\n")
-        self._pswriter.write(do_hatch(0, hatches['horiz']))
-        self._pswriter.write(do_hatch(90, hatches['vert']))
+        self._pswriter.write(do_hatch(90, hatches['horiz']))
+        self._pswriter.write(do_hatch(0, hatches['vert']))
         self._pswriter.write(do_hatch(45, hatches['diag1']))
         self._pswriter.write(do_hatch(-45, hatches['diag2']))
         self._pswriter.write("grestore\n")
@@ -857,15 +867,15 @@ class FigureCanvasPS(FigureCanvasBase):
         else: raise RuntimeError('Orientation must be "portrait" or "landscape"')
 
         self.figure.set_dpi(72) # Override the dpi kwarg
-        dpi = kwargs.get("dpi", 72)
+        imagedpi = kwargs.get("dpi", 72)
         facecolor = kwargs.get("facecolor", "w")
         edgecolor = kwargs.get("edgecolor", "w")
 
         if rcParams['text.usetex']:
-            self._print_figure_tex(outfile, format, dpi, facecolor, edgecolor,
+            self._print_figure_tex(outfile, format, imagedpi, facecolor, edgecolor,
                                    orientation, isLandscape, papertype)
         else:
-            self._print_figure(outfile, format, dpi, facecolor, edgecolor,
+            self._print_figure(outfile, format, imagedpi, facecolor, edgecolor,
                                orientation, isLandscape, papertype)
 
     def _print_figure(self, outfile, format, dpi=72, facecolor='w', edgecolor='w',
@@ -887,10 +897,10 @@ class FigureCanvasPS(FigureCanvasBase):
         passed_in_file_object = False
         if is_string_like(outfile):
             title = outfile
-            tmpfile = os.path.join(gettempdir(), md5.md5(outfile).hexdigest())
+            tmpfile = os.path.join(gettempdir(), md5(outfile).hexdigest())
         elif is_writable_file_like(outfile):
             title = None
-            tmpfile = os.path.join(gettempdir(), md5.md5(str(hash(outfile))).hexdigest())
+            tmpfile = os.path.join(gettempdir(), md5(str(hash(outfile))).hexdigest())
             passed_in_file_object = True
         else:
             raise ValueError("outfile must be a path or a file-like object")
@@ -939,7 +949,7 @@ class FigureCanvasPS(FigureCanvasBase):
         self.figure.set_edgecolor(edgecolor)
 
         self._pswriter = StringIO()
-        renderer = RendererPS(width, height, self._pswriter, dpi=dpi)
+        renderer = RendererPS(width, height, self._pswriter, imagedpi=dpi)
         self.figure.draw(renderer)
 
         self.figure.set_facecolor(origfacecolor)
@@ -1028,7 +1038,7 @@ class FigureCanvasPS(FigureCanvasBase):
         title = outfile
 
         # write to a temp file, we'll move it to outfile when done
-        tmpfile = os.path.join(gettempdir(), md5.md5(outfile).hexdigest())
+        tmpfile = os.path.join(gettempdir(), md5(outfile).hexdigest())
         fh = file(tmpfile, 'w')
 
         self.figure.dpi = 72 # ignore the dpi kwarg
@@ -1050,7 +1060,7 @@ class FigureCanvasPS(FigureCanvasBase):
         self.figure.set_edgecolor(edgecolor)
 
         self._pswriter = StringIO()
-        renderer = RendererPS(width, height, self._pswriter, dpi=dpi)
+        renderer = RendererPS(width, height, self._pswriter, imagedpi=dpi)
         self.figure.draw(renderer)
 
         self.figure.set_facecolor(origfacecolor)

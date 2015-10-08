@@ -89,9 +89,9 @@ host of others.
 """
 from __future__ import generators
 
-__version__  = '0.98.1'
-__revision__ = '$Revision: 5635 $'
-__date__     = '$Date: 2008-06-22 12:31:10 -0400 (Sun, 22 Jun 2008) $'
+__version__  = '0.98.3'
+__revision__ = '$Revision: 5941 $'
+__date__     = '$Date: 2008-07-31 15:08:08 -0400 (Thu, 31 Jul 2008) $'
 
 import md5, os, re, shutil, sys, warnings
 import distutils.sysconfig
@@ -801,8 +801,11 @@ def use(arg, warn=True):
         if warn: warnings.warn(_use_error_msg)
         return
     arg = arg.lower()
-    be_parts = arg.split('.')
-    name = validate_backend(be_parts[0])
+    if arg.startswith('module://'):
+        name = arg
+    else:
+        be_parts = arg.split('.')
+        name = validate_backend(be_parts[0])
     rcParams['backend'] = name
     if name == 'cairo' and len(be_parts) > 1:
         rcParams['cairo.format'] = validate_cairo_format(be_parts[1])
