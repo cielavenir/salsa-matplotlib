@@ -10,13 +10,17 @@ line segemnts)
 import math, warnings
 from matplotlib import rcParams, verbose
 
-from artist import Artist
+import artist
+from artist import Artist, kwdocd
 from backend_bases import GraphicsContextBase
-from cbook import is_string_like, iterable
+from cbook import is_string_like, iterable, dedent
 from colors import colorConverter
 from cm import ScalarMappable
 from numerix import arange, sin, cos, pi, asarray, sqrt, array, newaxis, ones
+from numerix import isnan, any
 from transforms import identity_transform
+
+import matplotlib.nxutils as nxutils
 
 class Collection(Artist):
     """
@@ -49,6 +53,30 @@ class Collection(Artist):
                 else: return val
 
         raise TypeError('val must be a float or nonzero sequence of floats')
+
+
+# these are not available for the object inspector until after the
+# class is built so we define an initial set here for the init
+# function and they will be overridden after object defn
+kwdocd['PatchCollection'] = """\
+    Valid PatchCollection kwargs are:
+
+      edgecolors=None,
+      facecolors=None,
+      linewidths=None,
+      antialiaseds = None,
+      offsets = None,
+      transOffset = identity_transform(),
+      norm = None,  # optional for ScalarMappable
+      cmap = None,  # ditto
+
+    offsets and transOffset are used to translate the patch after
+    rendering (default no offsets)
+
+    If any of edgecolors, facecolors, linewidths, antialiaseds are
+    None, they default to their patch.* rc params setting, in sequence
+    form.
+"""
 
 class PatchCollection(Collection, ScalarMappable):
     """
@@ -85,10 +113,15 @@ class PatchCollection(Collection, ScalarMappable):
                  linewidths=None,
                  antialiaseds = None,
                  offsets = None,
-                 transOffset = identity_transform(),
+                 transOffset = None,
                  norm = None,  # optional for ScalarMappable
                  cmap = None,  # ditto
                  ):
+        """
+        Create a PatchCollection
+
+        %(PatchCollection)s
+        """
         Collection.__init__(self)
         ScalarMappable.__init__(self, norm, cmap)
 
@@ -107,6 +140,67 @@ class PatchCollection(Collection, ScalarMappable):
         self._antialiaseds = antialiaseds
         self._offsets = offsets
         self._transOffset = transOffset
+        self._verts = []        
+    __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
+
+
+    def pick(self, mouseevent):
+        """
+        fire a pick event with the index into the data if the mouse
+        click is within the patch
+        """
+        if not self.pickable(): return
+        ind = []
+        x, y = mouseevent.x, mouseevent.y
+        for i, thispoly in enumerate(self.get_transformed_patches()):            
+            inside = nxutils.pnpoly(x, y, thispoly)
+            if inside: ind.append(i)
+        if len(ind):
+            self.figure.canvas.pick_event(mouseevent, self, ind=ind)
+        
+        
+    def get_transformed_patches(self):
+        """
+        get a sequence of the polygons in the collection in display (transformed) space
+
+        The ith element in the returned sequence is a list of x,y
+        vertices defining the ith polygon
+        """
+
+        verts = self._verts
+        offsets = self._offsets
+        usingOffsets = offsets is not None
+        transform = self.get_transform()
+        transOffset = self.get_transoffset()
+        Noffsets = 0
+        Nverts = len(verts)
+        if usingOffsets:
+            Noffsets = len(offsets)
+
+        N = max(Noffsets, Nverts)
+
+        data = []
+        print 'verts N=%d, Nverts=%d'%(N, Nverts), verts
+        print 'offsets; Noffsets=%d'%Noffsets
+        for i in xrange(N):
+            print 'i%%Nverts=%d'%(i%Nverts)
+            polyverts = verts[i % Nverts]
+            if any(isnan(polyverts)):
+                continue
+            print 'thisvert', i, polyverts
+            tverts = transform.seq_xy_tups(polyverts)
+            if usingOffsets:
+                print 'using offsets'
+                xo,yo = transOffset.xy_tup(offsets[i % Noffsets])
+                tverts = [(x+xo,y+yo) for x,y in tverts]
+
+            data.append(tverts)
+        return data
+
+    def get_transoffset(self):
+        if self._transOffset is None:
+            self._transOffset = identity_transform()
+        return self._transOffset
 
 
     def set_linewidth(self, lw):
@@ -216,17 +310,19 @@ class QuadMesh(PatchCollection):
         # does not call update_scalarmappable, need to update it
         # when creating/changing              ****** Why not?  speed?
         if not self.get_visible(): return
-        self._transform.freeze()
-        self._transOffset.freeze()
+        transform = self.get_transform()
+        transoffset = self.get_transoffset()
+        transform.freeze()
+        transoffset.freeze()
         #print 'QuadMesh draw'
         self.update_scalarmappable()  #######################
 
         renderer.draw_quad_mesh( self._meshWidth, self._meshHeight,
             self._facecolors, self._coordinates[:,0],
-            self._coordinates[:, 1], self.clipbox, self._transform,
-            self._offsets, self._transOffset, self._showedges)
-        self._transform.thaw()
-        self._transOffset.thaw()
+            self._coordinates[:, 1], self.clipbox, transform,
+            self._offsets, transoffset, self._showedges)
+        transform.thaw()
+        transoffset.thaw()
 
 class PolyCollection(PatchCollection):
     def __init__(self, verts, **kwargs):
@@ -234,10 +330,12 @@ class PolyCollection(PatchCollection):
         verts is a sequence of ( verts0, verts1, ...) where verts_i is
         a sequence of xy tuples of vertices, or an equivalent
         numerix array of shape (nv,2).
-        See PatchCollection for kwargs.
+
+        %(PatchCollection)s
         """
         PatchCollection.__init__(self,**kwargs)
         self._verts = verts
+    __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
 
     def set_verts(self, verts):
         '''This allows one to delay initialization of the vertices.'''
@@ -246,39 +344,59 @@ class PolyCollection(PatchCollection):
     def draw(self, renderer):
         if not self.get_visible(): return
         renderer.open_group('polycollection')
-        self._transform.freeze()
-        self._transOffset.freeze()
+        transform = self.get_transform()
+        transoffset = self.get_transoffset()
+
+        transform.freeze()
+        transoffset.freeze()
         self.update_scalarmappable()
         if is_string_like(self._edgecolors) and self._edgecolors[:2] == 'No':
             self._linewidths = (0,)
             #self._edgecolors = self._facecolors
         renderer.draw_poly_collection(
-            self._verts, self._transform, self.clipbox,
+            self._verts, transform, self.clipbox,
             self._facecolors, self._edgecolors,
             self._linewidths, self._antialiaseds,
-            self._offsets,  self._transOffset)
-        self._transform.thaw()
-        self._transOffset.thaw()
+            self._offsets,  transoffset)
+        transform.thaw()
+        transoffset.thaw()
         renderer.close_group('polycollection')
 
-
+        
     def get_verts(self, dataTrans=None):
         '''Return vertices in data coordinates.
         The calculation is incomplete in general; it is based
         on the vertices or the offsets, whichever is using
         dataTrans as its transformation, so it does not take
         into account the combined effect of segments and offsets.
-        '''
+        '''        
         verts = []
         if self._offsets is None:
             for seg in self._verts:
                 verts.extend(seg)
             return [tuple(xy) for xy in verts]
-        if self._transOffset == dataTrans:
+        if self.get_transoffset() == dataTrans:
             return [tuple(xy) for xy in self._offsets]
         raise NotImplementedError('Vertices in data coordinates are calculated\n'
                 + 'with offsets only if _transOffset == dataTrans.')
 
+class BrokenBarHCollection(PolyCollection):
+    """
+    A colleciton of horizontal bars spanning yrange with a sequence of
+    xranges
+    """
+    def __init__(self, xranges, yrange, **kwargs):
+        """
+        xranges : sequence of (xmin, xwidth)
+        yrange  : ymin, ywidth
+
+        %(PatchCollection)s
+        """
+        ymin, ywidth = yrange
+        ymax = ymin + ywidth
+        verts = [ [(xmin, ymin), (xmin, ymax), (xmin+xwidth, ymax), (xmin+xwidth, ymin)] for xmin, xwidth in xranges]
+        PolyCollection.__init__(self, verts, **kwargs)
+    __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
 
 class RegularPolyCollection(PatchCollection):
     def __init__(self,
@@ -300,13 +418,7 @@ class RegularPolyCollection(PatchCollection):
 
         * rotation is the rotation of the polygon in radians
 
-        kwargs: See PatchCollection for more details
-
-          * offsets are a sequence of x,y tuples that give the centers of
-            the polygon in data coordinates
-
-          * transOffset is the Transformation instance used to
-            transform the centers onto the canvas.
+        %(PatchCollection)s
 
         Example: see examples/dynamic_collection.py for complete example
 
@@ -334,6 +446,26 @@ class RegularPolyCollection(PatchCollection):
         self.numsides = numsides
         self.rotation = rotation
         self._update_verts()
+    __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
+
+    def get_transformed_patches(self):
+        
+        xverts, yverts = zip(*self._verts)
+        xverts = asarray(xverts)
+        yverts = asarray(yverts)
+        sizes = sqrt(asarray(self._sizes)*self._dpi.get()/72.0)
+        Nsizes = len(sizes)
+        transOffset = self.get_transoffset()
+        polys = []
+        for i, loc in enumerate(self._offsets):
+            xo,yo = transOffset.xy_tup(loc)
+            #print 'xo, yo', loc, (xo, yo)
+            scale = sizes[i % Nsizes]
+
+            thisxverts = scale*xverts + xo
+            thisyverts = scale*yverts + yo
+            polys.append(zip(thisxverts, thisyverts))
+        return polys
 
     def _update_verts(self):
         r = 1.0/math.sqrt(math.pi)  # unit area
@@ -343,8 +475,11 @@ class RegularPolyCollection(PatchCollection):
     def draw(self, renderer):
         if not self.get_visible(): return
         renderer.open_group('regpolycollection')
-        self._transform.freeze()
-        self._transOffset.freeze()
+        transform = self.get_transform()
+        transoffset = self.get_transoffset()
+
+        transform.freeze()
+        transoffset.freeze()
         self.update_scalarmappable()
         self._update_verts()
         scales = sqrt(asarray(self._sizes)*self._dpi.get()/72.0)
@@ -354,13 +489,13 @@ class RegularPolyCollection(PatchCollection):
             self._linewidths = (0,)
         renderer.draw_regpoly_collection(
             self.clipbox,
-            self._offsets, self._transOffset,
+            self._offsets, transoffset,
             self._verts, scales,
             self._facecolors, self._edgecolors,
             self._linewidths, self._antialiaseds)
 
-        self._transform.thaw()
-        self._transOffset.thaw()
+        transform.thaw()
+        transoffset.thaw()
         renderer.close_group('regpolycollection')
 
 
@@ -369,7 +504,7 @@ class RegularPolyCollection(PatchCollection):
         The calculation is incomplete; it uses only
         the offsets, and only if _transOffset is dataTrans.
         '''
-        if self._transOffset == dataTrans:
+        if self.get_transoffset() == dataTrans:
             return [tuple(xy) for xy in self._offsets]
         raise NotImplementedError('Vertices in data coordinates are calculated\n'
                 + 'only with offsets and only if _transOffset == dataTrans.')
@@ -383,7 +518,7 @@ class StarPolygonCollection(RegularPolyCollection):
                  **kwargs):
         """
         Draw a regular star like Polygone with numsides.
-        
+
         * dpi is the figure dpi instance, and is required to do the
           area scaling.
 
@@ -394,16 +529,12 @@ class StarPolygonCollection(RegularPolyCollection):
 
         * rotation is the rotation of the polygon in radians
 
-        kwargs: See PatchCollection for more details
-
-          * offsets are a sequence of x,y tuples that give the centers of
-            the polygon in data coordinates
-
-          * transOffset is the Transformation instance used to
-            transform the centers onto the canvas.
+        %(PatchCollection)s
         """
+
         RegularPolyCollection.__init__(self, dpi, numsides, rotation, sizes, **kwargs)
-    
+    __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
+
     def _update_verts(self):
         scale = 1.0/math.sqrt(math.pi)
         r = scale*ones(self.numsides*2)
@@ -494,6 +625,11 @@ class LineCollection(Collection, ScalarMappable):
         self._transOffset = transOffset
         self.set_segments(segments)
 
+    def get_transoffset(self):
+        if self._transOffset is None:
+            self._transOffset = identity_transform()
+        return self._transOffset
+
     def set_segments(self, segments):
         if segments is None: return
         self._segments = [asarray(seg) for seg in segments]
@@ -519,15 +655,20 @@ class LineCollection(Collection, ScalarMappable):
     def draw(self, renderer):
         if not self.get_visible(): return
         renderer.open_group('linecollection')
-        self._transform.freeze()
-        if self._transOffset is not None: self._transOffset.freeze()
+        transform = self.get_transform()
+        transoffset = self.get_transoffset()
+
+        transform.freeze()
+        transoffset.freeze()
+
         self.update_scalarmappable()
         renderer.draw_line_collection(
-            self._segments, self._transform, self.clipbox,
+            self._segments, transform, self.clipbox,
             self._colors, self._lw, self._ls, self._aa, self._offsets,
-            self._transOffset)
-        self._transform.thaw()
-        if self._transOffset is not None: self._transOffset.thaw()
+            transoffset)
+        transform.thaw()
+        transoffset.thaw()
+
         renderer.close_group('linecollection')
 
     def set_linewidth(self, lw):
@@ -617,7 +758,7 @@ class LineCollection(Collection, ScalarMappable):
             for seg in self._segments:
                 verts.extend(seg)
             return [tuple(xy) for xy in verts]
-        if self._transOffset == dataTrans:
+        if self.get_transoffset() == dataTrans:
             return [tuple(xy) for xy in self._offsets]
         raise NotImplementedError('Vertices in data coordinates are calculated\n'
                 + 'with offsets only if _transOffset == dataTrans.')
@@ -633,4 +774,11 @@ class LineCollection(Collection, ScalarMappable):
         self._colors = self.to_rgba(self._A, self._alpha)
 
 
+
+artist.kwdocd['Collection'] = artist.kwdoc(Collection)
+artist.kwdocd['PatchCollection'] = patchstr = artist.kwdoc(PatchCollection)
+for k in ('QuadMesh', 'PolyCollection', 'BrokenBarHCollection', 'RegularPolyCollection',
+          'StarPolygonCollection'):
+    artist.kwdocd[k] = patchstr
+artist.kwdocd['LineCollection'] = artist.kwdoc(LineCollection)
 

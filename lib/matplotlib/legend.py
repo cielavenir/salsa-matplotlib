@@ -130,7 +130,7 @@ class Legend(Artist):
   loc                   # a location code
   isaxes=True           # whether this is an axes legend
   numpoints = 4         # the number of points in the legend line
-  fontprop = FontProperties(size='smaller')  # the font property
+  prop = FontProperties(size='smaller')  # the font property
   pad = 0.2             # the fractional whitespace inside the legend border
   markerscale = 0.6     # the relative size of legend markers vs. original
   shadow                # if True, draw a shadow behind legend
@@ -196,7 +196,7 @@ The following dimensions are in axes coords
 
     def _set_artist_props(self, a):
         a.set_figure(self.figure)
-        a.set_transform(self._transform)
+        a.set_transform(self.get_transform())
 
     def _approx_text_height(self):
         return self.fontsize/72.0*self.figure.dpi.get()/self.parent.bbox.height()
@@ -216,15 +216,15 @@ The following dimensions are in axes coords
         if not len(self.legendHandles) and not len(self.texts): return
         for h in self.legendHandles:
             if h is not None:
-		h.draw(renderer)
-        	if 0: bbox_artist(h, renderer)
+                h.draw(renderer)
+                if 0: bbox_artist(h, renderer)
 
         for t in self.texts:
             if 0: bbox_artist(t, renderer)
             t.draw(renderer)
         renderer.close_group('legend')
         #draw_bbox(self.save, renderer, 'g')
-        #draw_bbox(self.ibox, renderer, 'r', self._transform)
+        #draw_bbox(self.ibox, renderer, 'r', self.get_transform())
 
     def _get_handle_text_bbox(self, renderer):
         'Get a bbox for the text and lines in axes coords'
@@ -238,7 +238,7 @@ The following dimensions are in axes coords
         bbox = bbox_all(bboxesAll)
         self.save = bbox
 
-        ibox =  inverse_transform_bbox(self._transform, bbox)
+        ibox =  inverse_transform_bbox(self.get_transform(), bbox)
         self.ibox = ibox
 
         return ibox
@@ -283,7 +283,6 @@ The following dimensions are in axes coords
                 ret.append(legline)
 
             elif isinstance(handle, RegularPolyCollection):
-
                 p = Rectangle(xy=(min(self._xdata), y-3/4*HEIGHT),
                               width = self.handlelen, height=HEIGHT/2,
                               )
@@ -294,8 +293,8 @@ The following dimensions are in axes coords
                 p.set_clip_box(None)
                 ret.append(p)
 
-	    else:
-		ret.append(None)
+            else:
+                ret.append(None)
 
         return ret
 
@@ -521,7 +520,7 @@ The following dimensions are in axes coords
         if not len(self.legendHandles) and not len(self.texts): return
         def get_tbounds(text):  #get text bounds in axes coords
             bbox = text.get_window_extent(renderer)
-            bboxa = inverse_transform_bbox(self._transform, bbox)
+            bboxa = inverse_transform_bbox(self.get_transform(), bbox)
             return bboxa.get_bounds()
 
         hpos = []
@@ -582,3 +581,6 @@ The following dimensions are in axes coords
             if self._loc in (CL, CR, C):            # center y
                 oy = (0.5-h/2)-b
             self._offset(ox, oy)
+
+
+#artist.kwdocd['Legend'] = kwdoc(Legend)

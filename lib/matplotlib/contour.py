@@ -19,7 +19,7 @@ import _contour
 from cm import ScalarMappable
 from cbook import iterable, is_string_like, flatten, enumerate, \
      allequal, dict_delall, strip_math, popd, popall, silent_list
-from colors import colorConverter, normalize, Colormap, ListedColormap, no_norm
+from colors import colorConverter, Normalize, Colormap, ListedColormap, NoNorm
 from collections import  PolyCollection, LineCollection
 from font_manager import FontProperties
 from numerix.mlab import amin, amax
@@ -115,7 +115,7 @@ class ContourLabeler:
             cmap = ListedColormap(colors, N=len(self.label_levels))
             self.label_cvalues = range(len(self.label_levels))
             self.label_mappable = ScalarMappable(cmap = cmap,
-                                                 norm = no_norm())
+                                                 norm = NoNorm())
 
         #self.cl = []   # Initialized in ContourSet.__init__
         #self.cl_cvalues = [] # same
@@ -449,17 +449,15 @@ class ContourSet(ScalarMappable, ContourLabeler):
                 self.linewidths = 0.05 # Good default for Postscript.
             if iterable(self.linewidths):
                 self.linewidths = self.linewidths[0]
-            #C = _contour.Cntr(x, y, z.filled(), z.mask())
             C = _contour.Cntr(x, y, z.filled(), ma.getmaskorNone(z))
             lowers = self._levels[:-1]
             uppers = self._levels[1:]
-            for level, level_upper, color in zip(lowers, uppers, self.tcolors):
+            for level, level_upper in zip(lowers, uppers):
                 nlist = C.trace(level, level_upper, points = 0,
                         nchunk = self.nchunk)
                 col = PolyCollection(nlist,
                                      linewidths = (self.linewidths,),
                                      antialiaseds = (self.antialiased,),
-                                     facecolors= color,
                                      edgecolors= 'None')
                 self.ax.add_collection(col)
                 self.collections.append(col)
@@ -467,12 +465,10 @@ class ContourSet(ScalarMappable, ContourLabeler):
         else:
             tlinewidths = self._process_linewidths()
             self.tlinewidths = tlinewidths
-            #C = _contour.Cntr(x, y, z.filled(), z.mask())
             C = _contour.Cntr(x, y, z.filled(), ma.getmaskorNone(z))
-            for level, color, width in zip(self.levels, self.tcolors, tlinewidths):
+            for level, width in zip(self.levels, tlinewidths):
                 nlist = C.trace(level, points = 0)
                 col = LineCollection(nlist,
-                                     colors = color,
                                      linewidths = width)
 
                 if level < 0.0 and self.monochrome:
@@ -480,6 +476,7 @@ class ContourSet(ScalarMappable, ContourLabeler):
                 col.set_label(str(level))         # only for self-documentation
                 self.ax.add_collection(col)
                 self.collections.append(col)
+        self.changed() # set the colors
         x0 = ma.minimum(x)
         x1 = ma.maximum(x)
         y0 = ma.minimum(y)
@@ -492,7 +489,6 @@ class ContourSet(ScalarMappable, ContourLabeler):
         tcolors = [ (tuple(rgba),) for rgba in
                                 self.to_rgba(self.cvalues, alpha=self.alpha)]
         self.tcolors = tcolors
-        contourNum = 0
         for color, collection in zip(tcolors, self.collections):
             collection.set_color(color)
         for label, cv in zip(self.cl, self.cl_cvalues):
@@ -632,9 +628,9 @@ class ContourSet(ScalarMappable, ContourLabeler):
         #                             + "with use of 'extend' kwarg")
         self._levels = list(self.levels)
         if self.extend in ('both', 'min'):
-            self._levels.insert(0, self.zmin - 1)
+            self._levels.insert(0, min(self.levels[0],self.zmin) - 1)
         if self.extend in ('both', 'max'):
-            self._levels.append(self.zmax + 1)
+            self._levels.append(max(self.levels[-1],self.zmax) + 1)
         self._levels = asarray(self._levels)
         self.vmin = amin(self.levels)  # alternative would be self.layers
         self.vmax = amax(self.levels)
@@ -672,7 +668,7 @@ class ContourSet(ScalarMappable, ContourLabeler):
             if self.extend in ('both', 'max'):
                 i1 = i1 + 1
             self.cvalues = range(i0, i1)
-            self.set_norm(no_norm())
+            self.set_norm(NoNorm())
         else:
             self.cvalues = self.layers
         if not self.norm.scaled():
@@ -680,7 +676,7 @@ class ContourSet(ScalarMappable, ContourLabeler):
         if self.extend in ('both', 'max', 'min'):
             self.norm.clip = False
         self.set_array(self.layers)
-        # self.tcolors will be set by the "changed" method
+        # self.tcolors are set by the "changed" method
 
     def _process_linewidths(self):
         linewidths = self.linewidths
@@ -694,6 +690,15 @@ class ContourSet(ScalarMappable, ContourLabeler):
                 linewidths = [linewidths] * Nlev
             tlinewidths = [(w,) for w in linewidths]
         return tlinewidths
+
+    def get_alpha(self):
+        '''For compatibility with artists, return self.alpha'''
+        return self.alpha
+
+    def set_alpha(self, alpha):
+        '''For compatibility with artists, set self.alpha'''
+        self.alpha = alpha
+        self.changed()
 
     contour_doc = """
         contour and contourf draw contour lines and filled contours,
@@ -750,7 +755,7 @@ class ContourSet(ScalarMappable, ContourLabeler):
             * cmap = None: a cm Colormap instance from matplotlib.cm.
               - if cmap == None and colors == None, a default Colormap is used.
 
-            * norm = None: a matplotlib.colors.normalize instance for
+            * norm = None: a matplotlib.colors.Normalize instance for
               scaling data values to colors.
               - if norm == None, and colors == None, the default
                 linear scaling is used.
@@ -798,7 +803,7 @@ class ContourSet(ScalarMappable, ContourLabeler):
                 specified
 
               - if linewidths == None, the default width in lines.linewidth in
-                .matplotlibrc is used
+                matplotlibrc is used
 
             contourf only:
             ***** Obsolete: ****

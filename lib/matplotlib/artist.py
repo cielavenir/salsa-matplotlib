@@ -30,7 +30,7 @@ class Artist:
     def __init__(self):
         self.figure = None
 
-        self._transform = identity_transform()
+        self._transform = None
         self._transformSet = False
         self._visible = True
         self._animated = False
@@ -39,6 +39,7 @@ class Artist:
         self._clipon = False
         self._lod = False
         self._label = ''
+        self._picker = None
 
         self.eventson = False  # fire events only if eventson
         self._oid = 0  # an observer id
@@ -75,7 +76,62 @@ class Artist:
 
     def get_transform(self):
         'return the Transformation instance used by this artist'
+        if self._transform is None:
+            self._transform = identity_transform()
         return self._transform
+
+
+    def pickable(self):
+        'return True if self is pickable'
+        return (self.figure is not None and
+                self.figure.canvas is not None and
+                self._picker is not None)
+
+    def pick(self, mouseevent):
+        """
+        the user picked location x,y; if this Artist is within picker
+        "pick epsilon" of x,y fire off a pick event
+        """
+        # if mouseevent x, y are within picker call self.figure.canvas.pick_event(self, mouseevent)
+        pass
+    
+    def set_picker(self, picker):
+        """
+        set the epsilon for picking used by this artist
+
+        picker can be one of the following:
+
+          None -  picking is disabled for this artist (default)
+
+          boolean - if True then picking will be enabled and the
+            artist will fire a pick event if the mouse event is over
+            the artist
+        
+          float - if picker is a number it is interpreted as an
+            epsilon tolerance in points and the the artist will fire
+            off an event if it's data is within epsilon of the mouse
+            event.  For some artists like lines and patch collections,
+            the artist may provide additional data to the pick event
+            that is generated, eg the indices of the data within
+            epsilon of the pick event
+
+          function - if picker is callable, it is a user supplied
+            function which determines whether the artist is hit by the
+            mouse event.
+
+              hit, props = picker(artist, mouseevent)
+
+            to determine the hit test.  if the mouse event is over the
+            artist, return hit=True and props is a dictionary of
+            properties you want added to the PickEvent attributes
+
+        ACCEPTS: [None|float|boolean|callable]
+        """
+        self._picker = picker
+
+    def get_picker(self):
+        'return the Pickeration instance used by this artist'
+        return self._picker
 
     def is_figure_set(self):
         return self.figure is not None
@@ -339,7 +395,7 @@ class ArtistInspector:
             return '%s or %s' % (s, self.aliasd[s])
         else: return s
 
-    def pprint_setters(self, prop=None):
+    def pprint_setters(self, prop=None, leadingspace=2):
         """
         if prop is None, return a list of strings of all settable properies
         and their valid values
@@ -348,9 +404,13 @@ class ArtistInspector:
         property will be returned as a string of property : valid
         values
         """
+        if leadingspace:
+            pad = ' '*leadingspace
+        else:
+            pad  = ''
         if prop is not None:
             accepts = self.get_valid_values(prop)
-            return '    %s: %s' %(prop, accepts)
+            return '%s%s: %s' %(pad, prop, accepts)
 
         attrs = self.get_setters()
         attrs.sort()
@@ -359,7 +419,8 @@ class ArtistInspector:
         for prop in attrs:
             accepts = self.get_valid_values(prop)
             name = self.aliased_name(prop)
-            lines.append('    %s: %s' %(name, accepts))
+
+            lines.append('%s%s: %s' %(pad, name, accepts))
         return lines
 
     def pprint_getters(self):
@@ -423,9 +484,9 @@ get.__doc__ = getp.__doc__
 
 def setp(h, *args, **kwargs):
     """
-    matplotlib supports the use of setp ("set property") and getp to set 
-    and get object properties, as well as to do introspection on the 
-    object For example, to set the linestyle of a line to be dashed, you 
+    matplotlib supports the use of setp ("set property") and getp to set
+    and get object properties, as well as to do introspection on the
+    object For example, to set the linestyle of a line to be dashed, you
     can do
 
       >>> line, = plot([1,2,3])
@@ -494,6 +555,8 @@ def setp(h, *args, **kwargs):
             ret.extend( [func(val)] )
     return [x for x in flatten(ret)]
 
+def kwdoc(a):
+    return '\n'.join(ArtistInspector(a).pprint_setters(leadingspace=8))
 
-
-
+kwdocd = dict()
+kwdocd['Artist'] = kwdoc(Artist)

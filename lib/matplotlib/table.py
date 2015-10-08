@@ -24,6 +24,7 @@ import sys, warnings
 from matplotlib import verbose
 from numerix import ones, Float, add, asarray
 
+import artist
 from artist import Artist
 from patches import Rectangle
 from cbook import enumerate, is_string_like, flatten
@@ -129,7 +130,7 @@ class Cell(Rectangle):
     def get_text_bounds(self, renderer):
         """ Get text bounds in axes co-ordinates. """
         bbox = self._text.get_window_extent(renderer)
-        bboxa = inverse_transform_bbox(self._transform, bbox)
+        bboxa = inverse_transform_bbox(self.get_transform(), bbox)
         return bboxa.get_bounds()
 
     def get_required_width(self, renderer):
@@ -207,7 +208,7 @@ class Table(Artist):
 
         cell = Cell(xy, *args, **kwargs)
         cell.set_figure(self.figure)
-        cell.set_transform(self._transform)
+        cell.set_transform(self.get_transform())
 
         cell.set_clip_on(False)
         self._cells[(row, col)] = cell
@@ -237,7 +238,7 @@ class Table(Artist):
                  if pos[0] >= 0 and pos[1] >= 0]
 
         bbox = bbox_all(boxes)
-        return inverse_transform_bbox(self._transform, bbox)
+        return inverse_transform_bbox(self.get_transform(), bbox)
 
     def get_child_artists(self):
         'Return the Artists cintained by the table'
@@ -333,9 +334,10 @@ class Table(Artist):
 
     def set_fontsize(self, size):
         """
-Set the fontsize of the cell text
+        Set the fontsize of the cell text
 
-ACCEPTS: a float in points"""
+        ACCEPTS: a float in points
+        """
 
         for cell in self._cells.itervalues():
             cell.set_fontsize(size)
@@ -510,3 +512,4 @@ def table(ax,
     return table
 
 
+artist.kwdocd['Table'] = artist.kwdoc(Table)

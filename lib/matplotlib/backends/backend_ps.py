@@ -1,6 +1,5 @@
 """
-A PostScript backend, which can produce both PostScript .ps and
-
+A PostScript backend, which can produce both PostScript .ps and .eps
 """
 
 from __future__ import division
@@ -195,14 +194,16 @@ class RendererPS(RendererBase):
     def set_hatch(self, hatch):
         """
         hatch can be one of:
-        /   - diagonal hatching
-        \   - back diagonal
-        |   - vertical
-        -   - horizontal
-        +   - crossed
-        X   - crossed diagonal
+            /   - diagonal hatching
+            \   - back diagonal
+            |   - vertical
+            -   - horizontal
+            +   - crossed
+            X   - crossed diagonal
+        
         letters can be combined, in which case all the specified
         hatchings are done
+        
         if same letter repeats, it increases the density of hatching
         in that direction
         """

@@ -30,11 +30,12 @@ Finally, legal html names for colors, like 'red', 'burlywood' and
 """
 import re
 
-from numerix import array, arange, take, put, Float, Int, where, \
+from numerix import array, arange, take, put, Float, Int, putmask, \
      zeros, asarray, sort, searchsorted, sometrue, ravel, divide,\
-     clip, ones, typecode, typecodes, alltrue
+     ones, typecode, typecodes, alltrue, clip
 from numerix.mlab import amin, amax
 import numerix.ma as ma
+import numerix as nx
 from cbook import enumerate, is_string_like, iterable
 from matplotlib import rcParams
 import warnings
@@ -535,8 +536,9 @@ def makeMappingArray(N, data):
     lut[0] = y1[0]
     lut[-1] = y0[-1]
     # ensure that the lut is confined to values between 0 and 1 by clipping it
-    lut = where(lut > 1., 1., lut)
-    lut = where(lut < 0., 0., lut)
+    clip(lut, 0.0, 1.0)
+    #lut = where(lut > 1., 1., lut)
+    #lut = where(lut < 0., 0., lut)
     return lut
 
 
@@ -575,6 +577,7 @@ class Colormap:
         interval (0.0, 1.0).
         Alpha must be a scalar.
         """
+
         if not self._isinit: self._init()
         alpha = min(alpha, 1.0) # alpha must be between 0 and 1
         alpha = max(alpha, 0.0)
@@ -587,16 +590,16 @@ class Colormap:
             vtype = 'array'
             xma = ma.asarray(X)
             xa = xma.filled(0)
-            mask_bad = ma.getmaskorNone(xma)
+            mask_bad = ma.getmask(xma)
         if typecode(xa) in typecodes['Float']:
-            xa = where(xa == 1.0, 0.9999999, xa) # Tweak so 1.0 is in range.
+            putmask(xa, xa==1.0, 0.9999999) #Treat 1.0 as slightly less than 1.
             xa = (xa * self.N).astype(Int)
-        mask_under = xa < 0
-        mask_over = xa > self.N-1
-        xa = where(mask_under, self._i_under, xa)
-        xa = where(mask_over, self._i_over, xa)
-        if mask_bad is not None: # and sometrue(mask_bad):
-            xa = where(mask_bad, self._i_bad, xa)
+        # Set the over-range indices before the under-range;
+        # otherwise the under-range values get converted to over-range.
+        putmask(xa, xa>self.N-1, self._i_over)
+        putmask(xa, xa<0, self._i_under)
+        if mask_bad is not None and mask_bad.shape == xa.shape:
+            putmask(xa, mask_bad, self._i_bad)
         rgba = take(self._lut, xa)
         if vtype == 'scalar':
             rgba = tuple(rgba[0,:])
@@ -715,11 +718,12 @@ class ListedColormap(LinearSegmentedColormap):
         self._set_extremes()
 
 
-class normalize:
+class Normalize:
+    """
+    Normalize a given value to the 0-1 range
+    """
     def __init__(self, vmin=None, vmax=None, clip = True):
         """
-        Normalize a given value to the 0-1 range
-
         If vmin or vmax is not given, they are taken from the input's
         minimum and maximum value respectively.  If clip is True and
         the given value falls outside the range, the returned value
@@ -732,8 +736,9 @@ class normalize:
         self.vmax = vmax
         self.clip = clip
 
-    def __call__(self, value):
-
+    def __call__(self, value, clip=None):
+        if clip is None:
+            clip = self.clip
         if isinstance(value, (int, float)):
             vtype = 'scalar'
             val = ma.array([value])
@@ -748,14 +753,26 @@ class normalize:
         elif vmin==vmax:
             return 0.*value
         else:
-            if self.clip:
-                mask = ma.getmaskorNone(val)
-                val = ma.array(clip(val.filled(vmax), vmin, vmax),
+            if clip:
+                mask = ma.getmask(val)
+                val = ma.array(nx.clip(val.filled(vmax), vmin, vmax),
                                 mask=mask)
-            result = (val-vmin)/float(vmax-vmin)
+            result = (val-vmin) * (1.0/(vmax-vmin))
         if vtype == 'scalar':
             result = result[0]
         return result
+
+    def inverse(self, value):
+        if not self.scaled():
+            raise ValueError("Not invertible until scaled")
+        vmin, vmax = self.vmin, self.vmax
+
+        if isinstance(value, (int, float)):
+            return vmin + value * (vmax - vmin)
+        else:
+            val = ma.asarray(value)
+            return vmin + val * (vmax - vmin)
+
 
     def autoscale(self, A):
         if not self.scaled():
@@ -766,17 +783,62 @@ class normalize:
         'return true if vmin and vmax set'
         return (self.vmin is not None and self.vmax is not None)
 
-    # This method seems out of place and unused; try deleting it.
-    #def is_mappable(self):
-    #    return hasattr(self, '_A') and self._A is not None and self._A.shape<=2
+class LogNorm(Normalize):
+    """
+    Normalize a given value to the 0-1 range on a log scale
+    """
+    def __call__(self, value, clip=None):
+        if clip is None:
+            clip = self.clip
+        if isinstance(value, (int, float)):
+            vtype = 'scalar'
+            val = ma.array([value])
+        else:
+            vtype = 'array'
+            val = ma.asarray(value)
+        self.autoscale(val)
+        vmin, vmax = self.vmin, self.vmax
+        if vmin > vmax:
+            raise ValueError("minvalue must be less than or equal to maxvalue")
+        elif vmin<=0:
+            raise ValueError("values must all be positive")
+        elif vmin==vmax:
+            return 0.*value
+        else:
+            if clip:
+                mask = ma.getmask(val)
+                val = ma.array(nx.clip(val.filled(vmax), vmin, vmax),
+                                mask=mask)
+            result = (ma.log(val)-nx.log(vmin))/(nx.log(vmax)-nx.log(vmin))
+        if vtype == 'scalar':
+            result = result[0]
+        return result
 
-class no_norm(normalize):
+    def inverse(self, value):
+        if not self.scaled():
+            raise ValueError("Not invertible until scaled")
+        vmin, vmax = self.vmin, self.vmax
+
+        if isinstance(value, (int, float)):
+            return vmin * pow((vmax/vmin), value)
+        else:
+            val = ma.asarray(value)
+            return vmin * ma.power((vmax/vmin), val)
+
+
+
+class NoNorm(Normalize):
     '''
-    Dummy replacement for normalize, for the case where we
+    Dummy replacement for Normalize, for the case where we
     want to use indices directly in a ScalarMappable.
     '''
-    def __call__(self, value):
+    def __call__(self, value, clip=None):
         return value
 
+    def inverse(self, value):
+        return value
 
+# compatibility with earlier class names that violated convention:
+normalize = Normalize
+no_norm = NoNorm
 

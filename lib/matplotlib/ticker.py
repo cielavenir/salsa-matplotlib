@@ -116,6 +116,7 @@ from numerix import absolute, arange, array, asarray, Float, floor, log, \
 from matplotlib.numerix.mlab import amin, amax, std, mean
 from matplotlib.mlab import frange
 from cbook import strip_math
+from transforms import nonsingular
 
 class TickHelper:
 
@@ -266,6 +267,8 @@ class ScalarFormatter(Formatter):
         self.offset = 0
         self.orderOfMagnitude = 0
         self.format = ''
+        self._scientific = True
+        self._powerlimits = rcParams['axes.formatter.limits']
 
     def __call__(self, x, pos=None):
         'Return the format for tick val x at position pos'
@@ -273,6 +276,22 @@ class ScalarFormatter(Formatter):
             return ''
         else:
             return self.pprint_val(x)
+
+    def set_scientific(self, b):
+        'True or False to turn scientific notation on or off; see also set_powerlimits()'
+        self._scientific = bool(b)
+
+    def set_powerlimits(self, lims):
+        '''
+        Sets size thresholds for scientific notation.
+
+        e.g. xaxis.set_powerlimits((-3, 4)) sets the pre-2007 default in
+        which scientific notation is used for numbers less than
+        1e-3 or greater than 1e4.
+        See also set_scientific().
+        '''
+        assert len(lims) == 2, "argument must be a sequence of length 2"
+        self._powerlimits = lims
 
     def format_data_short(self,value):
         'return a short formatted string representation of a number'
@@ -336,6 +355,9 @@ class ScalarFormatter(Formatter):
     def _set_orderOfMagnitude(self,range):
         # if scientific notation is to be used, find the appropriate exponent
         # if using an numerical offset, find the exponent after applying the offset
+        if not self._scientific:
+            self.orderOfMagnitude = 0
+            return
         locs = absolute(self.locs)
         if self.offset: oom = math.floor(math.log10(range))
         else:
@@ -343,17 +365,19 @@ class ScalarFormatter(Formatter):
             else: val = locs[-1]
             if val == 0: oom = 0
             else: oom = math.floor(math.log10(val))
-        if oom <= -3:
+        if oom <= self._powerlimits[0]:
             self.orderOfMagnitude = oom
-        elif oom >= 4:
+        elif oom >= self._powerlimits[1]:
             self.orderOfMagnitude = oom
         else:
             self.orderOfMagnitude = 0
 
     def _set_format(self):
         # set the format string to format all the ticklabels
+        # The floating point black magic (adding 1e-15 and formatting
+        # to 8 digits) may warrant review and cleanup.
         locs = (array(self.locs)-self.offset) / 10**self.orderOfMagnitude+1e-15
-        sigfigs = [len(str('%1.3f'% loc).split('.')[1].rstrip('0')) \
+        sigfigs = [len(str('%1.8f'% loc).split('.')[1].rstrip('0')) \
                    for loc in locs]
         sigfigs.sort()
         self.format = '%1.' + str(sigfigs[-1]) + 'f'
@@ -535,7 +559,7 @@ class Locator(TickHelper):
     def autoscale(self):
         'autoscale the view limits'
         self.verify_intervals()
-        return  self.nonsingular(*self.dataInterval.get_bounds())
+        return nonsingular(*self.dataInterval.get_bounds())
 
     def pan(self, numsteps):
         'Pan numticks (can be positive or negative)'
@@ -555,18 +579,6 @@ class Locator(TickHelper):
         interval = self.viewInterval.span()
         step = 0.1*interval*direction
         self.viewInterval.set_bounds(vmin + step, vmax - step)
-
-    def nonsingular(self, vmin, vmax, expander=0.001, tiny=1e-15):
-        if vmax < vmin:
-            vmin, vmax = vmax, vmin
-        if vmax - vmin <= max(abs(vmin), abs(vmax)) * tiny:
-            if vmin==0.0:
-                vmin -= 1
-                vmax += 1
-            else:
-                vmin -= expander*abs(vmin)
-                vmax += expander*abs(vmax)
-        return vmin, vmax
 
     def refresh(self):
         'refresh internal information based on current lim'
@@ -689,7 +701,7 @@ class LinearLocator(Locator):
         vmin = math.floor(scale*vmin)/scale
         vmax = math.ceil(scale*vmax)/scale
 
-        return self.nonsingular(vmin, vmax)
+        return nonsingular(vmin, vmax)
 
 
 def closeto(x,y):
@@ -773,14 +785,13 @@ class MultipleLocator(Locator):
             vmin -=1
             vmax +=1
 
-        return self.nonsingular(vmin, vmax)
+        return nonsingular(vmin, vmax)
 
 def scale_range(vmin, vmax, n = 1, threshold=100):
     dv = abs(vmax - vmin)
     maxabsv = max(abs(vmin), abs(vmax))
     if maxabsv == 0 or dv/maxabsv < 1e-12:
         return 1.0, 0.0
-    #print vmin, vmax
     meanv = 0.5*(vmax+vmin)
     if abs(meanv)/dv < threshold:
         offset = 0
@@ -837,13 +848,13 @@ class MaxNLocator(Locator):
     def __call__(self):
         self.verify_intervals()
         vmin, vmax = self.viewInterval.get_bounds()
-        vmin, vmax = self.nonsingular(vmin, vmax, expander = 0.05)
+        vmin, vmax = nonsingular(vmin, vmax, expander = 0.05)
         return self.bin_boundaries(vmin, vmax)
 
     def autoscale(self):
         self.verify_intervals()
         dmin, dmax = self.dataInterval.get_bounds()
-        dmin, dmax = self.nonsingular(dmin, dmax, expander = 0.05)
+        dmin, dmax = nonsingular(dmin, dmax, expander = 0.05)
         return take(self.bin_boundaries(dmin, dmax), [0,-1])
 
 
@@ -943,7 +954,7 @@ class LogLocator(Locator):
         if vmin==vmax:
             vmin = decade_down(vmin,self._base)
             vmax = decade_up(vmax,self._base)
-        return self.nonsingular(vmin, vmax)
+        return nonsingular(vmin, vmax)
 
 class AutoLocator(MaxNLocator):
     def __init__(self):

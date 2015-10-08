@@ -18,7 +18,7 @@ from transforms import unit_bbox
 
 import figure
 import numerix as nx
-from colors import normalize
+from colors import Normalize
 
 import art3d
 import proj3d
@@ -199,18 +199,21 @@ class Axes3DI(Axes):
             self.zz_dataLim.update_numerix(z, z, not had_data)
         self.autoscale_view()
 
-    def autoscale_view(self):
+    def autoscale_view(self, scalex=True, scaley=True, scalez=True):
         self.set_top_view()
         if not self._ready: return
 
         if not self._autoscaleon: return
-        locator = self.w_xaxis.get_major_locator()
-        #print 'auto', locator.autoscale()
-        self.set_w_xlim(locator.autoscale())
-        locator = self.w_yaxis.get_major_locator()
-        self.set_w_ylim(locator.autoscale())
-        locator = self.w_zaxis.get_major_locator()
-        self.set_w_zlim(locator.autoscale())
+
+        if scalex:
+            locator = self.w_xaxis.get_major_locator()
+            self.set_w_xlim(locator.autoscale())
+        if scaley:
+            locator = self.w_yaxis.get_major_locator()
+            self.set_w_ylim(locator.autoscale())
+        if scalez:
+            locator = self.w_zaxis.get_major_locator()
+            self.set_w_zlim(locator.autoscale())
 
     def get_w_lims(self):
         minx,maxx = self.get_w_xlim()
@@ -366,7 +369,7 @@ class Axes3DI(Axes):
 	if self.button_pressed == 1:
             return 'azimuth=%d deg, elevation=%d deg ' % (self.azim, self.elev)
 	    # ignore xd and yd and display angles instead
-	    
+
         p = (xd,yd)
         edges = self.tunit_edges()
         #lines = [proj3d.line2d(p0,p1) for (p0,p1) in edges]
@@ -401,7 +404,7 @@ class Axes3DI(Axes):
         """
         if not self.button_pressed:
             return
-            
+
         if self.M is None:
             return
             # this shouldn't be called before the graph has been drawn for the first time!
@@ -534,7 +537,7 @@ class Axes3DI(Axes):
             lines.append((box[0],n+box[0]))
         #
         color = nx.array([0,0,1,1])
-        norm = normalize(min(shade),max(shade))
+        norm = Normalize(min(shade),max(shade))
         colors = [color * (0.5+norm(v)*0.5) for v in shade]
         for c in colors: c[3] = 1
         polyc = art3d.Poly3DCollection(polys, facecolors=colors, *args, **kwargs)
