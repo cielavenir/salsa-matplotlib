@@ -201,12 +201,12 @@ class Divider(object):
     def locate(self, nx, ny, nx1=None, ny1=None, axes=None, renderer=None):
         """
 
-        :param nx, nx1: Integers specifying the column-position of the
+        :param nx,nx1: Integers specifying the column-position of the
           cell. When nx1 is None, a single nx-th column is
           specified. Otherwise location of columns spanning between nx
           to nx1 (but excluding nx1-th column) is specified.
 
-        :param ny, ny1: same as nx and nx1, but for row positions.
+        :param ny,ny1: same as nx and nx1, but for row positions.
         """
 
         figW, figH = self._fig.get_size_inches()
@@ -250,12 +250,12 @@ class Divider(object):
         (:class:`mpl_toolkits.axes_grid.axes_divider.AxesLocator`) for
         specified cell.
 
-        :param nx, nx1: Integers specifying the column-position of the
+        :param nx,nx1: Integers specifying the column-position of the
           cell. When nx1 is None, a single nx-th column is
           specified. Otherwise location of columns spanning between nx
           to nx1 (but excluding nx1-th column) is specified.
 
-        :param ny, ny1: same as nx and nx1, but for row positions.
+        :param ny,ny1: same as nx and nx1, but for row positions.
         """
         return AxesLocator(self, nx, ny, nx1, ny1)
 
@@ -298,12 +298,12 @@ class AxesLocator(object):
         """
         :param axes_divider: An instance of AxesDivider class.
 
-        :param nx, nx1: Integers specifying the column-position of the
+        :param nx,nx1: Integers specifying the column-position of the
           cell. When nx1 is None, a single nx-th column is
           specified. Otherwise location of columns spanning between nx
           to nx1 (but excluding nx1-th column) is is specified.
 
-        :param ny, ny1: same as nx and nx1, but for row positions.
+        :param ny,ny1: same as nx and nx1, but for row positions.
         """
         self._axes_divider = axes_divider
 

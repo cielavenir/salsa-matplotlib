@@ -1403,13 +1403,16 @@ class BackendTkAgg(OptionalBackendPackage):
         except ImportError:
             return None
 
+        from distutils import sysconfig
         tcl_poss = [tcl_lib_dir,
                     os.path.normpath(os.path.join(tcl_lib_dir, '..')),
                     "/usr/lib/tcl" + str(Tkinter.TclVersion),
+                    "/usr/lib/%s/tcl%s" % (sysconfig.get_config_var('MULTIARCH'), Tkinter.TclVersion),
                     "/usr/lib"]
         tk_poss = [tk_lib_dir,
                     os.path.normpath(os.path.join(tk_lib_dir, '..')),
                    "/usr/lib/tk" + str(Tkinter.TkVersion),
+                   "/usr/lib/%s/tk%s" % (sysconfig.get_config_var('MULTIARCH'), Tkinter.TkVersion),
                    "/usr/lib"]
         for ptcl, ptk in zip(tcl_poss, tk_poss):
             tcl_config = os.path.join(ptcl, "tclConfig.sh")
@@ -1748,7 +1751,10 @@ class BackendGtk3Agg(OptionalBackendPackage):
     def check_requirements(self):
         if 'TRAVIS' in os.environ:
             raise CheckFailed("Can't build with Travis")
-
+        # yoh: Builds of Debian packages often lead to a dead-lock here
+        #      As a workaround forcing build manually without a check
+        BackendAgg.force = True
+        return "ok"
         # This check needs to be performed out-of-process, because
         # importing gi and then importing regular old pygtk afterward
         # segfaults the interpreter.

@@ -1,10 +1,8 @@
-#10_build_fix.patch
 20_matplotlibrc_path_search_fix.patch
 40_bts608939_draw_markers_description.patch
 50_bts608942_spaces_in_param_args.patch
 70_bts720549_try_StayPuft_for_xkcd.patch
 multiarch-tktcl.patch
-#gtk3agg_check_no-multiprocessing.patch
 gtk3cairo_check_no-multiprocessing.patch
 10ef9a7e26dc34328b7ec7fd0ed2c2db6104b342.patch
 9bc518230684b3a8bb69af60e160f90e1091cd0c.patch

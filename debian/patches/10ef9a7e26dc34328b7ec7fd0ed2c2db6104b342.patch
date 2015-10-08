@@ -1,9 +1,10 @@
-From 10ef9a7e26dc34328b7ec7fd0ed2c2db6104b342 Mon Sep 17 00:00:00 2001
+From c935053e346fc01c477f39049e122dd5114f3f0c Mon Sep 17 00:00:00 2001
 From: Thomas A Caswell <tcaswell@gmail.com>
 Date: Sun, 4 Oct 2015 15:51:22 -0400
-Subject: [PATCH] FIX: remove incorrect error checking
+Subject: FIX: remove incorrect error checking
 
 Currently fails with qt5
+Patch-Name: 10ef9a7e26dc34328b7ec7fd0ed2c2db6104b342.patch
 ---
  lib/matplotlib/backends/qt_compat.py | 5 -----
  1 file changed, 5 deletions(-)
@@ -12,7 +13,7 @@ diff --git a/lib/matplotlib/backends/qt_compat.py b/lib/matplotlib/backends/qt_c
 index 6ce8fd6..326f0f6 100644
 --- a/lib/matplotlib/backends/qt_compat.py
 +++ b/lib/matplotlib/backends/qt_compat.py
-@@ -140,11 +140,6 @@ def _getSaveFileName(*args, **kwargs):
+@@ -140,11 +140,6 @@ if _sip_imported:
              def _getSaveFileName(*args, **kwargs):
                  return QtGui.QFileDialog.getSaveFileName(*args, **kwargs), None
  

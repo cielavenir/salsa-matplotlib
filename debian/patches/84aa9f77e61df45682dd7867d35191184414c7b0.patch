@@ -1,7 +1,7 @@
-From 84aa9f77e61df45682dd7867d35191184414c7b0 Mon Sep 17 00:00:00 2001
+From eef9c9fd88be93fe222aca2753fc01ad28df5729 Mon Sep 17 00:00:00 2001
 From: Thomas A Caswell <tcaswell@gmail.com>
 Date: Mon, 5 Oct 2015 21:40:20 -0400
-Subject: [PATCH] TST: properly fence-post qt{4,5} backend tests
+Subject: TST: properly fence-post qt{4,5} backend tests
 
 This issue is that the new 'default' qt version is 5 if it is
 available.  In the tests the backend is Agg so we are hitting the
@@ -13,6 +13,7 @@ is seeing the PyQt4 version of the classes.  This results in error on
 Added test_backend_qt5.py to white listed tests.
 
 closes #5194
+Patch-Name: 84aa9f77e61df45682dd7867d35191184414c7b0.patch
 ---
  lib/matplotlib/__init__.py               |  1 +
  lib/matplotlib/tests/test_backend_qt4.py |  9 +++++++--
@@ -20,10 +21,10 @@ closes #5194
  3 files changed, 19 insertions(+), 11 deletions(-)
 
 diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
-index 88842ae..8f7378e 100644
+index f805fea..534fd9e 100644
 --- a/lib/matplotlib/__init__.py
 +++ b/lib/matplotlib/__init__.py
-@@ -1429,6 +1429,7 @@ def tk_window_focus():
+@@ -1431,6 +1431,7 @@ default_test_modules = [
      'matplotlib.tests.test_backend_pgf',
      'matplotlib.tests.test_backend_ps',
      'matplotlib.tests.test_backend_qt4',
@@ -35,7 +36,7 @@ diff --git a/lib/matplotlib/tests/test_backend_qt4.py b/lib/matplotlib/tests/tes
 index b59eda3..f32cf74 100644
 --- a/lib/matplotlib/tests/test_backend_qt4.py
 +++ b/lib/matplotlib/tests/test_backend_qt4.py
-@@ -17,6 +17,7 @@
+@@ -17,6 +17,7 @@ except ImportError:
  
  try:
      from matplotlib.backends.qt_compat import QtCore
@@ -43,7 +44,7 @@ index b59eda3..f32cf74 100644
      from matplotlib.backends.backend_qt4 import (MODIFIER_KEYS,
                                                   SUPER, ALT, CTRL, SHIFT)
  
-@@ -24,7 +25,11 @@
+@@ -24,7 +25,11 @@ try:
      _, AltModifier, AltKey = MODIFIER_KEYS[ALT]
      _, SuperModifier, SuperKey = MODIFIER_KEYS[SUPER]
      _, ShiftModifier, ShiftKey = MODIFIER_KEYS[SHIFT]
@@ -56,7 +57,7 @@ index b59eda3..f32cf74 100644
  except ImportError:
      HAS_QT = False
  
-@@ -33,7 +38,7 @@
+@@ -33,7 +38,7 @@ except ImportError:
  @knownfailureif(not HAS_QT)
  @switch_backend('Qt4Agg')
  def test_fig_close():
@@ -69,7 +70,7 @@ diff --git a/lib/matplotlib/tests/test_backend_qt5.py b/lib/matplotlib/tests/tes
 index 9fa5160..b5ebf2f 100644
 --- a/lib/matplotlib/tests/test_backend_qt5.py
 +++ b/lib/matplotlib/tests/test_backend_qt5.py
-@@ -4,7 +4,7 @@
+@@ -4,7 +4,7 @@ from __future__ import (absolute_import, division, print_function,
  from matplotlib.externals import six
  
  from matplotlib import pyplot as plt
@@ -78,7 +79,7 @@ index 9fa5160..b5ebf2f 100644
  from matplotlib.testing.decorators import knownfailureif
  from matplotlib._pylab_helpers import Gcf
  import copy
-@@ -24,17 +24,19 @@
+@@ -24,17 +24,19 @@ try:
      _, AltModifier, AltKey = MODIFIER_KEYS[ALT]
      _, SuperModifier, SuperKey = MODIFIER_KEYS[SUPER]
      _, ShiftModifier, ShiftKey = MODIFIER_KEYS[SHIFT]

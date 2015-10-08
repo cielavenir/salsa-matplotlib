@@ -1,5 +1,15 @@
-Description: don't separate param and its argument with a space
+From 69b6e1c324085b03637b08426817cd5a5c974873 Mon Sep 17 00:00:00 2001
+From: SVN-Git Migration <python-modules-team@lists.alioth.debian.org>
+Date: Thu, 8 Oct 2015 09:47:13 -0700
+Subject: don't separate param and its argument with a space
 
+Patch-Name: 50_bts608942_spaces_in_param_args.patch
+---
+ lib/mpl_toolkits/axes_grid1/axes_divider.py | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/lib/mpl_toolkits/axes_grid1/axes_divider.py b/lib/mpl_toolkits/axes_grid1/axes_divider.py
+index 79424ec..8ac3c2e 100644
 --- a/lib/mpl_toolkits/axes_grid1/axes_divider.py
 +++ b/lib/mpl_toolkits/axes_grid1/axes_divider.py
 @@ -201,12 +201,12 @@ class Divider(object):

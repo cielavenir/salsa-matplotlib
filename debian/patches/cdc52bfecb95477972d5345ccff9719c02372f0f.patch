@@ -1,7 +1,7 @@
-From cdc52bfecb95477972d5345ccff9719c02372f0f Mon Sep 17 00:00:00 2001
+From 1ce09c22cf5f3e3531ed4d5dfa6fa315eaa177f9 Mon Sep 17 00:00:00 2001
 From: Thomas A Caswell <tcaswell@gmail.com>
 Date: Tue, 6 Oct 2015 01:00:36 -0400
-Subject: [PATCH] FIX: be more careful about pyside
+Subject: FIX: be more careful about pyside
 
 If:
 
@@ -16,6 +16,7 @@ miss the qt4 import conditionals which means QtCore is never imported
 which means we get name errors from the pyqt / pyside patch up code.
 
 This catches those exceptions and gives pyside a chance to be imported.
+Patch-Name: cdc52bfecb95477972d5345ccff9719c02372f0f.patch
 ---
  lib/matplotlib/backends/qt_compat.py | 25 ++++++++++++++-----------
  1 file changed, 14 insertions(+), 11 deletions(-)
@@ -24,7 +25,7 @@ diff --git a/lib/matplotlib/backends/qt_compat.py b/lib/matplotlib/backends/qt_c
 index 326f0f6..67d0687 100644
 --- a/lib/matplotlib/backends/qt_compat.py
 +++ b/lib/matplotlib/backends/qt_compat.py
-@@ -139,19 +139,22 @@ def _getSaveFileName(*args, **kwargs):
+@@ -139,19 +139,22 @@ if _sip_imported:
              # call to getapi() can fail in older versions of sip
              def _getSaveFileName(*args, **kwargs):
                  return QtGui.QFileDialog.getSaveFileName(*args, **kwargs), None

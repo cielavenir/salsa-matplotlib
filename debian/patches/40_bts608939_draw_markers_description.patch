@@ -1,6 +1,15 @@
-Description: minor glitch in draw_markers() description
-Author: Jakub Wilk <jwilk@debian.org>
+From 6d96a63c649e7e79548ce1bed48280c663ef51a0 Mon Sep 17 00:00:00 2001
+From: Jakub Wilk <jwilk@debian.org>
+Date: Thu, 8 Oct 2015 09:47:12 -0700
+Subject: minor glitch in draw_markers() description
 
+Patch-Name: 40_bts608939_draw_markers_description.patch
+---
+ doc/api/api_changes.rst | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/doc/api/api_changes.rst b/doc/api/api_changes.rst
+index 6a2b2b5..443c08e 100644
 --- a/doc/api/api_changes.rst
 +++ b/doc/api/api_changes.rst
 @@ -1545,7 +1545,7 @@ New methods:

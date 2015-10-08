@@ -1,8 +1,9 @@
-From ada2f99e13da03c9352e0c528f1b6feaa2863dc3 Mon Sep 17 00:00:00 2001
+From 13505e84eee9d9c3ca1037d4e565293ee80837ac Mon Sep 17 00:00:00 2001
 From: Thomas A Caswell <tcaswell@gmail.com>
 Date: Tue, 6 Oct 2015 08:50:40 -0400
-Subject: [PATCH] FIX: restore lpy compat
+Subject: FIX: restore lpy compat
 
+Patch-Name: ada2f99e13da03c9352e0c528f1b6feaa2863dc3.patch
 ---
  lib/matplotlib/tests/test_backend_qt5.py | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)

@@ -1,7 +1,7 @@
-From f67ea3c62f33f0e675b3e091044c4983ae01b085 Mon Sep 17 00:00:00 2001
+From 3bf2b08132304e3f6bde660e126543a7bc4b65ca Mon Sep 17 00:00:00 2001
 From: Thomas A Caswell <tcaswell@gmail.com>
 Date: Tue, 6 Oct 2015 00:16:50 -0400
-Subject: [PATCH] FIX: mro issue with pyside/pyqt4
+Subject: FIX: mro issue with pyside/pyqt4
 
 Do not let a `super` be called or the the c++ base-classes will be
 initialized twice which causes havoc.
@@ -10,6 +10,7 @@ initialized twice which causes havoc.
  - pyqt4 may segfault on exit
 
 closes #5196
+Patch-Name: f67ea3c62f33f0e675b3e091044c4983ae01b085.patch
 ---
  lib/matplotlib/backends/backend_qt4agg.py | 7 ++++++-
  1 file changed, 6 insertions(+), 1 deletion(-)
@@ -18,7 +19,7 @@ diff --git a/lib/matplotlib/backends/backend_qt4agg.py b/lib/matplotlib/backends
 index 392d5d5..d36991c 100644
 --- a/lib/matplotlib/backends/backend_qt4agg.py
 +++ b/lib/matplotlib/backends/backend_qt4agg.py
-@@ -15,7 +15,7 @@
+@@ -15,7 +15,7 @@ import matplotlib
  from matplotlib.figure import Figure
  
  

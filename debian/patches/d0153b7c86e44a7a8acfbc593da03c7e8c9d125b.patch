@@ -1,8 +1,9 @@
-From d0153b7c86e44a7a8acfbc593da03c7e8c9d125b Mon Sep 17 00:00:00 2001
+From 8e05470692c0f5a5b98bbeb08c12be857212e163 Mon Sep 17 00:00:00 2001
 From: Thomas A Caswell <tcaswell@gmail.com>
 Date: Tue, 6 Oct 2015 01:08:03 -0400
-Subject: [PATCH] TST: be a bit more defensive about imports/HAS_QT
+Subject: TST: be a bit more defensive about imports/HAS_QT
 
+Patch-Name: d0153b7c86e44a7a8acfbc593da03c7e8c9d125b.patch
 ---
  lib/matplotlib/tests/test_backend_qt4.py | 17 +++++++++++------
  lib/matplotlib/tests/test_backend_qt5.py | 14 +++++++-------
@@ -12,7 +13,7 @@ diff --git a/lib/matplotlib/tests/test_backend_qt4.py b/lib/matplotlib/tests/tes
 index f32cf74..e2fe57a 100644
 --- a/lib/matplotlib/tests/test_backend_qt4.py
 +++ b/lib/matplotlib/tests/test_backend_qt4.py
-@@ -7,6 +7,7 @@
+@@ -7,6 +7,7 @@ from matplotlib import pyplot as plt
  from matplotlib.testing.decorators import cleanup, switch_backend
  from matplotlib.testing.decorators import knownfailureif
  from matplotlib._pylab_helpers import Gcf
@@ -20,7 +21,7 @@ index f32cf74..e2fe57a 100644
  import copy
  
  try:
-@@ -16,7 +17,8 @@
+@@ -16,7 +17,8 @@ except ImportError:
      import mock
  
  try:
@@ -30,7 +31,7 @@ index f32cf74..e2fe57a 100644
  
      from matplotlib.backends.backend_qt4 import (MODIFIER_KEYS,
                                                   SUPER, ALT, CTRL, SHIFT)
-@@ -25,11 +27,14 @@
+@@ -25,11 +27,14 @@ try:
      _, AltModifier, AltKey = MODIFIER_KEYS[ALT]
      _, SuperModifier, SuperKey = MODIFIER_KEYS[SUPER]
      _, ShiftModifier, ShiftKey = MODIFIER_KEYS[SHIFT]
@@ -68,7 +69,7 @@ index b5ebf2f..8f56bbf 100644
  import copy
  
  try:
-@@ -16,7 +16,8 @@
+@@ -16,7 +16,8 @@ except ImportError:
      import mock
  
  try:
@@ -78,7 +79,7 @@ index b5ebf2f..8f56bbf 100644
      from matplotlib.backends.backend_qt5 import (MODIFIER_KEYS,
                                                   SUPER, ALT, CTRL, SHIFT)
  
-@@ -24,11 +25,10 @@
+@@ -24,11 +25,10 @@ try:
      _, AltModifier, AltKey = MODIFIER_KEYS[ALT]
      _, SuperModifier, SuperKey = MODIFIER_KEYS[SUPER]
      _, ShiftModifier, ShiftKey = MODIFIER_KEYS[SHIFT]
