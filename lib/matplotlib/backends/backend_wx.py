@@ -92,9 +92,10 @@ Examples which work on this release:
  (3) - Clipping seems to be broken.
 """
 
-cvs_id = '$Id: backend_wx.py 5256 2008-05-25 01:30:32Z jdh2358 $'
+cvs_id = '$Id: backend_wx.py 5633 2008-06-22 16:24:02Z jdh2358 $'
 
-import sys, os, os.path, math, StringIO, weakref
+
+import sys, os, os.path, math, StringIO, weakref, warnings
 
 # Debugging settings here...
 # Debug level set here. If the debug level is less than 5, information
@@ -283,13 +284,13 @@ class RendererWx(RendererBase):
         if new_bounds is not None:
             new_bounds = new_bounds.bounds
         gfx_ctx = gc.gfx_ctx
-        if True or gfx_ctx._lastcliprect != new_bounds:
+        if gfx_ctx._lastcliprect != new_bounds:
             gfx_ctx._lastcliprect = new_bounds
             if new_bounds is None:
                 gfx_ctx.ResetClip()
             else:
                 gfx_ctx.Clip(new_bounds[0], self.height - new_bounds[1] - new_bounds[3],
-                             new_bounds[1], new_bounds[3])
+                             new_bounds[2], new_bounds[3])
 
     #@staticmethod
     def convert_path(gfx_ctx, tpath):
@@ -678,6 +679,17 @@ class FigureCanvasWx(FigureCanvasBase, wx.Panel):
         h = int(math.ceil(h))
 
         wx.Panel.__init__(self, parent, id, size=wx.Size(w, h))
+
+        def do_nothing(*args, **kwargs):
+            warnings.warn('could not find a setinitialsize function for backend_wx; please report your wxpython version=%s to the matplotlib developers list'%backend_version)
+            pass
+
+        # try to find the set size func across wx versions
+        try:
+            getattr(self, 'SetInitialSize')
+        except AttributeError:
+            self.SetInitialSize = getattr(self, 'SetBestFittingSize', do_nothing)
+
         # Create the drawing bitmap
         self.bitmap =wx.EmptyBitmap(w, h)
         DEBUG_MSG("__init__() - bitmap w:%d h:%d" % (w,h), 2, self)
@@ -1635,8 +1647,14 @@ class NavigationToolbar2Wx(NavigationToolbar2, wx.ToolBar):
             filename = dlg.GetFilename()
             DEBUG_MSG('Save file dir:%s name:%s' % (dirname, filename), 3, self)
             format = exts[dlg.GetFilterIndex()]
-            # Explicitly pass in the selected filetype to override the
-            # actual extension if necessary
+            basename, ext = os.path.splitext(filename)
+            if ext.startswith('.'):
+                ext = ext[1:]
+            if ext in ('svg', 'pdf', 'ps', 'eps', 'png') and format!=ext:
+                #looks like they forgot to set the image type drop
+                #down, going with the extension.
+                warnings.warn('extension %s did not match the selected image type %s; going with %s'%(ext, format, ext), stacklevel=0)
+                format = ext
             try:
                 self.canvas.print_figure(
                     os.path.join(dirname, filename), format=format)

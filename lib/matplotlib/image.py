@@ -16,6 +16,7 @@ from matplotlib import cm
 
 # For clarity, names from _image are given explicitly in this module:
 from matplotlib import _image
+from matplotlib import _png
 
 # For user convenience, the names from _image are also imported into
 # the image namespace:
@@ -57,6 +58,7 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
                  extent=None,
                  filternorm=1,
                  filterrad=4.0,
+                 resample = False,
                  **kwargs
                  ):
 
@@ -86,6 +88,7 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
 
 
         self.set_interpolation(interpolation)
+        self.set_resample(resample)
         self.axes = ax
 
 
@@ -170,7 +173,7 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
 
         if self._imcache is None:
             if self._A.dtype == np.uint8 and len(self._A.shape) == 3:
-                im = _image.frombyte(self._A[xslice,yslice,:], 0)
+                im = _image.frombyte(self._A[yslice,xslice,:], 0)
                 im.is_grayscale = False
             else:
                 if self._rgbacache is None:
@@ -200,12 +203,15 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
 
         im.set_interpolation(self._interpd[self._interpolation])
 
+        im.set_resample(self._resample)
 
         # the viewport translation
         tx = (xmin-self.axes.viewLim.x0)/dxintv * numcols
         ty = (ymin-self.axes.viewLim.y0)/dyintv * numrows
 
-        l, b, widthDisplay, heightDisplay = self.axes.bbox.bounds
+        l, b, r, t = self.axes.bbox.extents
+        widthDisplay = (round(r) + 0.5) - (round(l) - 0.5)
+        heightDisplay = (round(t) + 0.5) - (round(b) - 0.5)
         widthDisplay *= magnification
         heightDisplay *= magnification
         im.apply_translation(tx, ty)
@@ -226,7 +232,7 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
             warnings.warn("Images are not supported on non-linear axes.")
         im = self.make_image(renderer.get_image_magnification())
         l, b, widthDisplay, heightDisplay = self.axes.bbox.bounds
-        renderer.draw_image(l, b, im, self.axes.bbox.frozen(),
+        renderer.draw_image(round(l), round(b), im, self.axes.bbox.frozen(),
                             *self.get_transformed_clip_path_and_affine())
 
     def contains(self, mouseevent):
@@ -251,12 +257,13 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
         """Write the image to png file with fname"""
         im = self.make_image()
         if noscale:
-            numrows,numcols = im.get_size()
+            numrows, numcols = im.get_size()
             im.reset_matrix()
             im.set_interpolation(0)
             im.resize(numcols, numrows)
         im.flipud_out()
-        im.write_png(fname)
+        rows, cols, buffer = im.as_rgba_str()
+        _png.write_png(buffer, cols, rows, fname)
 
     def set_data(self, A, shape=None):
         """
@@ -323,6 +330,13 @@ class AxesImage(martist.Artist, cm.ScalarMappable):
             raise ValueError('Illegal interpolation string')
         self._interpolation = s
 
+    def set_resample(self, v):
+        if v is None: v = rcParams['image.resample']
+        self._resample = v
+
+    def get_interpolation(self):
+        return self._resample
+
     def get_extent(self):
         'get the image extent: left, right, bottom, top'
         if self._extent is not None:
@@ -378,7 +392,9 @@ class NonUniformImage(AxesImage):
             raise RuntimeError('You must first set the image array')
 
         x0, y0, v_width, v_height = self.axes.viewLim.bounds
-        l, b, width, height = self.axes.bbox.bounds
+        l, b, r, t = self.axes.bbox.extents
+        width = (round(r) + 0.5) - (round(l) - 0.5)
+        height = (round(t) + 0.5) - (round(b) - 0.5)
         width *= magnification
         height *= magnification
         im = _image.pcolor(self._Ax, self._Ay, self._A,
@@ -487,8 +503,11 @@ class PcolorImage(martist.Artist, cm.ScalarMappable):
         fc = self.axes.get_frame().get_facecolor()
         bg = mcolors.colorConverter.to_rgba(fc, 0)
         bg = (np.array(bg)*255).astype(np.uint8)
-        width = self.axes.bbox.width * magnification
-        height = self.axes.bbox.height * magnification
+        l, b, r, t = self.axes.bbox.extents
+        width = (round(r) + 0.5) - (round(l) - 0.5)
+        height = (round(t) + 0.5) - (round(b) - 0.5)
+        width = width * magnification
+        height = height * magnification
         if self.check_update('array'):
             A = self.to_rgba(self._A, alpha=self._alpha, bytes=True)
             self._rgbacache = A
@@ -508,8 +527,8 @@ class PcolorImage(martist.Artist, cm.ScalarMappable):
     def draw(self, renderer, *args, **kwargs):
         if not self.get_visible(): return
         im = self.make_image(renderer.get_image_magnification())
-        renderer.draw_image(self.axes.bbox.xmin,
-                            self.axes.bbox.ymin,
+        renderer.draw_image(round(self.axes.bbox.xmin),
+                            round(self.axes.bbox.ymin),
                             im,
                             self.axes.bbox.frozen(),
                             *self.get_transformed_clip_path_and_affine())
@@ -637,26 +656,30 @@ class FigureImage(martist.Artist, cm.ScalarMappable):
 
     def draw(self, renderer, *args, **kwargs):
         if not self.get_visible(): return
+        # todo: we should be able to do some cacheing here
         im = self.make_image()
-        renderer.draw_image(self.ox, self.oy, im, self.figure.bbox,
+
+        renderer.draw_image(round(self.ox), round(self.oy), im, self.figure.bbox,
                             *self.get_transformed_clip_path_and_affine())
 
     def write_png(self, fname):
         """Write the image to png file with fname"""
         im = self.make_image()
-        im.write_png(fname)
+        rows, cols, buffer = im.as_rgba_str()
+        _png.write_png(buffer, cols, rows, fname)
 
 def imread(fname):
     """
-    return image file in fname as numpy array
+    Return image file in *fname* as :class:`numpy.array`.
 
-    return value is a numpy array.  For grayscale images, the return
-    array is MxN.  For RGB images, the return value is MxNx3.  For
-    RGBA images the return value is MxNx4
+    Return value is a :class:`numpy.array`.  For grayscale images, the
+    return array is MxN.  For RGB images, the return value is MxNx3.
+    For RGBA images the return value is MxNx4.
 
-    matplotlib can only read PNGs natively, but if PIL is installed,
-    it will use it to load the image and return an array (if possible)
-    which can be used with imshow
+    matplotlib can only read PNGs natively, but if `PIL
+    <http://www.pythonware.com/products/pil/>`_ is installed, it will
+    use it to load the image and return an array (if possible) which
+    can be used with :func:`~matplotlib.pyplot.imshow`.
 
     TODO: support RGB and grayscale return values in _image.readpng
     """
@@ -669,7 +692,7 @@ def imread(fname):
         return pil_to_array(image)
 
 
-    handlers = {'png' :_image.readpng,
+    handlers = {'png' :_png.read_png,
                 }
     basename, ext = os.path.splitext(fname)
     ext = ext.lower()[1:]

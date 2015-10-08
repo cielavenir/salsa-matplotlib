@@ -1,63 +1,97 @@
 """
 This is an object-orient plotting library.
 
-A procedural interface is provided by the companion pylab
-module, which may be imported directly, e.g.
+A procedural interface is provided by the companion pylab module,
+which may be imported directly, e.g::
 
     from pylab import *
 
-or using ipython:
+or using ipython::
 
     ipython -pylab
 
-For the most part, direct use of the object-oriented library
-is encouraged when programming rather than working
-interactively.  The exceptions are the pylab commands
-figure(), subplot(), show(), and savefig(), which can
-greatly simplify scripting.
+For the most part, direct use of the object-oriented library is
+encouraged when programming rather than working interactively.  The
+exceptions are the pylab commands :func:`~matplotlib.pyplot.figure`,
+:func:`~matplotlib.pyplot.subplot`,
+:func:`~matplotlib.backends.backend_qt4agg.show`, and
+:func:`~pyplot.savefig`, which can greatly simplify scripting.
 
 Modules include:
-    axes: defines the Axes class.  Most pylab commands are
-        wrappers for Axes methods.  The axes module is the
-        highest level of OO access to the library.
-    figure: defines Figure class.
-    artist: defines the Artist base class for all classes
-        that draw things.
-    line: defines Line2D class for drawing lines and markers
-    patches: defines classes for drawing polygons
-    text: defines Text, TextWithDash, and Annotate classes
-    image: defines AxesImage and FigureImage classes
-    collections: classes for efficient drawing of groups of
-        lines or polygons
-    colors: classes for interpreting color specifications
-        and for making colormaps
-    cm: colormaps and the ScalarMappable mixin class for
-        providing color mapping functionality to other
+
+    :mod:`matplotlib.axes`
+        defines the :class:`~matplotlib.axes.Axes` class.  Most pylab
+        commands are wrappers for :class:`~matplotlib.axes.Axes`
+        methods.  The axes module is the highest level of OO access to
+        the library.
+
+    :mod:`matplotlib.figure`
+        defines the :class:`~matplotlib.figure.Figure` class.
+
+    :mod:`matplotlib.artist`
+        defines the :class:`~matplotlib.artist.Artist` base class for
+        all classes that draw things.
+
+    :mod:`matplotlib.lines`
+        defines the :class:`~matplotlib.lines.Line2D` class for
+        drawing lines and markers
+
+    :mod`matplotlib.patches`
+        defines classes for drawing polygons
+
+    :mod:`matplotlib.text`
+        defines the :class:`~matplotlib.text.Text`,
+        :class:`~matplotlib.text.TextWithDash`, and
+        :class:`~matplotlib.text.Annotate` classes
+
+    :mod:`matplotlib.image`
+        defines the :class:`~matplotlib.image.AxesImage` and
+        :class:`~matplotlib.image.FigureImage` classes
+
+    :mod:`matplotlib.collections`
+        classes for efficient drawing of groups of lines or polygons
+
+    :mod:`matplotlib.colors`
+        classes for interpreting color specifications and for making
+        colormaps
+
+    :mod:`matplotlib.cm`
+        colormaps and the :class:`~matplotlib.image.ScalarMappable`
+        mixin class for providing color mapping functionality to other
         classes
-    ticker: classes for calculating tick mark locations and
-        for formatting tick labels
-    backends: a subpackage with modules for various gui
-        libraries and output formats
+
+    :mod:`matplotlib.ticker`
+        classes for calculating tick mark locations and for formatting
+        tick labels
+
+    :mod:`matplotlib.backends`
+        a subpackage with modules for various gui libraries and output
+        formats
 
 The base matplotlib namespace includes:
-    rcParams: a dictionary of default configuration
-        settings.  It is initialized by code which may be
-        overridded by a matplotlibrc file.
-    rc(): a function for setting groups of rcParams values
-    use(): a function for setting the matplotlib backend.
-        If used, this function must be called immediately
-        after importing matplotlib for the first time.  In
-        particular, it must be called *before* importing
-        pylab (if pylab is imported).
 
-matplotlib is written by John D. Hunter (jdh2358 at
-gmail.com and a host of others).
+    :data:`~matplotlib.rcParams`
+        a global dictionary of default configuration settings.  It is
+        initialized by code which may be overridded by a matplotlibrc
+        file.
+
+    :func:`~matplotlib.rc`
+        a function for setting groups of rcParams values
+
+    :func:`~matplotlib.use`
+        a function for setting the matplotlib backend.  If used, this
+        function must be called immediately after importing matplotlib
+        for the first time.  In particular, it must be called
+        **before** importing pylab (if pylab is imported).
+
+matplotlib is written by John D. Hunter (jdh2358 at gmail.com) and a
+host of others.
 """
 from __future__ import generators
 
-__version__  = '0.98.0'
-__revision__ = '$Revision: 5314 $'
-__date__     = '$Date: 2008-05-29 23:09:53 -0400 (Thu, 29 May 2008) $'
+__version__  = '0.98.1'
+__revision__ = '$Revision: 5635 $'
+__date__     = '$Date: 2008-06-22 12:31:10 -0400 (Sun, 22 Jun 2008) $'
 
 import md5, os, re, shutil, sys, warnings
 import distutils.sysconfig
@@ -534,10 +568,11 @@ _deprecated_map = {
 
 class RcParams(dict):
 
-    """A dictionary object including validation
+    """
+    A dictionary object including validation
 
     validating functions are defined and associated with rc parameters in
-    rcsetup.py
+    :mod:`matplotlib.rcsetup`
     """
 
     validate = dict([ (key, converter) for key, (default, converter) in \
@@ -649,47 +684,52 @@ rcParams['text.usetex'] = checkdep_usetex(rcParams['text.usetex'])
 
 def rc(group, **kwargs):
     """
-    Set the current rc params.  Group is the grouping for the rc, eg
-    for lines.linewidth the group is 'lines', for axes.facecolor, the
-    group is 'axes', and so on.  Group may also be a list or tuple
-    of group names, eg ('xtick','ytick').  kwargs is a list of
-    attribute name/value pairs, eg
+    Set the current rc params.  Group is the grouping for the rc, eg.
+    for ``lines.linewidth`` the group is ``lines``, for
+    ``axes.facecolor``, the group is ``axes``, and so on.  Group may
+    also be a list or tuple of group names, eg. (*xtick*, *ytick*).
+    *kwargs* is a dictionary attribute name/value pairs, eg::
 
       rc('lines', linewidth=2, color='r')
 
-    sets the current rc params and is equivalent to
+    sets the current rc params and is equivalent to::
 
       rcParams['lines.linewidth'] = 2
       rcParams['lines.color'] = 'r'
 
     The following aliases are available to save typing for interactive
-    users
-        'lw'  : 'linewidth'
-        'ls'  : 'linestyle'
-        'c'   : 'color'
-        'fc'  : 'facecolor'
-        'ec'  : 'edgecolor'
-        'mew' : 'markeredgewidth'
-        'aa'  : 'antialiased'
+    users:
 
-    Thus you could abbreviate the above rc command as
+    =====   =================
+    Alias   Property
+    =====   =================
+    'lw'    'linewidth'
+    'ls'    'linestyle'
+    'c'     'color'
+    'fc'    'facecolor'
+    'ec'    'edgecolor'
+    'mew'   'markeredgewidth'
+    'aa'    'antialiased'
+    =====   =================
+
+    Thus you could abbreviate the above rc command as::
 
           rc('lines', lw=2, c='r')
 
 
     Note you can use python's kwargs dictionary facility to store
     dictionaries of default parameters.  Eg, you can customize the
-    font rc as follows
+    font rc as follows::
 
       font = {'family' : 'monospace',
               'weight' : 'bold',
-              'size'   : 'larger',
-             }
+              'size'   : 'larger'}
 
       rc('font', **font)  # pass in the font dict as kwargs
 
     This enables you to easily switch between several configurations.
-    Use rcdefaults to restore the default rc params after changes.
+    Use :func:`~matplotlib.pyplot.rcdefaults` to restore the default
+    rc params after changes.
     """
 
     aliases = {
@@ -717,7 +757,7 @@ def rc(group, **kwargs):
 def rcdefaults():
     """
     Restore the default rc params - the ones that were created at
-    matplotlib load time
+    matplotlib load time.
     """
     rcParams.update(rcParamsDefault)
 
@@ -736,7 +776,7 @@ matplotlib.use() must be called *before* pylab, matplotlib.pyplot,
 or matplotlib.backends is imported for the first time.
 """
 
-def use(arg):
+def use(arg, warn=True):
     """
     Set the matplotlib backend to one of the known backends.
 
@@ -748,19 +788,27 @@ def use(arg):
 
     will specify a default of pdf output generated by Cairo.
 
-    Note: this function must be called *before* importing pylab
-    for the first time; or, if you are not using pylab, it must
-    be called before importing matplotlib.backends.
+    Note: this function must be called *before* importing pylab for
+    the first time; or, if you are not using pylab, it must be called
+    before importing matplotlib.backends.  If warn is True, a warning
+    is issued if you try and callthis after pylab or pyplot have been
+    loaded.  In certain black magic use cases, eg
+    pyplot.switch_backends, we are doing the reloading necessary to
+    make the backend switch work (in some cases, eg pure image
+    backends) so one can set warn=False to supporess the warnings
     """
     if 'matplotlib.backends' in sys.modules:
-        warnings.warn(_use_error_msg)
+        if warn: warnings.warn(_use_error_msg)
+        return
+    arg = arg.lower()
     be_parts = arg.split('.')
     name = validate_backend(be_parts[0])
     rcParams['backend'] = name
-    if name == 'Cairo' and len(be_parts) > 1:
+    if name == 'cairo' and len(be_parts) > 1:
         rcParams['cairo.format'] = validate_cairo_format(be_parts[1])
 
 def get_backend():
+    "Returns the current backend"
     return rcParams['backend']
 
 def interactive(b):

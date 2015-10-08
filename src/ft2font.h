@@ -45,6 +45,8 @@ public:
   Py::Object py_draw_rect(const Py::Tuple & args);
   static char draw_rect_filled__doc__ [];
   Py::Object py_draw_rect_filled(const Py::Tuple & args);
+  static char as_array__doc__ [];
+  Py::Object py_as_array(const Py::Tuple & args);
   static char as_str__doc__ [];
   Py::Object py_as_str(const Py::Tuple & args);
   static char as_rgb_str__doc__ [];
@@ -66,7 +68,7 @@ public:
   void makeRgbCopy();
   void makeRgbaCopy();
 
-  void resize(unsigned long width, unsigned long height);
+  void resize(long width, long height);
 };
 
 

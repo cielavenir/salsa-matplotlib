@@ -291,11 +291,15 @@ class ColorConverter:
         """
         try:
             if not cbook.is_string_like(arg) and cbook.iterable(arg):
-                if len(arg) == 4 and alpha is None:
+                if len(arg) == 4:
                     if [x for x in arg if (float(x) < 0) or  (x > 1)]:
                         # This will raise TypeError if x is not a number.
                         raise ValueError('number in rbga sequence outside 0-1 range')
-                    return tuple(arg)
+                    if alpha is None:
+                        return tuple(arg)
+                    if alpha < 0.0 or alpha > 1.0:
+                        raise ValueError("alpha must be in range 0-1")
+                    return arg[0], arg[1], arg[2], arg[3] * alpha
                 r,g,b = arg[:3]
                 if [x for x in (r,g,b) if (float(x) < 0) or  (x > 1)]:
                     raise ValueError('number in rbg sequence outside 0-1 range')
@@ -536,18 +540,19 @@ class LinearSegmentedColormap(Colormap):
         self._set_extremes()
 
 
-class ListedColormap(LinearSegmentedColormap):
+class ListedColormap(Colormap):
     """Colormap object generated from a list of colors.
 
-    Color boundaries are evenly spaced.  This is intended for simulating
-    indexed color selection, but may be useful for generating
-    special colormaps also.
+    This may be most useful when indexing directly into a colormap,
+    but it can also be used to generate special colormaps for ordinary
+    mapping.
     """
     def __init__(self, colors, name = 'from_list', N = None):
         """
         Make a colormap from a list of colors.
 
-        colors is a list of matplotlib color specifications
+        colors is a list of matplotlib color specifications,
+            or an equivalent Nx3 floating point array (N rgb values)
         name is a string to identify the colormap
         N is the number of entries in the map.  The default is None,
             in which case there is one colormap entry for each

@@ -79,6 +79,7 @@ else:
     True = True
     False = False
 
+BUILT_PNG       = False
 BUILT_AGG       = False
 BUILT_FT2FONT   = False
 BUILT_TTCONV    = False
@@ -106,7 +107,7 @@ options = {'display_status': True,
            'provide_pytz': 'auto',
            'provide_dateutil': 'auto',
            'provide_configobj': 'auto',
-           'provide_traits': 'auto',
+           'provide_traits': False,
            'build_agg': True,
            'build_gtk': 'auto',
            'build_gtkagg': 'auto',
@@ -141,7 +142,7 @@ if os.path.exists("setup.cfg"):
 
     try: options['provide_traits'] = config.getboolean("provide_packages",
                                                        "enthought.traits")
-    except: options['provide_traits'] = 'auto'
+    except: options['provide_traits'] = False
 
     try: options['build_gtk'] = config.getboolean("gui_support", "gtk")
     except: options['build_gtk'] = 'auto'
@@ -248,9 +249,6 @@ def get_pkgconfig(module,
 
     status, output = commands.getstatusoutput(
         "%s %s %s" % (pkg_config_exec, flags, packages))
-    #if packages.startswith('pygtk'):
-    #    print 'status', status, output
-    #    raise SystemExit
     if status == 0:
         for token in output.split():
             attr = _flags.get(token[:2], None)
@@ -462,9 +460,11 @@ def check_provide_configobj():
             return False
 
 def check_provide_traits():
-    if options['provide_traits'] is True:
-        print_status("enthought.traits", "matplotlib will provide")
-        return True
+    # Let's not install traits by default for now, unless it is specifically
+    # asked for in setup.cfg AND it is not already installed
+#    if options['provide_traits'] is True:
+#        print_status("enthought.traits", "matplotlib will provide")
+#        return True
     try:
         from enthought import traits
         try:
@@ -478,12 +478,16 @@ def check_provide_traits():
                 version = version.version
             except AttributeError:
                 version = version.__version__
-            if version.endswith('mpl'):
-                print_status("enthought.traits", "matplotlib will provide")
-                return True
-            else:
-                print_status("enthought.traits", version)
-                return False
+            # next 2 lines added temporarily while we figure out what to do
+            # with traits:
+            print_status("enthought.traits", version)
+            return False
+#            if version.endswith('mpl'):
+#                print_status("enthought.traits", "matplotlib will provide")
+#                return True
+#            else:
+#                print_status("enthought.traits", version)
+#                return False
     except ImportError:
         if options['provide_traits']:
             print_status("enthought.traits", "matplotlib will provide")
@@ -564,12 +568,18 @@ def add_numpy_flags(module):
     import numpy
     module.include_dirs.append(numpy.get_include())
 
+def add_png_flags(module):
+    try_pkgconfig(module, 'libpng', 'png')
+    add_base_flags(module)
+    add_numpy_flags(module)
+    module.libraries.append('z')
+    module.include_dirs.extend(['.'])
+    module.libraries.extend(std_libs)
+
 def add_agg_flags(module):
     'Add the module flags to build extensions which use agg'
 
     # before adding the freetype flags since -z comes later
-    try_pkgconfig(module, 'libpng', 'png')
-    module.libraries.append('z')
     add_base_flags(module)
     add_numpy_flags(module)
     module.include_dirs.extend(['src', '%s/include'%AGG_VERSION, '.'])
@@ -579,6 +589,7 @@ def add_agg_flags(module):
 
 def add_ft2font_flags(module):
     'Add the module flags to ft2font extension'
+    add_numpy_flags(module)
     if not get_pkgconfig(module, 'freetype2'):
         module.libraries.extend(['freetype', 'z'])
         add_base_flags(module)
@@ -1194,6 +1205,25 @@ def build_wxagg(ext_modules, packages):
 
      ext_modules.append(module)
      BUILT_WXAGG = True
+
+def build_png(ext_modules, packages):
+    global BUILT_PNG
+    if BUILT_PNG: return # only build it if you you haven't already
+
+    deps = ['src/_png.cpp', 'src/mplutils.cpp']
+    deps.extend(glob.glob('CXX/*.cxx'))
+    deps.extend(glob.glob('CXX/*.c'))
+
+    module = Extension(
+        'matplotlib._png',
+        deps,
+        include_dirs=numpy_inc_dirs,
+        )
+
+    add_png_flags(module)
+    ext_modules.append(module)
+
+    BUILT_PNG = True
 
 
 def build_agg(ext_modules, packages):

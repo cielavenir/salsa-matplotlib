@@ -33,8 +33,9 @@ yy = r * N.cos(theta)
 spiral = zip(xx,yy)
 
 # Make some offsets
-xo = N.random.randn(npts)
-yo = N.random.randn(npts)
+rs = N.random.RandomState([12345678])
+xo = rs.randn(npts)
+yo = rs.randn(npts)
 xyo = zip(xo, yo)
 
 # Make a list of colors cycling through the rgbcmyk series.
@@ -45,7 +46,7 @@ fig = P.figure()
 a = fig.add_subplot(2,2,1)
 col = collections.LineCollection([spiral], offsets=xyo,
                                 transOffset=a.transData)
-trans = transforms.Affine2D().scale(fig.dpi/72.0)
+trans = fig.dpi_scale_trans + transforms.Affine2D().scale(1.0/72.0)
 col.set_transform(trans)  # the points to pixels transform
     # Note: the first argument to the collection initializer
     # must be a list of sequences of x,y tuples; we have only
@@ -86,7 +87,7 @@ a.set_title('PolyCollection using offsets')
 
 a = fig.add_subplot(2,2,3)
 
-col = collections.RegularPolyCollection(fig.dpi, 7,
+col = collections.RegularPolyCollection(7,
                                         sizes = N.fabs(xx)*10.0, offsets=xyo,
                                         transOffset=a.transData)
 trans = transforms.Affine2D().scale(fig.dpi/72.0)
@@ -112,7 +113,7 @@ ym = N.amax(yy)
 xx = (0.2 + (ym-yy)/ym)**2 * N.cos(yy-0.4) * 0.5
 segs = []
 for i in range(ncurves):
-    xxx = xx + 0.02*N.random.randn(nverts)
+    xxx = xx + 0.02*rs.randn(nverts)
     curve = zip(xxx, yy*100)
     segs.append(curve)
 

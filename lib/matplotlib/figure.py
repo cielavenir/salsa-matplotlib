@@ -1,5 +1,18 @@
 """
-Figure class -- add docstring here!
+The figure module provides the top-level
+:class:`~matplotlib.artist.Artist`, the :class:`Figure`, which
+contains all the plot elements.  The following classes are defined
+
+:class:`SubplotParams`
+    control the default spacing of the subplots
+
+:class:`BlockingMouseInput`
+    creates a callable object to retrieve mouse clicks in a blocking way for interactive sessions
+
+:class:`Figure`
+    top level container for all plot elements
+
+
 """
 import numpy as np
 import time
@@ -32,18 +45,24 @@ class SubplotParams:
         All dimensions are fraction of the figure width or height.
         All values default to their rc params
 
-        The following attributes are available:
+        The following attributes are available
 
-        left : the left side of the subplots of the figure
-        right : the right side of the subplots of the figure
-        bottom : the bottom of the subplots of the figure
-        top : the top of the subplots of the figure
-        wspace : the amount of width reserved for blank space between subplots
-        hspace : the amount of height reserved for white space between subplots
-
-        validate : make sure the params are in a legal state
-        (left<right, etc)
+        *left*  = 0.125
+            the left side of the subplots of the figure
+        *right* = 0.9
+            the right side of the subplots of the figure
+        *bottom* = 0.1
+            the bottom of the subplots of the figure
+        *top* = 0.9
+            the top of the subplots of the figure
+        *wspace* = 0.2
+            the amount of width reserved for blank space between subplots
+        *hspace* = 0.2
+            the amount of height reserved for white space between subplots
+        *validate*
+            make sure the params are in a legal state (*left*<*right*, etc)
         """
+
         self.validate = True
         self.update(left, bottom, right, top, wspace, hspace)
 
@@ -100,16 +119,18 @@ class SubplotParams:
 
 
 class BlockingMouseInput(object):
-    """ Class that creates a callable object to retrieve mouse clicks in a
-        blocking way.
+    """
+    Class that creates a callable object to retrieve mouse clicks in a
+    blocking way.
     """
     def __init__(self, fig):
         self.fig = fig
 
 
     def on_click(self, event):
-        """ Event handler that will be passed to the current figure to
-            retrieve clicks.
+        """
+        Event handler that will be passed to the current figure to
+        retrieve clicks.
         """
         if event.button == 3:
             # If it's a right click, pop the last coordinates.
@@ -137,8 +158,9 @@ class BlockingMouseInput(object):
 
 
     def __call__(self, n=1, timeout=30, verbose=False, show_clicks=True):
-        """ Blocking call to retrieve n coordinate pairs through mouse
-            clicks.
+        """
+        Blocking call to retrieve n coordinate pairs through mouse
+        clicks.
         """
         self.verbose     = verbose
         self.done        = False
@@ -179,10 +201,21 @@ class BlockingMouseInput(object):
 class Figure(Artist):
 
     """
-    The Figure instance supports callbacks through a callbacks
-    attribute which is a cbook.CallbackRegistry instance.  The events
-    you can connect to are 'dpi_changed', and the callback will be
-    called with func(fig) where fig is the Figure instance
+    The Figure instance supports callbacks through a *callbacks*
+    attribute which is a :class:`matplotlib.cbook.CallbackRegistry`
+    instance.  The events you can connect to are 'dpi_changed', and
+    the callback will be called with ``func(fig)`` where fig is the
+    :class:`Figure` instance.
+
+    The figure patch is drawn by a the attribute
+
+    *figurePatch*
+       a :class:`matplotlib.patches.Rectangle` instance
+    *suppressComposite
+       for multiple figure images, the figure will make composite
+       images depending on the renderer option_image_nocomposite
+       function.  If suppressComposite is True|False, this will
+       override the renderer
     """
 
     def __str__(self):
@@ -198,9 +231,20 @@ class Figure(Artist):
                  subplotpars = None, # default to rc
                  ):
         """
-        figsize is a w,h tuple in inches
-        dpi is dots per inch
-        subplotpars is a SubplotParams instance, defaults to rc
+        *figsize*
+            w,h tuple in inches
+        *dpi*
+            dots per inch
+        *facecolor*
+            the figure patch facecolor; defaults to rc ``figure.facecolor``
+        *edgecolor*
+            the figure patch edge color; defaults to rc ``figure.edgecolor``
+        *linewidth*
+            the figure patch edge linewidth; the default linewidth of the frame
+        *frameon*
+            if False, suppress drawing the figure frame
+        *subplotpars*
+            a :class:`SubplotParams` instance, defaults to rc
         """
         Artist.__init__(self)
 
@@ -238,9 +282,7 @@ class Figure(Artist):
         self._axstack = Stack()  # maintain the current axes
         self.axes = []
         self.clf()
-
         self._cachedRenderer = None
-        self._autoLayout = rcParams['figure.autolayout']
 
     def _get_dpi(self):
         return self._dpi
@@ -249,9 +291,6 @@ class Figure(Artist):
         self.dpi_scale_trans.clear().scale(dpi, dpi)
         self.callbacks.process('dpi_changed', self)
     dpi = property(_get_dpi, _set_dpi)
-
-    def enable_auto_layout(self, setting=True):
-        self._autoLayout = setting
 
     def autofmt_xdate(self, bottom=0.2, rotation=30, ha='right'):
         """
@@ -262,10 +301,12 @@ class Figure(Artist):
         bottom subplot and turn them off on other subplots, as well as
         turn off xlabels.
 
-
-        bottom : the bottom of the subplots for subplots_adjust
-        rotation: the rotation of the xtick labels
-        ha : the horizontal alignment of the xticklabels
+        *bottom*
+            the bottom of the subplots for :meth:`subplots_adjust`
+        *rotation*
+            the rotation of the xtick labels
+        *ha*
+            the horizontal alignment of the xticklabels
         """
         allsubplots = np.alltrue([hasattr(ax, 'is_last_row') for ax in self.axes])
         if len(self.axes)==1:
@@ -284,12 +325,13 @@ class Figure(Artist):
                             label.set_visible(False)
                         ax.set_xlabel('')
 
-        if allsubplots and not self._autoLayout:
+        if allsubplots:
             self.subplots_adjust(bottom=bottom)
 
     def get_children(self):
         'get a list of artists contained in the figure'
         children = [self.figurePatch]
+        children.extend(self.artists)
         children.extend(self.axes)
         children.extend(self.lines)
         children.extend(self.patches)
@@ -299,7 +341,8 @@ class Figure(Artist):
         return children
 
     def contains(self, mouseevent):
-        """Test whether the mouse event occurred on the figure.
+        """
+        Test whether the mouse event occurred on the figure.
 
         Returns True,{}
         """
@@ -312,6 +355,39 @@ class Figure(Artist):
     def get_window_extent(self, *args, **kwargs):
         'get the figure bounding box in display space; kwargs are void'
         return self.bbox
+
+    def suptitle(self, t, **kwargs):
+        """
+        Add a centered title to the figure.
+
+        kwargs are :class:`matplotlib.text.Text` properties.  Using figure
+        coordinates, the defaults are::
+
+          *x* = 0.5
+              the x location of text in figure coords
+          *y* = 0.98
+              the y location of the text in figure coords
+          *horizontalalignment* = 'center'
+              the horizontal alignment of the text
+          *verticalalignment* = 'top'
+              the vertical alignment of the text
+
+        A :class:`matplotlib.text.Text` instance is returned.
+
+        Example::
+
+          fig.subtitle('this is the figure title', fontsize=12)
+        """
+        x = kwargs.pop('x', 0.5)
+        y = kwargs.pop('y', 0.98)
+        if ('horizontalalignment' not in kwargs) and ('ha' not in kwargs):
+            kwargs['horizontalalignment'] = 'center'
+
+        if ('verticalalignment' not in kwargs) and ('va' not in kwargs):
+            kwargs['verticalalignment'] = 'top'
+
+        t = self.text(x, y, t, **kwargs)
+        return t
 
     def set_canvas(self, canvas):
         """
@@ -326,10 +402,11 @@ class Figure(Artist):
         Set the hold state.  If hold is None (default), toggle the
         hold state.  Else set the hold state to boolean value b.
 
-        Eg
-        hold()      # toggle hold
-        hold(True)  # hold is on
-        hold(False) # hold is off
+        Eg::
+
+            hold()      # toggle hold
+            hold(True)  # hold is on
+            hold(False) # hold is off
         """
         if b is None: self._hold = not self._hold
         else: self._hold = b
@@ -344,45 +421,51 @@ class Figure(Artist):
                  vmax=None,
                  origin=None):
         """
-        FIGIMAGE(X) # add non-resampled array to figure
+        call signatures::
 
-        FIGIMAGE(X, xo, yo) # with pixel offsets
+          figimage(X, **kwargs)
 
-        FIGIMAGE(X, **kwargs) # control interpolation ,scaling, etc
+        adds a non-resampled array *X* to the figure.
 
-        Add a nonresampled figure to the figure from array X.  xo and yo are
-        offsets in pixels
+        ::
 
-        X must be a float array
+          figimage(X, xo, yo)
 
-            If X is MxN, assume luminance (grayscale)
-            If X is MxNx3, assume RGB
-            If X is MxNx4, assume RGBA
+        with pixel offsets *xo*, *yo*,
 
-        The following kwargs are allowed:
+        *X* must be a float array:
 
-          * cmap is a cm colormap instance, eg cm.jet.  If None, default to
-            the rc image.cmap valuex
+        * If *X* is MxN, assume luminance (grayscale)
+        * If *X* is MxNx3, assume RGB
+        * If *X* is MxNx4, assume RGBA
 
-          * norm is a matplotlib.colors.Normalize instance; default is
-            normalization().  This scales luminance -> 0-1
+        Optional keyword arguments:
 
-          * vmin and vmax are used to scale a luminance image to 0-1.  If
-            either is None, the min and max of the luminance values will be
-            used.  Note if you pass a norm instance, the settings for vmin and
-            vmax will be ignored.
+          =========   ==========================================================
+          Keyword     Description
+          =========   ==========================================================
+          xo or yo    An integer, the *x* and *y* image offset in pixels
+          cmap        a :class:`matplotlib.cm.ColorMap` instance, eg cm.jet.
+                      If None, default to the rc ``image.cmap`` value
+          norm        a :class:`matplotlib.colors.Normalize` instance. The
+                      default is normalization().  This scales luminance -> 0-1
+          vmin|vmax   are used to scale a luminance image to 0-1.  If either is
+                      None, the min and max of the luminance values will be
+                      used.  Note if you pass a norm instance, the settings for
+                      *vmin* and *vmax* will be ignored.
+          alpha       the alpha blending value, default is 1.0
+          origin      [ 'upper' | 'lower' ] Indicates where the [0,0] index of
+                      the array is in the upper left or lower left corner of
+                      the axes. Defaults to the rc image.origin value
+          =========   ==========================================================
 
-          * alpha = 1.0 : the alpha blending value
+        figimage complements the axes image
+        (:meth:`~matplotlib.axes.Axes.imshow`) which will be resampled
+        to fit the current axes.  If you want a resampled image to
+        fill the entire figure, you can define an
+        :class:`~matplotlib.axes.Axes` with size [0,1,0,1].
 
-          * origin is either 'upper' or 'lower', which indicates where the [0,0]
-            index of the array is in the upper left or lower left corner of
-            the axes.  Defaults to the rc image.origin value
-
-        This complements the axes image (Axes.imshow) which will be resampled
-        to fit the current axes.  If you want a resampled image to fill the
-        entire figure, you can define an Axes with size [0,1,0,1].
-
-        A image.FigureImage instance is returned.
+        An :class:`matplotlib.image.FigureImage` instance is returned.
         """
 
         if not self._hold: self.clf()
@@ -406,10 +489,12 @@ class Figure(Artist):
 
         Set the figure size in inches
 
-        Usage: set_size_inches(self, w,h)  OR
-               set_size_inches(self, (w,h) )
+        Usage::
 
-        optional kwarg forward=True will cause the canvas size to be
+             fig.set_size_inches(w,h)  # OR
+             fig.set_size_inches((w,h) )
+
+        optional kwarg *forward=True* will cause the canvas size to be
         automatically updated; eg you can resize the figure window
         from the shell
 
@@ -549,18 +634,17 @@ class Figure(Artist):
         Add an a axes with axes rect [left, bottom, width, height] where all
         quantities are in fractions of figure width and height.  kwargs are
         legal Axes kwargs plus "projection" which sets the projection type
-        of the axes.  (For backward compatibility, polar=True may also be
-        provided, which is equivalent to projection='polar').
+        of the axes.  (For backward compatibility, *polar=True* may also be
+        provided, which is equivalent to *projection='polar'*).
         Valid values for "projection" are: %s.  Some of these projections
-        support additional kwargs, which may be provided to add_axes.
+        support additional kwargs, which may be provided to add_axes::
 
             rect = l,b,w,h
-            add_axes(rect)
-            add_axes(rect, frameon=False, axisbg='g')
-            add_axes(rect, polar=True)
-            add_axes(rect, projection='polar')
-            add_axes(ax)   # add an Axes instance
-
+            fig.add_axes(rect)
+            fig.add_axes(rect, frameon=False, axisbg='g')
+            fig.add_axes(rect, polar=True)
+            fig.add_axes(rect, projection='polar')
+            fig.add_axes(ax)   # add an Axes instance
 
         If the figure already has an axes with key *args, *kwargs then it will
         simply make that axes current and return it.  If you do not want this
@@ -568,12 +652,12 @@ class Figure(Artist):
         use a unique set of args and kwargs.  The artist "label" attribute has
         been exposed for this purpose.  Eg, if you want two axes that are
         otherwise identical to be added to the figure, make sure you give them
-        unique labels:
+        unique labels::
 
-            add_axes(rect, label='axes1')
-            add_axes(rect, label='axes2')
+            fig.add_axes(rect, label='axes1')
+            fig.add_axes(rect, label='axes2')
 
-        The Axes instance will be returned
+        The :class:`~matplotlib.axes.Axes` instance will be returned.
 
         The following kwargs are supported:
         %s
@@ -614,24 +698,24 @@ class Figure(Artist):
 
     def add_subplot(self, *args, **kwargs):
         """
-        Add a subplot.  Examples
+        Add a subplot.  Examples:
 
-            add_subplot(111)
-            add_subplot(1,1,1)            # equivalent but more general
-            add_subplot(212, axisbg='r')  # add subplot with red background
-            add_subplot(111, polar=True)  # add a polar subplot
-            add_subplot(sub)              # add Subplot instance sub
+            fig.add_subplot(111)
+            fig.add_subplot(1,1,1)            # equivalent but more general
+            fig.add_subplot(212, axisbg='r')  # add subplot with red background
+            fig.add_subplot(111, polar=True)  # add a polar subplot
+            fig.add_subplot(sub)              # add Subplot instance sub
 
-        kwargs are legal Axes kwargs plus "projection", which chooses
+        *kwargs* are legal :class:`!matplotlib.axes.Axes` kwargs plus *projection*, which chooses
         a projection type for the axes.  (For backward compatibility,
-        polar=True may also be provided, which is equivalent to
-        projection='polar').  Valid values for "projection" are: %s.
-        Some of these projections support additional kwargs, which may
-        be provided to add_axes.
+        *polar=True* may also be provided, which is equivalent to
+        *projection='polar'*).  Valid values for *projection* are: %s.
+        Some of these projections support additional *kwargs*, which may
+        be provided to :meth:`add_axes`.
 
-        The Axes instance will be returned.
+        The :class:`~matplotlib.axes.Axes` instance will be returned.
 
-        If the figure already has a subplot with key *args, *kwargs then it will
+        If the figure already has a subplot with key *args*, *kwargs* then it will
         simply make that subplot current and return it
 
         The following kwargs are supported:
@@ -675,7 +759,7 @@ class Figure(Artist):
         """
         Clear the figure
         """
-
+        self.suppressComposite = None
         self.callbacks = cbook.CallbackRegistry(('dpi_changed', ))
 
         for ax in tuple(self.axes):  # Iterate over the copy.
@@ -687,6 +771,7 @@ class Figure(Artist):
             toolbar.update()
         self._axstack.clear()
         self._seen = {}
+        self.artists = []        
         self.lines = []
         self.patches = []
         self.texts=[]
@@ -702,7 +787,7 @@ class Figure(Artist):
 
     def draw(self, renderer):
         """
-        Render the figure using Renderer instance renderer
+        Render the figure using :class:`matplotlib.backend_bases.RendererBase` instance renderer
         """
         # draw the figure bounding box, perhaps none for white figure
         #print 'figure draw'
@@ -711,82 +796,37 @@ class Figure(Artist):
 
         if self.frameon: self.figurePatch.draw(renderer)
 
+        # todo: respect zorder
         for p in self.patches: p.draw(renderer)
         for l in self.lines: l.draw(renderer)
+        for a in self.artists: a.draw(renderer)
+        
+        # override the renderer default if self.suppressComposite
+        # is not None
+        composite = renderer.option_image_nocomposite()
+        if self.suppressComposite is not None:
+            composite = self.suppressComposite
 
-        if len(self.images)<=1 or renderer.option_image_nocomposite() or not allequal([im.origin for im in self.images]):
+        if len(self.images)<=1 or composite or not allequal([im.origin for im in self.images]):
             for im in self.images:
                 im.draw(renderer)
         else:
             # make a composite image blending alpha
             # list of (_image.Image, ox, oy)
-
             mag = renderer.get_image_magnification()
             ims = [(im.make_image(mag), im.ox*mag, im.oy*mag)
                    for im in self.images]
             im = _image.from_images(self.bbox.height * mag,
                                     self.bbox.width * mag,
                                     ims)
+            if self.images[0].origin=='upper':
+                im.flipud_out()
+
             im.is_grayscale = False
             l, b, w, h = self.bbox.bounds
+            clippath, affine = self.get_transformed_clip_path_and_affine()
             renderer.draw_image(l, b, im, self.bbox,
-                                *self.get_transformed_clip_path_and_affine())
-
-        # update the positions of the axes
-        # This gives each of the axes the opportunity to resize itself
-        # based on the tick and axis labels etc., and then makes sure
-        # that any axes that began life aligned to another axes remains
-        # aligned after these adjustments
-        if self._autoLayout and len(self.axes) > 1:
-            aligned_positions = [{}, {}, {}, {}]
-            sizes = [{}, {}]
-            for a in self.axes:
-                a.update_layout(renderer)
-                orig_pos = a.get_position(True)
-                curr_pos = a.get_position()
-                for pos, orig, curr in zip(aligned_positions,
-                                           orig_pos.get_points().flatten(),
-                                           curr_pos.get_points().flatten()):
-                    if orig in pos:
-                        pos[orig][0].append(a)
-                        pos[orig][1].add(curr)
-                    else:
-                        pos[orig] = [[a], set([curr])]
-                for size, orig, curr in zip(sizes,
-                                            orig_pos.size,
-                                            curr_pos.size):
-                    orig = round(orig * 1000.0) / 1000.0
-                    if orig in size:
-                        size[orig][0].append(a)
-                        size[orig][1].add(curr)
-                    else:
-                        size[orig] = [[a], set([curr])]
-
-            for i, pos in enumerate(aligned_positions):
-                for axes, places in pos.values():
-                    if len(places) > 1:
-                        if i < 2:
-                            curr = max(places)
-                        else:
-                            curr = min(places)
-                        for a in axes:
-                            curr_pos = a.get_position().frozen()
-                            curr_pos.get_points()[i/2, i%2] = curr
-                            a.set_position(curr_pos, 'active')
-
-            for i, size in enumerate(sizes):
-                for axes, dims in size.values():
-                    new = min(dims)
-                    for a in axes:
-                        curr_pos = a.get_position().frozen()
-                        curr = curr_pos.size[i]
-                        if curr > new:
-                            extra = (curr - new) * 0.5
-                            curr_pos.get_points()[0, i] += extra
-                            curr_pos.get_points()[1, i] -= extra
-                            a.set_position(curr_pos, 'active')
-        elif self._autoLayout:
-            for a in self.axes: a.update_layout(renderer)
+                                clippath, affine)
 
         # render the axes
         for a in self.axes: a.draw(renderer)
@@ -804,7 +844,10 @@ class Figure(Artist):
         self.canvas.draw_event(renderer)
 
     def draw_artist(self, a):
-        'draw artist only -- this is available only after the figure is drawn'
+        """
+        draw :class:`matplotlib.artist.Artist` instance *a* only --
+        this is available only after the figure is drawn
+        """
         assert self._cachedRenderer is not None
         a.draw(self._cachedRenderer)
 
@@ -814,16 +857,18 @@ class Figure(Artist):
     def legend(self, handles, labels, *args, **kwargs):
         """
         Place a legend in the figure.  Labels are a sequence of
-        strings, handles is a sequence of line or patch instances, and
-        loc can be a string or an integer specifying the legend
-        location
+        strings, handles is a sequence of
+        :class:`~matplotlib.lines.Line2D` or
+        :class:`~matplotlib.patches.Patch` instances, and loc can be a
+        string or an integer specifying the legend location
 
-        USAGE:
+        USAGE::
+
           legend( (line1, line2, line3),
                   ('label1', 'label2', 'label3'),
                   'upper right')
 
-        The LOC location codes are
+        The *loc* location codes are::
 
           'best' : 0,          (currently not supported for figure legends)
           'upper right'  : 1,
@@ -837,27 +882,35 @@ class Figure(Artist):
           'upper center' : 9,
           'center'       : 10,
 
-        loc can also be an (x,y) tuple in figure coords, which
+        *loc* can also be an (x,y) tuple in figure coords, which
         specifies the lower left of the legend box.  figure coords are
         (0,0) is the left, bottom of the figure and 1,1 is the right,
         top.
 
-        The legend instance is returned.  The following kwargs are supported:
+        The legend instance is returned.  The following kwargs are supported
 
-        loc = "upper right" #
-        numpoints = 4         # the number of points in the legend line
-        prop = FontProperties(size='smaller')  # the font property
-        pad = 0.2             # the fractional whitespace inside the legend border
-        markerscale = 0.6     # the relative size of legend markers vs. original
-        shadow                # if True, draw a shadow behind legend
-        labelsep = 0.005     # the vertical space between the legend entries
-        handlelen = 0.05     # the length of the legend lines
-        handletextsep = 0.02 # the space between the legend line and legend text
-        axespad = 0.02       # the border between the axes and legend edge
+        *loc*
+            the location of the legend
+        *numpoints*
+            the number of points in the legend line
+        *prop*
+            a :class:`matplotlib.font_manager.FontProperties` instance
+        *pad*
+            the fractional whitespace inside the legend border
+        *markerscale*
+            the relative size of legend markers vs. original
+        *shadow*
+            if True, draw a shadow behind legend
+        *labelsep*
+            the vertical space between the legend entries
+        *handlelen*
+            the length of the legend lines
+        *handletextsep*
+            the space between the legend line and legend text
+        *axespad*
+            the border between the axes and legend edge
 
         """
-
-
         handles = flatten(handles)
         l = Legend(self, handles, labels, *args, **kwargs)
         self.legends.append(l)
@@ -865,10 +918,12 @@ class Figure(Artist):
 
     def text(self, x, y, s, *args, **kwargs):
         """
-        Add text to figure at location x,y (relative 0-1 coords) See
-        the help for Axis text for the meaning of the other arguments
+        Add text to figure at location *x*, *y* (relative 0-1
+        coords). See :func:`~matplotlib.pyplot.text` for the meaning
+        of the other arguments.
 
-        kwargs control the Text properties:
+        kwargs control the :class:`~matplotlib.text.Text` properties:
+
         %(Text)s
         """
 
@@ -913,32 +968,43 @@ class Figure(Artist):
 
     def savefig(self, *args, **kwargs):
         """
-        SAVEFIG(fname, dpi=None, facecolor='w', edgecolor='w',
-        orientation='portrait', papertype=None, format=None):
+        call signature::
+
+          savefig(fname, dpi=None, facecolor='w', edgecolor='w',
+                  orientation='portrait', papertype=None, format=None):
 
         Save the current figure.
 
-        fname - the filename to save the current figure to.  The
-                output formats supported depend on the backend being
-                used.  and are deduced by the extension to fname.
-                Possibilities are eps, jpeg, pdf, png, ps, svg.  fname
-                can also be a file or file-like object - cairo backend
-                only.
+        The output formats available depend on the backend being used.
 
-        dpi - is the resolution in dots per inch.  If
-              None it will default to the value savefig.dpi in the
-              matplotlibrc file
+        Arguments:
 
-        facecolor and edgecolor are the colors of the figure rectangle
+          *fname*:
+            A string containing a path to a filename, or a Python file-like object.
 
-        orientation is either 'landscape' or 'portrait' - not supported on
-        all backends; currently only on postscript output
+            If *format* is *None* and *fname* is a string, the output
+            format is deduced from the extension of the filename.
 
-        papertype is is one of 'letter', 'legal', 'executive', 'ledger', 'a0'
-        through 'a10', or 'b0' through 'b10' - only supported for postscript
-        output
+        Keyword arguments:
 
-        format - one of the file extensions supported by the active backend.
+          *dpi*: [ None | scalar > 0 ]
+            The resolution in dots per inch.  If *None* it will default to
+            the value ``savefig.dpi`` in the matplotlibrc file.
+
+          *facecolor*, *edgecolor*:
+            the colors of the figure rectangle
+
+          *orientation*: [ 'landscape' | 'portrait' ]
+            not supported on all backends; currently only on postscript output
+
+          *papertype*:
+            One of 'letter', 'legal', 'executive', 'ledger', 'a0' through
+            'a10', 'b0' through 'b10'. Only supported for postscript
+            output.
+
+          *format*:
+            One of the file extensions supported by the active
+            backend.  Most backends support png, pdf, ps, eps and svg.
         """
 
         for key in ('dpi', 'facecolor', 'edgecolor'):
@@ -968,16 +1034,18 @@ class Figure(Artist):
     colorbar.__doc__ =  '''
         Create a colorbar for a ScalarMappable instance.
 
-        Documentation for the pylab thin wrapper: %s
+        Documentation for the pylab thin wrapper:
+        %s
+
         '''% cbar.colorbar_doc
 
     def subplots_adjust(self, *args, **kwargs):
         """
-        subplots_adjust(self, left=None, bottom=None, right=None, top=None,
-                        wspace=None, hspace=None)
-        fig.subplots_adjust(left=None, bottom=None, right=None, wspace=None, hspace=None):
-        Update the SubplotParams with kwargs (defaulting to rc where
+        fig.subplots_adjust(left=None, bottom=None, right=None, wspace=None, hspace=None)
+
+        Update the :class:`SubplotParams` with *kwargs* (defaulting to rc where
         None) and update the subplot locations
+
         """
         self.subplotpars.update(*args, **kwargs)
         import matplotlib.axes
@@ -996,14 +1064,21 @@ class Figure(Artist):
 
     def ginput(self, n=1, timeout=30, verbose=False, show_clicks=True):
         """
-        ginput(self, n=1, timeout=30, verbose=False, show_clicks=True)
+        call signature::
+
+          ginput(self, n=1, timeout=30, verbose=False, show_clicks=True)
 
         Blocking call to interact with the figure.
 
-        This will wait for n clicks from the user and return a list of the
-        coordinates of each click. If timeout is negative, does not
-        timeout. If n is negative, accumulate clicks until a middle
-        click terminates the input. Right clicking cancels last input.
+        This will wait for *n* clicks from the user and return a list of the
+        coordinates of each click.
+
+        If *timeout* is negative, does not timeout.
+
+        If *n* is negative, accumulate clicks until a middle click
+        terminates the input.
+
+        Right clicking cancels last input.
         """
 
         blocking_mouse_input = BlockingMouseInput(self)
@@ -1014,14 +1089,14 @@ class Figure(Artist):
 
 def figaspect(arg):
     """
-    Create a figure with specified aspect ratio.  If arg is a number,
-    use that aspect ratio.  If arg is an array, figaspect will
+    Create a figure with specified aspect ratio.  If *arg* is a number,
+    use that aspect ratio.  If *arg* is an array, figaspect will
     determine the width and height for a figure that would fit array
     preserving aspect ratio.  The figure width, height in inches are
     returned.  Be sure to create an axes with equal with and height,
     eg
 
-    Example usage:
+    Example usage::
 
       # make a figure twice as tall as it is wide
       w, h = figaspect(2.)

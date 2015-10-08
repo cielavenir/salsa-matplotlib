@@ -1,11 +1,9 @@
-#include <png.h>
-
 // To remove a gcc warning
 #ifdef _POSIX_C_SOURCE
 #undef _POSIX_C_SOURCE
 #endif
 
-#include "Python.h" //after png.h due to setjmp bug
+#include "Python.h"
 #include <string>
 
 #include <iostream>
@@ -426,11 +424,22 @@ Image::resize(const Py::Tuple& args, const Py::Dict& kwargs) {
           case HAMMING:  filter.calculate(agg::image_filter_hamming(), norm); break;
           case HERMITE:  filter.calculate(agg::image_filter_hermite(), norm); break;
         }
-	typedef agg::span_image_filter_rgba_2x2<img_accessor_type, interpolator_type> span_gen_type;
-	typedef agg::renderer_scanline_aa<renderer_base, span_alloc_type, span_gen_type> renderer_type;
-	span_gen_type sg(ia, interpolator, filter);
-	renderer_type ri(rb, sa, sg);
-	agg::render_scanlines(ras, sl, ri);
+	if (resample)
+	  {
+	    typedef agg::span_image_resample_rgba_affine<img_accessor_type> span_gen_type;
+	    typedef agg::renderer_scanline_aa<renderer_base, span_alloc_type, span_gen_type> renderer_type;
+	    span_gen_type sg(ia, interpolator, filter);
+	    renderer_type ri(rb, sa, sg);
+	    agg::render_scanlines(ras, sl, ri);
+	  }
+	else
+	  {
+	    typedef agg::span_image_filter_rgba_2x2<img_accessor_type, interpolator_type> span_gen_type;
+	    typedef agg::renderer_scanline_aa<renderer_base, span_alloc_type, span_gen_type> renderer_type;
+	    span_gen_type sg(ia, interpolator, filter);
+	    renderer_type ri(rb, sa, sg);
+	    agg::render_scanlines(ras, sl, ri);
+	  }
       }
       break;
     case BILINEAR:
@@ -464,11 +473,22 @@ Image::resize(const Py::Tuple& args, const Py::Dict& kwargs) {
           case LANCZOS: filter.calculate(agg::image_filter_lanczos(radius), norm); break;
           case BLACKMAN: filter.calculate(agg::image_filter_blackman(radius), norm); break;
           }
-	typedef agg::span_image_filter_rgba<img_accessor_type, interpolator_type> span_gen_type;
-	typedef agg::renderer_scanline_aa<renderer_base, span_alloc_type, span_gen_type> renderer_type;
-	span_gen_type sg(ia, interpolator, filter);
-	renderer_type ri(rb, sa, sg);
-	agg::render_scanlines(ras, sl, ri);
+	if (resample)
+	  {
+	    typedef agg::span_image_resample_rgba_affine<img_accessor_type> span_gen_type;
+	    typedef agg::renderer_scanline_aa<renderer_base, span_alloc_type, span_gen_type> renderer_type;
+	    span_gen_type sg(ia, interpolator, filter);
+	    renderer_type ri(rb, sa, sg);
+	    agg::render_scanlines(ras, sl, ri);
+	  }
+	else
+	  {
+	    typedef agg::span_image_filter_rgba<img_accessor_type, interpolator_type> span_gen_type;
+	    typedef agg::renderer_scanline_aa<renderer_base, span_alloc_type, span_gen_type> renderer_type;
+	    span_gen_type sg(ia, interpolator, filter);
+	    renderer_type ri(rb, sa, sg);
+	    agg::render_scanlines(ras, sl, ri);
+	  }
       }
       break;
 
@@ -528,6 +548,20 @@ Image::get_size(const Py::Tuple& args) {
   ret[1] = Py::Int((long)colsIn);
   return ret;
 
+}
+
+char Image::get_resample__doc__[] =
+"get_resample()\n"
+"\n"
+"Get the resample flag."
+;
+
+Py::Object
+Image::get_resample(const Py::Tuple& args) {
+  _VERBOSE("Image::get_resample");
+
+  args.verify_length(0);
+  return Py::Int((int)resample);
 }
 
 char Image::get_size_out__doc__[] =
@@ -593,129 +627,20 @@ Image::set_interpolation(const Py::Tuple& args) {
 
 }
 
-static void write_png_data(png_structp png_ptr, png_bytep data, png_size_t length) {
-  PyObject* py_file_obj = (PyObject*)png_get_io_ptr(png_ptr);
-  PyObject* write_method = PyObject_GetAttrString(py_file_obj, "write");
-  PyObject* result = NULL;
-  if (write_method)
-    result = PyObject_CallFunction(write_method, (char *)"s#", data, length);
-  Py_XDECREF(write_method);
-  Py_XDECREF(result);
-}
-
-static void flush_png_data(png_structp png_ptr) {
-  PyObject* py_file_obj = (PyObject*)png_get_io_ptr(png_ptr);
-  PyObject* flush_method = PyObject_GetAttrString(py_file_obj, "flush");
-  PyObject* result = NULL;
-  if (flush_method)
-    result = PyObject_CallFunction(flush_method, (char *)"");
-  Py_XDECREF(flush_method);
-  Py_XDECREF(result);
-}
-
-// this code is heavily adapted from the paint license, which is in
-// the file paint.license (BSD compatible) included in this
-// distribution.  TODO, add license file to MANIFEST.in and CVS
-char Image::write_png__doc__[] =
-"write_png(fname)\n"
+char Image::set_resample__doc__[] =
+"set_resample(boolean)\n"
 "\n"
-"Write the image to filename fname as png\n"
+"Set the resample flag."
 ;
+
 Py::Object
-Image::write_png(const Py::Tuple& args)
-{
-  //small memory leak in this function - JDH 2004-06-08
-  _VERBOSE("Image::write_png");
-
+Image::set_resample(const Py::Tuple& args) {
+  _VERBOSE("Image::set_resample");
   args.verify_length(1);
-
-  FILE *fp = NULL;
-  Py::Object py_fileobj = Py::Object(args[0]);
-  if (py_fileobj.isString()) {
-    std::string fileName = Py::String(py_fileobj);
-    const char *file_name = fileName.c_str();
-    if ((fp = fopen(file_name, "wb")) == NULL)
-      throw Py::RuntimeError( Printf("Could not open file %s", file_name).str() );
-  }
-  else {
-    PyObject* write_method = PyObject_GetAttrString(py_fileobj.ptr(), "write");
-    if (!(write_method && PyCallable_Check(write_method))) {
-      Py_XDECREF(write_method);
-      throw Py::TypeError("Object does not appear to be a path or a Python file-like object");
-    }
-    Py_XDECREF(write_method);
-  }
-
-  png_structp png_ptr;
-  png_infop info_ptr;
-  struct png_color_8_struct sig_bit;
-  png_uint_32 row=0;
-
-  //todo: allocate on heap
-  png_bytep *row_pointers = NULL;
-  std::pair<agg::int8u*,bool> bufpair;
-  bufpair.first = NULL;
-  bufpair.second = false;
-
-  try {
-    row_pointers = new png_bytep[rowsOut];
-    if (!row_pointers)
-      throw Py::RuntimeError("Out of memory");
-
-    bufpair = _get_output_buffer();
-    for (row = 0; row < rowsOut; ++row)
-      row_pointers[row] = bufpair.first + row * colsOut * 4;
-
-    png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-    if (png_ptr == NULL)
-      throw Py::RuntimeError("Could not create write struct");
-
-    info_ptr = png_create_info_struct(png_ptr);
-    if (info_ptr == NULL)
-      throw Py::RuntimeError("Could not create info struct");
-
-    if (setjmp(png_ptr->jmpbuf))
-      throw Py::RuntimeError("Error building image");
-
-    if (fp) {
-      png_init_io(png_ptr, fp);
-    } else {
-      png_set_write_fn(png_ptr, (void*)py_fileobj.ptr(),
-		       &write_png_data, &flush_png_data);
-    }
-    png_set_IHDR(png_ptr, info_ptr,
-                 colsOut, rowsOut, 8,
-                 PNG_COLOR_TYPE_RGB_ALPHA, PNG_INTERLACE_NONE,
-                 PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
-
-    // this a a color image!
-    sig_bit.gray = 0;
-    sig_bit.red = 8;
-    sig_bit.green = 8;
-    sig_bit.blue = 8;
-    /* if the image has an alpha channel then */
-    sig_bit.alpha = 8;
-    png_set_sBIT(png_ptr, info_ptr, &sig_bit);
-
-    png_write_info(png_ptr, info_ptr);
-    png_write_image(png_ptr, row_pointers);
-    png_write_end(png_ptr, info_ptr);
-    png_destroy_write_struct(&png_ptr, &info_ptr);
-  } catch (...) {
-    if (bufpair.second) delete [] bufpair.first;
-    if (fp) fclose(fp);
-    png_destroy_write_struct(&png_ptr, &info_ptr);
-    delete [] row_pointers;
-    throw;
-  }
-
-  if (fp) fclose(fp);
-  delete [] row_pointers;
-  if (bufpair.second) delete [] bufpair.first;
-
+  int flag = Py::Int(args[0]);
+  resample = (bool)flag;
   return Py::Object();
 }
-
 
 
 char Image::set_aspect__doc__[] =
@@ -752,14 +677,15 @@ Image::init_type() {
   add_varargs_method( "buffer_rgba", &Image::buffer_rgba, Image::buffer_rgba__doc__);
   add_varargs_method( "get_aspect", &Image::get_aspect, Image::get_aspect__doc__);
   add_varargs_method( "get_interpolation", &Image::get_interpolation, Image::get_interpolation__doc__);
+  add_varargs_method( "get_resample", &Image::get_resample, Image::get_resample__doc__);
   add_varargs_method( "get_size", &Image::get_size, Image::get_size__doc__);
   add_varargs_method( "get_size_out", &Image::get_size_out, Image::get_size_out__doc__);
   add_varargs_method( "reset_matrix", &Image::reset_matrix, Image::reset_matrix__doc__);
   add_varargs_method( "get_matrix", &Image::get_matrix, Image::get_matrix__doc__);
   add_keyword_method( "resize", &Image::resize, Image::resize__doc__);
   add_varargs_method( "set_interpolation", &Image::set_interpolation, Image::set_interpolation__doc__);
+  add_varargs_method( "set_resample", &Image::set_resample, Image::set_resample__doc__);
   add_varargs_method( "set_aspect", &Image::set_aspect, Image::set_aspect__doc__);
-  add_varargs_method( "write_png", &Image::write_png, Image::write_png__doc__);
   add_varargs_method( "set_bg", &Image::set_bg, Image::set_bg__doc__);
   add_varargs_method( "flipud_out", &Image::flipud_out, Image::flipud_out__doc__);
   add_varargs_method( "flipud_in", &Image::flipud_in, Image::flipud_in__doc__);
@@ -813,11 +739,14 @@ _image_module::from_images(const Py::Tuple& args) {
   renderer_base rb(pixf);
 
 
+  //clear the background of the rendering buffer with alpha 1 and the
+  //gtkagg screen noise problem in figimage_demo.py goes away -- see
+  //comment backend_gtkagg.py _render_figure method JDH
+  //rb.clear(agg::rgba(1, 1, 1, 1));
+
   for (size_t imnum=0; imnum< N; imnum++) {
     tup = Py::Tuple(tups[imnum]);
     Image* thisim = static_cast<Image*>(tup[0].ptr());
-    if (imnum==0)
-      rb.clear(thisim->bg);
     ox = Py::Int(tup[1]);
     oy = Py::Int(tup[2]);
 
@@ -845,118 +774,6 @@ _image_module::from_images(const Py::Tuple& args) {
 
 
 
-}
-
-
-
-char _image_module_readpng__doc__[] =
-"readpng(fname)\n"
-"\n"
-"Load an image from png file into a numerix array of MxNx4 float";
-Py::Object
-_image_module::readpng(const Py::Tuple& args) {
-
-  args.verify_length(1);
-  std::string fname = Py::String(args[0]);
-
-  png_byte header[8];	// 8 is the maximum size that can be checked
-
-  FILE *fp = fopen(fname.c_str(), "rb");
-  if (!fp)
-    throw Py::RuntimeError(Printf("_image_module::readpng could not open PNG file %s for reading", fname.c_str()).str());
-
-  if (fread(header, 1, 8, fp) != 8)
-    throw Py::RuntimeError("_image_module::readpng: error reading PNG header");
-  if (png_sig_cmp(header, 0, 8))
-    throw Py::RuntimeError("_image_module::readpng: file not recognized as a PNG file");
-
-
-  /* initialize stuff */
-  png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-
-  if (!png_ptr)
-    throw Py::RuntimeError("_image_module::readpng:  png_create_read_struct failed");
-
-  png_infop info_ptr = png_create_info_struct(png_ptr);
-  if (!info_ptr)
-    throw Py::RuntimeError("_image_module::readpng:  png_create_info_struct failed");
-
-  if (setjmp(png_jmpbuf(png_ptr)))
-    throw Py::RuntimeError("_image_module::readpng:  error during init_io");
-
-  png_init_io(png_ptr, fp);
-  png_set_sig_bytes(png_ptr, 8);
-
-  png_read_info(png_ptr, info_ptr);
-
-  png_uint_32 width = info_ptr->width;
-  png_uint_32 height = info_ptr->height;
-
-  // convert misc color types to rgb for simplicity
-  if (info_ptr->color_type == PNG_COLOR_TYPE_GRAY ||
-      info_ptr->color_type == PNG_COLOR_TYPE_GRAY_ALPHA)
-    png_set_gray_to_rgb(png_ptr);
-  else if (info_ptr->color_type == PNG_COLOR_TYPE_PALETTE)
-    png_set_palette_to_rgb(png_ptr);
-
-
-  int bit_depth = info_ptr->bit_depth;
-  if (bit_depth == 16)  png_set_strip_16(png_ptr);
-
-
-  png_set_interlace_handling(png_ptr);
-  png_read_update_info(png_ptr, info_ptr);
-
-  bool rgba = info_ptr->color_type == PNG_COLOR_TYPE_RGBA;
-  if ( (info_ptr->color_type != PNG_COLOR_TYPE_RGB) && !rgba) {
-    std::cerr << "Found color type " << (int)info_ptr->color_type  << std::endl;
-    throw Py::RuntimeError("_image_module::readpng: cannot handle color_type");
-  }
-
-  /* read file */
-  if (setjmp(png_jmpbuf(png_ptr)))
-    throw Py::RuntimeError("_image_module::readpng: error during read_image");
-
-  png_bytep *row_pointers = new png_bytep[height];
-  png_uint_32 row;
-
-  for (row = 0; row < height; row++)
-    row_pointers[row] = new png_byte[png_get_rowbytes(png_ptr,info_ptr)];
-
-  png_read_image(png_ptr, row_pointers);
-
-
-
-  int dimensions[3];
-  dimensions[0] = height;  //numrows
-  dimensions[1] = width;   //numcols
-  dimensions[2] = 4;
-
-  PyArrayObject *A = (PyArrayObject *) PyArray_FromDims(3, dimensions, PyArray_FLOAT);
-
-
-  for (png_uint_32 y = 0; y < height; y++) {
-    png_byte* row = row_pointers[y];
-    for (png_uint_32 x = 0; x < width; x++) {
-
-      png_byte* ptr = (rgba) ? &(row[x*4]) : &(row[x*3]);
-      size_t offset = y*A->strides[0] + x*A->strides[1];
-      //if ((y<10)&&(x==10)) std::cout << "r = " << ptr[0] << " " << ptr[0]/255.0 << std::endl;
-      *(float*)(A->data + offset + 0*A->strides[2]) = (float)(ptr[0]/255.0f);
-      *(float*)(A->data + offset + 1*A->strides[2]) = (float)(ptr[1]/255.0f);
-      *(float*)(A->data + offset + 2*A->strides[2]) = (float)(ptr[2]/255.0f);
-      *(float*)(A->data + offset + 3*A->strides[2]) = rgba ? (float)(ptr[3]/255.0f) : 1.0f;
-    }
-  }
-
-  //free the png memory
-  png_read_end(png_ptr, info_ptr);
-  png_destroy_read_struct(&png_ptr, &info_ptr, png_infopp_NULL);
-  fclose(fp);
-  for (row = 0; row < height; row++)
-    delete [] row_pointers[row];
-  delete [] row_pointers;
-  return Py::asObject((PyObject*)A);
 }
 
 

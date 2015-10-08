@@ -48,7 +48,7 @@ commands with the same names.
    * rec2txt          : pretty print a record array
    * rec2csv          : store record array in CSV file
    * csv2rec          : import record array from CSV file with type inspection
-   * rec_append_field : add a field/array to record array
+   * rec_append_fields: adds  field(s)/array(s) to record array
    * rec_drop_fields  : drop fields from record array
    * rec_join         : join two record arrays on sequence of fields
    * rec_groupby      : summarize data by groups (similar to SQL GROUP BY)
@@ -88,8 +88,8 @@ import csv, warnings, copy, os
 import numpy as np
 
 
-from matplotlib import nxutils
-from matplotlib import cbook
+import matplotlib.nxutils as nxutils
+import matplotlib.cbook as cbook
 
 # set is a new builtin function in 2.4; delete the following when
 # support for 2.3 is dropped.
@@ -716,7 +716,7 @@ def hist(y, bins=10, normed=0):
 def normpdf(x, *args):
     "Return the normal pdf evaluated at x; args provides mu, sigma"
     mu, sigma = args
-    return 1/(np.sqrt(2*np.pi)*sigma)*np.exp(-0.5 * (1/sigma*(x - mu))**2)
+    return 1./(np.sqrt(2*np.pi)*sigma)*np.exp(-0.5 * (1./sigma*(x - mu))**2)
 
 
 def levypdf(x, gamma, alpha):
@@ -1200,7 +1200,7 @@ def save(fname, X, fmt='%.18e',delimiter=' '):
 
 
 def load(fname,comments='#',delimiter=None, converters=None,skiprows=0,
-         usecols=None, unpack=False):
+         usecols=None, unpack=False, dtype=np.float_):
     """
     Load ASCII data from fname into an array and return the array.
 
@@ -1230,20 +1230,23 @@ def load(fname,comments='#',delimiter=None, converters=None,skiprows=0,
     a separator.
 
     converters, if not None, is a dictionary mapping column number to
-    a function that will convert that column to a float.  Eg, if
-    column 0 is a date string: converters={0:datestr2num}
+    a function that will convert that column to a float (or the optional
+    dtype if specified).  Eg, if column 0 is a date string:
+    converters={0:datestr2num}
 
     skiprows is the number of rows from the top to skip
 
     usecols, if not None, is a sequence of integer column indexes to
-    extract where 0 is the first column, eg usecols=(1,4,5) to extract
+    extract where 0 is the first column, eg usecols=[1,4,5] to extract
     just the 2nd, 5th and 6th columns
 
     unpack, if True, will transpose the matrix allowing you to unpack
     into named arguments on the left hand side
 
         t,y = load('test.dat', unpack=True) # for  two column data
-        x,y,z = load('somefile.dat', usecols=(3,5,7), unpack=True)
+        x,y,z = load('somefile.dat', usecols=[3,5,7], unpack=True)
+
+    dtype, the array will have this dtype.  default: numpy.float_
 
     See examples/load_demo.py which exeercises many of these options.
     """
@@ -1270,7 +1273,7 @@ def load(fname,comments='#',delimiter=None, converters=None,skiprows=0,
             converterseq = [converters.get(j,float)
                                for j,val in enumerate(splitfunc(line))]
         if usecols is not None:
-            vals = line.split(delimiter)
+            vals = splitfunc(line)
             row = [converterseq[j](vals[j]) for j in usecols]
         else:
             row = [converterseq[j](val)
@@ -1278,7 +1281,7 @@ def load(fname,comments='#',delimiter=None, converters=None,skiprows=0,
         thisLen = len(row)
         X.append(row)
 
-    X = np.array(X, np.float_)
+    X = np.array(X, dtype)
     r,c = X.shape
     if r==1 or c==1:
         X.shape = max(r,c),
@@ -1952,7 +1955,10 @@ def safe_isinf(x):
     else: return b
 
 def rec_append_field(rec, name, arr, dtype=None):
-    'return a new record array with field name populated with data from array arr'
+    """
+    return a new record array with field name populated with data from array arr.
+    This function is Depreacted. Please use rec_append_fields.
+    """
     warnings.warn("use rec_append_fields", DeprecationWarning)
     return rec_append_fields(rec, name, arr, dtype)
 

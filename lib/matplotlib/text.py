@@ -42,35 +42,38 @@ def get_rotation(rotation):
 # class is build so we define an initial set here for the init
 # function and they will be overridden after object defn
 artist.kwdocd['Text'] =  """\
-    alpha: float
-    animated: [True | False]
-    backgroundcolor: any matplotlib color
-    bbox: rectangle prop dict plus key 'pad' which is a pad in points
-    clip_box: a matplotlib.transform.Bbox instance
-    clip_on: [True | False]
-    color: any matplotlib color
-    family: [ 'serif' | 'sans-serif' | 'cursive' | 'fantasy' | 'monospace' ]
-    figure: a matplotlib.figure.Figure instance
-    fontproperties: a matplotlib.font_manager.FontProperties instance
-    horizontalalignment or ha: [ 'center' | 'right' | 'left' ]
-    label: any string
-    linespacing: float
-    lod: [True | False]
-    multialignment: ['left' | 'right' | 'center' ]
-    name or fontname: string eg, ['Sans' | 'Courier' | 'Helvetica' ...]
-    position: (x,y)
-    rotation: [ angle in degrees 'vertical' | 'horizontal'
-    size or fontsize: [ size in points | relative size eg 'smaller', 'x-large' ]
-    style or fontstyle: [ 'normal' | 'italic' | 'oblique']
-    text: string
-    transform: a matplotlib.transform transformation instance
-    variant: [ 'normal' | 'small-caps' ]
-    verticalalignment or va: [ 'center' | 'top' | 'bottom' | 'baseline' ]
-    visible: [True | False]
-    weight or fontweight: [ 'normal' | 'bold' | 'heavy' | 'light' | 'ultrabold' | 'ultralight']
-    x: float
-    y: float
-    zorder: any number
+    ========================== =========================================================================
+    alpha                      float
+    ========================== =========================================================================
+    animated                   [True | False]
+    backgroundcolor            any matplotlib color
+    bbox                       rectangle prop dict plus key 'pad' which is a pad in points
+    clip_box                   a matplotlib.transform.Bbox instance
+    clip_on                    [True | False]
+    color                      any matplotlib color
+    family                     [ 'serif' | 'sans-serif' | 'cursive' | 'fantasy' | 'monospace' ]
+    figure                     a matplotlib.figure.Figure instance
+    fontproperties             a matplotlib.font_manager.FontProperties instance
+    horizontalalignment or ha  [ 'center' | 'right' | 'left' ]
+    label                      any string
+    linespacing                float
+    lod                        [True | False]
+    multialignment             ['left' | 'right' | 'center' ]
+    name or fontname           string eg, ['Sans' | 'Courier' | 'Helvetica' ...]
+    position                   (x,y)
+    rotation                   [ angle in degrees 'vertical' | 'horizontal'
+    size or fontsize           [ size in points | relative size eg 'smaller', 'x-large' ]
+    style or fontstyle         [ 'normal' | 'italic' | 'oblique']
+    text                       string
+    transform                  a matplotlib.transform transformation instance
+    variant                    [ 'normal' | 'small-caps' ]
+    verticalalignment or va    [ 'center' | 'top' | 'bottom' | 'baseline' ]
+    visible                    [True | False]
+    weight or fontweight       [ 'normal' | 'bold' | 'heavy' | 'light' | 'ultrabold' | 'ultralight']
+    x                          float
+    y                          float
+    zorder                     any number
+    ========================== =========================================================================
     """
 
 class Text(Artist):
@@ -94,7 +97,8 @@ class Text(Artist):
                  **kwargs
                  ):
         """
-        Create a Text instance at x,y with string text.
+        Create a :class:`~matplotlib.text.Text` instance at *x*, *y*
+        with string *text*.
 
         Valid kwargs are
         %(Text)s
@@ -246,7 +250,7 @@ class Text(Artist):
 
         if valign=='center': offsety = (ymin + height/2.0)
         elif valign=='top': offsety  = (ymin + height)
-        elif valign=='baseline': offsety = (ymin + height) + baseline
+        elif valign=='baseline': offsety = (ymin + height) - baseline
         else: offsety = ymin
 
         xmin -= offsetx
@@ -391,7 +395,7 @@ class Text(Artist):
         return (x, y, self._text, self._color,
                 self._verticalalignment, self._horizontalalignment,
                 hash(self._fontproperties), self._rotation,
-                self._renderer.dpi
+                self._renderer.dpi, id(self._renderer)
                 )
 
     def get_text(self):
@@ -645,50 +649,51 @@ artist.kwdocd['Text'] = artist.kwdoc(Text)
 
 class TextWithDash(Text):
     """
-    This is basically a Text with a dash (drawn with a Line2D)
-    before/after it. It is intended to be a drop-in replacement
-    for Text, and should behave identically to Text when
-    dashlength=0.0.
+    This is basically a :class:`~matplotlib.text.Text` with a dash
+    (drawn with a :class:`~matplotlib.lines.Line2D`) before/after
+    it. It is intended to be a drop-in replacement for
+    :class:`~matplotlib.text.Text`, and should behave identically to
+    it when *dashlength* = 0.0.
 
     The dash always comes between the point specified by
-    set_position() and the text. When a dash exists, the
-    text alignment arguments (horizontalalignment,
-    verticalalignment) are ignored.
+    :meth:`~matplotlib.text.Text.set_position` and the text. When a
+    dash exists, the text alignment arguments (*horizontalalignment*,
+    *verticalalignment*) are ignored.
 
-    dashlength is the length of the dash in canvas units.
-    (default=0.0).
+    *dashlength* is the length of the dash in canvas units.
+    (default = 0.0).
 
-    dashdirection is one of 0 or 1, np.where 0 draws the dash
-    after the text and 1 before.
-    (default=0).
+    *dashdirection* is one of 0 or 1, where 0 draws the dash after the
+    text and 1 before.  (default = 0).
 
-    dashrotation specifies the rotation of the dash, and
-    should generally stay None. In this case
-    self.get_dashrotation() returns self.get_rotation().
-    (I.e., the dash takes its rotation from the text's
-    rotation). Because the text center is projected onto
-    the dash, major deviations in the rotation cause
+    *dashrotation* specifies the rotation of the dash, and should
+    generally stay *None*. In this case
+    :meth:`~matplotlib.text.TextWithDash.get_dashrotation` returns
+    :meth:`~matplotlib.text.Text.get_rotation`.  (I.e., the dash takes
+    its rotation from the text's rotation). Because the text center is
+    projected onto the dash, major deviations in the rotation cause
     what may be considered visually unappealing results.
-    (default=None).
+    (default = *None*)
 
-    dashpad is a padding length to add (or subtract) space
+    *dashpad* is a padding length to add (or subtract) space
     between the text and the dash, in canvas units.
-    (default=3).
+    (default = 3)
 
-    dashpush "pushes" the dash and text away from the point
-    specified by set_position() by the amount in canvas units.
-    (default=0)
+    *dashpush* "pushes" the dash and text away from the point
+    specified by :meth:`~matplotlib.text.Text.set_position` by the
+    amount in canvas units.  (default = 0)
 
-    NOTE: The alignment of the two objects is based on the
-    bbox of the Text, as obtained by get_window_extent().
-    This, in turn, appears to depend on the font metrics
-    as given by the rendering backend. Hence the quality
-    of the "centering" of the label text with respect to
-    the dash varies depending on the backend used.
+    *NOTE*: The alignment of the two objects is based on the bounding
+    box of the :class:`~matplotlib.text.Text`, as obtained by
+    :meth:`~matplotlib.artist.Artist.get_window_extent`.  This, in
+    turn, appears to depend on the font metrics as given by the
+    rendering backend. Hence the quality of the "centering" of the
+    label text with respect to the dash varies depending on the
+    backend used.
 
-    NOTE2: I'm not sure that I got the get_window_extent()
-    right, or whether that's sufficient for providing the
-    object bbox.
+    *NOTE 2*: I'm not sure that I got the
+    :meth:`~matplotlib.text.TextWithDash.get_window_extent` right, or
+    whether that's sufficient for providing the object bounding box.
     """
     __name__ = 'textwithdash'
 
@@ -746,11 +751,11 @@ class TextWithDash(Text):
 
     def get_prop_tup(self):
         """
-        Return a hashable tuple of properties
+        Return a hashable tuple of properties.
 
         Not intended to be human readable, but useful for backends who
         want to cache derived information about text (eg layouts) and
-        need to know if the text has changed
+        need to know if the text has changed.
         """
         props = [p for p in Text.get_prop_tup(self)]
         props.extend([self._x, self._y, self._dashlength, self._dashdirection, self._dashrotation, self._dashpad, self._dashpush])
@@ -970,8 +975,10 @@ artist.kwdocd['TextWithDash'] = artist.kwdoc(TextWithDash)
 
 class Annotation(Text):
     """
-    A Text class to make annotating things in the figure: Figure,
-    Axes, Point, Rectangle, etc... easier
+    A :class:`~matplotlib.text.Text` class to make annotating things
+    in the figure, such as :class:`~matplotlib.figure.Figure`,
+    :class:`~matplotlib.axes.Axes`,
+    :class:`~matplotlib.patches.Rectangle`, etc., easier.
     """
     def __str__(self):
         return "Annotation(%g,%g,%s)"%(self.xy[0],self.xy[1],self._text)
@@ -982,12 +989,12 @@ class Annotation(Text):
                  arrowprops=None,
                  **kwargs):
         """
-        Annotate the x,y point xy with text s at x,y location xytext
-        (xytext if None defaults to xy and textcoords if None defaults
-        to xycoords).
+        Annotate the *x*, *y* point *xy* with text *s* at *x*, *y*
+        location *xytext*.  (If *xytext* = *None*, defaults to *xy*,
+        and if *textcoords* = *None*, defaults to *xycoords*).
 
-        arrowprops, if not None, is a dictionary of line properties
-        (see matplotlib.lines.Line2D) for the arrow that connects
+        *arrowprops*, if not *None*, is a dictionary of line properties
+        (see :class:`matplotlib.lines.Line2D`) for the arrow that connects
         annotation to the point.   Valid keys are
 
         =========   ===========================================================
@@ -996,17 +1003,17 @@ class Annotation(Text):
         width       the width of the arrow in points
         frac        the fraction of the arrow length occupied by the head
         headwidth   the width of the base of the arrow head in points
-        shrink      often times it is convenient to have the arrowtip
+        shrink      oftentimes it is convenient to have the arrowtip
                     and base a bit away from the text and point being
-                    annotated.  If d is the distance between the text and
+                    annotated.  If *d* is the distance between the text and
                     annotated point, shrink will shorten the arrow so the tip
-                    and base are shink percent of the distance d away from the
-                    endpoints.  ie, shrink=0.05 is 5%%
-        ?           any key for matplotlib.patches.polygon
+                    and base are shink percent of the distance *d* away from the
+                    endpoints.  ie, ``shrink=0.05 is 5%%``
+        ?           any key for :class:`matplotlib.patches.polygon`
         =========   ===========================================================
 
-        xycoords and textcoords are strings that indicate the
-        coordinates of xy and xytext.
+        *xycoords* and *textcoords* are strings that indicate the
+        coordinates of *xy* and *xytext*.
 
         =================   ===================================================
              Property                           Description
@@ -1019,18 +1026,19 @@ class Annotation(Text):
         'axes fraction'     0,1 is lower left of axes and 1,1 is upper right
         'data'              use the coordinate system of the object being
                             annotated (default)
-        'offset points'     Specify an offset (in points) from the xy value
-        'polar'             you can specify theta, r for the annotation, even
-                            in cartesian plots.  Note that if you
+        'offset points'     Specify an offset (in points) from the *xy* value
+
+        'polar'             you can specify *theta*, *r* for the annotation,
+                            even in cartesian plots.  Note that if you
                             are using a polar axes, you do not need
                             to specify polar for the coordinate
-                            system since that is the native"data" coordinate
+                            system since that is the native "data" coordinate
                             system.
         =================   ===================================================
 
-        If a points or pixels option is specified, values will be
-        added to the left, bottom and if negative, values will be
-        subtracted from the top, right.  Eg::
+        If a 'points' or 'pixels' option is specified, values will be
+        added to the bottom-left and if negative, values will be
+        subtracted from the top-right.  Eg::
 
           # 10 points to the right of the left border of the axes and
           # 5 points below the top border

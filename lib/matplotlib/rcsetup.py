@@ -1,16 +1,35 @@
 """
-This file contains the default values and the validation code for the options.
+The rcsetup module contains the default values and the validation code for
+customization using matplotlib's rc settings.
 
-The code for parsing the matplotlibrc file and setting the values of rcParams
-uses the values from this file to set default values.
+Each rc setting is assigned a default value and a function used to validate any
+attempted changes to that setting. The default values and validation functions
+are defined in the rcsetup module, and are used to construct the rcParams global
+object which stores the settings and is referenced throughout matplotlib.
 
-Ultimately, the setup code should also use these values to write a default
-matplotlibrc file that actually reflects the values given here.
+These default values should be consistent with the default matplotlibrc file
+that actually reflects the values given here. Any additions or deletions to the
+parameter set listed here should also be visited to the
+:file:`matplotlibrc.template` in matplotlib's root source directory.
 """
 
 import os
 from matplotlib.fontconfig_pattern import parse_fontconfig_pattern
 from matplotlib.colors import is_color_like
+
+#interactive_bk = ['gtk', 'gtkagg', 'gtkcairo', 'fltkagg', 'qtagg', 'qt4agg',
+#                  'tkagg', 'wx', 'wxagg', 'cocoaagg']
+# The capitalized forms are needed for ipython at present; this may
+# change for later versions.
+
+interactive_bk = ['GTK', 'GTKAgg', 'GTKCairo', 'FltkAgg', 'QtAgg', 'Qt4Agg',
+                  'TkAgg', 'WX', 'WXAgg', 'CocoaAgg']
+
+
+non_interactive_bk = ['agg', 'cairo', 'emf', 'gdk',
+                      'pdf', 'ps', 'svg', 'template']
+all_backends = interactive_bk + non_interactive_bk
+
 
 class ValidateInStrings:
     def __init__(self, key, valid, ignorecase=False):
@@ -43,6 +62,16 @@ def validate_bool(b):
     else:
         raise ValueError('Could not convert "%s" to boolean' % b)
 
+def validate_bool_maybe_none(b):
+    'Convert b to a boolean or raise'
+    if type(b) is str:
+        b = b.lower()
+    if b=='none': return None
+    if b in ('t', 'y', 'yes', 'on', 'true', '1', 1, True): return True
+    elif b in ('f', 'n', 'no', 'off', 'false', '0', 0, False): return False
+    else:
+        raise ValueError('Could not convert "%s" to boolean' % b)
+
 def validate_float(s):
     'convert s to float or raise'
     try: return float(s)
@@ -70,11 +99,7 @@ def validate_fonttype(s):
             raise ValueError('Supported Postscript/PDF font types are %s' % fonttypes.values())
         return fonttype
 
-validate_backend = ValidateInStrings('backend',[
-    'Agg2', 'Agg', 'Aqt', 'Cairo', 'CocoaAgg', 'EMF', 'GD', 'GDK',
-    'GTK', 'GTKAgg', 'GTKCairo', 'FltkAgg', 'Paint', 'Pdf', 'PS',
-    'QtAgg', 'Qt4Agg', 'SVG', 'Template', 'TkAgg', 'WX', 'WXAgg',
-    ], ignorecase=True)
+validate_backend = ValidateInStrings('backend', all_backends, ignorecase=True)
 
 validate_numerix = ValidateInStrings('numerix',[
     'Numeric','numarray','numpy',
@@ -338,7 +363,7 @@ defaultParams = {
     'text.usetex'         : [False, validate_bool],
     'text.latex.unicode'  : [False, validate_bool],
     'text.latex.preamble' : [[''], validate_stringlist],
-    'text.dvipnghack'     : [False, validate_bool],
+    'text.dvipnghack'     : [None, validate_bool_maybe_none],
     'text.fontstyle'      : ['normal', str],
     'text.fontangle'      : ['normal', str],
     'text.fontvariant'    : ['normal', str],
@@ -359,6 +384,7 @@ defaultParams = {
     'image.cmap'          : ['jet', str],        # one of gray, jet, etc
     'image.lut'           : [256, validate_int],  # lookup table
     'image.origin'        : ['upper', str],  # lookup table
+    'image.resample'      : [False, validate_bool],
 
     'contour.negative_linestyle' : ['dashed', validate_negative_linestyle_legacy],
 
@@ -368,9 +394,9 @@ defaultParams = {
     'axes.facecolor'        : ['w', validate_color],    # background color; white
     'axes.edgecolor'        : ['k', validate_color],    # edge color; black
     'axes.linewidth'        : [1.0, validate_float],    # edge linewidth
-    'axes.titlesize'        : [14, validate_fontsize], # fontsize of the axes title
+    'axes.titlesize'        : ['large', validate_fontsize], # fontsize of the axes title
     'axes.grid'             : [False, validate_bool],   # display grid or not
-    'axes.labelsize'        : [12, validate_fontsize], # fontsize of the x any y labels
+    'axes.labelsize'        : ['medium', validate_fontsize], # fontsize of the x any y labels
     'axes.labelcolor'       : ['k', validate_color],    # color of axis label
     'axes.formatter.limits' : [[-7, 7], validate_nseq_int(2)],
                                # use scientific notation if log10
@@ -383,7 +409,7 @@ defaultParams = {
     'legend.loc'         : ['upper right',validate_legend_loc], # at some point, this should be changed to 'best'
     'legend.isaxes'      : [True,validate_bool],  # this option is internally ignored - it never served any useful purpose
     'legend.numpoints'   : [2, validate_int],     # the number of points in the legend line
-    'legend.fontsize'    : [14, validate_fontsize],
+    'legend.fontsize'    : ['large', validate_fontsize],
     'legend.pad'         : [0.2, validate_float], # the fractional whitespace inside the legend border
     'legend.markerscale' : [1.0, validate_float], # the relative size of legend markers vs. original
 
@@ -401,7 +427,7 @@ defaultParams = {
     'xtick.major.pad'  : [4, validate_float],      # distance to label in points
     'xtick.minor.pad'  : [4, validate_float],      # distance to label in points
     'xtick.color'      : ['k', validate_color],    # color of the xtick labels
-    'xtick.labelsize'  : [12, validate_fontsize], # fontsize of the xtick labels
+    'xtick.labelsize'  : ['medium', validate_fontsize], # fontsize of the xtick labels
     'xtick.direction'  : ['in', str],            # direction of xticks
 
     'ytick.major.size' : [4, validate_float],      # major ytick size in points
@@ -409,7 +435,7 @@ defaultParams = {
     'ytick.major.pad'  : [4, validate_float],      # distance to label in points
     'ytick.minor.pad'  : [4, validate_float],      # distance to label in points
     'ytick.color'      : ['k', validate_color],    # color of the ytick labels
-    'ytick.labelsize'  : [12, validate_fontsize], # fontsize of the ytick labels
+    'ytick.labelsize'  : ['medium', validate_fontsize], # fontsize of the ytick labels
     'ytick.direction'  : ['in', str],            # direction of yticks
 
     'grid.color'       : ['k', validate_color],       # grid color
@@ -430,8 +456,6 @@ defaultParams = {
     'figure.subplot.top'    : [0.9, ValidateInterval(0, 1, closedmin=True, closedmax=True)],
     'figure.subplot.wspace' : [0.2, ValidateInterval(0, 1, closedmin=True, closedmax=False)],
     'figure.subplot.hspace' : [0.2, ValidateInterval(0, 1, closedmin=True, closedmax=False)],
-
-    'figure.autolayout'   : [False, validate_bool],
 
     'savefig.dpi'         : [100, validate_float],   # DPI
     'savefig.facecolor'   : ['w', validate_color],  # facecolor; white

@@ -180,7 +180,7 @@ import unicodedata
 from warnings import warn
 
 from numpy import inf, isinf
-
+import numpy as np
 from matplotlib.pyparsing import Combine, Group, Optional, Forward, \
     Literal, OneOrMore, ZeroOrMore, ParseException, Empty, \
     ParseResults, Suppress, oneOf, StringEnd, ParseFatalException, \
@@ -197,6 +197,10 @@ from matplotlib._mathtext_data import latex_to_bakoma, \
         latex_to_standard, tex2uni, latex_to_cmex, stix_virtual_fonts
 from matplotlib import get_data_path, rcParams
 
+
+
+import matplotlib.colors as mcolors
+import matplotlib._png as _png
 ####################
 
 
@@ -337,7 +341,7 @@ def MathtextBackendAgg():
 
 class MathtextBackendBitmapRender(MathtextBackendAggRender):
     def get_results(self, box):
-        return self.image
+        return self.image, self.depth
 
 def MathtextBackendBitmap():
     return MathtextBackendBbox(MathtextBackendBitmapRender())
@@ -522,7 +526,7 @@ class Fonts(object):
         realpath, stat_key = get_realpath_and_stat(info.font.fname)
         used_characters = self.used_characters.setdefault(
             stat_key, (realpath, Set()))
-        used_characters[1].update(unichr(info.num))
+        used_characters[1].add(info.num)
         self.mathtext_backend.render_glyph(ox, oy, info)
 
     def render_rect_filled(self, x1, y1, x2, y2):
@@ -655,8 +659,9 @@ class TruetypeFonts(Fonts):
         return xHeight
 
     def get_underline_thickness(self, font, fontsize, dpi):
-        cached_font = self._get_font(font)
-        return cached_font.font.underline_thickness / 64.0 / fontsize * (10.0 * dpi / 100.0)
+        # This function used to grab underline thickness from the font,
+        # but that information is just too un-reliable, so it is now hardcoded.
+        return ((0.75 / 12.0) * fontsize * dpi) / 72.0
 
     def get_kern(self, font1, fontclass1, sym1, fontsize1,
                  font2, fontclass2, sym2, fontsize2, dpi):
@@ -682,12 +687,15 @@ class BakomaFonts(TruetypeFonts):
     fontmap = {}
 
     def __init__(self, *args, **kwargs):
+        self._stix_fallback = StixFonts(*args, **kwargs)
+
         TruetypeFonts.__init__(self, *args, **kwargs)
         if not len(self.fontmap):
             for key, val in self._fontmap.iteritems():
                 fullpath = findfont(val)
                 self.fontmap[key] = fullpath
                 self.fontmap[val] = fullpath
+
 
     _slanted_symbols = Set(r"\int \oint".split())
 
@@ -717,14 +725,8 @@ class BakomaFonts(TruetypeFonts):
                         cached_font.charmap[num])
 
         if symbol_name is None:
-            warn("Unrecognized symbol '%s'. Substituting with a dummy symbol."
-                 % sym.encode('ascii', 'backslashreplace'), MathTextWarning)
-            fontname = 'it'
-            cached_font = self._get_font(fontname)
-            num = 0x3F # currency character, for lack of anything better
-            gid = cached_font.charmap[num]
-            symbol_name = cached_font.font.get_glyph_name(gid)
-            slanted = False
+            return self._stix_fallback._get_glyph(
+                fontname, font_class, sym, fontsize)
 
         return cached_font, num, symbol_name, fontsize, slanted
 
@@ -840,10 +842,11 @@ class UnicodeFonts(TruetypeFonts):
             new_fontname = fontname
 
             if fontname == 'it':
-                unistring = unichr(uniindex)
-                if (not unicodedata.category(unistring)[0] == "L"
-                    or unicodedata.name(unistring).startswith("GREEK CAPITAL")):
-                    new_fontname = 'rm'
+                if uniindex < 0x10000:
+                    unistring = unichr(uniindex)
+                    if (not unicodedata.category(unistring)[0] == "L"
+                        or unicodedata.name(unistring).startswith("GREEK CAPITAL")):
+                        new_fontname = 'rm'
 
             slanted = (new_fontname == 'it') or sym in self._slanted_symbols
             found_symbol = False
@@ -856,10 +859,7 @@ class UnicodeFonts(TruetypeFonts):
                     glyphindex = cached_font.charmap[uniindex]
                     found_symbol = True
                 except KeyError:
-                    warn("Font '%s' does not have a glyph for '%s'" %
-                         (cached_font.font.postscript_name,
-                          sym.encode('ascii', 'backslashreplace')),
-                         MathTextWarning)
+                    pass
 
         if not found_symbol:
             if self.cm_fallback:
@@ -868,6 +868,12 @@ class UnicodeFonts(TruetypeFonts):
                 return self.cm_fallback._get_glyph(
                     fontname, 'it', sym, fontsize)
             else:
+                if fontname == 'it' and isinstance(self, StixFonts):
+                    return self._get_glyph('rm', font_class, sym, fontsize)
+                warn("Font '%s' does not have a glyph for '%s'" %
+                     (cached_font.font.postscript_name,
+                      sym.encode('ascii', 'backslashreplace')),
+                     MathTextWarning)
                 warn("Substituting with a dummy symbol.", MathTextWarning)
                 fontname = 'rm'
                 new_fontname = fontname
@@ -890,18 +896,18 @@ class StixFonts(UnicodeFonts):
     A font handling class for the STIX fonts
     """
     _fontmap = { 'rm'  : 'STIXGeneral',
-                 'it'  : 'STIXGeneralItalic',
-                 'bf'  : 'STIXGeneralBol',
-                 'nonunirm' : 'STIXNonUni',
-                 'nonuniit' : 'STIXNonUniIta',
-                 'nonunibf' : 'STIXNonUniBol',
+                 'it'  : 'STIXGeneral:italic',
+                 'bf'  : 'STIXGeneral:weight=bold',
+                 'nonunirm' : 'STIXNonUnicode',
+                 'nonuniit' : 'STIXNonUnicode:italic',
+                 'nonunibf' : 'STIXNonUnicode:weight=bold',
 
                  0 : 'STIXGeneral',
-                 1 : 'STIXSiz1Sym',
-                 2 : 'STIXSiz2Sym',
-                 3 : 'STIXSiz3Sym',
-                 4 : 'STIXSiz4Sym',
-                 5 : 'STIXSiz5Sym'
+                 1 : 'STIXSize1',
+                 2 : 'STIXSize2',
+                 3 : 'STIXSize3',
+                 4 : 'STIXSize4',
+                 5 : 'STIXSize5'
                  }
     fontmap = {}
     use_cmex = False
@@ -2024,14 +2030,15 @@ class Parser(object):
 
         lbrace       = Literal('{').suppress()
         rbrace       = Literal('}').suppress()
-        start_group  = (Optional(latexfont) + lbrace)
+        start_group  = (Optional(latexfont) - lbrace)
         start_group.setParseAction(self.start_group)
         end_group    = rbrace.copy()
         end_group.setParseAction(self.end_group)
 
         bslash       = Literal('\\')
 
-        accent       = oneOf(self._accent_map.keys() + list(self._wide_accents))
+        accent       = oneOf(self._accent_map.keys() +
+                             list(self._wide_accents))
 
         function     = oneOf(list(self._function_names))
 
@@ -2049,18 +2056,18 @@ class Parser(object):
                       ).setParseAction(self.space).setName('space')
 
         customspace  =(Literal(r'\hspace')
-                     + (( lbrace
-                        + float
-                        + rbrace
+                     - (( lbrace
+                        - float
+                        - rbrace
                        ) | Error(r"Expected \hspace{n}"))
                      ).setParseAction(self.customspace).setName('customspace')
 
         unicode_range = u"\U00000080-\U0001ffff"
         symbol       =(Regex(UR"([a-zA-Z0-9 +\-*/<>=:,.;!'@()\[\]|%s])|(\\[%%${}\[\]_|])" % unicode_range)
-                     | Combine(
+                     | (Combine(
                          bslash
                        + oneOf(tex2uni.keys())
-                       )
+                       ) + FollowedBy(Regex("[^a-zA-Z]")))
                      ).setParseAction(self.symbol).leaveWhitespace()
 
         c_over_c     =(Suppress(bslash)
@@ -2070,7 +2077,7 @@ class Parser(object):
         accent       = Group(
                          Suppress(bslash)
                        + accent
-                       + placeable
+                       - placeable
                      ).setParseAction(self.accent).setName("accent")
 
         function     =(Suppress(bslash)
@@ -2082,7 +2089,7 @@ class Parser(object):
                        + ZeroOrMore(
                            autoDelim
                          | simple)
-                       + end_group
+                       - end_group
                      ).setParseAction(self.group).setName("group")
 
         font        <<(Suppress(bslash)
@@ -2101,8 +2108,8 @@ class Parser(object):
                        Suppress(Literal(r"\sqrt"))
                      + Optional(
                          Suppress(Literal("["))
-                       + Regex("[0-9]+")
-                       + Suppress(Literal("]")),
+                       - Regex("[0-9]+")
+                       - Suppress(Literal("]")),
                          default = None
                        )
                      + (group | Error("Expected \sqrt{value}"))
@@ -2114,7 +2121,7 @@ class Parser(object):
                      ^ group
                      ^ frac
                      ^ sqrt
-                     ) | Error("Expected symbol or group")
+                     )
 
         simple      <<(space
                      | customspace
@@ -2128,7 +2135,7 @@ class Parser(object):
                          ( Optional(placeable)
                          + OneOrMore(
                              subsuperop
-                           + placeable
+                           - placeable
                            )
                          )
                        | placeable
@@ -2160,7 +2167,7 @@ class Parser(object):
             non_math
           + ZeroOrMore(
                 Suppress(math_delim)
-              + math
+              + Optional(math)
               + (Suppress(math_delim)
                  | Error("Expected end of math '$'"))
               + non_math
@@ -2486,14 +2493,14 @@ class Parser(object):
             if super is not None:
                 hlist = HCentered([super])
                 hlist.hpack(width, 'exactly')
-                vlist.extend([hlist, Kern(rule_thickness * 2.0)])
+                vlist.extend([hlist, Kern(rule_thickness * 3.0)])
             hlist = HCentered([nucleus])
             hlist.hpack(width, 'exactly')
             vlist.append(hlist)
             if sub is not None:
                 hlist = HCentered([sub])
                 hlist.hpack(width, 'exactly')
-                vlist.extend([Kern(rule_thickness * 2.0), hlist])
+                vlist.extend([Kern(rule_thickness * 3.0), hlist])
                 shift = hlist.height + hlist.depth + rule_thickness * 2.0
             vlist = Vlist(vlist)
             vlist.shift_amount = shift + nucleus.depth * 0.5
@@ -2716,3 +2723,112 @@ class MathTextParser(object):
         font_output.mathtext_backend = None
 
         return result
+
+    def to_mask(self, texstr, dpi=120, fontsize=14):
+        """
+        Returns a tuple (*array*, *depth*)
+
+          - *array* is an NxM uint8 alpha ubyte mask array of
+            rasterized tex.
+
+          - depth is the offset of the baseline from the bottom of the
+            image in pixels.
+
+        ''texstr''
+            A valid mathtext string, eg r'IQ: $\sigma_i=15$'
+
+        ''dpi''
+            The dots-per-inch to render the text
+
+        ''fontsize''
+            The font size in points
+        """
+        assert(self._output=="bitmap")
+        prop = FontProperties(size=fontsize)
+        ftimage, depth = self.parse(texstr, dpi=dpi, prop=prop)
+
+        x = ftimage.as_array()
+        return x, depth
+
+    def to_rgba(self, texstr, color='black', dpi=120, fontsize=14):
+        """
+        Returns a tuple (*array*, *depth*)
+
+          - *array* is an NxMx4 RGBA array of ubyte rasterized tex.
+
+          - depth is the offset of the baseline from the bottom of the
+            image in pixels.
+
+        Returns a tuple (array, depth), where depth is the offset of
+        the baseline from the bottom of the image.
+
+        ''texstr''
+            A valid mathtext string, eg r'IQ: $\sigma_i=15$'
+
+        ''color''
+            A valid matplotlib color argument
+
+        ''dpi''
+            The dots-per-inch to render the text
+
+        ''fontsize''
+            The font size in points
+        """
+        x, depth = self.to_mask(texstr, dpi=dpi, fontsize=fontsize)
+
+        r, g, b = mcolors.colorConverter.to_rgb(color)
+        RGBA = np.zeros((x.shape[0], x.shape[1], 4), dtype=np.uint8)
+        RGBA[:,:,0] = int(255*r)
+        RGBA[:,:,1] = int(255*g)
+        RGBA[:,:,2] = int(255*b)
+        RGBA[:,:,3] = x
+        return RGBA, depth
+
+    def to_png(self, filename, texstr, color='black', dpi=120, fontsize=14):
+        """
+        Writes a tex expression to a PNG file.
+
+        Returns the offset of the baseline from the bottom of the
+        image in pixels.
+
+        ''filename''
+            A writable filename or fileobject
+
+        ''texstr''
+            A valid mathtext string, eg r'IQ: $\sigma_i=15$'
+
+        ''color''
+            A valid matplotlib color argument
+
+        ''dpi''
+            The dots-per-inch to render the text
+
+        ''fontsize''
+            The font size in points
+
+            """
+
+        rgba, depth = self.to_rgba(texstr, color=color, dpi=dpi, fontsize=fontsize)
+        numrows, numcols, tmp = rgba.shape
+        _png.write_png(rgba.tostring(), numcols, numrows, filename)
+        return depth
+
+    def get_depth(self, texstr, dpi=120, fontsize=14):
+        """
+        Returns the offset of the baseline from the bottom of the
+        image in pixels.
+
+        ''texstr''
+            A valid mathtext string, eg r'IQ: $\sigma_i=15$'
+
+        ''dpi''
+            The dots-per-inch to render the text
+
+        ''fontsize''
+            The font size in points
+
+            """
+        assert(self._output=="bitmap")
+        prop = FontProperties(size=fontsize)
+        ftimage, depth = self.parse(texstr, dpi=dpi, prop=prop)
+        return depth
