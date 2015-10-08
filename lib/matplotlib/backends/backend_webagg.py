@@ -17,10 +17,10 @@ import six
 
 import datetime
 import errno
-import io
 import json
 import os
 import random
+import sys
 import socket
 import threading
 
@@ -196,7 +196,7 @@ class WebAggApplication(tornado.web.Application):
 
             self.set_header('Content-Type', mimetypes.get(fmt, 'binary'))
 
-            buff = io.BytesIO()
+            buff = six.BytesIO()
             manager.canvas.print_figure(buff, format=fmt)
             self.write(buff.getvalue())
 
@@ -333,11 +333,13 @@ class WebAggApplication(tornado.web.Application):
         launched. We may end up with two concurrently running loops in that
         unlucky case with all the expected consequences.
         """
-        print("Press Ctrl+C to stop server")
+        print("Press Ctrl+C to stop WebAgg server")
+        sys.stdout.flush()
         try:
             tornado.ioloop.IOLoop.instance().start()
         except KeyboardInterrupt:
-            print("Server stopped")
+            print("Server is stopped")
+            sys.stdout.flush()
         finally:
             cls.started = False
 

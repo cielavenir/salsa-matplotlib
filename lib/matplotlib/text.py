@@ -83,12 +83,12 @@ docstring.interpd.update(Text="""
     linespacing                float
     lod                        [True | False]
     multialignment             ['left' | 'right' | 'center' ]
-    name or fontname           string eg,
+    name or fontname           string e.g.,
                                ['Sans' | 'Courier' | 'Helvetica' ...]
     position                   (x,y)
     rotation                   [ angle in degrees 'vertical' | 'horizontal'
     rotation_mode              [ None | 'anchor']
-    size or fontsize           [size in points | relative size eg 'smaller',
+    size or fontsize           [size in points | relative size e.g., 'smaller',
                                                                   'x-large']
     style or fontstyle         [ 'normal' | 'italic' | 'oblique']
     text                       string
@@ -437,7 +437,7 @@ class Text(Artist):
     def set_bbox(self, rectprops):
         """
         Draw a bounding box around self.  rectprops are any settable
-        properties for a rectangle, eg facecolor='red', alpha=0.5.
+        properties for a rectangle, e.g., facecolor='red', alpha=0.5.
 
           t.set_bbox(dict(facecolor='red', alpha=0.5))
 
@@ -469,6 +469,8 @@ class Text(Artist):
         else:
             self._bbox_patch = None
             self._bbox = rectprops
+
+        self._update_clip_properties()
 
     def get_bbox_patch(self):
         """
@@ -520,6 +522,61 @@ class Text(Artist):
         fontsize_in_pixel = renderer.points_to_pixels(self.get_size())
         self._bbox_patch.set_mutation_scale(fontsize_in_pixel)
         self._bbox_patch.draw(renderer)
+
+    def _update_clip_properties(self):
+        clipprops = dict(clip_box=self.clipbox,
+                         clip_path=self._clippath,
+                         clip_on=self._clipon)
+
+        if self._bbox:
+            bbox = self._bbox.update(clipprops)
+        if self._bbox_patch:
+            bbox = self._bbox_patch.update(clipprops)
+
+    def set_clip_box(self, clipbox):
+        """
+        Set the artist's clip :class:`~matplotlib.transforms.Bbox`.
+
+        ACCEPTS: a :class:`matplotlib.transforms.Bbox` instance
+        """
+        super(Text, self).set_clip_box(clipbox)
+        self._update_clip_properties()
+
+    def set_clip_path(self, path, transform=None):
+        """
+        Set the artist's clip path, which may be:
+
+          * a :class:`~matplotlib.patches.Patch` (or subclass) instance
+
+          * a :class:`~matplotlib.path.Path` instance, in which case
+             an optional :class:`~matplotlib.transforms.Transform`
+             instance may be provided, which will be applied to the
+             path before using it for clipping.
+
+          * *None*, to remove the clipping path
+
+        For efficiency, if the path happens to be an axis-aligned
+        rectangle, this method will set the clipping box to the
+        corresponding rectangle and set the clipping path to *None*.
+
+        ACCEPTS: [ (:class:`~matplotlib.path.Path`,
+        :class:`~matplotlib.transforms.Transform`) |
+        :class:`~matplotlib.patches.Patch` | None ]
+        """
+        super(Text, self).set_clip_path(path, transform)
+        self._update_clip_properties()
+
+    def set_clip_on(self, b):
+        """
+        Set whether artist uses clipping.
+
+        When False artists will be visible out side of the axes which
+        can lead to unexpected results.
+
+        ACCEPTS: [True | False]
+        """
+        super(Text, self).set_clip_on(b)
+        self._update_clip_properties()
 
     @allow_rasterization
     def draw(self, renderer):
@@ -677,7 +734,7 @@ class Text(Artist):
         Return a hashable tuple of properties.
 
         Not intended to be human readable, but useful for backends who
-        want to cache derived information about text (eg layouts) and
+        want to cache derived information about text (e.g., layouts) and
         need to know if the text has changed.
         """
         x, y = self.get_position()
@@ -761,6 +818,8 @@ class Text(Artist):
             self._bbox = dict(facecolor=color, edgecolor=color)
         else:
             self._bbox.update(dict(facecolor=color))
+
+        self._update_clip_properties()
 
     def set_color(self, color):
         """
@@ -1030,7 +1089,7 @@ class TextWithDash(Text):
     *dashrotation* specifies the rotation of the dash, and should
     generally stay *None*. In this case
     :meth:`~matplotlib.text.TextWithDash.get_dashrotation` returns
-    :meth:`~matplotlib.text.Text.get_rotation`.  (I.e., the dash takes
+    :meth:`~matplotlib.text.Text.get_rotation`.  (i.e., the dash takes
     its rotation from the text's rotation). Because the text center is
     projected onto the dash, major deviations in the rotation cause
     what may be considered visually unappealing results.
@@ -1121,7 +1180,7 @@ class TextWithDash(Text):
         Return a hashable tuple of properties.
 
         Not intended to be human readable, but useful for backends who
-        want to cache derived information about text (eg layouts) and
+        want to cache derived information about text (e.g., layouts) and
         need to know if the text has changed.
         """
         props = [p for p in Text.get_prop_tup(self)]
@@ -1439,17 +1498,17 @@ class _AnnotationBase(object):
         if s2 == 'data':
             y = float(self.convert_yunits(y))
 
-        tr = self._get_xy_transform(renderer, s)
+        tr = self._get_xy_transform(renderer, (x, y), s)
         x1, y1 = tr.transform_point((x, y))
         return x1, y1
 
-    def _get_xy_transform(self, renderer, s):
+    def _get_xy_transform(self, renderer, xy, s):
 
         if isinstance(s, tuple):
             s1, s2 = s
             from matplotlib.transforms import blended_transform_factory
-            tr1 = self._get_xy_transform(renderer, s1)
-            tr2 = self._get_xy_transform(renderer, s2)
+            tr1 = self._get_xy_transform(renderer, xy, s1)
+            tr2 = self._get_xy_transform(renderer, xy, s2)
             tr = blended_transform_factory(tr1, tr2)
             return tr
 
@@ -1498,7 +1557,17 @@ class _AnnotationBase(object):
         #     bbox0 = self._get_bbox(renderer, bbox)
 
         if bbox0 is not None:
-            xy0 = bbox0.bounds[:2]
+            x, y = xy
+            bounds = bbox0.extents
+            if x < 0:
+                x0 = bounds[2]
+            else:
+                x0 = bounds[0]
+            if y < 0:
+                y0 = bounds[3]
+            else:
+                y0 = bounds[1]
+            xy0 = (x0, y0)
         elif bbox_name == "offset":
             xy0 = self._get_ref_xy(renderer)
 
@@ -1703,7 +1772,7 @@ class Annotation(Text, _AnnotationBase):
                     annotated.  If *d* is the distance between the text and
                     annotated point, shrink will shorten the arrow so the tip
                     and base are shink percent of the distance *d* away from
-                    the endpoints.  ie, ``shrink=0.05 is 5%%``
+                    the endpoints.  i.e., ``shrink=0.05 is 5%%``
         ?           any key for :class:`matplotlib.patches.polygon`
         =========   ===========================================================
 
@@ -1858,14 +1927,15 @@ class Annotation(Text, _AnnotationBase):
         patch.
         """
         # generate transformation,
-        self.set_transform(self._get_xy_transform(renderer, self.anncoords))
+        self.set_transform(self._get_xy_transform(
+            renderer, self.xy, self.anncoords))
 
         ox0, oy0 = self._get_xy_display()
         ox1, oy1 = xy_pixel
 
         if self.arrowprops:
             x0, y0 = xy_pixel
-            l, b, w, h = self.get_window_extent(renderer).bounds
+            l, b, w, h = Text.get_window_extent(self, renderer).bounds
             r = l + w
             t = b + h
             xc = 0.5 * (l + r)
@@ -1883,7 +1953,7 @@ class Annotation(Text, _AnnotationBase):
                 # the textbox.
                 # TODO : Rotation needs to be accounted.
                 relpos = self._arrow_relpos
-                bbox = self.get_window_extent(renderer)
+                bbox = Text.get_window_extent(self, renderer)
                 ox0 = bbox.x0 + bbox.width * relpos[0]
                 oy0 = bbox.y0 + bbox.height * relpos[1]
 
@@ -1915,7 +1985,7 @@ class Annotation(Text, _AnnotationBase):
                             self.arrow_patch.set_patchA(None)
                             return
 
-                        bbox = self.get_window_extent(renderer)
+                        bbox = Text.get_window_extent(self, renderer)
                         l, b, w, h = bbox.bounds
                         l -= pad / 2.
                         b -= pad / 2.
@@ -1953,7 +2023,6 @@ class Annotation(Text, _AnnotationBase):
                 width = d.pop('width', 4)
                 headwidth = d.pop('headwidth', 12)
                 frac = d.pop('frac', 0.1)
-
                 self.arrow = YAArrow(self.figure,
                                      (x0 + dx, y0 + dy), (x - dx, y - dy),
                                      width=width, headwidth=headwidth,
@@ -2015,6 +2084,36 @@ class Annotation(Text, _AnnotationBase):
             self.arrow_patch.draw(renderer)
 
         Text.draw(self, renderer)
+
+    def get_window_extent(self, renderer=None):
+        '''
+        Return a :class:`~matplotlib.transforms.Bbox` object bounding
+        the text and arrow annotation, in display units.
+
+        *renderer* defaults to the _renderer attribute of the text
+        object.  This is not assigned until the first execution of
+        :meth:`draw`, so you must use this kwarg if you want
+        to call :meth:`get_window_extent` prior to the first
+        :meth:`draw`.  For getting web page regions, it is
+        simpler to call the method after saving the figure. The
+        *dpi* used defaults to self.figure.dpi; the renderer dpi is
+        irrelevant.
+
+        '''
+        if not self.get_visible():
+            return Bbox.unit()
+        arrow = self.arrow
+        arrow_patch = self.arrow_patch
+
+        text_bbox = Text.get_window_extent(self, renderer=renderer)
+        bboxes = [text_bbox]
+
+        if self.arrow is not None:
+            bboxes.append(arrow.get_window_extent(renderer=renderer))
+        elif self.arrow_patch is not None:
+            bboxes.append(arrow_patch.get_window_extent(renderer=renderer))
+
+        return Bbox.union(bboxes)
 
 
 docstring.interpd.update(Annotation=Annotation.__init__.__doc__)

@@ -595,7 +595,7 @@ class Figure(Artist):
           Keyword     Description
           =========   =========================================================
           xo or yo    An integer, the *x* and *y* image offset in pixels
-          cmap        a :class:`matplotlib.colors.Colormap` instance, eg
+          cmap        a :class:`matplotlib.colors.Colormap` instance, e.g.,
                       cm.jet. If *None*, default to the rc ``image.cmap``
                       value
           norm        a :class:`matplotlib.colors.Normalize` instance. The
@@ -649,7 +649,7 @@ class Figure(Artist):
              fig.set_size_inches((w,h) )
 
         optional kwarg *forward=True* will cause the canvas size to be
-        automatically updated; eg you can resize the figure window
+        automatically updated; e.g., you can resize the figure window
         from the shell
 
         ACCEPTS: a w,h tuple with w,h in inches
@@ -780,8 +780,14 @@ class Figure(Artist):
             # to tuples for the key
             ret = []
             for k, v in items:
-                if iterable(v):
+                # some objects can define __getitem__ without being
+                # iterable and in those cases the conversion to tuples
+                # will fail. So instead of using the iterable(v) function
+                # we simply try and convert to a tuple, and proceed if not.
+                try:
                     v = tuple(v)
+                except Exception:
+                    pass
                 ret.append((k, v))
             return tuple(ret)
 
@@ -1226,7 +1232,7 @@ class Figure(Artist):
     @docstring.dedent_interpd
     def gca(self, **kwargs):
         """
-        Return the current axes, creating one if necessary
+        Get the current axes, creating one if necessary
 
         The following kwargs are supported for ensuring the returned axes
         adheres to the given projection etc., and for axes creation if
@@ -1610,6 +1616,9 @@ class Figure(Artist):
             if ax.get_visible():
                 bb.append(ax.get_tightbbox(renderer))
 
+        if len(bb) == 0:
+            return self.bbox_inches
+
         _bbox = Bbox.union([b for b in bb if b.width != 0 or b.height != 0])
 
         bbox_inches = TransformedBbox(_bbox,
@@ -1663,7 +1672,7 @@ def figaspect(arg):
     determine the width and height for a figure that would fit array
     preserving aspect ratio.  The figure width, height in inches are
     returned.  Be sure to create an axes with equal with and height,
-    eg
+    e.g.,
 
     Example usage::
 

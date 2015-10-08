@@ -111,7 +111,7 @@ class MathtextBackend(object):
     Subclasses need to override the following:
 
       - :meth:`render_glyph`
-      - :meth:`render_filled_rect`
+      - :meth:`render_rect_filled`
       - :meth:`get_results`
 
     And optionally, if you need to use a Freetype hinting style:
@@ -136,7 +136,7 @@ class MathtextBackend(object):
         """
         raise NotImplementedError()
 
-    def render_filled_rect(self, x1, y1, x2, y2):
+    def render_rect_filled(self, x1, y1, x2, y2):
         """
         Draw a filled black rectangle from (*x1*, *y1*) to (*x2*, *y2*).
         """
@@ -3011,7 +3011,7 @@ class MathTextParser(object):
     def to_mask(self, texstr, dpi=120, fontsize=14):
         """
         *texstr*
-            A valid mathtext string, eg r'IQ: $\sigma_i=15$'
+            A valid mathtext string, e.g., r'IQ: $\sigma_i=15$'
 
         *dpi*
             The dots-per-inch to render the text
@@ -3037,7 +3037,7 @@ class MathTextParser(object):
     def to_rgba(self, texstr, color='black', dpi=120, fontsize=14):
         """
         *texstr*
-            A valid mathtext string, eg r'IQ: $\sigma_i=15$'
+            A valid mathtext string, e.g., r'IQ: $\sigma_i=15$'
 
         *color*
             Any matplotlib color argument
@@ -3077,7 +3077,7 @@ class MathTextParser(object):
             A writable filename or fileobject
 
         *texstr*
-            A valid mathtext string, eg r'IQ: $\sigma_i=15$'
+            A valid mathtext string, e.g., r'IQ: $\sigma_i=15$'
 
         *color*
             A valid matplotlib color argument
@@ -3102,7 +3102,7 @@ class MathTextParser(object):
         image in pixels.
 
         *texstr*
-            A valid mathtext string, eg r'IQ: $\sigma_i=15$'
+            A valid mathtext string, e.g., r'IQ: $\sigma_i=15$'
 
         *dpi*
             The dots-per-inch to render the text

@@ -283,6 +283,24 @@ class stride_testcase(CleanupTestCase):
         assert_equal(y.shape, x1.shape)
         assert_array_equal(y, x1)
 
+    def test_stride_ensure_integer_type(self):
+        N = 100
+        x = np.empty(N + 20, dtype='>f4')
+        x.fill(np.NaN)
+        y = x[10:-10]
+        y.fill(0.3)
+        # previous to #3845 lead to corrupt access
+        y_strided = mlab.stride_windows(y, n=33, noverlap=0.6)
+        assert_array_equal(y_strided, 0.3)
+        # previous to #3845 lead to corrupt access
+        y_strided = mlab.stride_windows(y, n=33.3, noverlap=0)
+        assert_array_equal(y_strided, 0.3)
+        # even previous to #3845 could not find any problematic
+        # configuration however, let's be sure it's not accidentally
+        # introduced
+        y_strided = mlab.stride_repeat(y, n=33.815)
+        assert_array_equal(y_strided, 0.3)
+
 
 class csv_testcase(CleanupTestCase):
     def setUp(self):
@@ -2906,7 +2924,7 @@ class gaussian_kde_evaluate_tests(object):
         np.testing.assert_array_almost_equal(y, y_expected, 7)
 
     def test_evaluate_inv_dim(self):
-        """ Invert the dimensions. ie, Give the dataset a dimension of
+        """ Invert the dimensions. i.e., Give the dataset a dimension of
         1 [3,2,4], and the points will have a dimension of 3 [[3],[2],[4]].
         ValueError should be raised"""
         np.random.seed(8765678)

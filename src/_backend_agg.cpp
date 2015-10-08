@@ -665,7 +665,8 @@ Py::Object
 RendererAgg::draw_markers(const Py::Tuple& args)
 {
     typedef agg::conv_transform<PathIterator>                  transformed_path_t;
-    typedef PathSnapper<transformed_path_t>                    snap_t;
+    typedef PathNanRemover<transformed_path_t>                 nan_removed_t;
+    typedef PathSnapper<nan_removed_t>                         snap_t;
     typedef agg::conv_curve<snap_t>                            curve_t;
     typedef agg::conv_stroke<curve_t>                          stroke_t;
     typedef agg::pixfmt_amask_adaptor<pixfmt, alpha_mask_type> pixfmt_amask_type;
@@ -693,7 +694,8 @@ RendererAgg::draw_markers(const Py::Tuple& args)
 
     PathIterator       marker_path(marker_path_obj);
     transformed_path_t marker_path_transformed(marker_path, marker_trans);
-    snap_t             marker_path_snapped(marker_path_transformed,
+    nan_removed_t      marker_path_nan_removed(marker_path_transformed, true, marker_path.has_curves());
+    snap_t             marker_path_snapped(marker_path_nan_removed,
                                            gc.snap_mode,
                                            marker_path.total_vertices(),
                                            gc.linewidth);
@@ -701,7 +703,8 @@ RendererAgg::draw_markers(const Py::Tuple& args)
 
     PathIterator path(path_obj);
     transformed_path_t path_transformed(path, trans);
-    snap_t             path_snapped(path_transformed,
+    nan_removed_t      path_nan_removed(path_transformed, false, false);
+    snap_t             path_snapped(path_nan_removed,
                                     SNAP_FALSE,
                                     path.total_vertices(),
                                     0.0);
@@ -715,6 +718,7 @@ RendererAgg::draw_markers(const Py::Tuple& args)
     theRasterizer.reset();
     theRasterizer.reset_clipping();
     rendererBase.reset_clipping(true);
+    agg::rect_i marker_size(0x7FFFFFFF, 0x7FFFFFFF, -0x7FFFFFFF, -0x7FFFFFFF);
 
     agg::int8u  staticFillCache[MARKER_CACHE_SIZE];
     agg::int8u  staticStrokeCache[MARKER_CACHE_SIZE];
@@ -738,6 +742,8 @@ RendererAgg::draw_markers(const Py::Tuple& args)
                 fillCache = new agg::int8u[fillSize];
             }
             scanlines.serialize(fillCache);
+            marker_size = agg::rect_i(scanlines.min_x(), scanlines.min_y(),
+                                      scanlines.max_x(), scanlines.max_y());
         }
 
         stroke_t stroke(marker_path_curve);
@@ -757,6 +763,10 @@ RendererAgg::draw_markers(const Py::Tuple& args)
             strokeCache = new agg::int8u[strokeSize];
         }
         scanlines.serialize(strokeCache);
+        marker_size = agg::rect_i(std::min(marker_size.x1, scanlines.min_x()),
+                                  std::min(marker_size.y1, scanlines.min_y()),
+                                  std::max(marker_size.x2, scanlines.max_x()),
+                                  std::max(marker_size.y2, scanlines.max_y()));
 
         theRasterizer.reset_clipping();
         rendererBase.reset_clipping(true);
@@ -769,10 +779,10 @@ RendererAgg::draw_markers(const Py::Tuple& args)
         agg::serialized_scanlines_adaptor_aa8::embedded_scanline sl;
 
         agg::rect_d clipping_rect(
-            -1.0 - scanlines.max_x(),
-            -1.0 - scanlines.max_y(),
-            1.0 + width - scanlines.min_x(),
-            1.0 + height - scanlines.min_y());
+            -1.0 - marker_size.x2,
+            -1.0 - marker_size.y2,
+            1.0 + width - marker_size.x1,
+            1.0 + height - marker_size.y1);
 
         if (has_clippath)
         {
@@ -1918,7 +1928,7 @@ RendererAgg::draw_quad_mesh(const Py::Tuple& args)
 
     Py::Object transforms_obj = Py::List(0);
     Py::Tuple linewidths(1);
-    linewidths[0] = Py::Float(gc.linewidth);
+    linewidths[0] = Py::Float(gc.linewidth * 72.0 / dpi);
     Py::SeqBase<Py::Object> linestyles_obj;
     Py::Tuple antialiaseds(1);
     antialiaseds[0] = Py::Int(antialiased ? 1 : 0);

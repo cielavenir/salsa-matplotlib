@@ -114,7 +114,7 @@ class _AxesImageBase(martist.Artist, cm.ScalarMappable):
     def __getstate__(self):
         state = super(_AxesImageBase, self).__getstate__()
         # We can't pickle the C Image cached object.
-        state.pop('_imcache', None)
+        state['_imcache'] = None
         return state
 
     def get_size(self):
@@ -1255,7 +1255,7 @@ def imread(fname, format=None):
         if im is None:
             raise ValueError('Only know how to handle extensions: %s; '
                              'with PIL installed matplotlib can handle '
-                             'more images' % list(six.iterkeys(handlers.keys)))
+                             'more images' % list(six.iterkeys(handlers)))
         return im
 
     handler = handlers[ext]
@@ -1291,7 +1291,7 @@ def imsave(fname, arr, vmin=None, vmax=None, cmap=None, format=None,
         or *vmax* is None, that limit is determined from the *arr*
         min/max value.
       *cmap*:
-        cmap is a colors.Colormap instance, eg cm.jet.
+        cmap is a colors.Colormap instance, e.g., cm.jet.
         If None, default to the rc image.cmap value.
       *format*:
         One of the file extensions supported by the active

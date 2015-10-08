@@ -19,6 +19,7 @@ import io
 import json
 import os
 import time
+import warnings
 
 import numpy as np
 
@@ -44,6 +45,96 @@ def new_figure_manager_given_figure(num, figure):
     canvas = FigureCanvasWebAggCore(figure)
     manager = FigureManagerWebAgg(canvas, num)
     return manager
+
+
+# http://www.cambiaresearch.com/articles/15/javascript-char-codes-key-codes
+_SHIFT_LUT = {59: ':',
+              61: '+',
+              173: '_',
+              186: ':',
+              187: '+',
+              188: '<',
+              189: '_',
+              190: '>',
+              191: '?',
+              192: '~',
+              219: '{',
+              220: '|',
+              221: '}',
+              222: '"'}
+
+_LUT = {8: 'backspace',
+        9: 'tab',
+        13: 'enter',
+        16: 'shift',
+        17: 'control',
+        18: 'alt',
+        19: 'pause',
+        20: 'caps',
+        27: 'escape',
+        32: ' ',
+        33: 'pageup',
+        34: 'pagedown',
+        35: 'end',
+        36: 'home',
+        37: 'left',
+        38: 'up',
+        39: 'right',
+        40: 'down',
+        45: 'insert',
+        46: 'delete',
+        91: 'super',
+        92: 'super',
+        93: 'select',
+        106: '*',
+        107: '+',
+        109: '-',
+        110: '.',
+        111: '/',
+        144: 'num_lock',
+        145: 'scroll_lock',
+        186: ':',
+        187: '=',
+        188: ',',
+        189: '-',
+        190: '.',
+        191: '/',
+        192: '`',
+        219: '[',
+        220: '\\',
+        221: ']',
+        222: "'"}
+
+
+def _handle_key(key):
+    """Handle key codes"""
+    code = int(key[key.index('k') + 1:])
+    value = chr(code)
+    # letter keys
+    if code >= 65 and code <= 90:
+        if 'shift+' in key:
+            key = key.replace('shift+', '')
+        else:
+            value = value.lower()
+    # number keys
+    elif code >= 48 and code <= 57:
+        if 'shift+' in key:
+            value = ')!@#$%^&*('[int(value)]
+            key = key.replace('shift+', '')
+    # function keys
+    elif code >= 112 and code <= 123:
+        value = 'f%s' % (code - 111)
+    # number pad keys
+    elif code >= 96 and code <= 105:
+        value = '%s' % (code - 96)
+    # keys with shift alternatives
+    elif code in _SHIFT_LUT and 'shift+' in key:
+        key = key.replace('shift+', '')
+        value = _SHIFT_LUT[code]
+    elif code in _LUT:
+        value = _LUT[code]
+    key = key[:key.index('k')] + value
+    return key
 
 
 class FigureCanvasWebAggCore(backend_agg.FigureCanvasAgg):
@@ -191,7 +282,8 @@ class FigureCanvasWebAggCore(backend_agg.FigureCanvasAgg):
             pass
         elif e_type == 'draw':
             self.draw()
-        elif e_type in ('button_press', 'button_release', 'motion_notify'):
+        elif e_type in ('button_press', 'button_release', 'motion_notify',
+                        'figure_enter', 'figure_leave', 'scroll'):
             x = event['x']
             y = event['y']
             y = self.get_renderer().height - y
@@ -213,9 +305,14 @@ class FigureCanvasWebAggCore(backend_agg.FigureCanvasAgg):
                 self.button_release_event(x, y, button)
             elif e_type == 'motion_notify':
                 self.motion_notify_event(x, y)
+            elif e_type == 'figure_enter':
+                self.enter_notify_event(xy=(x, y))
+            elif e_type == 'figure_leave':
+                self.leave_notify_event()
+            elif e_type == 'scroll':
+                self.scroll_event(x, y, event['step'])
         elif e_type in ('key_press', 'key_release'):
-            key = event['key']
-
+            key = _handle_key(event['key'])
             if e_type == 'key_press':
                 self.key_press_event(key)
             elif e_type == 'key_release':
@@ -252,6 +349,7 @@ class FigureCanvasWebAggCore(backend_agg.FigureCanvasAgg):
         # identical or within a pixel or so).
         self._png_is_old = True
         self.manager.resize(w, h)
+        self.resize_event()
 
     def handle_send_image_mode(self, event):
         # The client requests notification of what the current image mode is.
@@ -318,6 +416,10 @@ class NavigationToolbar2WebAgg(backend_bases.NavigationToolbar2):
         backend_bases.NavigationToolbar2.release_zoom(self, event)
         self.canvas.send_event(
             "rubberband", x0=-1, y0=-1, x1=-1, y1=-1)
+
+    def save_figure(self, *args):
+        """Save the current figure"""
+        self.canvas.send_event('save')
 
 
 class FigureManagerWebAgg(backend_bases.FigureManagerBase):
@@ -393,7 +495,8 @@ class FigureManagerWebAgg(backend_bases.FigureManagerBase):
         for filetype, ext in sorted(FigureCanvasWebAggCore.
                                     get_supported_filetypes_grouped().
                                     items()):
-            extensions.append(ext[0])
+            if not ext[0] == 'pgf':  # pgf does not support BytesIO
+                extensions.append(ext[0])
         output.write("mpl.extensions = {0};\n\n".format(
             json.dumps(extensions)))
 

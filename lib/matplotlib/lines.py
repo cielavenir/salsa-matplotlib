@@ -189,7 +189,7 @@ class Line2D(Artist):
     """
     A line - the line can have both a solid linestyle connecting all
     the vertices, and a marker at each vertex.  Additionally, the
-    drawing of the solid line is influenced by the drawstyle, eg one
+    drawing of the solid line is influenced by the drawstyle, e.g., one
     can create "stepped" lines in various styles.
 
 
@@ -462,6 +462,9 @@ class Line2D(Artist):
         """Set the markevery property to subsample the plot when using markers.
 
         e.g., if `every=5`, every 5-th marker will be plotted.
+
+        ACCEPTS: [None | int | length-2 tuple of int | slice |
+        list/array of int | float | length-2 tuple of float]
 
         Parameters
         ----------
@@ -970,6 +973,8 @@ class Line2D(Artist):
     def set_marker(self, marker):
         """
         Set the line marker
+
+        ACCEPTS: :mod:`A valid marker style <matplotlib.markers>`
 
         Parameters
         -----------

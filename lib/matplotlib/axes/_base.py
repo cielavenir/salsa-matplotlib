@@ -202,7 +202,7 @@ class _process_plot_var_args(object):
             if self.command != 'plot':
                 # the Line2D class can handle unitized data, with
                 # support for post hoc unit changes etc.  Other mpl
-                # artists, eg Polygon which _process_plot_var_args
+                # artists, e.g., Polygon which _process_plot_var_args
                 # also serves on calls to fill, cannot.  So this is a
                 # hack to say: if you are not "plot", which is
                 # creating Line2D, then convert the data now to
@@ -232,8 +232,9 @@ class _process_plot_var_args(object):
 
     def _makeline(self, x, y, kw, kwargs):
         kw = kw.copy()  # Don't modify the original kw.
-        if 'color' not in kw and 'color' not in kwargs:
-            kw['color'] = six.next(self.color_cycle)
+        kwargs = kwargs.copy()
+        if kw.get('color', None) is None and kwargs.get('color', None) is None:
+            kwargs['color'] = kw['color'] = six.next(self.color_cycle)
             # (can't use setdefault because it always evaluates
             # its second argument)
         seg = mlines.Line2D(x, y,
@@ -420,7 +421,7 @@ class _AxesBase(martist.Artist):
 
         self.spines = self._gen_axes_spines()
 
-        # this call may differ for non-sep axes, eg polar
+        # this call may differ for non-sep axes, e.g., polar
         self._init_axis()
 
         if axisbg is None:
@@ -816,6 +817,16 @@ class _AxesBase(martist.Artist):
     def cla(self):
         """Clear the current axes."""
         # Note: this is called by Axes.__init__()
+
+        # stash the current visibility state
+        if hasattr(self, 'patch'):
+            patch_visible = self.patch.get_visible()
+        else:
+            patch_visible = True
+
+        xaxis_visible = self.xaxis.get_visible()
+        yaxis_visible = self.yaxis.get_visible()
+
         self.xaxis.cla()
         self.yaxis.cla()
         for name, spine in six.iteritems(self.spines):
@@ -941,6 +952,13 @@ class _AxesBase(martist.Artist):
 
         self._shared_x_axes.clean()
         self._shared_y_axes.clean()
+        if self._sharex:
+            self.xaxis.set_visible(xaxis_visible)
+            self.patch.set_visible(patch_visible)
+
+        if self._sharey:
+            self.yaxis.set_visible(yaxis_visible)
+            self.patch.set_visible(patch_visible)
 
     def clear(self):
         """clear the axes"""
@@ -1899,7 +1917,7 @@ class _AxesBase(martist.Artist):
     def autoscale_view(self, tight=None, scalex=True, scaley=True):
         """
         Autoscale the view limits using the data limits. You can
-        selectively autoscale only a single axis, eg, the xaxis by
+        selectively autoscale only a single axis, e.g., the xaxis by
         setting *scaley* to *False*.  The autoscaling preserves any
         axis direction reversal that has already been done.
 
@@ -2168,7 +2186,7 @@ class _AxesBase(martist.Artist):
         *axis* can be 'both' (default), 'x', or 'y' to control which
         set of gridlines are drawn.
 
-        *kwargs* are used to set the grid line properties, eg::
+        *kwargs* are used to set the grid line properties, e.g.,::
 
            ax.grid(color='r', linestyle='-', linewidth=2)
 

@@ -207,7 +207,6 @@ def test_clipping_of_log():
     # line segment is effectively removed. That means that the closepoly
     # operation must be replaced by a move to the first point.
     assert np.allclose(tcodes, [ M, M, L, L, L ])
-    assert np.allclose(tpoints[-1], tpoints[0])
 
 
 class NonAffineForTest(mtrans.Transform):
@@ -474,6 +473,15 @@ def test_bbox_intersection():
     assert_equal(inter(r1, r4), None)
     # single point
     assert_bbox_eq(inter(r1, r5), bbox_from_ext(1, 1, 1, 1))
+
+
+@cleanup
+def test_log_transform():
+    # Tests that the last line runs without exception (previously the
+    # transform would fail if one of the axes was logarithmic).
+    fig, ax = plt.subplots()
+    ax.set_yscale('log')
+    ax.transData.transform((1,1))
 
 
 if __name__=='__main__':

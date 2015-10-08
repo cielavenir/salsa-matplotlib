@@ -4,7 +4,7 @@ from __future__ import (absolute_import, division, print_function,
 import six
 from six.moves import xrange
 
-from nose.tools import assert_equal, assert_raises
+from nose.tools import assert_equal, assert_raises, assert_false, assert_true
 import datetime
 
 import numpy as np
@@ -98,6 +98,30 @@ def test_twin_axis_locaters_formatters():
     ax1.xaxis.set_minor_formatter(plt.FixedFormatter(['c', '3', 'p', 'o']))
     ax2 = ax1.twiny()
     ax3 = ax1.twinx()
+
+
+@cleanup
+def test_twinx_cla():
+    fig, ax = plt.subplots()
+    ax2 = ax.twinx()
+    ax3 = ax2.twiny()
+    plt.draw()
+    assert_false(ax2.xaxis.get_visible())
+    assert_false(ax2.patch.get_visible())
+    ax2.cla()
+    ax3.cla()
+
+    assert_false(ax2.xaxis.get_visible())
+    assert_false(ax2.patch.get_visible())
+    assert_true(ax2.yaxis.get_visible())
+
+    assert_true(ax3.xaxis.get_visible())
+    assert_false(ax3.patch.get_visible())
+    assert_false(ax3.yaxis.get_visible())
+
+    assert_true(ax.xaxis.get_visible())
+    assert_true(ax.patch.get_visible())
+    assert_true(ax.yaxis.get_visible())
 
 
 @image_comparison(baseline_images=["autoscale_tiny_range"], remove_text=True)
@@ -953,7 +977,7 @@ def test_markevery_polar():
 
 
 @image_comparison(baseline_images=['marker_edges'],
-                  remove_text=True)
+                  remove_text=True, tol=3)
 def test_marker_edges():
     x = np.linspace(0, 1, 10)
     fig = plt.figure()
@@ -2197,6 +2221,23 @@ def test_eventplot():
     np.testing.assert_equal(num_collections, num_datasets)
 
 
+@image_comparison(baseline_images=['test_eventplot_defaults'], extensions=['png'], remove_text=True)
+def test_eventplot_defaults():
+    '''
+    test that eventplot produces the correct output given the default params
+    (see bug #3728)
+    '''
+    np.random.seed(0)
+
+    data1 = np.random.random([32, 20]).tolist()
+    data2 = np.random.random([6, 20]).tolist()
+    data = data1 + data2
+
+    fig = plt.figure()
+    axobj = fig.add_subplot(111)
+    colls = axobj.eventplot(data)
+
+
 @cleanup
 def test_empty_eventplot():
     fig, ax = plt.subplots(1, 1)
@@ -3385,6 +3426,17 @@ def test_pathological_hexbin():
         plt.show()
         assert_equal(len(w), 0)
 
+@cleanup
+def test_color_None():
+    # issue 3855
+    fig, ax = plt.subplots()
+    ax.plot([1,2], [1,2], color=None)
+    plt.show()
+
+@cleanup
+def test_numerical_hist_label():
+    fig, ax = plt.subplots()
+    ax.hist([range(15)] * 5, label=range(5))
 
 if __name__ == '__main__':
     import nose
