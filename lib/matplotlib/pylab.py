@@ -61,6 +61,7 @@ _Plotting commands
   loglog   - a log log plot
   matshow  - display a matrix in a new figure preserving aspect
   margins  - set margins used in autoscaling
+  pause    - pause for a specified interval
   pcolor   - make a pseudocolor plot
   pcolormesh - make a pseudocolor plot using a quadrilateral mesh
   pie      - make a pie chart
@@ -292,3 +293,6 @@ save.__doc__ = """\
 
 # don't let numpy's datetime hide stdlib
 import datetime
+
+if sys.version_info > (2, 6, 0):
+    bytes = __builtins__['bytes']

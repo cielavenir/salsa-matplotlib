@@ -18,7 +18,7 @@ from __future__ import division
 
 """
 
-cvs_id = '$Id: backend_wx.py 8767 2010-11-01 13:04:29Z mdboom $'
+cvs_id = '$Id$'
 
 
 import sys, os, os.path, math, StringIO, weakref, warnings
@@ -352,7 +352,7 @@ class RendererWx(RendererBase):
         bitmap = wx.BitmapFromBufferRGBA(cols,rows,image_array)
         gc = self.get_gc()
         gc.select()
-        gc.gfx_ctx.DrawBitmap(bitmap,int(l),int(b),int(w),int(h))
+        gc.gfx_ctx.DrawBitmap(bitmap,int(l),int(self.height-b),int(w),int(-h))
         gc.unselect()
 
     def draw_text(self, gc, x, y, s, prop, angle, ismath):

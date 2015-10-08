@@ -212,10 +212,11 @@ def _spectral_helper(x, y, NFFT=256, Fs=2, detrend=detrend_none,
 
     #Make sure we're dealing with a numpy array. If y and x were the same
     #object to start with, keep them that way
-
     x = np.asarray(x)
     if not same_data:
         y = np.asarray(y)
+    else:
+        y = x
 
     # zero pad x and y up to NFFT if they are shorter than NFFT
     if len(x)<NFFT:
@@ -245,12 +246,6 @@ def _spectral_helper(x, y, NFFT=256, Fs=2, detrend=detrend_none,
         raise ValueError("sides must be one of: 'default', 'onesided', or "
             "'twosided'")
 
-    # MATLAB divides by the sampling frequency so that density function
-    # has units of dB/Hz and can be integrated by the plotted frequency
-    # values. Perform the same scaling here.
-    if scale_by_freq:
-        scaling_factor /= Fs
-
     if cbook.iterable(window):
         assert(len(window) == NFFT)
         windowVals = window
@@ -260,7 +255,7 @@ def _spectral_helper(x, y, NFFT=256, Fs=2, detrend=detrend_none,
     step = NFFT - noverlap
     ind = np.arange(0, len(x) - NFFT + 1, step)
     n = len(ind)
-    Pxy = np.zeros((numFreqs,n), np.complex_)
+    Pxy = np.zeros((numFreqs, n), np.complex_)
 
     # do the ffts of the slices
     for i in range(n):
@@ -278,16 +273,18 @@ def _spectral_helper(x, y, NFFT=256, Fs=2, detrend=detrend_none,
 
     # Scale the spectrum by the norm of the window to compensate for
     # windowing loss; see Bendat & Piersol Sec 11.5.2.
-    Pxy *= 1 / (np.abs(windowVals)**2).sum()
+    Pxy /= (np.abs(windowVals)**2).sum()
 
     # Also include scaling factors for one-sided densities and dividing by the
     # sampling frequency, if desired. Scale everything, except the DC component
     # and the NFFT/2 component:
     Pxy[1:-1] *= scaling_factor
 
-    #But do scale those components by Fs, if required
+    # MATLAB divides by the sampling frequency so that density function
+    # has units of dB/Hz and can be integrated by the plotted frequency
+    # values. Perform the same scaling here.
     if scale_by_freq:
-        Pxy[[0,-1]] /= Fs
+        Pxy /= Fs
 
     t = 1./Fs * (ind + NFFT / 2.)
     freqs = float(Fs) / pad_to * np.arange(numFreqs)
@@ -306,6 +303,8 @@ docstring.interpd.update(PSD=cbook.dedent("""
       *NFFT*: integer
           The number of data points used in each block for the FFT.
           Must be even; a power 2 is most efficient.  The default value is 256.
+          This should *NOT* be used to get zero padding, or the scaling of the
+          result will be incorrect. Use *pad_to* for this instead.
 
       *Fs*: scalar
           The sampling frequency (samples per time unit).  It is used
@@ -427,7 +426,7 @@ def specgram(x, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
         noverlap=128, pad_to=None, sides='default', scale_by_freq=None):
     """
     Compute a spectrogram of data in *x*.  Data are split into *NFFT*
-    length segements and the PSD of each section is computed.  The
+    length segments and the PSD of each section is computed.  The
     windowing function *window* is applied to each segment, and the
     amount of overlap of each segment is specified with *noverlap*.
 
@@ -2053,7 +2052,7 @@ def recs_join(key, name, recs, jointype='outer', missing=0., postfixes=None):
 
     returns a record array with columns [rowkey, name0, name1, ... namen-1].
     or if postfixes [PF0, PF1, ..., PFN-1] are supplied,
-      [rowkey, namePF0, namePF1, ... namePFN-1].
+    [rowkey, namePF0, namePF1, ... namePFN-1].
 
     Example::
 
@@ -2351,6 +2350,13 @@ class FormatObj:
     def fromstr(self, s):
         return s
 
+
+    def __hash__(self):
+        """
+        override the hash function of any of the formatters, so that we don't create duplicate excel format styles
+        """
+        return hash(self.__class__)
+
 class FormatString(FormatObj):
     def tostr(self, x):
         val = repr(x)
@@ -2378,6 +2384,9 @@ class FormatFloat(FormatFormatStr):
         FormatFormatStr.__init__(self, '%%1.%df'%precision)
         self.precision = precision
         self.scale = scale
+
+    def __hash__(self):
+        return hash((self.__class__, self.precision, self.scale))
 
     def toval(self, x):
         if x is not None:
@@ -2425,6 +2434,10 @@ class FormatMillions(FormatFloat):
 class FormatDate(FormatObj):
     def __init__(self, fmt):
         self.fmt = fmt
+
+    def __hash__(self):
+        return hash((self.__class__, self.fmt))
+
 
     def toval(self, x):
         if x is None: return 'None'

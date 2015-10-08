@@ -58,6 +58,7 @@ class FigureCanvasQTAgg( FigureCanvasQT, FigureCanvasAgg ):
         FigureCanvasAgg.__init__( self, figure )
         self.drawRect = False
         self.rect = []
+        self.blitbox = None
         self.replot = True
         self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent)
 
@@ -77,11 +78,11 @@ class FigureCanvasQTAgg( FigureCanvasQT, FigureCanvasAgg ):
         if DEBUG: print 'FigureCanvasQtAgg.paintEvent: ', self, \
            self.get_width_height()
 
-        # only replot data when needed
-        if type(self.replot) is bool: # might be a bbox for blitting
-            if self.replot:
-                FigureCanvasAgg.draw(self)
+        if self.replot:
+            FigureCanvasAgg.draw(self)
+            self.replot = False
 
+        if self.blitbox is None:
             # matplotlib is in rgba byte order.  QImage wants to put the bytes
             # into argb format and is in a 4 byte unsigned int.  Little endian
             # system is LSB first and expects the bytes in reverse order
@@ -101,11 +102,9 @@ class FigureCanvasQTAgg( FigureCanvasQT, FigureCanvasAgg ):
             if self.drawRect:
                 p.setPen( QtGui.QPen( QtCore.Qt.black, 1, QtCore.Qt.DotLine ) )
                 p.drawRect( self.rect[0], self.rect[1], self.rect[2], self.rect[3] )
-
             p.end()
-        # we are blitting here
         else:
-            bbox = self.replot
+            bbox = self.blitbox
             l, b, r, t = bbox.extents
             w = int(r) - int(l)
             h = int(t) - int(b)
@@ -117,7 +116,7 @@ class FigureCanvasQTAgg( FigureCanvasQT, FigureCanvasAgg ):
             p = QtGui.QPainter( self )
             p.drawPixmap(QtCore.QPoint(l, self.renderer.height-t), pixmap)
             p.end()
-        self.replot = False
+            self.blitbox = None
         self.drawRect = False
 
     def draw( self ):
@@ -127,15 +126,13 @@ class FigureCanvasQTAgg( FigureCanvasQT, FigureCanvasAgg ):
 
         if DEBUG: print "FigureCanvasQtAgg.draw", self
         self.replot = True
-        FigureCanvasAgg.draw(self)
         self.update()
 
     def blit(self, bbox=None):
         """
         Blit the region in bbox
         """
-
-        self.replot = bbox
+        self.blitbox = bbox
         l, b, w, h = bbox.bounds
         t = b + h
         self.repaint(l, self.renderer.height-t, w, h)

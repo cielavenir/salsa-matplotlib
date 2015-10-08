@@ -4,35 +4,8 @@
 Coding guide
 ************
 
-.. _version-control:
-
-Version control
-===============
-
-.. _using-svn:
-
-svn checkouts
--------------
-
-Checking out everything in the trunk (matplotlib and toolkits)::
-
-   svn co https://matplotlib.svn.sourceforge.net/svnroot/matplotlib/trunk \
-   matplotlib --username=youruser --password=yourpass
-
-Checking out the main source::
-
-   svn co https://matplotlib.svn.sourceforge.net/svnroot/matplotlib/trunk/\
-   matplotlib mpl --username=youruser --password=yourpass
-
-Branch checkouts, eg the 1.0.x maintenance branch::
-
-   svn co https://matplotlib.svn.sourceforge.net/svnroot/matplotlib/branches/\
-   v1_0_maint mpl1 --username=youruser --password=yourpass
-
-
-
 Committing changes
-------------------
+==================
 
 When committing changes to matplotlib, there are a few things to bear
 in mind.
@@ -50,7 +23,7 @@ in mind.
 * Can you pass :file:`examples/tests/backend_driver.py`?  This is our
   poor man's unit test.
 
-* Can you add a test to :file:`unit/nose_tests.py` to test your changes?
+* Can you add a test to :file:`lib/matplotlib/tests` to test your changes?
 
 * If you have altered extension code, do you pass
   :file:`unit/memleak_hawaii3.py`?
@@ -60,231 +33,7 @@ in mind.
   :file:`MANIFEST.in`.  This file determines what goes into the source
   distribution of the mpl build.
 
-* Keep the maintenance branch (0.91) the latest release branch (eg
-  0.98.4) and trunk in sync where it makes sense.  If there is a bug
-  on both that needs fixing, use `svnmerge.py
-  <http://www.orcaware.com/svn/wiki/Svnmerge.py>`_ to keep them in
-  sync.  See :ref:`svn-merge` below.
-
-.. _svn-merge:
-
-Using svnmerge
---------------
-
-svnmerge is useful for making bugfixes to a maintenance branch, and
-then bringing those changes into the trunk.
-
-The basic procedure is:
-
-* install ``svnmerge.py`` in your PATH::
-
-    > wget http://svn.apache.org/repos/asf/subversion/trunk/contrib/\
-      client-side/svnmerge/svnmerge.py
-
-* get a svn checkout of the branch you'll be making bugfixes to and
-  the trunk (see above)
-
-* Create and commit the bugfix on the branch.
-
-* Then make sure you svn upped on the trunk and have no local
-  modifications, and then from your checkout of the svn trunk do::
-
-       svnmerge.py merge -S BRANCHNAME
-
-  Where BRANCHNAME is the name of the branch to merge *from*,
-  e.g. v1_0_maint.
-
-  If you wish to merge only specific revisions (in an unusual
-  situation), do::
-
-      > svnmerge.py merge -rNNN1-NNN2
-
-  where the ``NNN`` are the revision numbers.  Ranges are also
-  acceptable.
-
-  The merge may have found some conflicts (code that must be manually
-  resolved).  Correct those conflicts, build matplotlib and test your
-  choices.  If you have resolved any conflicts, you can let svn clean
-  up the conflict files for you::
-
-      > svn -R resolved .
-
-  ``svnmerge.py`` automatically creates a file containing the commit
-  messages, so you are ready to make the commit::
-
-     > svn commit -F svnmerge-commit-message.txt
-
-
-.. _setting-up-svnmerge:
-
-Setting up svnmerge
-~~~~~~~~~~~~~~~~~~~
-
-.. note::
-   The following applies only to release managers when there is
-   a new release.  Most developers will not have to concern themselves
-   with this.
-
-* Creating a new branch from the trunk (if the release version is
-  1.0 at revision 8503)::
-
-      > svn copy \
-      https://matplotlib.svn.sf.net/svnroot/matplotlib/trunk/matplotlib@8503 \
-      https://matplotlib.svn.sf.net/svnroot/matplotlib/branches/v1_0_maint \
-      -m "Creating maintenance branch for 1.0"
-
-* You can add a new branch for the trunk to "track" using
-  "svnmerge.py init", e.g., from a working copy of the trunk::
-
-      > svnmerge.py init https://matplotlib.svn.sourceforge.net/svnroot/matplotlib/branches/v1_0_maint
-      property 'svnmerge-integrated' set on '.'
-
-  After doing a "svn commit" on this, this merge tracking is available
-  to everyone, so there's no need for anyone else to do the "svnmerge
-  init".
-
-* Tracking can later be removed with the "svnmerge.py uninit" command,
-  e.g.::
-
-      > svnmerge.py -S v1_0_maint uninit
-
-.. _using-git:
-
-Using git
----------
-
-Some matplotlib developers are experimenting with using git on top of
-the subversion repository.  Developers are not required to use git, as
-subversion will remain the canonical central repository for the
-foreseeable future.
-
-Cloning the git mirror
-~~~~~~~~~~~~~~~~~~~~~~
-
-There is an experimental `matplotlib github mirror`_ of the subversion
-repository. To make a local clone of it in the directory ``matplotlib``,
-enter the following commands::
-
-  # Download the entire git repository into "matplotlib", name the source repository "svn".
-  git clone --origin svn git@github.com:astraw/matplotlib.git
-
-  # Change into the newly created git repository.
-  cd matplotlib
-
-  # Setup the subversion mirroring.
-  git svn init --trunk=trunk/matplotlib --prefix=svn/ https://matplotlib.svn.sourceforge.net/svnroot/matplotlib
-
-  # Tell git svn to analyze the subversion history
-  git svn rebase -l
-
-.. _matplotlib github mirror: http://github.com/astraw/matplotlib
-
-To install from this cloned repository, use the commands in the
-:ref:`svn installation <install-svn>` section::
-
-  > cd matplotlib
-  > python setup.py install
-
-Note that it is not possible to interact with the matplotlib
-maintenance branches through git due to different representations of
-source code repositories in svnmerge and git.
-
-An example git workflow
-~~~~~~~~~~~~~~~~~~~~~~~
-
-The following is a suggested workflow for git/git-svn.
-
-Start with a virgin tree in sync with the svn trunk on the git branch
-"trunk"::
-
-  git checkout trunk
-  git svn rebase
-
-To create a new, local branch called "whizbang-branch"::
-
-  git checkout -b whizbang-branch
-
-Do make commits to the local branch::
-
-  # hack on a bunch of files
-  git add bunch of files
-  git commit -m "modified a bunch of files"
-  # repeat this as necessary
-
-Now, go back to the trunk branch and append the history of your branch
-to the git trunk branch, which will end up as the svn trunk::
-
-  git checkout trunk
-  git svn rebase # Ensure we have most recent svn
-  git rebase whizbang-branch # Append whizbang changes to trunk branch
-  git svn dcommit -n # Check that this will apply to svn
-  git svn dcommit # Actually apply to svn
-
-Finally, you may want to continue working on your whizbang-branch, so
-rebase it to the new trunk::
-
-  git checkout whizbang-branch
-  git rebase trunk
-
-How was this git mirror set up?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-These are notes for those interested in mirroring a subversion
-repository on github. I pieced this together by lots of
-trial-and-error.
-
-Step 1: Create a local mirror of the svn repository
-
-::
-
-  rsync -avzP rsync://matplotlib.svn.sourceforge.net/svn/matplotlib/ matplotlib-svn-rsync/
-
-Step 2: Import the svn history into a new git repository
-
-::
-
-  #!/bin/bash
-  set -e
-
-  TARGET=mpl.git.fixed
-  GIT=/home/astraw/git/bin/git
-  TRUNKBRANCH=trunk
-  SVNBRANCHPREFIX="svn/"
-
-  rm -rf $TARGET
-  mkdir $TARGET
-  cd $TARGET
-
-  $GIT init
-  $GIT svn init --rewrite-root=https://matplotlib.svn.sourceforge.net/svnroot/matplotlib \
-     --trunk=trunk/matplotlib --prefix=$SVNBRANCHPREFIX file:///mnt/workdisk/tmp/matplotlib-svn-rsync
-  $GIT svn fetch
-
-  # now, make master branch track ${SVNBRANCHPREFIX}trunk
-  $GIT checkout master -b tmp
-  $GIT branch -d master
-  $GIT checkout ${SVNBRANCHPREFIX}trunk -b $TRUNKBRANCH
-  $GIT branch -D tmp
-  $GIT svn rebase -l
-
-Step 3: Upload the git repository to github
-
-::
-
-  #!/bin/bash
-  set -e
-
-  TARGET=mpl.git.fixed
-  GIT=/home/astraw/git/bin/git
-  TRUNKBRANCH=trunk
-  SVNBRANCHPREFIX="svn/"
-
-  cd $TARGET
-
-  $GIT remote add github git@github.com:astraw/matplotlib.git
-  git push github $TRUNKBRANCH:master
-
-.. _style-guide:
+* Keep the maintenance branches and master in sync where it makes sense.
 
 Style guide
 ===========
@@ -352,8 +101,8 @@ To detect and fix these and other whitespace errors (see below),
 use `reindent.py
 <http://svn.python.org/projects/doctools/trunk/utils/reindent.py>`_ as
 a command-line script.  Unless you are sure your editor always
-does the right thing, please use reindent.py before checking changes into
-svn.
+does the right thing, please use reindent.py before committing your
+changes in git.
 
 Keep docstrings_ uniformly indented as in the example below, with
 nothing to the left of the triple quotes.  The
@@ -367,7 +116,7 @@ It may be preferable to use a temporary variable to replace a single
 long line with two shorter and more readable lines.
 
 Please do not commit lines with trailing white space, as it causes
-noise in svn diffs.  Tell your editor to strip whitespace from line
+noise in git diffs.  Tell your editor to strip whitespace from line
 ends when saving a file.  If you are an emacs user, the following in
 your ``.emacs`` will cause emacs to strip trailing white space upon
 saving for python, C and C++:
@@ -575,42 +324,30 @@ Writing examples
 ================
 
 We have hundreds of examples in subdirectories of
-file:`matplotlib/examples` in the trunk, and these are automatically
-generated when the website it built to show up both in the `examples
+file:`matplotlib/examples`, and these are automatically
+generated when the website is built to show up both in the `examples
 <http://matplotlib.sourceforge.net/examples/index.html>`_ and `gallery
 <http://matplotlib.sourceforge.net/gallery.html>`_ sections of the
 website.  Many people find these examples from the website, and do not
 have ready access to the file:`examples` directory in which they
 reside.  Thus any example data that is required for the example should
-be provided through the sample_data svn directory, which can then be
-accessed using :func:`matplotlib.cbook.get_sample_data`.  First get a
-copy of the repository and svn add your data::
-
-    svn co https://matplotlib.svn.sourceforge.net/svnroot/matplotlib/trunk/sample_data
-    cp ~/path/to/mydata.dat sample_data/
-    cd sample_data
-    svn add mydata.dat
-    svn commit -m 'added my data'
-
-and then in your example code you can load it into a file handle with::
+be added to the `sample_data
+<https://github.com/matplotlib/sample_data>`_ git repository.
+Then in your example code you can load it into a file handle with::
 
     import matplotlib.cbook as cbook
     fh = cbook.get_sample_data('mydata.dat')
 
-The file will be fetched from the svn repo using urllib and updated
+The file will be fetched from the git repo using urllib and updated
 when the revision number changes.
 
 
-If you prefer just to get the full path to the file instead of an file
+If you prefer just to get the full path to the file instead of a file
 object::
 
     import matplotlib.cbook as cbook
     datafile = cbook.get_sample_data('mydata.dat', asfileobj=False)
     print 'datafile', datafile
-
-
-.. _license-discussion:
-
 
 
 Testing
@@ -624,20 +361,50 @@ please ignore it while we consolidate our testing to these locations.)
 
 .. _nose: http://somethingaboutorange.com/mrl/projects/nose/
 
+Requirements
+------------
+
+The following software is required to run the tests:
+
+  - nose_, version 0.11.1 or later
+
+  - `Python Imaging Library
+    <http://www.pythonware.com/products/pil/>`_ (to compare image
+    results)
+
+  - `Ghostscript <http://pages.cs.wisc.edu/~ghost/>`_ (to render PDF
+    files)
+
+  - `Inkscape <http://inkscape.org>`_ (to render SVG files)
+
 Running the tests
 -----------------
 
-Running the tests is simple. Make sure you have nose installed and
-type from within Python::
+Running the tests is simple. Make sure you have nose installed and run
+the script :file:`tests.py` in the root directory of the distribution.
+The script can take any of the usual `nosetest arguments`_, such as
+
+===================  ===========
+``-v``               increase verbosity
+``-d``               detailed error messages
+``--with-coverage``  enable collecting coverage information
+===================  ===========
+
+To run a single test from the command line, you can provide a
+dot-separated path to the module followed by the function separated by
+a colon, eg.  (this is assuming the test is installed)::
+
+  python tests.py matplotlib.tests.test_simplification:test_clipping
+
+An alternative implementation that does not look at command line
+arguments works from within Python::
 
   import matplotlib
   matplotlib.test()
 
-To run a single test from the command line, you can provide
-a dot-separated path to the module and function, eg.
-(this is assuming the test is installed)::
 
-  nosetests matplotlib.tests.test_simplification:test_clipping
+.. _`nosetest arguments`: http://somethingaboutorange.com/mrl/projects/nose/1.0.0/usage.html
+
 
 
 Writing a simple test
@@ -732,6 +499,8 @@ Let's say you've added a new module named
 ``matplotlib.tests.test_whizbang_features``.  To add this module to
 the list of default tests, append its name to ``default_test_modules``
 in :file:`lib/matplotlib/__init__.py`.
+
+.. _license-discussion:
 
 Licenses
 ========

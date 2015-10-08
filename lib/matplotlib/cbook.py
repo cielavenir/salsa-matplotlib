@@ -8,11 +8,10 @@ import time, datetime
 import warnings
 import numpy as np
 import numpy.ma as ma
-from weakref import ref
+from weakref import ref, WeakKeyDictionary
 import cPickle
 import os.path
 import random
-import urllib2
 import new
 
 import matplotlib
@@ -30,7 +29,8 @@ major, minor1, minor2, s, tmp = sys.version_info
 # side effects.  Passing False eliminates those side effects.
 
 try:
-    preferredencoding = locale.getpreferredencoding(False).strip()
+    preferredencoding = locale.getpreferredencoding(
+        matplotlib.rcParams['axes.formatter.use_locale']).strip()
     if not preferredencoding:
         preferredencoding = None
 except (ValueError, ImportError, AttributeError):
@@ -110,15 +110,13 @@ class CallbackRegistry:
     Handle registering and disconnecting for a set of signals and
     callbacks::
 
-       signals = 'eat', 'drink', 'be merry'
-
        def oneat(x):
            print 'eat', x
 
        def ondrink(x):
            print 'drink', x
 
-       callbacks = CallbackRegistry(signals)
+       callbacks = CallbackRegistry()
 
        ideat = callbacks.connect('eat', oneat)
        iddrink = callbacks.connect('drink', ondrink)
@@ -209,34 +207,27 @@ class CallbackRegistry:
             '''
             return not self.__eq__(other)
 
-    def __init__(self, signals):
-        '*signals* is a sequence of valid signals'
-        self.signals = set(signals)
-        self.callbacks = dict([(s, dict()) for s in signals])
+    def __init__(self, *args):
+        if len(args):
+            warnings.warn(
+                'CallbackRegistry no longer requires a list of callback types.  Ignoring arguments',
+                DeprecationWarning)
+        self.callbacks = dict()
         self._cid = 0
-
-    def _check_signal(self, s):
-        'make sure *s* is a valid signal or raise a ValueError'
-        if s not in self.signals:
-            signals = list(self.signals)
-            signals.sort()
-            raise ValueError('Unknown signal "%s"; valid signals are %s'%(s, signals))
+        self._func_cid_map = WeakKeyDictionary()
 
     def connect(self, s, func):
         """
         register *func* to be called when a signal *s* is generated
         func will be called
         """
-        self._check_signal(s)
+        if func in self._func_cid_map:
+            return self._func_cid_map[func]
         proxy = self.BoundMethodProxy(func)
-        for cid, callback in self.callbacks[s].items():
-            # Clean out dead references
-            if callback.inst is not None and callback.inst() is None:
-                del self.callbacks[s][cid]
-            elif callback == proxy:
-                return cid
         self._cid += 1
+        self.callbacks.setdefault(s, dict())
         self.callbacks[s][self._cid] = proxy
+        self._func_cid_map[func] = self._cid
         return self._cid
 
     def disconnect(self, cid):
@@ -256,13 +247,13 @@ class CallbackRegistry:
         process signal *s*.  All of the functions registered to receive
         callbacks on *s* will be called with *\*args* and *\*\*kwargs*
         """
-        self._check_signal(s)
-        for cid, proxy in self.callbacks[s].items():
-            # Clean out dead references
-            if proxy.inst is not None and proxy.inst() is None:
-                del self.callbacks[s][cid]
-            else:
-                proxy(*args, **kwargs)
+        if s in self.callbacks:
+            for cid, proxy in self.callbacks[s].items():
+                # Clean out dead references
+                if proxy.inst is not None and proxy.inst() is None:
+                    del self.callbacks[s][cid]
+                else:
+                    proxy(*args, **kwargs)
 
 
 class Scheduler(threading.Thread):
@@ -374,8 +365,10 @@ def unique(x):
 
 def iterable(obj):
     'return true if *obj* is iterable'
-    try: len(obj)
-    except: return False
+    try:
+        iter(obj)
+    except TypeError:
+        return False
     return True
 
 
@@ -448,198 +441,216 @@ def to_filehandle(fname, flag='rU', return_opened=False):
 def is_scalar_or_string(val):
     return is_string_like(val) or not iterable(val)
 
-class ViewVCCachedServer(urllib2.BaseHandler):
-    """
-    Urllib2 handler that takes care of caching files.
-    The file cache.pck holds the directory of files that have been cached.
-    """
-    def __init__(self, cache_dir, baseurl):
-        self.cache_dir = cache_dir
-        self.baseurl = baseurl
-        self.read_cache()
-        self.remove_stale_files()
-        self.opener = urllib2.build_opener(self)
-
-    def in_cache_dir(self, fn):
-        # make sure the datadir exists
-        reldir, filename = os.path.split(fn)
-        datadir = os.path.join(self.cache_dir, reldir)
-        if not os.path.exists(datadir):
-            os.makedirs(datadir)
-
-        return os.path.join(datadir, filename)
-
-    def read_cache(self):
+def _get_data_server(cache_dir, baseurl):
+    import urllib2
+    class ViewVCCachedServer(urllib2.HTTPSHandler):
         """
-        Read the cache file from the cache directory.
+        Urllib2 handler that takes care of caching files.
+        The file cache.pck holds the directory of files that have been cached.
         """
-        fn = self.in_cache_dir('cache.pck')
-        if not os.path.exists(fn):
-            self.cache = {}
-            return
+        def __init__(self, cache_dir, baseurl):
+            urllib2.HTTPSHandler.__init__(self)
+            self.cache_dir = cache_dir
+            self.baseurl = baseurl
+            self.read_cache()
+            self.remove_stale_files()
+            self.opener = urllib2.build_opener(self)
 
-        f = open(fn, 'rb')
-        cache = cPickle.load(f)
-        f.close()
+        def in_cache_dir(self, fn):
+            # make sure the datadir exists
+            reldir, filename = os.path.split(fn)
+            datadir = os.path.join(self.cache_dir, reldir)
+            if not os.path.exists(datadir):
+                os.makedirs(datadir)
 
-        # Earlier versions did not have the full paths in cache.pck
-        for url, (fn, x, y) in cache.items():
-            if not os.path.isabs(fn):
-                cache[url] = (self.in_cache_dir(fn), x, y)
+            return os.path.join(datadir, filename)
 
-        # If any files are deleted, drop them from the cache
-        for url, (fn, _, _) in cache.items():
+        def read_cache(self):
+            """
+            Read the cache file from the cache directory.
+            """
+            fn = self.in_cache_dir('cache.pck')
             if not os.path.exists(fn):
-                del cache[url]
+                self.cache = {}
+                return
 
-        self.cache = cache
+            f = open(fn, 'rb')
+            cache = cPickle.load(f)
+            f.close()
 
-    def remove_stale_files(self):
-        """
-        Remove files from the cache directory that are not listed in
-        cache.pck.
-        """
-        # TODO: remove empty subdirectories
-        listed = set(fn for (_, (fn, _, _)) in self.cache.items())
-        existing = reduce(set.union,
-                          (set(os.path.join(dirpath, fn) for fn in filenames)
-                          for (dirpath, _, filenames) in os.walk(self.cache_dir)))
-        matplotlib.verbose.report(
-            'ViewVCCachedServer: files listed in cache.pck: %s' % listed, 'debug')
-        matplotlib.verbose.report(
-            'ViewVCCachedServer: files in cache directory: %s' % existing, 'debug')
+            # Earlier versions did not have the full paths in cache.pck
+            for url, (fn, x, y) in cache.items():
+                if not os.path.isabs(fn):
+                    cache[url] = (self.in_cache_dir(fn), x, y)
 
-        for path in existing - listed - set([self.in_cache_dir('cache.pck')]):
-            matplotlib.verbose.report('ViewVCCachedServer:remove_stale_files: removing %s'%path,
-                                      level='debug')
-            os.remove(path)
+            # If any files are deleted, drop them from the cache
+            for url, (fn, _, _) in cache.items():
+                if not os.path.exists(fn):
+                    del cache[url]
 
-    def write_cache(self):
-        """
-        Write the cache data structure into the cache directory.
-        """
-        fn = self.in_cache_dir('cache.pck')
-        f = open(fn, 'wb')
-        cPickle.dump(self.cache, f, -1)
-        f.close()
+            self.cache = cache
 
-    def cache_file(self, url, data, headers):
-        """
-        Store a received file in the cache directory.
-        """
-        # Pick a filename
-        fn = url[len(self.baseurl):]
-        fullpath = self.in_cache_dir(fn)
+        def remove_stale_files(self):
+            """
+            Remove files from the cache directory that are not listed in
+            cache.pck.
+            """
+            # TODO: remove empty subdirectories
+            listed = set(fn for (_, (fn, _, _)) in self.cache.items())
+            existing = reduce(set.union,
+                (set(os.path.join(dirpath, fn) for fn in filenames)
+                    for (dirpath, _, filenames) in os.walk(self.cache_dir)))
+            matplotlib.verbose.report(
+                'ViewVCCachedServer: files listed in cache.pck: %s' % listed,
+                'debug')
+            matplotlib.verbose.report(
+                'ViewVCCachedServer: files in cache directory: %s' % existing,
+                'debug')
 
-        f = open(fullpath, 'wb')
-        f.write(data)
-        f.close()
+            for path in existing - listed - \
+                    set([self.in_cache_dir('cache.pck')]):
+                matplotlib.verbose.report(
+                    'ViewVCCachedServer:remove_stale_files: removing %s'%path,
+                    level='debug')
+                os.remove(path)
 
-        # Update the cache
-        self.cache[url] = (fullpath, headers.get('ETag'), headers.get('Last-Modified'))
-        self.write_cache()
+        def write_cache(self):
+            """
+            Write the cache data structure into the cache directory.
+            """
+            fn = self.in_cache_dir('cache.pck')
+            f = open(fn, 'wb')
+            cPickle.dump(self.cache, f, -1)
+            f.close()
 
-    # These urllib2 entry points are used:
-    # http_request for preprocessing requests
-    # http_error_304 for handling 304 Not Modified responses
-    # http_response for postprocessing requests
+        def cache_file(self, url, data, headers):
+            """
+            Store a received file in the cache directory.
+            """
+            # Pick a filename
+            fn = url[len(self.baseurl):]
+            fullpath = self.in_cache_dir(fn)
 
-    def http_request(self, req):
-        """
-        Make the request conditional if we have a cached file.
-        """
-        url = req.get_full_url()
-        if url in self.cache:
-            _, etag, lastmod = self.cache[url]
-            req.add_header("If-None-Match", etag)
-            req.add_header("If-Modified-Since", lastmod)
-        return req
+            f = open(fullpath, 'wb')
+            f.write(data)
+            f.close()
 
-    def http_error_304(self, req, fp, code, msg, hdrs):
-        """
-        Read the file from the cache since the server has no newer version.
-        """
-        url = req.get_full_url()
-        fn, _, _ = self.cache[url]
-        matplotlib.verbose.report('ViewVCCachedServer: reading data file from cache file "%s"'
-                                  %fn, 'debug')
-        file = open(fn, 'rb')
-        handle = urllib2.addinfourl(file, hdrs, url)
-        handle.code = 304
-        return handle
+            # Update the cache
+            self.cache[url] = (fullpath, headers.get('ETag'),
+                               headers.get('Last-Modified'))
+            self.write_cache()
 
-    def http_response(self, req, response):
-        """
-        Update the cache with the returned file.
-        """
-        matplotlib.verbose.report('ViewVCCachedServer: received response %d: %s'
-                                  % (response.code, response.msg), 'debug')
-        if response.code != 200:
-            return response
-        else:
-            data = response.read()
-            self.cache_file(req.get_full_url(), data, response.headers)
-            result = urllib2.addinfourl(StringIO.StringIO(data),
-                                        response.headers,
-                                        req.get_full_url())
-            result.code = response.code
-            result.msg = response.msg
-            return result
+        # These urllib2 entry points are used:
+        # http_request for preprocessing requests
+        # http_error_304 for handling 304 Not Modified responses
+        # http_response for postprocessing requests
 
-    def get_sample_data(self, fname, asfileobj=True):
-        """
-        Check the cachedirectory for a sample_data file.  If it does
-        not exist, fetch it with urllib from the svn repo and
-        store it in the cachedir.
+        def https_request(self, req):
+            """
+            Make the request conditional if we have a cached file.
+            """
+            url = req.get_full_url()
+            if url in self.cache:
+                _, etag, lastmod = self.cache[url]
+                if etag is not None:
+                    req.add_header("If-None-Match", etag)
+                if lastmod is not None:
+                    req.add_header("If-Modified-Since", lastmod)
+            matplotlib.verbose.report(
+                "ViewVCCachedServer: request headers %s" % req.header_items(),
+                "debug")
+            return req
 
-        If asfileobj is True, a file object will be returned.  Else the
-        path to the file as a string will be returned.
-        """
-        # TODO: time out if the connection takes forever
-        # (may not be possible with urllib2 only - spawn a helper process?)
+        def https_error_304(self, req, fp, code, msg, hdrs):
+            """
+            Read the file from the cache since the server has no newer version.
+            """
+            url = req.get_full_url()
+            fn, _, _ = self.cache[url]
+            matplotlib.verbose.report(
+                'ViewVCCachedServer: reading data file from cache file "%s"'
+                %fn, 'debug')
+            file = open(fn, 'rb')
+            handle = urllib2.addinfourl(file, hdrs, url)
+            handle.code = 304
+            return handle
 
-        # quote is not in python2.4, so check for it and get it from
-        # urllib if it is not available
-        quote = getattr(urllib2, 'quote', None)
-        if quote is None:
-            import urllib
-            quote = urllib.quote
-
-        # retrieve the URL for the side effect of refreshing the cache
-        url = self.baseurl + quote(fname)
-        error = 'unknown error'
-        matplotlib.verbose.report('ViewVCCachedServer: retrieving %s'
-                                  % url, 'debug')
-        try:
-            response = self.opener.open(url)
-        except urllib2.URLError, e:
-            # could be a missing network connection
-            error = str(e)
-
-        cached = self.cache.get(url)
-        if cached is None:
-            msg = 'file %s not in cache; received %s when trying to retrieve' \
-                % (fname, error)
-            raise KeyError(msg)
-
-        fname = cached[0]
-
-        if asfileobj:
-            if os.path.splitext(fname)[-1].lower() in ('.csv', '.xrc', '.txt'):
-                mode = 'r'
+        def https_response(self, req, response):
+            """
+            Update the cache with the returned file.
+            """
+            matplotlib.verbose.report(
+                'ViewVCCachedServer: received response %d: %s'
+                % (response.code, response.msg), 'debug')
+            if response.code != 200:
+                return response
             else:
-                mode = 'rb'
-            return open(fname, mode)
-        else:
-            return fname
+                data = response.read()
+                self.cache_file(req.get_full_url(), data, response.headers)
+                result = urllib2.addinfourl(StringIO.StringIO(data),
+                                            response.headers,
+                                            req.get_full_url())
+                result.code = response.code
+                result.msg = response.msg
+                return result
+
+        def get_sample_data(self, fname, asfileobj=True):
+            """
+            Check the cachedirectory for a sample_data file.  If it does
+            not exist, fetch it with urllib from the git repo and
+            store it in the cachedir.
+
+            If asfileobj is True, a file object will be returned.  Else the
+            path to the file as a string will be returned.
+            """
+            # TODO: time out if the connection takes forever
+            # (may not be possible with urllib2 only - spawn a helper process?)
+
+            # quote is not in python2.4, so check for it and get it from
+            # urllib if it is not available
+            quote = getattr(urllib2, 'quote', None)
+            if quote is None:
+                import urllib
+                quote = urllib.quote
+
+            # retrieve the URL for the side effect of refreshing the cache
+            url = self.baseurl + quote(fname)
+            error = 'unknown error'
+            matplotlib.verbose.report('ViewVCCachedServer: retrieving %s'
+                                      % url, 'debug')
+            try:
+                response = self.opener.open(url)
+            except urllib2.URLError, e:
+                # could be a missing network connection
+                error = str(e)
+
+            cached = self.cache.get(url)
+            if cached is None:
+                msg = 'file %s not in cache; received %s when trying to '\
+                      'retrieve' % (fname, error)
+                raise KeyError(msg)
+
+            fname = cached[0]
+
+            if asfileobj:
+                if (os.path.splitext(fname)[-1].lower() in
+                       ('.csv', '.xrc', '.txt')):
+                    mode = 'r'
+                else:
+                    mode = 'rb'
+                return open(fname, mode)
+            else:
+                return fname
+
+    return ViewVCCachedServer(cache_dir, baseurl)
 
 
 def get_sample_data(fname, asfileobj=True):
     """
     Check the cachedirectory ~/.matplotlib/sample_data for a sample_data
-    file.  If it does not exist, fetch it with urllib from the mpl svn repo
+    file.  If it does not exist, fetch it with urllib from the mpl git repo
 
-      http://matplotlib.svn.sourceforge.net/svnroot/matplotlib/trunk/sample_data/
+      https://raw.github.com/matplotlib/sample_data/master
 
     and store it in the cachedir.
 
@@ -647,11 +658,11 @@ def get_sample_data(fname, asfileobj=True):
     path to the file as a string will be returned
 
     To add a datafile to this directory, you need to check out
-    sample_data from matplotlib svn::
+    sample_data from matplotlib git::
 
-      svn co https://matplotlib.svn.sourceforge.net/svnroot/matplotlib/trunk/sample_data
+      git clone git@github.com:matplotlib/sample_data
 
-    and svn add the data file you want to support.  This is primarily
+    and git add the data file you want to support.  This is primarily
     intended for use in mpl examples that need custom data.
 
     To bypass all downloading, set the rc parameter examples.download to False
@@ -670,12 +681,19 @@ def get_sample_data(fname, asfileobj=True):
     if myserver is None:
         configdir = matplotlib.get_configdir()
         cachedir = os.path.join(configdir, 'sample_data')
-        baseurl = 'http://matplotlib.svn.sourceforge.net/svnroot/matplotlib/trunk/sample_data/'
-        myserver = get_sample_data.myserver = ViewVCCachedServer(cachedir, baseurl)
+        baseurl = 'https://raw.github.com/matplotlib/sample_data/master/'
+        try:
+            myserver = _get_data_server(cachedir, baseurl)
+            get_sample_data.myserver = myserver
+        except ImportError:
+            raise ImportError(
+                'Python must be built with SSL support to fetch sample data '
+                'from the matplotlib repository')
 
     return myserver.get_sample_data(fname, asfileobj=asfileobj)
 
 get_sample_data.myserver = None
+
 def flatten(seq, scalarp=is_scalar_or_string):
     """
     this generator flattens nested containers such as
@@ -1224,6 +1242,12 @@ def reverse_dict(d):
     'reverse the dictionary -- may lose data if values are not unique!'
     return dict([(v,k) for k,v in d.items()])
 
+def restrict_dict(d, keys):
+    """
+    Return a dictionary that contains those keys that appear in both
+    d and keys, with values from d.
+    """
+    return dict([(k,v) for (k,v) in d.iteritems() if k in keys])
 
 def report_memory(i=0):  # argument may go away
     'return the memory consumed by process'
@@ -1241,7 +1265,18 @@ def report_memory(i=0):  # argument may go away
         a2 = Popen('ps -p %d -o rss,vsz' % pid, shell=True,
             stdout=PIPE).stdout.readlines()
         mem = int(a2[1].split()[0])
-
+    elif sys.platform.startswith('win'):
+        try:
+            a2 = Popen(["tasklist", "/nh", "/fi", "pid eq %d" % pid],
+                stdout=PIPE).stdout.read()
+        except OSError:
+            raise NotImplementedError(
+                "report_memory works on Windows only if "
+                "the 'tasklist' program is found")
+        mem = int(a2.strip().split()[-2].replace(',',''))
+    else:
+        raise NotImplementedError(
+                "We don't have a memory monitor for %s" % sys.platform)
     return mem
 
 _safezip_msg = 'In safezip, len(args[0])=%d but len(args[%d])=%d'
@@ -1790,12 +1825,33 @@ def align_iterators(func, *iterables):
 def is_math_text(s):
     # Did we find an even number of non-escaped dollar signs?
     # If so, treat is as math text.
-    s = unicode(s)
+    try:
+        s = unicode(s)
+    except UnicodeDecodeError:
+        raise ValueError(
+            "matplotlib display text must have all code points < 128 or use Unicode strings")
 
     dollar_count = s.count(r'$') - s.count(r'\$')
     even_dollars = (dollar_count > 0 and dollar_count % 2 == 0)
 
     return even_dollars
+
+# Numpy > 1.6.x deprecates putmask in favor of the new copyto.
+# So long as we support versions 1.6.x and less, we need the
+# following local version of putmask.  We choose to make a
+# local version of putmask rather than of copyto because the
+# latter includes more functionality than the former. Therefore
+# it is easy to make a local version that gives full putmask
+# behavior, but duplicating the full copyto behavior would be
+# more difficult.
+
+try:
+    np.copyto
+except AttributeError:
+    _putmask = np.putmask
+else:
+    def _putmask(a, mask, values):
+        return np.copyto(a, values, where=mask)
 
 
 if __name__=='__main__':

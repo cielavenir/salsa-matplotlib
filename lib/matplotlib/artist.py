@@ -92,7 +92,11 @@ class Artist(object):
         self.eventson = False  # fire events only if eventson
         self._oid = 0  # an observer id
         self._propobservers = {} # a dict from oids to funcs
-        self.axes = None
+        try:
+            self.axes = None
+        except AttributeError:
+            # Handle self.axes as a read-only property, as in Figure.
+            pass
         self._remove_method = None
         self._url = None
         self._gid = None
@@ -235,13 +239,13 @@ class Artist(object):
         """
         List the children of the artist which contain the mouse event *event*.
         """
-        import traceback
         L = []
         try:
             hascursor,info = self.contains(event)
             if hascursor:
                 L.append(self)
         except:
+            import traceback
             traceback.print_exc()
             print "while checking",self.__class__
 
@@ -724,21 +728,25 @@ class Artist(object):
             ret.extend( [func(v)] )
         return ret
 
-    def findobj(self, match=None):
+    def findobj(self, match=None, include_self=True):
         """
         pyplot signature:
-          findobj(o=gcf(), match=None)
+          findobj(o=gcf(), match=None, include_self=True)
 
         Recursively find all :class:matplotlib.artist.Artist instances
         contained in self.
 
         *match* can be
 
-          - None: return all objects contained in artist (including artist)
+          - None: return all objects contained in artist.
 
-          - function with signature ``boolean = match(artist)`` used to filter matches
+          - function with signature ``boolean = match(artist)``
+            used to filter matches
 
-          - class instance: eg Line2D.  Only return artists of class type
+          - class instance: eg Line2D.  Only return artists of class type.
+
+        If *include_self* is True (default), include self in the list to be
+        checked for a match.
 
         .. plot:: mpl_examples/pylab_examples/findobj_demo.py
         """
@@ -751,17 +759,18 @@ class Artist(object):
         elif callable(match):
             matchfunc = match
         else:
-            raise ValueError('match must be None, an matplotlib.artist.Artist subclass, or a callable')
-
+            raise ValueError('match must be None, a matplotlib.artist.Artist subclass, or a callable')
 
         artists = []
 
         for c in self.get_children():
             if matchfunc(c):
                 artists.append(c)
-            artists.extend([thisc for thisc in c.findobj(matchfunc) if matchfunc(thisc)])
+            artists.extend([thisc for thisc in
+                                c.findobj(matchfunc, include_self=False)
+                                                     if matchfunc(thisc)])
 
-        if matchfunc(self):
+        if include_self and matchfunc(self):
             artists.append(self)
         return artists
 

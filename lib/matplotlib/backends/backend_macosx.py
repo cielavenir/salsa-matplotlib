@@ -5,7 +5,7 @@ import numpy
 
 from matplotlib._pylab_helpers import Gcf
 from matplotlib.backend_bases import RendererBase, GraphicsContextBase,\
-     FigureManagerBase, FigureCanvasBase, NavigationToolbar2
+     FigureManagerBase, FigureCanvasBase, NavigationToolbar2, TimerBase
 from matplotlib.backend_bases import ShowBase
 
 from matplotlib.cbook import maxdict
@@ -13,7 +13,6 @@ from matplotlib.figure import Figure
 from matplotlib.path import Path
 from matplotlib.mathtext import MathTextParser
 from matplotlib.colors import colorConverter
-
 
 
 from matplotlib.widgets import SubplotTool
@@ -102,7 +101,13 @@ class RendererMac(RendererBase):
     def new_gc(self):
         self.gc.save()
         self.gc.set_hatch(None)
+        self.gc._alpha = 1.0
+        self.gc._forced_alpha = False # if True, _alpha overrides A from RGBA
         return self.gc
+
+    def draw_gouraud_triangle(self, gc, points, colors, transform):
+        points = transform.transform(points)
+        gc.draw_gouraud_triangle(points, colors)
 
     def draw_image(self, gc, x, y, im):
         im.flipud_out()
@@ -219,10 +224,12 @@ def draw_if_interactive():
     it will be redrawn as soon as the event loop resumes via PyOS_InputHook.
     This function should be called after each draw event, even if
     matplotlib is not running interactively.
-    """
-    figManager =  Gcf.get_active()
-    if figManager is not None:
-        figManager.canvas.invalidate()
+	"""
+    if matplotlib.is_interactive():
+        figManager =  Gcf.get_active()
+        if figManager is not None:
+            figManager.canvas.invalidate()
+
 
 def new_figure_manager(num, *args, **kwargs):
     """
@@ -236,6 +243,24 @@ def new_figure_manager(num, *args, **kwargs):
     canvas = FigureCanvasMac(figure)
     manager = FigureManagerMac(canvas, num)
     return manager
+
+class TimerMac(_macosx.Timer, TimerBase):
+    '''
+    Subclass of :class:`backend_bases.TimerBase` that uses CoreFoundation
+    run loops for timer events.
+
+    Attributes:
+    * interval: The time between timer events in milliseconds. Default
+        is 1000 ms.
+    * single_shot: Boolean flag indicating whether this timer should
+        operate as single shot (run once and then stop). Defaults to False.
+    * callbacks: Stores list of (func, args) tuples that will be called
+        upon timer events. This list can be manipulated directly, or the
+        functions add_callback and remove_callback can be used.
+    '''
+    # completely implemented at the C-level (in _macosx.Timer)
+
+
 
 class FigureCanvasMac(_macosx.FigureCanvas, FigureCanvasBase):
     """
@@ -307,6 +332,21 @@ class FigureCanvasMac(_macosx.FigureCanvas, FigureCanvasBase):
     def get_default_filetype(self):
         return 'png'
 
+    def new_timer(self, *args, **kwargs):
+        """
+        Creates a new backend-specific subclass of :class:`backend_bases.Timer`.
+        This is useful for getting periodic events through the backend's native
+        event loop. Implemented only for backends with GUIs.
+
+        optional arguments:
+
+        *interval*
+          Timer interval in milliseconds
+        *callbacks*
+          Sequence of (func, args, kwargs) where func(*args, **kwargs) will
+          be executed by the timer every *interval*.
+        """
+        return TimerMac(*args, **kwargs)
 
 class FigureManagerMac(_macosx.FigureManager, FigureManagerBase):
     """
@@ -333,9 +373,8 @@ class FigureManagerMac(_macosx.FigureManager, FigureManagerBase):
         # This is ugly, but this is what tkagg and gtk are doing.
         # It is needed to get ginput() working.
         self.canvas.figure.show = lambda *args: self.show()
-
-    def show(self):
-        self.canvas.draw()
+        if matplotlib.is_interactive():
+            self.show()
 
     def close(self):
         Gcf.destroy(self.num)
@@ -417,7 +456,7 @@ class NavigationToolbar2Mac(_macosx.NavigationToolbar2, NavigationToolbar2):
         _macosx.NavigationToolbar2.__init__(self, basedir)
 
     def draw_rubberband(self, event, x0, y0, x1, y1):
-        self.canvas.set_rubberband(x0, y0, x1, y1)
+        self.canvas.set_rubberband(int(x0), int(y0), int(x1), int(y1))
 
     def release(self, event):
         self.canvas.remove_rubberband()

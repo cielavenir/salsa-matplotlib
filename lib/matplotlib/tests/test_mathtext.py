@@ -82,36 +82,90 @@ math_tests = [
     r'${x}_{92}^{31415}+\pi $',
     r'${x}_{{y}_{b}^{a}}^{{z}_{c}^{d}}$',
     r'${y}_{3}^{\prime \prime \prime }$',
-    r"$\left( \xi \left( 1 - \xi \right) \right)$" # Bug 2969451
+    r"$\left( \xi \left( 1 - \xi \right) \right)$", # Bug 2969451
+    r"$\left(2 \, a=b\right)$", # Sage bug #8125
+    r"$? ! &$", # github issue #466
 ]
 
-def _run_all_tests():
-    fig = plt.figure(figsize=(5, len(math_tests) / 2.0))
-    for i, test in enumerate(math_tests):
-        fig.text(0, float(len(math_tests) - i - 1) / len(math_tests), test)
-    return fig
+digits = "0123456789"
+uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+lowercase = "abcdefghijklmnopqrstuvwxyz"
+uppergreek = (r"\Gamma \Delta \Theta \Lambda \Xi \Pi \Sigma \Upsilon \Phi \Psi "
+              r"\Omega")
+lowergreek = (r"\alpha \beta \gamma \delta \epsilon \zeta \eta \theta \iota "
+              r"\lambda \mu \nu \xi \pi \kappa \rho \sigma \tau \upsilon "
+              r"\phi \chi \psi")
+all = [digits, uppercase, lowercase, uppergreek, lowergreek]
 
-@image_comparison(baseline_images=['mathtext'])
-def test_mathtext():
-    fig = _run_all_tests()
-    fig.savefig('mathtext')
+font_test_specs = [
+    ([], all),
+    (['mathrm'], all),
+    (['mathbf'], all),
+    (['mathit'], all),
+    (['mathtt'], [digits, uppercase, lowercase]),
+    (['mathcircled'], [digits, uppercase, lowercase]),
+    (['mathrm', 'mathcircled'], [digits, uppercase, lowercase]),
+    (['mathbf', 'mathcircled'], [digits, uppercase, lowercase]),
+    (['mathbb'], [digits, uppercase, lowercase,
+                  r'\Gamma \Pi \Sigma \gamma \pi']),
+    (['mathrm', 'mathbb'], [digits, uppercase, lowercase,
+                            r'\Gamma \Pi \Sigma \gamma \pi']),
+    (['mathbf', 'mathbb'], [digits, uppercase, lowercase,
+                            r'\Gamma \Pi \Sigma \gamma \pi']),
+    (['mathcal'], [uppercase]),
+    (['mathfrak'], [uppercase, lowercase]),
+    (['mathbf', 'mathfrak'], [uppercase, lowercase]),
+    (['mathscr'], [uppercase, lowercase]),
+    (['mathsf'], [digits, uppercase, lowercase]),
+    (['mathrm', 'mathsf'], [digits, uppercase, lowercase]),
+    (['mathbf', 'mathsf'], [digits, uppercase, lowercase])
+    ]
 
-@image_comparison(baseline_images=['mathtext_stix'])
-def test_mathtext_stix():
-    matplotlib.rcParams['mathtext.fontset'] = 'stix'
+font_tests = []
+for fonts, chars in font_test_specs:
+    wrapper = [' '.join(fonts), ' $']
+    for font in fonts:
+        wrapper.append(r'\%s{' % font)
+    wrapper.append('%s')
+    for font in fonts:
+        wrapper.append('}')
+    wrapper.append('$')
+    wrapper = ''.join(wrapper)
 
-    fig = _run_all_tests()
-    fig.savefig('mathtext_stix')
+    for set in chars:
+        font_tests.append(wrapper % set)
 
-    matplotlib.rcParams['mathtext.fontset'] = 'cm'
+def make_set(basename, fontset, tests, extensions=None):
+    def make_test(filename, test):
+        @image_comparison(baseline_images=[filename], extensions=extensions)
+        def single_test():
+            matplotlib.rcParams['mathtext.fontset'] = fontset
+            fig = plt.figure(figsize=(5.25, 0.75))
+            fig.text(0.5, 0.5, test, horizontalalignment='center', verticalalignment='center')
+        func = single_test
+        func.__name__ = filename + "_test"
+        return func
 
-@image_comparison(baseline_images=['mathtext_stixsans'])
-def test_mathtext_stixsans():
-    matplotlib.rcParams['mathtext.fontset'] = 'stixsans'
+    # We inject test functions into the global namespace, rather than
+    # using a generator, so that individual tests can be run more
+    # easily from the commandline and so each test will have its own
+    # result.
+    for i, test in enumerate(tests):
+        filename = '%s_%s_%02d' % (basename, fontset, i)
+        globals()['test_%s' % filename] = make_test(filename, test)
 
-    fig = _run_all_tests()
-    fig.savefig('mathtext_stixsans')
+make_set('mathtext', 'cm', math_tests)
+make_set('mathtext', 'stix', math_tests)
+make_set('mathtext', 'stixsans', math_tests)
 
-    matplotlib.rcParams['mathtext.fontset'] = 'cm'
+make_set('mathfont', 'cm', font_tests, ['png'])
+make_set('mathfont', 'stix', font_tests, ['png'])
+make_set('mathfont', 'stixsans', font_tests, ['png'])
 
-
+def test_fontinfo():
+    import matplotlib.font_manager as font_manager
+    import matplotlib.ft2font as ft2font
+    fontpath = font_manager.findfont("Bitstream Vera Sans")
+    font = ft2font.FT2Font(fontpath)
+    table = font.get_sfnt_table("head")
+    assert table['version'] == (1, 0)
