@@ -2728,7 +2728,7 @@ class Axes(martist.Artist):
 
     def get_ymajorticklabels(self):
         """
-        Get the major y tick labels as a list of 
+        Get the major y tick labels as a list of
         :class:`~matplotlib.text.Text` instances.
         """
         return cbook.silent_list('Text yticklabel',
@@ -4197,8 +4197,8 @@ class Axes(martist.Artist):
         """
         Call signature::
 
-            def xcorr(self, x, y, normed=True, detrend=mlab.detrend_none,
-              usevlines=True, maxlags=10, **kwargs):
+            xcorr(self, x, y, normed=True, detrend=mlab.detrend_none,
+              usevlines=True, maxlags=10, **kwargs)
 
         Plot the cross correlation between *x* and *y*.  If *normed* =
         *True*, normalize the data by the cross correlation at 0-th
@@ -7485,7 +7485,7 @@ class Axes(martist.Artist):
         """
         Call signature::
 
-          def hist(x, bins=10, range=None, normed=False, weights=None,
+          hist(x, bins=10, range=None, normed=False, weights=None,
                  cumulative=False, bottom=None, histtype='bar', align='mid',
                  orientation='vertical', rwidth=None, log=False,
                  color=None, label=None,
@@ -7532,11 +7532,13 @@ class Axes(martist.Artist):
               pdf, bins, patches = ax.hist(...)
               print np.sum(pdf * np.diff(bins))
 
-            .. Note:: Until numpy release 1.5, the underlying numpy
-                      histogram function was incorrect with *normed*=*True*
-                      if bin sizes were unequal.  MPL inherited that
-                      error.  It is now corrected within MPL when using
-                      earlier numpy versions
+            .. note::
+
+                Until numpy release 1.5, the underlying numpy
+                histogram function was incorrect with *normed*=*True*
+                if bin sizes were unequal.  MPL inherited that
+                error.  It is now corrected within MPL when using
+                earlier numpy versions
 
           *weights*:
             An array of weights, of the same shape as *x*.  Each value in

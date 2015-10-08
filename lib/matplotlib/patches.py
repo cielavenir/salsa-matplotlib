@@ -768,7 +768,12 @@ class Polygon(Patch):
         Patch.__init__(self, **kwargs)
         xy = np.asarray(xy, np.float_)
         self._path = Path(xy)
-        self.set_closed(closed)
+
+        self._closed = closed
+        if closed and len(xy):
+            xy = np.concatenate([xy, [xy[0]]])
+
+        self._set_xy(xy)
 
     def get_path(self):
         return self._path
@@ -777,6 +782,10 @@ class Polygon(Patch):
         return self._closed
 
     def set_closed(self, closed):
+
+        if self._closed == bool(closed):
+            return
+
         self._closed = closed
         xy = self._get_xy()
         if closed:
@@ -1022,13 +1031,14 @@ class YAArrow(Patch):
         %(Patch)s
 
         """
-        self.figure = figure
         self.xytip = xytip
         self.xybase = xybase
         self.width = width
         self.frac = frac
         self.headwidth = headwidth
         Patch.__init__(self, **kwargs)
+        # Set self.figure after Patch.__init__, since it sets self.figure to None
+        self.figure = figure
 
     def get_path(self):
         # Since this is dpi dependent, we need to recompute the path
@@ -4231,6 +4241,3 @@ class ConnectionPatch(FancyArrowPatch):
             return
 
         FancyArrowPatch.draw(self, renderer)
-
-
-

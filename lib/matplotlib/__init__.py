@@ -99,7 +99,7 @@ to MATLAB&reg;, a registered trademark of The MathWorks, Inc.
 """
 from __future__ import generators
 
-__version__  = '1.1.1rc'
+__version__  = '1.1.1rc2'
 __version__numpy__ = '1.4' # minimum required numpy version
 
 import os, re, shutil, subprocess, sys, warnings
@@ -992,7 +992,7 @@ default_test_modules = [
     'matplotlib.tests.test_legend'
     ]
 
-def test(verbosity=0):
+def test(verbosity=1):
     """run the matplotlib test suite"""
     old_backend = rcParams['backend']
     try:
