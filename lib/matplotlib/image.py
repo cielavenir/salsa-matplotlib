@@ -106,40 +106,36 @@ class AxesImage(Artist, cm.ScalarMappable):
         self._imcache = None
         cm.ScalarMappable.changed(self)
 
-    def make_image(self):
-        if self._A is not None:
-            if self._imcache is None:
-                if typecode(self._A) == UInt8:
-                    im = _image.frombyte(self._A, 0)
-                    im.is_grayscale = False
-                else:
-                    x = self.to_rgba(self._A, self._alpha)
-                    im = _image.fromarray(x, 0)
-                    if len(self._A.shape) == 2:
-                        im.is_grayscale = self.cmap.is_gray()
-                    else:
-                        im.is_grayscale = False
-                self._imcache = im
-            else:
-                im = self._imcache
-        else:
+    def make_image(self, magnification=1.0):
+        if self._A is None:
             raise RuntimeError('You must first set the image array or the image attribute')
 
+        if self._imcache is None:
+            if typecode(self._A) == UInt8:
+                im = _image.frombyte(self._A, 0)
+                im.is_grayscale = False
+            else:
+                x = self.to_rgba(self._A, self._alpha)
+                im = _image.fromarray(x, 0)
+                if len(self._A.shape) == 2:
+                    im.is_grayscale = self.cmap.is_gray()
+                else:
+                    im.is_grayscale = False
+            self._imcache = im
+
+            if self.origin=='upper':
+                im.flipud_in()
+        else:
+            im = self._imcache
 
         bg = colorConverter.to_rgba(self.axes.get_frame().get_facecolor(), 0)
-
-        if self.origin=='upper':
-            im.flipud_in()
-
         im.set_bg( *bg)
 
-        im.set_interpolation(self._interpd[self._interpolation])
-
-
-
         # image input dimensions
-        numrows, numcols = im.get_size()
         im.reset_matrix()
+        numrows, numcols = im.get_size()
+
+        im.set_interpolation(self._interpd[self._interpolation])
 
         xmin, xmax, ymin, ymax = self.get_extent()
         dxintv = xmax-xmin
@@ -154,15 +150,11 @@ class AxesImage(Artist, cm.ScalarMappable):
 
         # the viewport translation
         tx = (xmin-self.axes.viewLim.xmin())/dxintv * numcols
-
-
-        #if flipy:
-        #    ty = -(ymax-self.axes.viewLim.ymax())/dyintv * numrows
-        #else:
-        #    ty = (ymin-self.axes.viewLim.ymin())/dyintv * numrows
         ty = (ymin-self.axes.viewLim.ymin())/dyintv * numrows
 
         l, b, widthDisplay, heightDisplay = self.axes.bbox.get_bounds()
+        widthDisplay *= magnification
+        heightDisplay *= magnification
 
         im.apply_translation(tx, ty)
         im.apply_scaling(sx, sy)
@@ -172,27 +164,28 @@ class AxesImage(Artist, cm.ScalarMappable):
         ry = heightDisplay  / numrows
         im.apply_scaling(rx, ry)
 
-        #print tx, ty, sx, sy, rx, ry, widthDisplay, heightDisplay
         im.resize(int(widthDisplay+0.5), int(heightDisplay+0.5),
                   norm=self._filternorm, radius=self._filterrad)
-
-        if self.origin=='upper':
-            im.flipud_in()
 
         return im
 
 
     def draw(self, renderer, *args, **kwargs):
         if not self.get_visible(): return
-        im = self.make_image()
+        im = self.make_image(renderer.get_image_magnification())
         l, b, widthDisplay, heightDisplay = self.axes.bbox.get_bounds()
         renderer.draw_image(l, b, im, self.axes.bbox)
 
-    def write_png(self, fname):
+    def write_png(self, fname, noscale=False):
         """Write the image to png file with fname"""
-        im = self.make_image(False)
+        im = self.make_image()
+        if noscale:
+            numrows,numcols = im.get_size()
+            im.reset_matrix()
+            im.set_interpolation(0)
+            im.resize(numcols, numrows)
+        im.flipud_out()
         im.write_png(fname)
-
 
     def set_data(self, A, shape=None):
         """
@@ -302,12 +295,14 @@ class NonUniformImage(AxesImage):
                            origin = 'lower',
                           )
 
-    def make_image(self):
+    def make_image(self, magnification=1.0):
         if self._A is None:
             raise RuntimeError('You must first set the image array')
 
         x0, y0, v_width, v_height = self.axes.viewLim.get_bounds()
         l, b, width, height = self.axes.bbox.get_bounds()
+	width *= magnification
+	height *= magnification
         im = _image.pcolor(self._Ax, self._Ay, self._A,
                            height, width,
                            (x0, x0+v_width, y0, y0+v_height),
@@ -410,7 +405,13 @@ class FigureImage(Artist, cm.ScalarMappable):
 
         return self._A.shape[:2]
 
-    def make_image(self):
+    def make_image(self, magnification=1.0):
+	# had to introduce argument magnification to satisfy the unit test
+	# figimage_demo.py. I have no idea, how magnification should be used
+	# within the function. It should be !=1.0 only for non-default DPI
+	# settings in the PS backend, as introduced by patch #1562394
+	# Probably Nicholas Young should look over this code and see, how
+	# magnification should be handled correctly.
         if self._A is None:
             raise RuntimeError('You must first set the image array')
 

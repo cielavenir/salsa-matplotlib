@@ -1,6 +1,6 @@
 /*
  * The Python Imaging Library.
- * $Id: _tkagg.cpp 2145 2006-03-14 16:06:52 -0500 (Tue, 14 Mar 2006) jdh2358 $
+ * $Id: _tkagg.cpp 2145 2006-03-14 21:06:52Z jdh2358 $
  *
  */
 

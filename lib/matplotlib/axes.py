@@ -14,8 +14,9 @@ import matplotlib.mlab
 from artist import Artist, setp
 from axis import XAxis, YAxis
 from cbook import iterable, is_string_like, flatten, enumerate, \
-     allequal, dict_delall, popd, popall, silent_list
-from collections import RegularPolyCollection, PolyCollection, LineCollection, QuadMesh
+     allequal, dict_delall, popd, popall, silent_list, is_numlike
+from collections import RegularPolyCollection, PolyCollection, LineCollection, QuadMesh, \
+     StarPolygonCollection
 from colors import colorConverter, normalize, Colormap, \
         LinearSegmentedColormap, looks_like_color, is_color_like
 import cm
@@ -36,12 +37,12 @@ from matplotlib.numerix.mlab import flipud, amin, amax
 from matplotlib import rcParams
 from patches import Patch, Rectangle, Circle, Polygon, Arrow, Wedge, Shadow, FancyArrow, bbox_artist
 import table
-from text import Text, TextWithDash, _process_text_args
+from text import Text, TextWithDash, Annotation, _process_text_args
 from transforms import Bbox, Point, Value, Affine, NonseparableTransformation
 from transforms import  FuncXY, Func, LOG10, IDENTITY, POLAR
 from transforms import get_bbox_transform, unit_bbox, one, origin, zero
 from transforms import blend_xy_sep_transform, Interval, identity_transform
-from transforms import PBox
+from transforms import PBox, identity_transform
 from font_manager import FontProperties
 
 from quiver import Quiver, QuiverKey
@@ -108,9 +109,9 @@ def _process_plot_format(fmt):
         }
 
 
-    linestyle = 'None'
-    marker = 'None'
-    color = rcParams['lines.color']
+    linestyle = None
+    marker = None
+    color = None
 
     # handle the multi char special cases and strip them from the
     # string
@@ -120,27 +121,35 @@ def _process_plot_format(fmt):
     if fmt.find('-.')>=0:
         linestyle = '-.'
         fmt = fmt.replace('-.', '')
+    if fmt.find(' ')>=0:
+        linestyle = 'None'
+        fmt = fmt.replace(' ', '')
 
     chars = [c for c in fmt]
 
     for c in chars:
         if lineStyles.has_key(c):
-            if linestyle != 'None':
+            if linestyle is not None:
                 raise ValueError, 'Illegal format string "%s"; two linestyle symbols' % fmt
-
             linestyle = c
         elif lineMarkers.has_key(c):
-            if marker != 'None':
+            if marker is not None:
                 raise ValueError, 'Illegal format string "%s"; two marker symbols' % fmt
             marker = c
         elif colors.has_key(c):
+            if color is not None:
+                raise ValueError, 'Illegal format string "%s"; two color symbols' % fmt
             color = c
         else:
             err = 'Unrecognized character %c in format string' % c
             raise ValueError, err
 
-    if linestyle == 'None' and marker == 'None':
+    if linestyle is None and marker is None:
         linestyle = rcParams['lines.linestyle']
+    if linestyle is None:
+        linestyle = 'None'
+    if marker is None:
+        marker = 'None'
 
     return linestyle, marker, color
 
@@ -177,6 +186,14 @@ class _process_plot_var_args:
 
         self.count = 0
 
+    def _get_next_cycle_color(self):
+        if self.count==0:
+            color = self.firstColor
+        else:
+            color = self.colors[int(self.count % self.Ncolors)]
+        self.count += 1
+        return color
+
     def __call__(self, *args, **kwargs):
         ret =  self._grab_next_args(*args, **kwargs)
         return ret
@@ -199,30 +216,17 @@ class _process_plot_var_args:
             func = getattr(fill_poly,funcName)
             func(val)
 
-
-    def is_filled(self, marker):
-        filled = ('o', '^', 'v', '<', '>', 's',
-                  'd', 'D', 'h', 'H',
-                  'p')
-        return marker in filled
-
-
     def _plot_1_arg(self, y, **kwargs):
         assert self.command == 'plot', 'fill needs at least 2 arguments'
-        if self.count==0:
-            color = self.firstColor
-        else:
-            color = self.colors[int(self.count % self.Ncolors)]
+        color = self._get_next_cycle_color()
 
         assert(iterable(y))
         try: N=max(y.shape)
         except AttributeError: N = len(y)
         ret =  Line2D(arange(N), y,
                       color = color,
-                      markerfacecolor=color,
                       )
         self.set_lineprops(ret, **kwargs)
-        self.count += 1
         return ret
 
     def _plot_2_args(self, tup2, **kwargs):
@@ -232,16 +236,14 @@ class _process_plot_var_args:
             y, fmt = tup2
             assert(iterable(y))
             linestyle, marker, color = _process_plot_format(fmt)
+            if color is None:
+                color = self._get_next_cycle_color()
 
-            if self.is_filled(marker): mec = None # use default
-            else: mec = color                     # use current color
             try: N=max(y.shape)
             except AttributeError: N = len(y)
 
             ret =  Line2D(xdata=arange(N), ydata=y,
                           color=color, linestyle=linestyle, marker=marker,
-                          markerfacecolor=color,
-                          markeredgecolor=mec,
                           )
             self.set_lineprops(ret, **kwargs)
             return ret
@@ -252,13 +254,11 @@ class _process_plot_var_args:
             assert(iterable(x))
             assert(iterable(y))
             if self.command == 'plot':
-                c = self.colors[self.count % self.Ncolors]
+                color = self._get_next_cycle_color()
                 ret =  Line2D(x, y,
-                              color = c,
-                              markerfacecolor = c,
+                              color = color,
                               )
                 self.set_lineprops(ret, **kwargs)
-                self.count += 1
             elif self.command == 'fill':
                 ret = Polygon( zip(x,y), fill=True, )
                 self.set_patchprops(ret, **kwargs)
@@ -272,13 +272,11 @@ class _process_plot_var_args:
             assert(iterable(y))
 
             linestyle, marker, color = _process_plot_format(fmt)
-            if self.is_filled(marker): mec = None # use default
-            else: mec = color                     # use current color
+            if color is None:
+                color = self._get_next_cycle_color()
 
-            ret = Line2D(x, y, color=color,
-                         linestyle=linestyle, marker=marker,
-                         markerfacecolor=color,
-                         markeredgecolor=mec,
+            ret = Line2D(x, y,
+                         color=color, linestyle=linestyle, marker=marker,
                          )
             self.set_lineprops(ret, **kwargs)
         if self.command == 'fill':
@@ -387,6 +385,11 @@ class Axes(Artist):
 
         if len(kwargs): setp(self, **kwargs)
 
+
+    def get_window_extent(self, *args, **kwargs):
+        'get the axes bounding box in display space'
+        return self.bbox
+    
     def _init_axis(self):
         "move this out of __init__ because non-separable axes don't use it"
         self.xaxis = XAxis(self)
@@ -857,6 +860,7 @@ class Axes(Artist):
 
     def add_artist(self, a):
         'Add any artist to the axes'
+        a.axes = self  # refer to parent
         self.artists.append(a)
         self._set_artist_props(a)
 
@@ -1006,20 +1010,22 @@ class Axes(Artist):
         if self.axison and self._frameon: self.axesPatch.draw(renderer)
         artists = []
 
-        if len(self.images)==1:
-            im = self.images[0]
-            artists.append(im)
-
-        elif len(self.images)>1:
-
+        if len(self.images)<=1 or renderer.option_image_nocomposite():
+            for im in self.images:
+                im.draw(renderer)
+        else:
             # make a composite image blending alpha
             # list of (_image.Image, ox, oy)
 
 
-            ims = [(im.make_image(),0,0) for im in self.images if im.get_visible()]
+            mag = renderer.get_image_magnification()
+            ims = [(im.make_image(mag),0,0)
+                   for im in self.images if im.get_visible()]
 
 
-            im = _image.from_images(self.bbox.height(), self.bbox.width(), ims)
+            im = _image.from_images(self.bbox.height()*mag,
+                                    self.bbox.width()*mag,
+                                    ims)
             im.is_grayscale = False
             l, b, w, h = self.bbox.get_bounds()
             # composite images need special args so they will not
@@ -1180,7 +1186,7 @@ class Axes(Artist):
         return self.viewLim.intervalx().get_bounds()
 
 
-    def set_xlim(self, *args, **kwargs):
+    def set_xlim(self, xmin=None, xmax=None, emit=False):
         """
         set_xlim(self, *args, **kwargs):
 
@@ -1203,34 +1209,24 @@ class Axes(Artist):
         ACCEPTS: len(2) sequence of floats
         """
 
-        vmin, vmax = self.get_xlim()
+        if xmax is None and hasattr(xmin,'__len__'):
+            xmin,xmax = xmin
 
-        xmin = popd(kwargs, 'xmin', None)
-        xmax = popd(kwargs, 'xmax', None)
-        emit = popd(kwargs, 'emit', False)
-        if len(args)!=0 and (xmin is not None or xmax is not None):
-            raise TypeError('You cannot pass args and xmin/xmax kwargs')
+        old_xmin,old_xmax = self.get_xlim()
+        if xmin is None: xmin = old_xmin
+        if xmax is None: xmax = old_xmax
 
-        if len(args)==0:
-            if xmin is not None: vmin = xmin
-            if xmax is not None: vmax = xmax
-        elif len(args)==1:
-            vmin, vmax = args[0]
-        elif len(args)==2:
-            vmin, vmax = args
-        else:
-            raise ValueError('args must be length 0, 1 or 2')
-
-        if self.transData.get_funcx().get_type()==LOG10 and min(vmin, vmax)<=0:
+        if self.transData.get_funcx().get_type()==LOG10 and min(xmin, xmax)<=0:
             raise ValueError('Cannot set nonpositive limits with log transform')
 
-        if abs(vmax - vmin) < 1e-38:
-            warnings.warn("vmax too close to vmin; adjusting")
-            vmin -= 1e-38
-            vmax += 1e-38
-        self.viewLim.intervalx().set_bounds(vmin, vmax)
+        if abs(xmax - xmin) < 1e-38:
+            warnings.warn("xmax too close to xmin; adjusting")
+            xmin -= 1e-38
+            xmax += 1e-38
+
+        self.viewLim.intervalx().set_bounds(xmin, xmax)
         if emit: self._send_xlim_event()
-        return vmin, vmax
+        return xmin, xmax
 
     def get_xscale(self):
         'return the xaxis scale string: log or linear'
@@ -1303,7 +1299,7 @@ class Axes(Artist):
         'Get the y axis range [ymin, ymax]'
         return self.viewLim.intervaly().get_bounds()
 
-    def set_ylim(self, *args, **kwargs):
+    def set_ylim(self, ymin=None, ymax=None, emit=False):
         """
         set_ylim(self, *args, **kwargs):
 
@@ -1326,33 +1322,23 @@ class Axes(Artist):
         ACCEPTS: len(2) sequence of floats
         """
 
-        vmin, vmax = self.get_ylim()
+        if ymax is None and hasattr(ymin,'__len__'):
+            ymin,ymax = ymin
 
-        ymin = popd(kwargs, 'ymin', None)
-        ymax = popd(kwargs, 'ymax', None)
-        emit = popd(kwargs, 'emit', False)
-        if len(args)!=0 and (ymin is not None or ymax is not None):
-            raise TypeError('You cannot pass args and ymin/ymax kwargs')
+        old_ymin,old_ymax = self.get_ylim()
+        if ymin is None: ymin = old_ymin
+        if ymax is None: ymax = old_ymax
 
-        if len(args)==0:
-            if ymin is not None: vmin = ymin
-            if ymax is not None: vmax = ymax
-        elif len(args)==1:
-            vmin, vmax = args[0]
-        elif len(args)==2:
-            vmin, vmax = args
-        else:
-            raise ValueError('args must be length 0, 1 or 2')
-
-        if self.transData.get_funcy().get_type()==LOG10 and min(vmin, vmax)<=0:
+        if self.transData.get_funcy().get_type()==LOG10 and min(ymin, ymax)<=0:
             raise ValueError('Cannot set nonpositive limits with log transform')
-        if abs(vmax - vmin) < 1e-38:
-            warnings.warn("vmax too close to vmin; adjusting")
-            vmin -= 1e-38
-            vmax += 1e-38
-        self.viewLim.intervaly().set_bounds(vmin, vmax)
+        if abs(ymax - ymin) < 1e-38:
+            warnings.warn("ymax too close to ymin; adjusting")
+            ymin -= 1e-38
+            ymax += 1e-38
+
+        self.viewLim.intervaly().set_bounds(ymin, ymax)
         if emit: self._send_ylim_event()
-        return vmin, vmax
+        return ymin, ymax
 
     def get_yscale(self):
         'return the yaxis scale string: log or linear'
@@ -1788,6 +1774,22 @@ class Axes(Artist):
         if kwargs.has_key('clip_on'):  t.set_clip_box(self.bbox)
         return t
 
+    def annotate(self, *args, **kwargs):
+        """
+        annotate(self, s, xyloc, textloc,
+                 xycoords='data', textcoords='data',
+                 lineprops=None,
+                 markerprops=None
+                 **props)
+
+%s
+        """%Annotation.__doc__
+        a = Annotation(*args, **kwargs)
+        a.set_transform(identity_transform())
+        self._set_artist_props(a)
+        self.texts.append(a)
+        return a
+        
 
     #### Lines and spans
 
@@ -1947,7 +1949,8 @@ class Axes(Artist):
         Returns a list of line instances that were added
         """
         linestyle, marker, color = _process_plot_format(fmt)
-
+        if color is None:
+            color = 'k'
 
         if not iterable(y): y = [y]
         if not iterable(xmin): xmin = [xmin]
@@ -1994,7 +1997,8 @@ class Axes(Artist):
         Returns a list of lines that were added
         """
         linestyle, marker, color = _process_plot_format(fmt)
-
+        if color is None:
+            color = 'k'
 
         if not iterable(x): x = [x]
         if not iterable(ymin): ymin = [ymin]
@@ -2115,12 +2119,11 @@ class Axes(Artist):
         information
         """
 
-        d = kwargs.copy()
-        scalex = d.pop('scalex', True)
-        scaley = d.pop('scaley', True)
+        scalex = popd(kwargs, 'scalex', True)
+        scaley = popd(kwargs, 'scaley', True)
         if not self._hold: self.cla()
         lines = []
-        for line in self._get_lines(*args, **d):
+        for line in self._get_lines(*args, **kwargs):
             self.add_line(line)
             lines.append(line)
         lines = [line for line in lines] # consume the generator
@@ -2195,16 +2198,15 @@ class Axes(Artist):
         """
         if not self._hold: self.cla()
 
-        dx = {'basex': kwargs.get('basex', 10),
-              'subsx': kwargs.get('subsx', None),
+        dx = {'basex': popd(kwargs,'basex', 10),
+              'subsx': popd(kwargs,'subsx', None),
               }
-        dy = {'basey': kwargs.get('basey', 10),
-              'subsy': kwargs.get('subsy', None),
+        dy = {'basey': popd(kwargs,'basey', 10),
+              'subsy': popd(kwargs,'subsy', None),
               }
 
         self.set_xscale('log', **dx)
         self.set_yscale('log', **dy)
-        dict_delall( kwargs, ('basex', 'basey', 'subsx', 'subsy'))
 
         b =  self._hold
         self._hold = True # we've already processed the hold
@@ -2232,12 +2234,11 @@ class Axes(Artist):
 
         """
         if not self._hold: self.cla()
-        d = {'basex': kwargs.get('basex', 10),
-             'subsx': kwargs.get('subsx', None),
+        d = {'basex': popd(kwargs, 'basex', 10),
+             'subsx': popd(kwargs, 'subsx', None),
              }
 
         self.set_xscale('log', **d)
-        dict_delall( kwargs, ('basex', 'subsx'))
         b =  self._hold
         self._hold = True # we've already processed the hold
         l = self.plot(*args, **kwargs)
@@ -2265,11 +2266,10 @@ class Axes(Artist):
         """
         if not self._hold: self.cla()
 
-        d = {'basey': kwargs.get('basey', 10),
-             'subsy': kwargs.get('subsy', None),
+        d = {'basey': popd(kwargs,'basey', 10),
+             'subsy': popd(kwargs,'subsy', None),
              }
         self.set_yscale('log', **d)
-        dict_delall( kwargs, ('basey', 'subsy'))
         b =  self._hold
         self._hold = True # we've already processed the hold
         l = self.plot(*args, **kwargs)
@@ -2908,8 +2908,6 @@ class Axes(Artist):
             l.set_color(ecolor)
         for l in caplines:
             l.set_color(ecolor)
-            l.set_markerfacecolor(ecolor)
-            l.set_markeredgecolor(ecolor)
 
         self.autoscale_view()
 
@@ -3119,9 +3117,8 @@ class Axes(Artist):
             'h' : hexagon
             '8' : octagon
 
-
-        if marker is None and verts is not None, verts is a sequence
-        of (x,y) vertices for a custom scatter symbol.  The
+        If marker is None and verts is not None, verts is a sequence
+        of (x,y) vertices for a custom scatter symbol.
 
         s is a size argument in points squared.
 
@@ -3190,26 +3187,74 @@ class Axes(Artist):
         if faceted: edgecolors = None
         else: edgecolors = 'None'
 
-        sym = syms.get(marker)
-        if sym is None and verts is None:
-            raise ValueError('Unknown marker symbol to scatter')
-
-        if sym is not None:
+        sym = None
+        starlike = False
+        
+        # to be API compatible
+        if marker is None and not (verts is None):
+            marker = (verts, 0)
+            verts = None
+        
+        if is_string_like(marker):
+            # the standard way to define symbols using a string character
+            sym = syms.get(marker)
+            if sym is None and verts is None:
+                raise ValueError('Unknown marker symbol to scatter')
             numsides, rotation = syms[marker]
-            collection = RegularPolyCollection(
-                self.figure.dpi,
-                numsides, rotation, scales,
-                facecolors = colors,
-                edgecolors = edgecolors,
-                linewidths = linewidths,
-                offsets = zip(x,y),
-                transOffset = self.transData,
-                )
+        
+        elif iterable(marker):
+            # accept marker to be:
+            #    (numsides, style, [angle])
+            # or
+            #    (verts[], style, [angle])
+            
+            if len(marker)<2 or len(marker)>3:
+                raise ValueError('Cannot create markersymbol from marker')
+            
+            if is_numlike(marker[0]):
+                # (numsides, style, [angle])
+                
+                if len(marker)==2:
+                    numsides, rotation = marker[0], math.pi/4.
+                elif len(marker)==3:
+                    numsides, rotation = marker[0], marker[2]
+                sym = True
+                
+                if marker[1]==1:
+                    # starlike symbol, everthing else is interpreted as solid symbol
+                    starlike = True
+            
+            else:
+                verts = asarray(marker[0])
+                
+        if sym is not None:
+            if not starlike:
+                collection = RegularPolyCollection(
+                    self.figure.dpi,
+                    numsides, rotation, scales,
+                    facecolors = colors,
+                    edgecolors = edgecolors,
+                    linewidths = linewidths,
+                    offsets = zip(x,y),
+                    transOffset = self.transData,
+                    )
+            else:
+                collection = StarPolygonCollection(
+                    self.figure.dpi,
+                    numsides, rotation, scales,
+                    facecolors = colors,
+                    edgecolors = edgecolors,
+                    linewidths = linewidths,
+                    offsets = zip(x,y),
+                    transOffset = self.transData,
+                    )
         else:
-            verts = asarray(verts)
-            # hmm, the scaling is whacked -- how do we want to scale with custom verts?
+            # rescale verts
+            rescale = sqrt(max(verts[:,0]**2+verts[:,1]**2))
+            verts /= rescale
+            
             scales = asarray(scales)
-            #scales = sqrt(scales * self.figure.dpi.get() / 72.)
+            scales = sqrt(scales * self.figure.dpi.get() / 72.)
             if len(scales)==1:
                 verts = [scales[0]*verts]
             else:
@@ -3323,7 +3368,6 @@ class Axes(Artist):
         self.autoscale_view()
         return q
     quiver2.__doc__ = Quiver.quiver_doc
-
     def quiver(self, *args, **kw):
         if (len(args) == 3 or len(args) == 5) and not iterable(args[-1]):
             return self.quiver_classic(*args, **kw)
@@ -3418,14 +3462,17 @@ class Axes(Artist):
             V = V*(S/Nmax)
             N = N*Nmax
 
-        alpha = kwargs.get('alpha', 1.0)
-        width = kwargs.get('width', .5)
-        norm = kwargs.get('norm', None)
-        cmap = kwargs.get('cmap', None)
-        vmin = kwargs.get('vmin', None)
-        vmax = kwargs.get('vmax', None)
-        color = kwargs.get('color', None)
-        shading = kwargs.get('shading', 'faceted')
+        alpha = popd(kwargs,'alpha', 1.0)
+        width = popd(kwargs,'width', .5)
+        norm = popd(kwargs,'norm', None)
+        cmap = popd(kwargs,'cmap', None)
+        vmin = popd(kwargs,'vmin', None)
+        vmax = popd(kwargs,'vmax', None)
+        color = popd(kwargs,'color', None)
+        shading = popd(kwargs,'shading', 'faceted')
+
+        if len(kwargs):
+            raise TypeError, "quiver() got an unexpected keyword argument '%s'"%kwargs.keys()[0]
 
         C = None
         if color == 'length' or color is True:
@@ -3721,12 +3768,15 @@ class Axes(Artist):
         """
         if not self._hold: self.cla()
 
-        alpha = kwargs.get('alpha', 1.0)
-        norm = kwargs.get('norm', None)
-        cmap = kwargs.get('cmap', None)
-        vmin = kwargs.get('vmin', None)
-        vmax = kwargs.get('vmax', None)
-        shading = kwargs.get('shading', 'faceted')
+        alpha = popd(kwargs,'alpha', 1.0)
+        norm = popd(kwargs,'norm', None)
+        cmap = popd(kwargs,'cmap', None)
+        vmin = popd(kwargs,'vmin', None)
+        vmax = popd(kwargs,'vmax', None)
+        shading = popd(kwargs,'shading', 'faceted')
+
+	if len(kwargs):
+            raise TypeError, "pcolor() got an unexpected keyword argument '%s'"%kwargs.keys()[0]
 
         if len(args)==1:
             C = args[0]
@@ -3972,10 +4022,13 @@ class Axes(Artist):
         """
 
         if not self._hold: self.cla()
-        shading = kwargs.get('shading', 'faceted')
-        cmap = kwargs.get('cmap', cm.get_cmap())
-        norm = kwargs.get('norm', normalize())
-        alpha = kwargs.get('alpha', 1.0)
+        shading = popd(kwargs,'shading', 'faceted')
+        cmap = popd(kwargs,'cmap', cm.get_cmap())
+        norm = popd(kwargs,'norm', normalize())
+        alpha = popd(kwargs,'alpha', 1.0)
+
+	if len(kwargs):
+            raise TypeError, "pcolor_classic() got an unexpected keyword argument '%s'"%kwargs.keys()[0]
 
         if len(args)==1:
             C = args[0]
@@ -4347,7 +4400,7 @@ class SubplotBase:
       Subplot(211)    # 2 rows, 1 column, first (upper) plot
     """
 
-    def __init__(self, fig, *args, **kwargs):
+    def __init__(self, fig, *args):
         """
         fig is a figure instance
 
@@ -4541,6 +4594,7 @@ class PolarAxes(Axes):
         self.lines = []
         self.images = []
         self.patches = []
+        self.artists = []
         self.collections = []
         self.texts = []     # text in axis coords
 
@@ -4745,6 +4799,7 @@ class PolarAxes(Axes):
         artists.extend(self.texts)
         artists.extend(self.collections)
         artists.extend(self.patches)
+        artists.extend(self.artists)        
         dsu = [ (a.zorder, a) for a in artists]
         dsu.sort()
 

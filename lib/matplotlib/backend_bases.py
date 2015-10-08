@@ -46,6 +46,14 @@ class RendererBase:
         """
         raise NotImplementedError
 
+    def get_image_magnification(self):
+        """
+        Get the factor by which to magnify images passed to draw_image.  
+        Allows a backend to have images at a different resolution to other
+        artists.
+        """
+        return 1.0
+
     def draw_image(self, x, y, im, bbox):
         """
         Draw the Image instance into the current axes; x is the
@@ -58,6 +66,13 @@ class RendererBase:
         None
         """
         raise NotImplementedError
+
+    def option_image_nocomposite(self):
+        """
+        overwrite this method for renderers that do not necessarily
+        want to rescale and composite raster images. (like SVG)
+        """
+        return False
 
     def _draw_markers(self, bgc, path, rgbFace, x, y, trans):
         """
@@ -910,7 +925,7 @@ class FigureCanvasBase:
         (depending on the backend), truncated to integers"""
         return int(self.figure.bbox.width()), int(self.figure.bbox.height())
 
-    def print_figure(self, filename, dpi=300, facecolor='w', edgecolor='w',
+    def print_figure(self, filename, dpi=None, facecolor='w', edgecolor='w',
                      orientation='portrait', **kwargs):
         """
         Render the figure to hardcopy. Set the figure patch face and edge
@@ -920,6 +935,7 @@ class FigureCanvasBase:
 
         filename    - can also be a file object on image backends
         orientation - only currently applies to PostScript printing.
+        dpi - the dots per inch to save the figure in; if None, use savefig.dpi
         """
         pass
 

@@ -159,6 +159,10 @@ class Figure(Artist):
 
         self._cachedRenderer = None
 
+    def get_window_extent(self, *args, **kwargs):
+        'get the figure bounding box in display space'
+        return self.bbox
+
     def set_canvas(self, canvas):
         """
         Set the canvas the contains the figure
@@ -425,7 +429,7 @@ class Figure(Artist):
         if not len(args): return
         if isinstance(args[0], Axes):
             a = args[0]
-            a.set_figure(self)
+            assert(a.get_figure() is self)            
         else:
             rect = args[0]
             ispolar = popd(kwargs, 'polar', False)
@@ -459,7 +463,6 @@ class Figure(Artist):
         """
 
         key = self._make_key(*args, **kwargs)
-
         if self._seen.has_key(key):
             ax = self._seen[key]
             self.sca(ax)
@@ -468,9 +471,9 @@ class Figure(Artist):
 
         if not len(args): return
 
-        if isinstance(args[0], Subplot) or isinstance(args, PolarSubplot):
+        if isinstance(args[0], Subplot) or isinstance(args[0], PolarSubplot):
             a = args[0]
-            a.set_figure(self)
+            assert(a.get_figure() is self)
         else:
             ispolar = popd(kwargs, 'polar', False)
             if ispolar:
@@ -519,19 +522,22 @@ class Figure(Artist):
         for p in self.patches: p.draw(renderer)
         for l in self.lines: l.draw(renderer)
 
-        if len(self.images)==1:
-            im = self.images[0]
-            im.draw(renderer)
-        elif len(self.images)>1:
+        if len(self.images)<=1 or renderer.option_image_nocomposite() or not allequal([im.origin for im in self.images]):
+            for im in self.images:
+                im.draw(renderer)
+        else:
             # make a composite image blending alpha
             # list of (_image.Image, ox, oy)
-            if not allequal([im.origin for im in self.images]):
-                raise ValueError('Composite images with different origins not supported')
-            ims = [(im.make_image(), im.ox, im.oy) for im in self.images]
-            im = _image.from_images(self.bbox.height(), self.bbox.width(), ims)
+
+            mag = renderer.get_image_magnification()
+            ims = [(im.make_image(mag), im.ox*mag, im.oy*mag)
+                   for im in self.images]
+            im = _image.from_images(self.bbox.height()*mag,
+                                    self.bbox.width()*mag,
+                                    ims)
             im.is_grayscale = False
             l, b, w, h = self.bbox.get_bounds()
-            renderer.draw_image(0, 0, im, self.bbox)
+            renderer.draw_image(l, b, im, self.bbox)
 
 
         # render the axes
@@ -641,18 +647,19 @@ class Figure(Artist):
 
     def savefig(self, *args, **kwargs):
         """
-        SAVEFIG(fname, dpi=150, facecolor='w', edgecolor='w',
+        SAVEFIG(fname, dpi=None, facecolor='w', edgecolor='w',
         orientation='portrait', papertype=None, format=None):
 
         Save the current figure.
 
-        fname - the filename to save the current figure to.
-                The output formats supported depend on the backend being used.
-                and are deduced by the extension to fname.
-                Possibilities are eps, jpeg, pdf, png, ps, svg.
-                fname can also be a file or file-like object - cairo backend
-                only.
-        dpi - is the resolution in dots per inch.
+        fname - the filename to save the current figure to.  The
+                output formats supported depend on the backend being
+                used.  and are deduced by the extension to fname.
+                Possibilities are eps, jpeg, pdf, png, ps, svg.  fname
+                can also be a file or file-like object - cairo backend
+                only.  dpi - is the resolution in dots per inch.  If
+                None it will default to the value savefig.dpi in the
+                matplotlibrc file
 
         facecolor and edgecolor are the colors of the figure rectangle
 

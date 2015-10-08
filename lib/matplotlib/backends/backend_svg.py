@@ -2,7 +2,7 @@ from __future__ import division
 
 import os, codecs, base64, tempfile
 
-from matplotlib import verbose, __version__
+from matplotlib import verbose, __version__, rcParams
 from matplotlib.backend_bases import RendererBase, GraphicsContextBase,\
      FigureManagerBase, FigureCanvasBase
 from matplotlib.colors import rgb2hex
@@ -24,12 +24,16 @@ def new_figure_manager(num, *args, **kwargs):
 _fontd = {}
 _capstyle_d = {'projecting' : 'square', 'butt' : 'butt', 'round': 'round',}
 class RendererSVG(RendererBase):
-    def __init__(self, width, height, svgwriter):
+    def __init__(self, width, height, svgwriter, basename=None):
         self.width=width
         self.height=height
         self._svgwriter = svgwriter
 
         self._groupd = {}
+        if not rcParams['svg.image_inline']:
+            assert basename is not None
+            self.basename = basename
+            self._imaged = {}
         self._clipd = {}
         svgwriter.write(svgProlog%(width,height,width,height))
 
@@ -38,11 +42,11 @@ class RendererSVG(RendererBase):
         if clipid is None:
             clippath = ''
         else:
-            clippath = 'clip-path:url(#%s);' % clipid
+            clippath = 'clip-path="url(#%s)"' % clipid
 
-        self._svgwriter.write ('%s<%s %s %s/>\n' % (
+        self._svgwriter.write ('%s<%s %s %s %s/>\n' % (
             cliprect,
-            element, self._get_style(gc, rgbFace, clippath), details))
+            element, self._get_style(gc, rgbFace), clippath, details))
 
     def _get_font(self, prop):
         key = hash(prop)
@@ -56,7 +60,7 @@ class RendererSVG(RendererBase):
         font.set_size(size, 72.0)
         return font
 
-    def _get_style(self, gc, rgbFace, clippath):
+    def _get_style(self, gc, rgbFace):
         """
         return the style string.
         style is generated from the GraphicsContext, rgbFace and clippath
@@ -76,20 +80,20 @@ class RendererSVG(RendererBase):
         linewidth = gc.get_linewidth()
         if linewidth:
             return 'style="fill: %s; stroke: %s; stroke-width: %f; ' \
-                'stroke-linejoin: %s; stroke-linecap: %s; %s opacity: %f; ' \
-                '%s"' % (fill,
+                'stroke-linejoin: %s; stroke-linecap: %s; %s opacity: %f"' % (
+                         fill,
                          rgb2hex(gc.get_rgb()),
                          linewidth,
                          gc.get_joinstyle(),
                          _capstyle_d[gc.get_capstyle()],
                          dashes,
                          gc.get_alpha(),
-                         clippath,)
+                )
         else:
-            return 'style="fill: %s; opacity: %f; ' \
-                '%s"' % (fill,
+            return 'style="fill: %s; opacity: %f"' % (\
+                         fill,
                          gc.get_alpha(),
-                         clippath,)
+                )
 
     def _get_gc_clip_svg(self, gc):
         cliprect = gc.get_clip_rectangle()
@@ -130,40 +134,68 @@ class RendererSVG(RendererBase):
             (x,  self.height-y, width/2.0, height/2.0, -rotation, x, self.height-y)
         self._draw_svg_element('ellipse', details, gc, rgbFace)
 
+    def option_image_nocomposite(self):
+        """
+        if svg.image_noscale is True, compositing multiple images into one is prohibited
+        """
+        return rcParams['svg.image_noscale']
+
     def draw_image(self, x, y, im, bbox):
-        filename = os.path.join (tempfile.gettempdir(),
-                                 tempfile.gettempprefix() + '.png'
-                                 )
-
-        verbose.report ('Writing image file for include: %s' % filename)
-        # im.write_png() accepts a filename, not file object, would be
-        # good to avoid using files and write to mem with StringIO
-
-        # JDH: it *would* be good, but I don't know how to do this
-        # since libpng seems to want a FILE* and StringIO doesn't seem
-        # to provide one.  I suspect there is a way, but I don't know
-        # it
-
-        im.flipud_out()
+        trans = [1,0,0,1,0,0]
+        transstr = ''
+        if rcParams['svg.image_noscale']:
+            trans = list(im.get_matrix())
+            if im.get_interpolation() != 0:
+                trans[4] += trans[0]
+                trans[5] += trans[3]
+            trans[5] = -trans[5]
+            transstr = 'transform="matrix(%f %f %f %f %f %f)" '%tuple(trans)
+            assert trans[1] == 0
+            assert trans[2] == 0
+            numrows,numcols = im.get_size()
+            im.reset_matrix()
+            im.set_interpolation(0)
+            im.resize(numcols, numrows)
 
         h,w = im.get_size_out()
-        y = self.height-y-h
-        im.write_png(filename)
 
-        imfile = file (filename, 'r')
-        image64 = base64.encodestring (imfile.read())
-        imfile.close()
-        os.remove(filename)
-        lines = [image64[i:i+76] for i in range(0, len(image64), 76)]
+        if rcParams['svg.image_inline']:
+            filename = os.path.join (tempfile.gettempdir(),
+                                    tempfile.gettempprefix() + '.png'
+                                    )
+
+            verbose.report ('Writing temporary image file for inlining: %s' % filename)
+            # im.write_png() accepts a filename, not file object, would be
+            # good to avoid using files and write to mem with StringIO
+
+            # JDH: it *would* be good, but I don't know how to do this
+            # since libpng seems to want a FILE* and StringIO doesn't seem
+            # to provide one.  I suspect there is a way, but I don't know
+            # it
+
+            im.flipud_out()
+            im.write_png(filename)
+            im.flipud_out()
+
+            imfile = file (filename, 'r')
+            image64 = base64.encodestring (imfile.read())
+            imfile.close()
+            os.remove(filename)
+            hrefstr = 'data:image/png;base64,\n' + image64
+
+        else:
+            self._imaged[self.basename] = self._imaged.get(self.basename,0) + 1
+            filename = '%s.image%d.png'%(self.basename, self._imaged[self.basename])
+            verbose.report( 'Writing image file for inclusion: %s' % filename)
+            im.flipud_out()
+            im.write_png(filename)
+            im.flipud_out()
+            hrefstr = filename
 
         self._svgwriter.write (
             '<image x="%f" y="%f" width="%f" height="%f" '
-            'xlink:href="data:image/png;base64,\n%s" />\n'
-            % (x, y, w+1, h+1, '\n'.join(lines))
+            'xlink:href="%s" %s/>\n'%(x/trans[0], (self.height-y)/trans[3]-h, w, h, hrefstr, transstr)
             )
-
-         # unflip
-        im.flipud_out()
 
     def draw_line(self, gc, x1, y1, x2, y2):
         details = 'd="M %f,%f L %f,%f"' % (x1, self.height-y1,
@@ -185,7 +217,7 @@ class RendererSVG(RendererBase):
 
     def draw_point(self, gc, x, y):
         # result seems to have a hole in it...
-        self.draw_arc(gc, gc.get_rgb(), x, y, 1, 0, 0, 0)
+        self.draw_arc(gc, gc.get_rgb(), x, y, 1, 0, 0, 0, 0)
 
     def draw_polygon(self, gc, rgbFace, points):
         details = 'points = "%s"' % ' '.join(['%f,%f'%(x,self.height-y)
@@ -225,24 +257,33 @@ class RendererSVG(RendererBase):
         Draw math text using matplotlib.mathtext
         """
         fontsize = prop.get_size_in_points()
-        width, height, svg_glyphs = math_parse_s_ft2font_svg(s, 72, fontsize)
+        width, height, svg_elements = math_parse_s_ft2font_svg(s,
+                                                                72, fontsize)
+        svg_glyphs = svg_elements.svg_glyphs
+        svg_lines = svg_elements.svg_lines
         color = rgb2hex(gc.get_rgb())
 
         svg = ""
         self.open_group("mathtext")
-        for fontname, fontsize, num, ox, oy, metrics in svg_glyphs:
-            thetext=unichr(num)
-            thetext.encode('utf-8')
-            style = 'font-size: %f; font-family: %s; fill: %s;'%(fontsize, fontname, color)
+        for fontname, fontsize, thetext, ox, oy, metrics in svg_glyphs:
+            style = 'font-size: %f; font-family: %s; fill: %s;'%(fontsize,
+                                                            fontname, color)
             if angle!=0:
                 transform = 'transform="translate(%f,%f) rotate(%1.1f) translate(%f,%f)"' % (x,y,-angle,-x,-y) # Inkscape doesn't support rotate(angle x y)
             else: transform = ''
-            newx, newy = x+ox, y-oy
+            #newx, newy = x+ox, y-oy
+            newx, newy = x+ox, y+oy-height
             svg += """\
 <text style="%(style)s" x="%(newx)f" y="%(newy)f" %(transform)s>%(thetext)s</text>
 """ % locals()
 
         self._svgwriter.write (svg)
+        rgbFace = gc.get_rgb()
+        for xmin, ymin, xmax, ymax in svg_lines:
+            newx, newy = x + xmin, y + height - ymax#-(ymax-ymin)/2#-height
+            self.draw_rectangle(gc, rgbFace, newx, newy, xmax-xmin, ymax-ymin)
+            #~ self.draw_line(gc, x + xmin, y + ymin,# - height,
+                                     #~ x + xmax, y + ymax)# - height)
         self.close_group("mathtext")
 
     def finish(self):
@@ -256,7 +297,7 @@ class RendererSVG(RendererBase):
 
     def get_text_width_height(self, s, prop, ismath):
         if ismath:
-            width, height, glyphs = math_parse_s_ft2font_svg(
+            width, height, trash = math_parse_s_ft2font_svg(
                 s, 72, prop.get_size_in_points())
             return width, height
         font = self._get_font(prop)
@@ -285,7 +326,7 @@ class FigureCanvasSVG(FigureCanvasBase):
         basename, ext = os.path.splitext(filename)
         if not len(ext): filename += '.svg'
         svgwriter = codecs.open( filename, 'w', 'utf-8' )
-        renderer = RendererSVG(w, h, svgwriter)
+        renderer = RendererSVG(w, h, svgwriter, basename)
         self.figure.draw(renderer)
         renderer.finish()
 
