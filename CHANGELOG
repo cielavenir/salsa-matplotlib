@@ -1,4 +1,111 @@
 ===============================================================
+2008-05-29 Released 0.91.3 at revision 5313
+
+2008-05-29 matplotlib.image.imread now no longer always returns RGBA
+           -- if the image is luminance or RGB, it will return a MxN
+           or MxNx3 array if possible.  Also uint8 is no longer always
+           forced to float.
+
+2008-05-29 Implement path clipping in PS backend - JDH
+
+2008-05-29 Fixed two bugs in texmanager.py:
+               improved comparison of dvipng versions
+               fixed a bug introduced when get_grey method was added
+           - DSD
+
+2008-05-29 Implement path clipping in SVG backend - MGD
+
+2008-05-28 Fix crashing of PDFs in xpdf and ghostscript when two-byte
+           characters are used with Type 3 fonts - MGD
+
+2008-05-28 Allow keyword args to configure widget properties as
+           requested in
+           http://sourceforge.net/tracker/index.php?func=detail&aid=1866207&group_id=80706&atid=560722
+           - JDH
+
+2008-05-28 Fix rendering of composite glyphs in Type 3 conversion
+           (particularly as evidenced in the Eunjin.ttf Korean font)
+           Thanks Jae-Joon Lee for finding this!
+
+2008-05-21 Fix segfault in TkAgg backend - MGD
+
+2008-05-21 Fix a "local variable unreferenced" bug in plotfile - MM
+
+2008-05-19 Fix crash when Windows can not access the registry to
+           determine font path [Bug 1966974, thanks Patrik Simons] - MGD
+
+2008-05-14 Don't use stat on Windows (fixes font embedding problem) - MGD
+
+2008-05-09 Fix /singlequote (') in Postscript backend - MGD
+
+2008-05-08 Fix kerning in SVG when embedding character outlines - MGD
+
+2008-05-06 Fix strange colors when blitting in QtAgg and Qt4Agg - MGD
+
+2008-05-02 On PyQt <= 3.14 there is no way to determine the underlying
+           Qt version. [1851364] - MGD
+
+2008-05-02 Don't call sys.exit() when pyemf is not found [1924199] -
+           MGD
+
+2008-05-02 Update _subprocess.c from upstream Python 2.5.2 to get a
+           few memory and reference-counting-related bugfixes.  See
+           bug 1949978. - MGD
+
+2008-04-29 Fix bug in mlab.sqrtm - MM
+
+2008-04-28 Fix bug in SVG text with Mozilla-based viewers (the symbol
+           tag is not supported) - MGD
+
+2008-04-24 Fix sub/superscripts when the size of the font has been
+           changed - MGD
+
+2008-04-22 Use "svg.embed_char_paths" consistently everywhere - MGD
+
+2008-04-11 Fix global font rcParam setting after initialization
+           time. - MGD
+
+2008-03-27 Fix saving to Unicode filenames with Agg backend
+           (other backends appear to already work...)
+           (Thanks, Christopher Barker) - MGD
+
+2008-03-26 Fix SVG backend bug that prevents copying and pasting in
+           Inkscape (thanks Kaushik Ghose) - MGD
+
+2008-03-23 Fix a pdf backend bug which sometimes caused the outermost
+           gsave to not be balanced with a grestore. - JKS
+
+2008-02-29 Fix class Wx toolbar pan and zoom functions (Thanks Jeff
+           Peery) - MGD
+
+2008-02-16 Added some new rec array functionality to mlab
+           (rec_summarize, rec2txt and rec_groupby).  See
+           examples/rec_groupby_demo.py.  Thanks to Tim M for rec2txt.
+
+2008-02-11 Update plotting() doc string to refer to getp/setp. - JKS
+
+2008-02-01 Fix doubly-included font problem in Postscript backend - MGD
+
+2008-02-01 Fix reference leak in ft2font Glyph objects. - MGD
+
+2008-01-31 Don't use unicode strings with usetex by default - DSD
+
+2008-01-31 Fix text spacing problems in PDF backend with *some* fonts,
+           such as STIXGeneral.
+
+2008-01-31 Fix \sqrt with radical number (broken by making [ and ]
+           work below) - MGD
+
+2008-01-10 Fix bug displaying [ and ] in mathtext - MGD
+
+2008-01-10 Fix bug when displaying a tick value offset with scientific
+           notation. (Manifests itself as a warning that the \times
+           symbol can not be found). - MGD
+
+2008-01-10 Use setup.cfg to set the default parameters (tkagg,
+           numpy) when building windows installers - DSD
+
+===============================================================
 2008-01-06 Released 0.91.2 at revision 4802
 
 2007-12-26 Reduce too-late use of matplotlib.use() to a warning

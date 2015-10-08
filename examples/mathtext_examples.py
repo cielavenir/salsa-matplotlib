@@ -40,7 +40,7 @@ stests = [
     r"$f^'$",
     r'$\frac{x_2888}{y}$',
     r"$\sqrt[3]{\frac{X_2}{Y}}=5$",
-    r"$\sqrt[5x\pi]{\prod^\frac{x}{2\pi^2}_\infty}$",
+    r"$\sqrt[5]{\prod^\frac{x}{2\pi^2}_\infty}$",
     r"$\sqrt[3]{x}=5$",
     r'$\frac{X}{\frac{X}{Y}}$',
     # From UTR #25
@@ -49,14 +49,14 @@ stests = [
     r'$\widehat{abc}\widetilde{def}$',
     r'$\Gamma \Delta \Theta \Lambda \Xi \Pi \Sigma \Upsilon \Phi \Psi \Omega$',
     r'$\alpha \beta \gamma \delta \epsilon \zeta \eta \theta \iota \lambda \mu \nu \xi \pi \kappa \rho \sigma \tau \upsilon \phi \chi \psi$',
-    ur'Generic symbol: $\u23ce \mathrm{\ue0f2 \U0001D538}$'
+    #ur'Generic symbol: $\u23ce \mathrm{\ue0f2 \U0001D538}$'
     ]
 
 from pylab import *
 
 def doall():
     tests = stests
-    
+
     figure(figsize=(8, (len(tests) * 1) + 2))
     plot([0, 0], 'r')
     grid(False)
@@ -69,7 +69,7 @@ def doall():
     savefig('mathtext_examples')
     #close('all')
     show()
-    
+
 if '--latex' in sys.argv:
     fd = open("mathtext_examples.ltx", "w")
     fd.write("\\documentclass{article}\n")

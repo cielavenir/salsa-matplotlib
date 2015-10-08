@@ -38,7 +38,7 @@ new_figure_manager, draw_if_interactive, show = pylab_setup()
 
 def switch_backend(newbackend):
     """
-    Swtich the default backend to newbackend.  This feature is
+    Switch the default backend to newbackend.  This feature is
     EXPERIMENTAL, and is only expected to work switching to an image
     backend.  Eg, if you have a bunch of PS scripts that you want to
     run from an interactive ipython session, you may want to switch to
@@ -933,7 +933,7 @@ def plotting():
     gca      - return the current axes
     gcf      - return the current figure
     gci      - get the current image, or None
-    get      - get a handle graphics property
+    getp     - get a handle graphics property
     hist     - make a histogram
     hold     - set the hold state on current axes
     legend   - add a legend to the axes
@@ -949,7 +949,7 @@ def plotting():
     rc       - control the default params
     savefig  - save the current figure
     scatter  - make a scatter plot
-    set      - set a handle graphics property
+    setp     - set a handle graphics property
     semilogx - log x axis
     semilogy - log y axis
     show     - show the figures
@@ -1225,7 +1225,7 @@ def plotfile(fname, cols=(0,), plotfuncs=None,
     xname, x = getname_val(cols[0])
 
     if len(cols)==1:
-        ax1 = fig.add_subplot(N,1,i)
+        ax1 = fig.add_subplot(1,1,1)
         funcname = plotfuncs.get(cols[0], 'plot')
         func = getattr(ax1, funcname)
         func(x, **kwargs)

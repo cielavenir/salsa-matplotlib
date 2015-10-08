@@ -202,24 +202,29 @@ def unique(x):
    return dict([ (val, 1) for val in x]).keys()
 
 def iterable(obj):
+    'return true if obj is iterable'
     try: len(obj)
     except: return 0
     return 1
 
 
 def is_string_like(obj):
+    'return true if obj looks like a string'
     if hasattr(obj, 'shape'): return 0
     try: obj + ''
     except (TypeError, ValueError): return 0
     return 1
 
 def is_writable_file_like(obj):
+    'return true if obj looks like a file object'
     return hasattr(obj, 'write') and callable(obj.write)
 
 def is_scalar(obj):
+    'return true if ob is not string like and is not iterable'
     return is_string_like(obj) or not iterable(obj)
 
 def is_numlike(obj):
+    'return true if obj looks like a number'
     try: obj+1
     except TypeError: return False
     else: return True
@@ -412,8 +417,11 @@ class GetRealpathAndStat:
         result = self._cache.get(path)
         if result is None:
             realpath = os.path.realpath(path)
-            stat = os.stat(realpath)
-            stat_key = (stat.st_ino, stat.st_dev)
+            if sys.platform == 'win32':
+                stat_key = realpath
+            else:
+                stat = os.stat(realpath)
+                stat_key = (stat.st_ino, stat.st_dev)
             result = realpath, stat_key
             self._cache[path] = result
         return result
