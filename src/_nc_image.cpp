@@ -1,10 +1,12 @@
+
 #include <iostream>
 #include <fstream>
 #include <cmath>
 #include <cstdio>
 #include <png.h>
+
+#include "Python.h" //after png.h due to setjmp bug
 #include <string>
-#include "Python.h"
 
 #ifdef NUMARRAY
 #include "numarray/arrayobject.h"
@@ -12,6 +14,7 @@
 #ifdef NUMERIC
 #include "Numeric/arrayobject.h"
 #else
+#define PY_ARRAY_TYPES_PREFIX NumPy
 #include "numpy/arrayobject.h"
 #endif
 #endif
@@ -237,7 +240,7 @@ Image::buffer_argb32(const Py::Tuple& args) {
   agg::rendering_buffer rtmp;
   rtmp.attach(buf_tmp, colsOut, rowsOut, row_len);
 
-  color_conv(&rtmp, rbufOut, agg::color_conv_rgba32_to_argb32());
+  agg::color_conv(&rtmp, rbufOut, agg::color_conv_rgba32_to_argb32());
 
   //todo: how to do this with native CXX
   //PyObject* o = Py_BuildValue("s#", buf_tmp, row_len * rowsOut);
@@ -629,13 +632,15 @@ Image::write_png(const Py::Tuple& args)
   png_uint_32 row=0;
 
   //todo: allocate on heap
-  png_bytep row_pointers[rowsOut];
+  png_bytep *row_pointers = new png_bytep[rowsOut];
+
   for (row = 0; row < rowsOut; ++row)
     row_pointers[row] = bufpair.first + row * colsOut * 4;
 
   fp = fopen(file_name, "wb");
   if (fp == NULL) {
     if (bufpair.second) delete [] bufpair.first;
+    delete [] row_pointers;
     throw Py::RuntimeError(Printf("Could not open file %s", file_name).str());
   }
 
@@ -644,6 +649,7 @@ Image::write_png(const Py::Tuple& args)
   if (png_ptr == NULL) {
     if (bufpair.second) delete [] bufpair.first;
     fclose(fp);
+    delete [] row_pointers;
     throw Py::RuntimeError("Could not create write struct");
   }
 
@@ -652,6 +658,7 @@ Image::write_png(const Py::Tuple& args)
     if (bufpair.second) delete [] bufpair.first;
     fclose(fp);
     png_destroy_write_struct(&png_ptr, &info_ptr);
+    delete [] row_pointers;
     throw Py::RuntimeError("Could not create info struct");
   }
 
@@ -659,6 +666,7 @@ Image::write_png(const Py::Tuple& args)
     if (bufpair.second) delete [] bufpair.first;
     fclose(fp);
     png_destroy_write_struct(&png_ptr, &info_ptr);
+    delete [] row_pointers;
     throw Py::RuntimeError("Error building image");
   }
 
@@ -682,6 +690,8 @@ Image::write_png(const Py::Tuple& args)
   png_write_end(png_ptr, info_ptr);
   png_destroy_write_struct(&png_ptr, &info_ptr);
   fclose(fp);
+
+  delete [] row_pointers;
 
   if (bufpair.second) delete [] bufpair.first;
   return Py::Object();
@@ -886,9 +896,10 @@ _image_module::readpng(const Py::Tuple& args) {
   if (setjmp(png_jmpbuf(png_ptr)))
     throw Py::RuntimeError("_image_module::readpng: error during read_image");
 
-  png_bytep row_pointers[height];
+  png_bytep *row_pointers = new png_bytep[height];
+  png_uint_32 row;
 
-  for (png_uint_32 row = 0; row < height; row++)
+  for (row = 0; row < height; row++)
     row_pointers[row] = new png_byte[png_get_rowbytes(png_ptr,info_ptr)];
 
   png_read_image(png_ptr, row_pointers);
@@ -921,8 +932,9 @@ _image_module::readpng(const Py::Tuple& args) {
   png_read_end(png_ptr, info_ptr);
   png_destroy_read_struct(&png_ptr, &info_ptr, png_infopp_NULL);
   fclose(fp);
-  for (png_uint_32 row = 0; row < height; row++)
+  for (row = 0; row < height; row++)
     delete [] row_pointers[row];
+  delete [] row_pointers;
   return Py::asObject((PyObject*)A);
 }
 
@@ -1184,10 +1196,10 @@ _image_module::frombyte(const Py::Tuple& args) {
   const size_t N = imo->rowsIn * imo->colsIn * imo->BPP;
   size_t i = 0;
   if (A->dimensions[2] == 4) {
-      std::memmove(buffer, arrbuf, N);
+      memmove(buffer, arrbuf, N);
   } else {
       while (i < N) {
-          std::memmove(buffer, arrbuf, 3);
+          memmove(buffer, arrbuf, 3);
           buffer += 3;
           arrbuf += 3;
           *buffer++ = 255;
@@ -1259,7 +1271,7 @@ _image_module::frombuffer(const Py::Tuple& args) {
   agg::int8u* buffer = new agg::int8u[NUMBYTES];
   if (buffer==NULL) //todo: also handle allocation throw
     throw Py::MemoryError("_image_module::frombuffer could not allocate memory");
-  std::memmove(buffer, rawbuf, NUMBYTES);
+  memmove(buffer, rawbuf, NUMBYTES);
 
   if (isoutput) {
     // make the output buffer point to the input buffer
@@ -1434,7 +1446,7 @@ _image_module::pcolor(const Py::Tuple& args) {
   size_t rowsize(cols*4);
   rowstart = rowstarts;
   agg::int8u * position = buffer;
-  agg::int8u * oldposition;
+  agg::int8u * oldposition = NULL;
   start = reinterpret_cast<unsigned char*>(d->data);
   for(i=0;i<rows;i++,rowstart++)
   {

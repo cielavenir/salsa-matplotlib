@@ -63,7 +63,9 @@ def show():
     """
     Show all the figures and enter the gtk mainloop
 
-    This should be the last line of your script
+    This should be the last line of your script.  This function sets
+    interactive mode to True, as detailed on
+    http://matplotlib.sf.net/interactive.html
     """
     for manager in Gcf.get_all_fig_managers():
         manager.show()
@@ -81,7 +83,8 @@ def new_figure_manager(num, *args, **kwargs):
     Create a new figure manager instance
     """
     _focus = windowing.FocusManager()
-    figure = Figure(*args, **kwargs)
+    FigureClass = kwargs.pop('FigureClass', Figure)
+    figure = FigureClass(*args, **kwargs)
     window = Tk.Tk()
     canvas = FigureCanvasTkAgg(figure, master=window)    
     figManager = FigureManagerTkAgg(canvas, num, window)
@@ -175,12 +178,12 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
         """
         return self._tkcanvas
 
-    def print_figure(self, filename, dpi=150,
-                     facecolor='w', edgecolor='w',
-                     orientation='portrait'):
+    def print_figure(self, filename, dpi=150, facecolor='w', edgecolor='w',
+                     orientation='portrait', **kwargs):
 
         agg = self.switch_backends(FigureCanvasAgg)
-        agg.print_figure(filename, dpi, facecolor, edgecolor, orientation)
+        agg.print_figure(filename, dpi, facecolor, edgecolor, orientation,
+                         **kwargs)
         self.figure.set_canvas(self)
 
     def motion_notify_event(self, event):

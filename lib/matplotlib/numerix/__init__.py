@@ -13,7 +13,7 @@ numerix  imports either Numeric or numarray based on various selectors.
    likely never used.
 
 To summarize: the  commandline is examined first, the  rc file second,
-and the default array package is Numeric.  
+and the default array package is Numeric.
 """
 
 import sys, os
@@ -33,7 +33,7 @@ for a in sys.argv:
         break
     del a
 
-if which[0] is None:     
+if which[0] is None:
     try:  # In theory, rcParams always has *some* value for numerix.
         which = rcParams['numerix'], "rc"
     except KeyError:
@@ -50,7 +50,7 @@ if which[0] not in ["numeric", "numarray", "numpy"]:
 if which[0] == "numarray":
     #from na_imports import *
     from numarray import *
-    from _na_imports import nx, inf, infinity, Infinity, Matrix
+    from _na_imports import nx, inf, infinity, Infinity, Matrix, isnan, all
     from numarray.numeric import nonzero
     from numarray.convolve import cross_correlate, convolve
     import numarray
@@ -58,13 +58,17 @@ if which[0] == "numarray":
 elif which[0] == "numeric":
     #from nc_imports import *
     from Numeric import *
-    from _nc_imports import nx, inf, infinity, Infinity
+    from _nc_imports import nx, inf, infinity, Infinity, isnan, all
     from Matrix import Matrix
     import Numeric
     version = 'Numeric %s'%Numeric.__version__
 elif which[0] == "numpy":
-    import numpy
-    from numpy import *
+    try:
+        import numpy.oldnumeric as numpy
+        from numpy.oldnumeric import *
+    except ImportError:
+        import numpy
+        from numpy import *
     from _sp_imports import nx, infinity
     from _sp_imports import UInt8, UInt16, UInt32
     Matrix = matrix
@@ -72,9 +76,15 @@ elif which[0] == "numpy":
 else:
     raise RuntimeError("invalid numerix selector")
 
+if (which[0] == 'numeric'):
+    def any(a):
+        return sometrue(ravel(a))
+
 # Some changes are only applicable to the new numpy:
 if (which[0] == 'numarray' or
     which[0] == 'numeric'):
+    from mlab import amin, amax
+    newaxis = NewAxis
     def typecode(a):
         return a.typecode()
     def iscontiguous(a):
@@ -83,6 +93,9 @@ if (which[0] == 'numarray' or
         return a.byteswapped()
     def itemsize(a):
         return a.itemsize()
+    def angle(a):
+        return arctan2(a.imag, a.real)
+
 
 else:
     # We've already checked for a valid numerix selector,
@@ -95,7 +108,7 @@ else:
         return a.byteswap()
     def itemsize(a):
         return a.itemsize
-    # resize function is already defined by numpy 
+    # resize function is already defined by numpy
     # Fix typecode->dtype
     def fixkwargs(kwargs):
         if 'typecode' in kwargs:
@@ -111,7 +124,7 @@ else:
     def ones(*args, **kwargs):
         fixkwargs(kwargs)
         return numpy.ones(*args, **kwargs)
-    
+
 
 verbose.report('numerix %s'%version)
 # a bug fix for blas numeric suggested by Fernando Perez
@@ -127,7 +140,7 @@ def _import_fail_message(module, version):
               "module" : module,
               "specific" : version + module
               }
-    print """ 
+    print """
 The import of the %(which)s version of the %(module)s module,
 %(specific)s, failed.  This is is either because %(which)s was
 unavailable when matplotlib was compiled, because a dependency of

@@ -92,7 +92,7 @@ Examples which work on this release:
  (3) - Clipping seems to be broken.
 """
 
-cvs_id = '$Id: backend_wx.py,v 1.32 2005/09/02 20:45:36 jdh2358 Exp $'
+cvs_id = '$Id: backend_wx.py 2502 2006-06-21 13:22:31 +0000 (Wed, 21 Jun 2006) jdh2358 $'
 
 import sys, os, os.path, math, StringIO
 
@@ -926,10 +926,8 @@ The current aspect ration will be kept."""
         drawDC.DrawBitmap(self.bitmap, 0, 0)
         drawDC.EndDrawing()
 
-    def print_figure(self, filename, dpi=150,
-                     facecolor='w', edgecolor='w',
-                     orientation='portrait'):
-
+    def print_figure(self, filename, dpi=150, facecolor='w', edgecolor='w',
+                     orientation='portrait', **kwargs):
         """
         Render the figure to hardcopy
         """
@@ -949,7 +947,8 @@ The current aspect ration will be kept."""
             ps = self.switch_backends(FigureCanvasPS)
             ps.figure.dpi.set(72)
 
-            ps.print_figure(filename, 72, facecolor, edgecolor)
+            ps.print_figure(filename, 72, facecolor, edgecolor, orientation, 
+                            **kwargs)
             self.figure.dpi.set(origDPI)
             self.figure.set_canvas(self)
             return
@@ -962,7 +961,8 @@ The current aspect ration will be kept."""
             origDPI = self.figure.dpi.get()
             svg = self.switch_backends(FigureCanvasSVG)
             svg.figure.dpi.set(72)
-            svg.print_figure(filename, 72, facecolor, edgecolor)
+            svg.print_figure(filename, 72, facecolor, edgecolor, orientation,
+                             **kwargs)
             self.figure.dpi.set(origDPI)
             self.figure.set_canvas(self)
             return
@@ -1210,7 +1210,8 @@ def new_figure_manager(num, *args, **kwargs):
         wxapp = wx.PySimpleApp()
         wxapp.SetExitOnFrameDelete(True)
 
-    fig = Figure(*args, **kwargs)
+    FigureClass = kwargs.pop('FigureClass', Figure)
+    fig = FigureClass(*args, **kwargs)
     frame = FigureFrameWx(num, fig)
     figmgr = frame.get_figure_manager()
     if matplotlib.is_interactive():

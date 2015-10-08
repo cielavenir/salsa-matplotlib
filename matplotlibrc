@@ -24,9 +24,9 @@
 #  - a legal html color name, eg red, blue, darkslategray
 
 #### CONFIGURATION BEGINS HERE
-# the default backend; one of GTK GTKAgg GTKCairo FltkAgg QtAgg TkAgg 
-#     Agg Cairo GD GDK Paint PS SVG Template
-backend      : GTKAgg     
+# the default backend; one of GTK GTKAgg GTKCairo FltkAgg QtAgg TkAgg
+#     Agg Cairo GD GDK Paint PS PDF SVG Template
+backend      : GTKAgg
 numerix      : numpy  # numpy, Numeric or numarray
 interactive  : False      # see http://matplotlib.sourceforge.net/interactive.html
 toolbar      : toolbar2   # None | classic | toolbar2
@@ -96,10 +96,8 @@ patch.antialiased 	: True    # render patches in antialised (no jaggies)
 # expanded, extra-expanded, ultra-expanded, wider, and narrower.  This
 # property is not currently implemented.
 #
-# The font.size property has 11 values: xx-small, x-small, small,
-# medium, large, x-large, xx-large, larger, smaller, length (such as
-# 12pt), and percentage.  larger and smaller are relative values.
-# percentage is not yet implemented.
+# The font.size property is the default font size for text, given in pts.
+# 12pt is the standard value.
 #
 font.family         : sans-serif
 font.style          : normal
@@ -108,23 +106,26 @@ font.weight         : medium
 font.stretch        : normal
 # note that font.size controls default text sizes.  To configure
 # special text sizes tick labels, axes, labels, title, etc, see the rc
-# settings for axes and ticks
-font.size           : medium
+# settings for axes and ticks. Special text sizes can be defined
+# relative to font.size, using the following values: xx-small, x-small,
+# small, medium, large, x-large, xx-large, larger, or smaller
+font.size           : 12.0
 font.serif          : New Century Schoolbook, Century Schoolbook L, Utopia, ITC Bookman, Bookman, Bitstream Vera Serif, Nimbus Roman No9 L, Times New Roman, Times, Palatino, Charter, serif
-font.sans-serif     : Lucida Grande, Verdana, Geneva, Lucida, Bitstream Vera Sans, Arial, Helvetica, sans-serif
+font.sans-serif     : Lucida Grande, Verdana, Geneva, Lucida, Bitstream Vera Sans, Arial, Helvetica, Avant Garde, sans-serif
 font.cursive        : Apple Chancery, Textile, Zapf Chancery, Sand, cursive
 font.fantasy        : Comic Sans MS, Chicago, Charcoal, Impact, Western, fantasy
 font.monospace      : Andale Mono, Bitstream Vera Sans Mono, Nimbus Mono L, Courier New, Courier, Fixed, Terminal, monospace
-font.latex.package  : type1cm  # This must be an available LaTeX font
-#package, like 'times' or 'pslatex' ; only applies if text.usetex is set
 
 ### TEXT
 # text properties used by text.Text.  See
 # http://matplotlib.sourceforge.net/matplotlib.text.html for more
 # information on text properties
 text.color          : black
-text.usetex         : False  # use tex/latex for all text handling.  See http://matplotlib.sf.net/matplotlib.texmanager.html
-text.tex.engine     : latex  # tex is faster, but latex is required to use special font packages
+text.usetex         : False  # use latex for all text handling.  For more information, see
+                             # http://www.scipy.org/Wiki/Cookbook/Matplotlib/UsingTex
+text.dvipnghack     : False  # some versions of dvipng don't handle
+                             # alpha channel properly.  Use True to correct and flush
+                             # ~/.matplotlib/tex.cache before testing
 
 ### AXES
 # default face and edge color, default tick sizes,
@@ -138,6 +139,9 @@ axes.grid           : False   # display grid or not
 axes.titlesize      : 14      # fontsize of the axes title
 axes.labelsize      : 12      # fontsize of the x any y labels
 axes.labelcolor     : black
+axes.axisbelow      : False   # whether axis gridlines and ticks are below
+                              # the axes elements (lines, text, etc)  
+                      
 
 polaraxes.grid      : True    # display grid on polar axes
 
@@ -166,17 +170,17 @@ grid.linestyle   :   :       # dotted
 grid.linewidth   :   0.5     # in points
 
 ### Legend
-legend.isaxes	:	True
-legend.numpoints 	:	4  # the number of points in the legend line
-legend.fontsize : 14
-legend.pad 	:	0.2 # the fractional whitespace inside the legend border
-legend.markerscale 	:	1.0    # the relative size of legend markers vs. original
+legend.isaxes        : True
+legend.numpoints     : 4      # the number of points in the legend line
+legend.fontsize      : 14
+legend.pad           : 0.2    # the fractional whitespace inside the legend border
+legend.markerscale   : 1.0    # the relative size of legend markers vs. original
 # the following dimensions are in axes coords
-legend.labelsep 	:	0.010 # the vertical space between the legend entries
-legend.handlelen 	:	0.05  # the length of the legend lines
-legend.handletextsep 	:	0.02 # the space between the legend line and legend text
-legend.axespad 	:	0.02       # the border between the axes and legend edge
-legend.shadow	:	False
+legend.labelsep      : 0.010  # the vertical space between the legend entries
+legend.handlelen     : 0.05   # the length of the legend lines
+legend.handletextsep : 0.02   # the space between the legend line and legend text
+legend.axespad       : 0.02   # the border between the axes and legend edge
+legend.shadow        : False
 
 ### FIGURE
 # See http://matplotlib.sourceforge.net/matplotlib.figure.html#Figure
@@ -196,11 +200,15 @@ figure.subplot.hspace : 0.2   # the amount of height reserved for white space be
 
 
 ### IMAGES
-image.aspect : free              # free | preserve
+image.aspect : equal             # equal | auto | a number
 image.interpolation  : bilinear  # see help(imshow) for options
-image.cmap   : jet               # gray | jet
+image.cmap   : jet               # gray | jet etc...
 image.lut    : 256               # the size of the colormap lookup table
 image.origin : upper             # lower | upper
+
+
+### CONTOUR PLOTS
+contour.negative_linestyle :  6.0, 6.0 # negative contour dashstyle (size in points)
 
 ### SAVING FIGURES
 # the default savefig params can be different for the GUI backends.
@@ -215,13 +223,17 @@ tk.window_focus   : False    # Maintain shell focus for TkAgg
 tk.pythoninspect  : False    # tk sets PYTHONINSEPCT
 
 # ps backend params
-ps.papersize      : letter   # executive, letter, legal, ledger, A0-A10, B0-B6, C0-C6
-ps.useafm         : False    # use of afm fonts -- breaks mathtext but results in small files
+ps.papersize      : letter   # auto, letter, legal, ledger, A0-A10, B0-B10
+ps.useafm         : False    # use of afm fonts, results in small files
 ps.usedistiller   : False    # can be: None, ghostscript or xpdf
                                           # Experimental: may produce smaller files.
                                           # xpdf intended for production of publication quality files,
                                           # but requires ghostscript, xpdf and ps2eps
 ps.distiller.res  : 6000      # dpi
+
+# pdf backend params
+pdf.compression   : 6 # integer from 0 to 9
+		      # 0 disables compression (good for debugging)
 
 # Set the verbose flags.  This controls how much information
 # matplotlib gives you at runtime and where it goes.  Ther verbosity
@@ -240,5 +252,5 @@ ps.distiller.res  : 6000      # dpi
 #
 # You can access the verbose instance in your code
 #   from matplotlib import verbose.
-verbose.level  : silent     # one of silent, helpful, debug, debug-annoying
+verbose.level  : silent      # one of silent, helpful, debug, debug-annoying
 verbose.fileo  : sys.stdout  # a log filename, sys.stdout or sys.stderr

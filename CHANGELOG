@@ -1,4 +1,444 @@
 ===============================================================
+2006-07-11 Released 0.87.4 at revision 2558
+
+2006-07-07 Fixed a usetex bug with older versions of latex - DSD 
+
+2006-07-07 Add compatibility for NumPy 1.0 - TEO
+
+2006-06-29 Added a Qt4Agg backend. Thank you James Amundson - DSD
+
+2006-06-26 Fixed a usetex bug. On windows, usetex will prcess
+           postscript output in the current directory rather than
+           in a temp directory. This is due to the use of spaces 
+           and tildes in windows paths, which cause problems with 
+           latex. The subprocess module is no longer used. - DSD
+
+2006-06-22 Various changes to bar(), barh(), and hist().
+           Added 'edgecolor' keyword arg to bar() and barh().
+           The x and y args in barh() have been renamed to width
+           and bottom respectively, and their order has been swapped
+           to maintain a (position, value) order ala matlab. left,
+           height, width and bottom args can now all be scalars or
+           sequences. barh() now defaults to edge alignment instead
+           of center alignment. Added a keyword arg 'align' to bar(),
+           barh() and hist() that controls between edge or center bar
+           alignment. Fixed ignoring the rcParams['patch.facecolor']
+           for bar color in bar() and barh(). Fixed ignoring the
+           rcParams['lines.color'] for error bar color in bar()
+           and barh(). Fixed a bug where patches would be cleared
+           when error bars were plotted if rcParams['axes.hold']
+           was False. - MAS
+
+2006-06-22 Added support for numerix 2-D arrays as alternatives to
+           a sequence of (x,y) tuples for specifying paths in
+           collections, quiver, contour, pcolor, transforms.
+           Fixed contour bug involving setting limits for
+           color mapping.  Added numpy-style all() to numerix. - EF
+
+2006-06-20 Added custom FigureClass hook to pylab interface - see
+           examples/custom_figure_class.py
+
+2006-06-16 Added colormaps from gist (gist_earth, gist_stern,
+           gist_rainbow, gist_gray, gist_yarg, gist_heat, gist_ncar) - JW
+
+2006-06-16 Added a pointer to parent in figure canvas so you can
+           access the container with fig.canvas.manager.  Useful if
+           you want to set the window title, eg in gtk
+           fig.canvas.manager.window.set_title, though a GUI neutral
+           method would be preferable JDH
+
+2006-06-16 Fixed colorbar.py to handle indexed colors (i.e.,
+           norm = no_norm()) by centering each colored region
+           on its index. - EF
+
+2006-06-15 Added scalex and scaley to Axes.autoscale_view to support
+           selective autoscaling just the x or y axis, and supported
+           these command in plot so you can say plot(something,
+           scaley=False) and just the x axis will be autoscaled.
+           Modified axvline and axhline to support this, so for
+           example axvline will no longer autoscale the y axis. JDH
+
+2006-06-13 Fix so numpy updates are backward compatible - TEO
+
+2006-06-12 Updated numerix to handle numpy restructuring of
+           oldnumeric - TEO
+
+2006-06-12 Updated numerix.fft to handle numpy restructuring
+           Added ImportError to numerix.linear_algebra for numpy -TEO
+
+2006-06-11 Added quiverkey command to pylab and Axes, using
+           QuiverKey class in quiver.py.  Changed pylab and Axes
+           to use quiver2 if possible, but drop back to the
+           newly-renamed quiver_classic if necessary.  Modified
+           examples/quiver_demo.py to illustrate the new quiver
+           and quiverkey.  Changed LineCollection implementation
+           slightly to improve compatibility with PolyCollection. - EF
+
+2006-06-11 Fixed a usetex bug for windows, running latex on files
+           with spaces in their names or paths was failing - DSD
+
+2006-06-09 Made additions to numerix, changes to quiver to make it
+           work with all numeric flavors. - EF
+
+2006-06-09 Added quiver2 function to pylab and method to axes,
+           with implementation via a Quiver class in quiver.py.
+           quiver2 will replace quiver before the next release;
+           it is placed alongside it initially to facilitate
+           testing and transition. See also
+           examples/quiver2_demo.py. - EF
+
+2006-06-08 Minor bug fix to make ticker.py draw proper minus signs
+           with usetex - DSD
+
+===============================================================
+2006-06-06 Released 0.87.3 at revision 2432
+
+2006-05-30 More partial support for polygons with outline or fill,
+           but not both.  Made LineCollection inherit from
+           ScalarMappable. - EF
+
+2006-05-29 Yet another revision of aspect-ratio handling. - EF
+
+2006-05-27 Committed a patch to prevent stroking zero-width lines in
+           the svg backend - DSD
+
+2006-05-24 Fixed colorbar positioning bug identified by Helge
+           Avlesen, and improved the algorithm; added a 'pad'
+           kwarg to control the spacing between colorbar and
+           parent axes. - EF
+
+2006-05-23 Changed color handling so that collection initializers
+           can take any mpl color arg or sequence of args; deprecated
+           float as grayscale, replaced by string representation of
+           float. - EF
+
+2006-05-19 Fixed bug: plot failed if all points were masked - EF
+
+2006-05-19 Added custom symbol option to scatter - JDH
+
+2006-05-18 New example, multi_image.py; colorbar fixed to show
+           offset text when the ScalarFormatter is used; FixedFormatter
+           augmented to accept and display offset text. - EF
+
+2006-05-14 New colorbar; old one is renamed to colorbar_classic.
+           New colorbar code is in colorbar.py, with wrappers in
+           figure.py and pylab.py.
+           Fixed aspect-handling bug reported by Michael Mossey.
+           Made backend_bases.draw_quad_mesh() run.- EF
+
+2006-05-08 Changed handling of end ranges in contourf: replaced
+           "clip-ends" kwarg with "extend".  See docstring for
+           details. -EF
+
+2006-05-08 Added axisbelow to rc - JDH
+
+2006-05-08 If using PyGTK require version 2.2+ - SC
+
+2006-04-19 Added compression support to PDF backend, controlled by
+           new pdf.compression rc setting. - JKS
+
+2006-04-19 Added Jouni's PDF backend
+
+2006-04-18 Fixed a bug that caused agg to not render long lines
+
+2006-04-16 Masked array support for pcolormesh; made pcolormesh support the
+           same combinations of X,Y,C dimensions as pcolor does;
+           improved (I hope) description of grid used in pcolor,
+           pcolormesh. - EF
+
+2006-04-14 Reorganized axes.py - EF
+
+2006-04-13 Fixed a bug Ryan found using usetex with sans-serif fonts and
+           exponential tick labels - DSD
+
+2006-04-11 Refactored backend_ps and backend_agg to prevent module-level
+           texmanager imports. Now these imports only occur if text.usetex
+           rc setting is true - DSD
+
+2006-04-10 Committed changes required for building mpl on win32
+           platforms with visual studio.  This allows wxpython
+           blitting for fast animations. - CM
+
+2006-04-10 Fixed an off-by-one bug in Axes.change_geometry.
+
+2006-04-10 Fixed bug in pie charts where wedge wouldn't have label in
+           legend. Submitted by Simon Hildebrandt. - ADS
+
+2006-05-06 Usetex makes temporary latex and dvi files in a temporary
+           directory, rather than in the user's current working
+           directory - DSD
+
+2006-04-05 Apllied Ken's wx deprecation warning patch closing sf patch
+           #1465371 - JDH
+
+2006-04-05 Added support for the new API in the postscript backend.
+           Allows values to be masked using nan's, and faster file
+           creation - DSD
+
+2006-04-05 Use python's subprocess module for usetex calls to
+           external programs. subprocess catches when they exit
+           abnormally so an error can be raised. - DSD
+
+2006-04-03 Fixed the bug in which widgets would not respond to
+           events.  This regressed the twinx functionality, so I
+           also updated subplots_adjust to update axes that share
+           an x or y with a subplot instance. - CM
+
+2006-04-02 Moved PBox class to transforms and deleted pbox.py;
+           made pylab axis command a thin wrapper for Axes.axis;
+           more tweaks to aspect-ratio handling; fixed Axes.specgram
+           to account for the new imshow default of unit aspect
+           ratio; made contour set the Axes.dataLim. - EF
+
+2006-03-31 Fixed the Qt "Underlying C/C++ object deleted" bug. - JRE
+
+2006-03-31 Applied Vasily Sulatskov's Qt Navigation Toolbar enhancement. - JRE
+
+2006-03-31 Ported Norbert's rewriting of Halldor's stineman_interp
+           algorithm to make it numerix compatible and added code to
+           matplotlib.mlab.  See examples/interp_demo.py - JDH
+
+2006-03-30 Fixed a bug in aspect ratio handling; blocked potential
+           crashes when panning with button 3; added axis('image')
+           support. - EF
+
+2006-03-28 More changes to aspect ratio handling; new PBox class
+           in new file pbox.py to facilitate resizing and repositioning
+           axes; made PolarAxes maintain unit aspect ratio. - EF
+
+2006-03-23 Refactored TextWithDash class to inherit from, rather than
+           delegate to, the Text class. Improves object inspection
+           and closes bug # 1357969 - DSD
+
+2006-03-22 Improved aspect ratio handling, including pylab interface.
+           Interactive resizing, pan, zoom of images and plots
+           (including panels with a shared axis) should work.
+           Additions and possible refactoring are still likely. - EF
+
+2006-03-21 Added another colorbrewer colormap (RdYlBu) - JSWHIT
+
+2006-03-21 Fixed tickmarks for logscale plots over very large ranges.
+           Closes bug # 1232920 - DSD
+
+2006-03-21 Added Rob Knight's arrow code; see examples/arrow_demo.py - JDH
+
+2006-03-20 Added support for masking values with nan's, using ADS's
+           isnan module and the new API. Works for *Agg backends - DSD
+
+2006-03-20 Added contour.negative_linestyle rcParam - ADS
+
+2006-03-20 Added _isnan extension module to test for nan with Numeric
+	   - ADS
+
+2006-03-17 Added Paul and Alex's support for faceting with quadmesh
+           in sf patch 1411223 - JDH
+
+2006-03-17 Added Charle Twardy's pie patch to support colors=None.
+           Closes sf patch 1387861 - JDH
+
+2006-03-17 Applied sophana's patch to support overlapping axes with
+           toolbar navigation by toggling activation with the 'a' key.
+           Closes sf patch 1432252 - JDH
+
+2006-03-17 Applied Aarre's linestyle patch for backend EMF; closes sf
+           patch 1449279 - JDH
+
+2006-03-17 Applied  Jordan Dawe's patch to support kwarg properties
+           for grid lines in the grid command.  Closes sf patch
+           1451661 - JDH
+
+2006-03-17 Center postscript output on page when using usetex - DSD
+
+2006-03-17 subprocess module built if Python <2.4 even if subprocess
+           can be imported from an egg - ADS
+
+2006-03-17 Added _subprocess.c from Python upstream and hopefully
+           enabled building (without breaking) on Windows, although
+           not tested. - ADS
+
+2006-03-17 Updated subprocess.py to latest Python upstream and
+           reverted name back to subprocess.py - ADS
+
+2006-03-16 Added John Porter's 3D handling code
+
+
+===============================================================
+2006-03-16 Released 0.87.2 at revision 2150
+
+2006-03-15 Fixed bug in MaxNLocator revealed by daigos@infinito.it.
+           The main change is that Locator.nonsingular now adjusts
+           vmin and vmax if they are nearly the same, not just if
+           they are equal.  A new kwarg, "tiny", sets the threshold. -
+           EF
+
+2006-03-14 Added import of compatibility library for newer numpy
+           linear_algebra - TEO
+
+2006-03-12 Extended "load" function to support individual columns and
+           moved "load" and "save" into matplotlib.mlab so they can be
+           used outside of pylab -- see examples/load_converter.py -
+           JDH
+
+2006-03-12 Added AutoDateFormatter and AutoDateLocator submitted
+           by James Evans. Try the load_converter.py example for a
+           demo. - ADS
+
+2006-03-11 Added subprocess module from python-2.4 - DSD
+
+2006-03-11 Fixed landscape orientation support with the usetex
+           option. The backend_ps print_figure method was
+           getting complicated, I added a _print_figure_tex
+           method to maintain some degree of sanity - DSD
+
+2006-03-11 Added "papertype" savefig kwarg for setting
+           postscript papersizes. papertype and ps.papersize
+           rc setting can also be set to "auto" to autoscale
+           pagesizes - DSD
+
+2006-03-09 Apply P-J's patch to make pstoeps work on windows
+           patch report # 1445612 - DSD
+
+2006-03-09 Make backend rc parameter case-insensitive - DSD
+
+2006-03-07 Fixed bug in backend_ps related to C0-C6 papersizes,
+           which were causing problems with postscript viewers.
+           Supported page sizes include letter, legal, ledger,
+           A0-A10, and B0-B10 - DSD
+
+===============================================================
+2006-03-07 Released 0.87.1
+
+2006-03-04 backend_cairo.py:
+           fix get_rgb() bug reported by Keith Briggs.
+           Require pycairo 1.0.2.
+           Support saving png to file-like objects. - SC
+
+2006-03-03 Fixed pcolor handling of vmin, vmax - EF
+
+2006-03-02 improve page sizing with usetex with the latex
+           geometry package. Closes bug # 1441629 - DSD
+
+2006-03-02 Fixed dpi problem with usetex png output. Accepted a
+           modified version of patch # 1441809 - DSD
+
+2006-03-01 Fixed axis('scaled') to deal with case xmax < xmin - JSWHIT
+
+2006-03-01 Added reversed colormaps (with '_r' appended to name) - JSWHIT
+
+2006-02-27 Improved eps bounding boxes with usetex - DSD
+
+2006-02-27 Test svn commit, again!
+
+2006-02-27 Fixed two dependency checking bugs related to usetex
+           on Windows - DSD
+
+2006-02-27 Made the rc deprecation warnings a little more human
+           readable.
+
+2006-02-26 Update the previous gtk.main_quit() bug fix to use gtk.main_level()
+           - SC
+
+2006-02-24 Implemented alpha support in contour and contourf - EF
+
+2006-02-22 Fixed gtk main quit bug when quit was called before
+           mainloop. - JDH
+
+2006-02-22 Small change to colors.py to workaround apparent
+           bug in numpy masked array module - JSWHIT
+
+2006-02-22 Fixed bug in ScalarMappable.to_rgba() reported by
+           Ray Jones, and fixed incorrect fix found by Jeff
+           Whitaker - EF
+
+===============================================================
+2006-02-22 Released 0.87
+
+2006-02-21 Fixed portrait/landscape orientation in postscript backend - DSD
+
+2006-02-21 Fix bug introduced in yesterday's bug fix - SC
+
+2006-02-20 backend_gtk.py FigureCanvasGTK.draw(): fix bug reported by
+           David Tremouilles - SC
+
+2006-02-20 Remove the "pygtk.require('2.4')" error from
+           examples/embedding_in_gtk2.py - SC
+
+2006-02-18 backend_gtk.py FigureCanvasGTK.draw(): simplify to use (rather than
+           duplicate) the expose_event() drawing code - SC
+
+2006-02-12 Added stagger or waterfall plot capability to LineCollection;
+           illustrated in examples/collections.py. - EF
+
+2006-02-11 Massive cleanup of the usetex code in the postscript backend. Possibly
+           fixed the clipping issue users were reporting with older versions of
+           ghostscript - DSD
+
+2006-02-11 Added autolim kwarg to axes.add_collection.  Changed
+           collection get_verts() methods accordingly. - EF
+
+2006-02-09 added a temporary rc parameter text.dvipnghack, to allow Mac users to get nice
+           results with the usetex option. - DSD
+
+2006-02-09 Fixed a bug related to setting font sizes with the usetex option. - DSD
+
+2006-02-09 Fixed a bug related to usetex's latex code. - DSD
+
+2006-02-09 Modified behavior of font.size rc setting. You should define font.size in pts,
+           which will set the "medium" or default fontsize. Special text sizes like axis
+           labels or tick labels can be given relative font sizes like small, large,
+           x-large, etc. and will scale accordingly. - DSD
+
+2006-02-08 Added py2exe specific datapath check again.  Also added new
+           py2exe helper function get_py2exe_datafiles for use in py2exe
+           setup.py scripts. - CM
+
+2006-02-02 Added box function to pylab
+
+2006-02-02 Fixed a problem in setupext.py, tk library formatted in unicode
+           caused build problems - DSD
+
+2006-02-01 Dropped TeX engine support in usetex to focus on LaTeX. - DSD
+
+2006-01-29 Improved usetex option to respect the serif, sans-serif, monospace,
+           and cursive rc settings. Removed the font.latex.package rc setting,
+           it is no longer required - DSD
+
+2006-01-29 Fixed tex's caching to include font.family rc information - DSD
+
+2006-01-29 Fixed subpixel rendering bug in *Agg that was causing
+           uneven gridlines - JDH
+
+2006-01-28 Added fontcmd to backend_ps's RendererPS.draw_tex, to support other
+           font families in eps output - DSD
+
+2006-01-28 Added MaxNLocator to ticker.py, and changed contour.py to
+           use it by default. - EF
+
+2006-01-28 Added fontcmd to backend_ps's RendererPS.draw_tex, to support other
+           font families in eps output - DSD
+
+2006-01-27 Buffered reading of matplotlibrc parameters in order to allow
+           'verbose' settings to be processed first (allows verbose.report
+           during rc validation process) - DSD
+
+2006-01-27 Removed setuptools support from setup.py and created a
+           separate setupegg.py file to replace it. - CM
+
+2006-01-26 Replaced the ugly datapath logic with a cleaner approach from
+           http://wiki.python.org/moin/DistutilsInstallDataScattered.
+           Overrides the install_data command. - CM
+
+2006-01-24 Don't use character typecodes in cntr.c --- changed to use
+           defined typenumbers instead. - TEO
+
+2006-01-24 Fixed some bugs in usetex's and ps.usedistiller's dependency
+
+2006-01-24 Added masked array support to scatter - EF
+
+2006-01-24 Fixed some bugs in usetex's and ps.usedistiller's dependency
+           checking - DSD
+
+===============================================================
 2006-01-24 Released 0.86.2
 
 2006-01-20 Added a converters dict to pylab load to convert selected
@@ -31,7 +471,7 @@
             dependencies. This needs testing, but the xpdf option should produce
             the highest-quality output and small file sizes - DSD
 
-2006-01-10 For the usetex option, backend_ps now does all the LaTeX work in the 
+2006-01-10 For the usetex option, backend_ps now does all the LaTeX work in the
             os's temp directory - DSD
 
 2006-1-10 Added checks for usetex dependencies. - DSD
@@ -71,10 +511,10 @@
            Agg, PS
 
 2005-12-03 Modified scipy patch to support Numeric, scipy and numarray
-	   Some work remains to be done because some of the scipy
-	   imports are broken if only the core is installed.  Eg
-	   apparently we need from scipy.basic.fftpack import * rather
-	   than from scipy.fftpack import *
+           Some work remains to be done because some of the scipy
+           imports are broken if only the core is installed.  Eg
+           apparently we need from scipy.basic.fftpack import * rather
+           than from scipy.fftpack import *
 
 2005-12-03 Applied some fixes to Nicholas Young's nonuniform image
            patch

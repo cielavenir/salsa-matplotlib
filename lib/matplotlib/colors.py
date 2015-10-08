@@ -32,10 +32,12 @@ import re
 
 from numerix import array, arange, take, put, Float, Int, where, \
      zeros, asarray, sort, searchsorted, sometrue, ravel, divide,\
-     clip, ones, typecode, typecodes
+     clip, ones, typecode, typecodes, alltrue
 from numerix.mlab import amin, amax
 import numerix.ma as ma
 from cbook import enumerate, is_string_like, iterable
+from matplotlib import rcParams
+import warnings
 
 cnames = {
     'aliceblue'            : '#F0F8FF',
@@ -319,6 +321,7 @@ cnames = {
     }
 
 def looks_like_color(c):
+    warnings.warn('Use is_color_like instead!', DeprecationWarning)
     if is_string_like(c):
         if cnames.has_key(c): return True
         elif len(c)==1: return True
@@ -332,6 +335,14 @@ def looks_like_color(c):
             return False
     else:
         return False
+
+def is_color_like(c):
+    try:
+        colorConverter.to_rgb(c)
+        return True
+    except ValueError:
+        return False
+
 
 def rgb2hex(rgb):
     'Given a len 3 rgb tuple of 0-1 floats, return the hex string'
@@ -363,18 +374,25 @@ class ColorConverter:
         }
 
     cache = {}
-    def to_rgb(self, arg):
+    def to_rgb(self, arg, warn=True):
         """
-        returns a tuple of three floats from 0-1.  arg can be a matlab
-        format string, a html hex color string, an rgb tuple, or a
-        float between 0 and 1.  In the latter case, grayscale is used
+        Returns an RGB tuple of three floats from 0-1.
+
+        arg can be an RGB sequence or a string in any of several forms:
+            1) a letter from the set 'rgbcmykw'
+            2) a hex color string, like '#00FFFF'
+            3) a standard name, like 'aqua'
+            4) a float, like '0.4', indicating gray on a 0-1 scale
         """
+        # warn kwarg will go away when float-as-grayscale does
         try: return self.cache[arg]
         except KeyError: pass
         except TypeError: # could be unhashable rgb seq
             arg = tuple(arg)
             try: self.cache[arg]
             except KeyError: pass
+            except TypeError:
+                raise ValueError('to_rgb: unhashable even inside a tuple')
 
         try:
             if is_string_like(arg):
@@ -382,33 +400,81 @@ class ColorConverter:
                 if str1.startswith('#'):
                     color = hex2color(str1)
                 else:
-                    color = self.colors[arg]
+                    try:
+                        color = self.colors[arg]
+                    except KeyError:
+                        color = tuple([float(arg)]*3)
+            elif iterable(arg):   # streamline this after removing float case
+                color = tuple(arg[:3])
+                if [x for x in color if (x < 0) or  (x > 1)]:
+                    raise ValueError('to_rgb: Invalid rgb arg "%s"' % (str(arg)))
             elif isinstance(arg, (float,int)):
-                if 0<=arg<=1:
+                #raise Exception('number is %s' % str(arg))
+                if warn: warnings.warn(
+                    "For gray use a string, '%s', not a float, %s" %
+                                                (str(arg), str(arg)),
+                                                DeprecationWarning)
+                else: self._gray = True
+                if 0 <= arg <= 1:
                     color = (arg,arg,arg)
                 else:
                     raise ValueError('Floating point color arg must be between 0 and 1')
-            else: # assume tuple (or list)
-                assert isinstance(arg[2], (float,int))
-                color = tuple(arg[:3])
+            else:
+                raise ValueError('to_rgb: Invalid rgb arg "%s"' % (str(arg)))
 
-            self.cache[arg] = color # raise exception if color not set
+            self.cache[arg] = color
 
-        except KeyError:
-            raise ValueError('to_rgb: Invalid rgb arg "%s"' % (str(arg)))
-        except Exception, exc:
+        except (KeyError, ValueError, TypeError), exc:
             raise ValueError('to_rgb: Invalid rgb arg "%s"\n%s' % (str(arg), exc))
 
         return color
 
-    def to_rgba(self, arg, alpha=1.0):
+    def to_rgba(self, arg, alpha=1.0, warn=True):
         """
-        returns a tuple of four floats from 0-1.  arg can be a matlab
-        format string, a html hex color string, an rgb tuple, or a
-        float between 0 and 1.  In the latter case, grayscale is used
+        Returns an RGBA tuple of four floats from 0-1.
+
+        For acceptable values of arg, see to_rgb.
         """
-        r,g,b = self.to_rgb(arg)
+        r,g,b = self.to_rgb(arg, warn)
         return r,g,b,alpha
+
+    def to_rgba_list(self, c):
+        """
+        Returns a list of rgba tuples.
+
+        Accepts a single mpl color spec or a sequence of specs.
+        If the sequence is a list, the list items are changed in place.
+        """
+        # This can be improved after removing float-as-grayscale.
+        if not is_string_like(c):
+            try:
+                N = len(c) # raises TypeError if it is not a sequence
+                # Temporary hack: keep single rgb or rgba from being
+                # treated as grayscale.
+                if N==3 or N==4:
+                    L = [x for x in c if x>=0 and x<=1]
+                    if len(L) == N:
+                        raise ValueError
+                # If c is a list, we need to return the same list but
+                # with modified items so that items can be appended to
+                # it. This is needed for examples/dynamic_collections.py.
+                if not isinstance(c, list): # specific; don't need duck-typing
+                    c = list(c)
+                self._gray = False
+                for i, cc in enumerate(c):
+                    c[i] = self.to_rgba(cc, warn=False)  # change in place
+                if self._gray:
+                    msg = "In argument %s: use string, not float, for grayscale" % str(c)
+                    warnings.warn(msg, DeprecationWarning)
+                return c
+            except (ValueError, TypeError):
+                pass
+        try:
+            return [self.to_rgba(c)]
+        except (ValueError, TypeError):
+            raise TypeError('c must be a matplotlib color arg or a sequence of them')
+
+
 
 colorConverter = ColorConverter()
 
@@ -465,11 +531,18 @@ def makeMappingArray(N, data):
 
 
 class Colormap:
-    """Base class for all scalar to rgb mappings"""
+    """Base class for all scalar to rgb mappings
+
+        Important methods:
+            set_bad()
+            set_under()
+            set_over()
+    """
     def __init__(self, name, N=256):
         """Public class attributes:
             self.N:       number of rgb quantization levels
             self.name:    name of colormap
+
         """
         self.name = name
         self.N = N
@@ -497,7 +570,7 @@ class Colormap:
         alpha = max(alpha, 0.0)
         self._lut[:-3, -1] = alpha
         mask_bad = None
-        if isinstance(X, (int, float)):
+        if not iterable(X):
             vtype = 'scalar'
             xa = array([X])
         else:
@@ -514,22 +587,28 @@ class Colormap:
         xa = where(mask_over, self._i_over, xa)
         if mask_bad is not None: # and sometrue(mask_bad):
             xa = where(mask_bad, self._i_bad, xa)
-        #print 'types', typecode(self._lut), typecode(xa), xa.shape
         rgba = take(self._lut, xa)
         if vtype == 'scalar':
             rgba = tuple(rgba[0,:])
-        #print rgba[0,1:10,:]       # Now the same for numpy, numeric...
         return rgba
 
-    def set_bad(self, color = 'k', alpha = 0.0):
+    def set_bad(self, color = 'k', alpha = 1.0):
+        '''Set color to be used for masked values.
+        '''
         self._rgba_bad = colorConverter.to_rgba(color, alpha)
         if self._isinit: self._set_extremes()
 
     def set_under(self, color = 'k', alpha = 1.0):
+        '''Set color to be used for low out-of-range values.
+           Requires norm.clip = False
+        '''
         self._rgba_under = colorConverter.to_rgba(color, alpha)
         if self._isinit: self._set_extremes()
 
     def set_over(self, color = 'k', alpha = 1.0):
+        '''Set color to be used for high out-of-range values.
+           Requires norm.clip = False
+        '''
         self._rgba_over = colorConverter.to_rgba(color, alpha)
         if self._isinit: self._set_extremes()
 
@@ -547,6 +626,10 @@ class Colormap:
     def _init():
         '''Generate the lookup table, self._lut'''
         raise NotImplementedError("Abstract class only")
+
+    def is_gray(self):
+        return (alltrue(self._lut[:,0] == self._lut[:,1])
+                    and alltrue(self._lut[:,0] == self._lut[:,2]))
 
 
 class LinearSegmentedColormap(Colormap):
@@ -617,6 +700,7 @@ class ListedColormap(LinearSegmentedColormap):
                     for c in self.colors], typecode=Float)
         self._lut = zeros((self.N + 3, 4), Float)
         self._lut[:-3, :-1] = rgb
+        self._lut[:-3, -1] = 1
         self._isinit = True
         self._set_extremes()
 
@@ -630,9 +714,9 @@ class normalize:
         minimum and maximum value respectively.  If clip is True and
         the given value falls outside the range, the returned value
         will be 0 or 1, whichever is closer. Returns 0 if vmin==vmax.
-        Works with scalars or arrays, including masked arrays.  If clip
-        is True, masked values on input will be set to 1 on output; if
-        clip is False, the mask will be propagated to the output.
+        Works with scalars or arrays, including masked arrays.  If
+        clip is True, masked values are set to 1; otherwise they
+        remain masked.
         """
         self.vmin = vmin
         self.vmax = vmax
@@ -655,8 +739,10 @@ class normalize:
             return 0.*value
         else:
             if self.clip:
-                val = clip(val.filled(vmax), vmin, vmax)
-            result = (1.0/(vmax-vmin))*(val-vmin)
+                mask = ma.getmaskorNone(val)
+                val = ma.array(clip(val.filled(vmax), vmin, vmax),
+                                mask=mask)
+            result = (val-vmin)/float(vmax-vmin)
         if vtype == 'scalar':
             result = result[0]
         return result

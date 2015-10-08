@@ -83,7 +83,6 @@ from matplotlib.figure import Figure
 from matplotlib.font_manager import fontManager
 from matplotlib.ft2font import FT2Font
 from matplotlib.mathtext import math_parse_s_ft2font
-from matplotlib.texmanager import TexManager
 from matplotlib.transforms import lbwh_to_bbox
 from matplotlib.numerix.mlab import fliplr
 import matplotlib.numerix
@@ -109,11 +108,16 @@ class RendererAgg(RendererBase):
     texd = {}  # a cache of tex image rasters
     def __init__(self, width, height, dpi):
         if __debug__: verbose.report('RendererAgg.__init__', 'debug-annoying')
+        RendererBase.__init__(self)
         self.dpi = dpi
         self.width = width
         self.height = height
+        if __debug__: verbose.report('RendererAgg.__init__ width=%s, \
+                        height=%s'%(width, height), 'debug-annoying')
         self._renderer = _RendererAgg(int(width), int(height), dpi.get(),
                                     debug=False)
+        if __debug__: verbose.report('RendererAgg.__init__ _RendererAgg done',
+                                     'debug-annoying')
         self.draw_polygon = self._renderer.draw_polygon
         self.draw_rectangle = self._renderer.draw_rectangle
         self.draw_path = self._renderer.draw_path
@@ -129,12 +133,12 @@ class RendererAgg(RendererBase):
         self.restore_region = self._renderer.restore_region
 
 
-        self.texmanager = TexManager()
-
         self.bbox = lbwh_to_bbox(0,0, self.width, self.height)
+        if __debug__: verbose.report('RendererAgg.__init__ done',
+                                     'debug-annoying')
 
     def draw_arc(self, gcEdge, rgbFace, x, y, width, height, angle1, angle2):
-        """
+        """        
         Draw an arc centered at x,y with width and height and angles
         from 0.0 to 360.0
 
@@ -148,15 +152,6 @@ class RendererAgg(RendererBase):
         self._renderer.draw_ellipse(
             gcEdge, rgbFace, x, y, width/2, height/2)  # ellipse takes radius
 
-
-    def _draw_image(self, x, y, im):
-        """
-        Draw the Image instance into the current axes; x, y is the
-        upper left hand corner of the image
-        """
-        if __debug__: verbose.report('RendererAgg.draw_image', 'debug-annoying')
-        #self._renderer.draw_image(int(x), int(self.height-y), im)
-        self._renderer.draw_image(int(x), int(y), im)
 
     def draw_line(self, gc, x1, y1, x2, y2):
         """
@@ -182,7 +177,8 @@ class RendererAgg(RendererBase):
         """
         Draw the math text using matplotlib.mathtext
         """
-        if __debug__: verbose.report('RendererAgg.draw_mathtext', 'debug-annoying')
+        if __debug__: verbose.report('RendererAgg.draw_mathtext',
+                                     'debug-annoying')
         size = prop.get_size_in_points()
         width, height, fonts = math_parse_s_ft2font(
             s, self.dpi.get(), size, angle)
@@ -239,8 +235,8 @@ class RendererAgg(RendererBase):
         if ismath=='TeX':
             # todo: handle props
             size = prop.get_size_in_points()
-            dpi = self.dpi.get()
-            Z = self.texmanager.get_rgba(s, size, dpi, rgb)
+            texmanager = self.get_texmanager()
+            Z = texmanager.get_rgba(s, size, self.dpi.get(), rgb)
             m,n,tmp = Z.shape
             return n,m
 
@@ -260,17 +256,18 @@ class RendererAgg(RendererBase):
         rgb = gc.get_rgb()
         size = prop.get_size_in_points()
         dpi = self.dpi.get()
-
+        
         flip = angle==90
         w,h = self.get_text_width_height(s, prop, 'TeX', rgb)
         if flip:
             w,h = h,w
             x -= w
-
-        key = s, size, dpi, rgb, angle, rcParams['font.latex.package'], rcParams['text.tex.engine']
+        
+        texmanager = self.get_texmanager()
+        key = s, size, dpi, rgb, angle, texmanager.get_font_config()
         im = self.texd.get(key)
         if im is None:
-            Z = self.texmanager.get_rgba(s, size, dpi, rgb)
+            Z = texmanager.get_rgba(s, size, dpi, rgb)
             if flip:
                 r = Z[:,:,0]
                 g = Z[:,:,1]
@@ -304,7 +301,8 @@ class RendererAgg(RendererBase):
         """
         Get the font for text instance t, cacheing for efficiency
         """
-        if __debug__: verbose.report('RendererAgg._get_agg_font', 'debug-annoying')
+        if __debug__: verbose.report('RendererAgg._get_agg_font',
+                                     'debug-annoying')
 
         key = hash(prop)
         font = _fontd.get(key)
@@ -326,19 +324,23 @@ class RendererAgg(RendererBase):
         convert point measures to pixes using dpi and the pixels per
         inch of the display
         """
-        if __debug__: verbose.report('RendererAgg.points_to_pixels', 'debug-annoying')
+        if __debug__: verbose.report('RendererAgg.points_to_pixels',
+                                     'debug-annoying')
         return points*self.dpi.get()/72.0
 
     def tostring_rgb(self):
-        if __debug__: verbose.report('RendererAgg.tostring_rgb', 'debug-annoying')
+        if __debug__: verbose.report('RendererAgg.tostring_rgb',
+                                     'debug-annoying')
         return self._renderer.tostring_rgb()
 
     def tostring_argb(self):
-        if __debug__: verbose.report('RendererAgg.tostring_argb', 'debug-annoying')
+        if __debug__: verbose.report('RendererAgg.tostring_argb',
+                                     'debug-annoying')
         return self._renderer.tostring_argb()
 
     def buffer_rgba(self,x,y):
-        if __debug__: verbose.report('RendererAgg.buffer_rgba', 'debug-annoying')
+        if __debug__: verbose.report('RendererAgg.buffer_rgba',
+                                     'debug-annoying')
         return self._renderer.buffer_rgba(x,y)
 
     def clear(self):
@@ -350,9 +352,12 @@ def new_figure_manager(num, *args, **kwargs):
     """
     Create a new figure manager instance
     """
-    if __debug__: verbose.report('backend_agg.new_figure_manager', 'debug-annoying')
+    if __debug__: verbose.report('backend_agg.new_figure_manager',
+                                 'debug-annoying')
 
-    thisFig = Figure(*args, **kwargs)
+
+    FigureClass = kwargs.pop('FigureClass', Figure)
+    thisFig = FigureClass(*args, **kwargs)
     canvas = FigureCanvasAgg(thisFig)
     manager = FigureManagerBase(canvas, num)
     return manager
@@ -398,20 +403,22 @@ class FigureCanvasAgg(FigureCanvasBase):
         return self.renderer
 
     def tostring_rgb(self):
-        if __debug__: verbose.report('FigureCanvasAgg.tostring_rgb', 'debug-annoying')
+        if __debug__: verbose.report('FigureCanvasAgg.tostring_rgb',
+                                     'debug-annoying')
         return self.renderer.tostring_rgb()
 
     def tostring_argb(self):
-        if __debug__: verbose.report('FigureCanvasAgg.tostring_argb', 'debug-annoying')
+        if __debug__: verbose.report('FigureCanvasAgg.tostring_argb',
+                                     'debug-annoying')
         return self.renderer.tostring_argb()
 
     def buffer_rgba(self,x,y):
-        if __debug__: verbose.report('FigureCanvasAgg.buffer_rgba', 'debug-annoying')
+        if __debug__: verbose.report('FigureCanvasAgg.buffer_rgba',
+                                     'debug-annoying')
         return self.renderer.buffer_rgba(x,y)
 
-    def print_figure(self, filename, dpi=150,
-                     facecolor='w', edgecolor='w',
-                     orientation='portrait'):
+    def print_figure(self, filename, dpi=150, facecolor='w', edgecolor='w',
+                     orientation='portrait', **kwargs):
         """
         Render the figure to hardcopy.  Set the figure patch face and
         edge colors.  This is useful because some of the GUIs have a
@@ -425,9 +432,8 @@ class FigureCanvasAgg(FigureCanvasBase):
         If filename is a fileobject, write png to file object (thus
         you can, for example, write the png to stdout
         """
-        if __debug__: verbose.report('FigureCanvasAgg.print_figure', 'debug-annoying')
-
-
+        if __debug__: verbose.report('FigureCanvasAgg.print_figure',
+                                     'debug-annoying')
 
         # store the orig figure dpi, color and size information so we
         # can restore them later.  For image creation alone, this is
@@ -439,7 +445,6 @@ class FigureCanvasAgg(FigureCanvasBase):
         origDPI = self.figure.dpi.get()
         origfacecolor = self.figure.get_facecolor()
         origedgecolor = self.figure.get_edgecolor()
-
 
         self.figure.dpi.set(dpi)
         self.figure.set_facecolor(facecolor)
@@ -472,11 +477,13 @@ class FigureCanvasAgg(FigureCanvasBase):
             elif ext.find('svg')>=0:
                 from backend_svg import FigureCanvasSVG
                 svg = self.switch_backends(FigureCanvasSVG)
-                svg.print_figure(filename, dpi, facecolor, edgecolor, orientation)
+                svg.print_figure(filename, dpi, facecolor, edgecolor,
+                                 orientation, **kwargs)
             elif ext.find('ps')>=0 or ext.find('ep')>=0:
                 from backend_ps import FigureCanvasPS # lazy import
                 ps = self.switch_backends(FigureCanvasPS)
-                ps.print_figure(filename, dpi, facecolor, edgecolor, orientation)
+                ps.print_figure(filename, dpi, facecolor, edgecolor,
+                                orientation, **kwargs)
             else:
                 raise IOError('Do not know know to handle extension *%s' % ext)
 

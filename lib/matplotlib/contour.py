@@ -6,11 +6,13 @@ from __future__ import division
 from matplotlib import rcParams
 import numerix.ma as ma
 
+from ticker import MaxNLocator
+from transforms import Interval, Value
 from numerix import absolute, arange, array, asarray, ones, divide,\
      transpose, log, log10, Float, Float32, ravel, zeros, Int16,\
      Int32, Int, Float64, ceil, indices, shape, which, where, sqrt,\
      asum, resize, reshape, add, argmin, arctan2, pi, argsort, sin,\
-     cos, nonzero, take
+     cos, nonzero, take, concatenate, all, newaxis
 
 from mlab import linspace, meshgrid
 import _contour
@@ -22,7 +24,7 @@ from collections import  PolyCollection, LineCollection
 from font_manager import FontProperties
 from numerix.mlab import amin, amax
 from text import Text
-
+import warnings
 
 # We can't use a single line collection for contour because a line
 # collection can have only a single line style, and we want to be able to have
@@ -219,8 +221,8 @@ class ContourLabeler:
 
         slc = trans.seq_xy_tups(linecontour)
         x,y = slc[ind]
-        xx= array(slc)[:,0].copy()
-        yy=array(slc)[:,1].copy()
+        xx= asarray(slc)[:,0].copy()
+        yy=asarray(slc)[:,1].copy()
 
         #indices which are under the label
         inds=nonzero(((xx < x+xlabel) & (xx > x-xlabel)) &
@@ -256,19 +258,30 @@ class ContourLabeler:
 
         new_x1d, new_y1d = trans.inverse_xy_tup((new_x1, new_y1))
         new_x2d, new_y2d = trans.inverse_xy_tup((new_x2, new_y2))
+        new_xy1 = array(((new_x1d, new_y1d),))
+        new_xy2 = array(((new_x2d, new_y2d),))
+
 
         if rot > 0:
-            if len(lc1) > 0 and (lc1[-1][0] <= new_x1d) and (lc1[-1][1] <= new_y1d):
-                lc1.append((new_x1d, new_y1d))
+            if (len(lc1) > 0 and (lc1[-1][0] <= new_x1d)
+                             and (lc1[-1][1] <= new_y1d)):
+                lc1 = concatenate((lc1, new_xy1))
+                #lc1.append((new_x1d, new_y1d))
 
-            if len(lc2) > 0 and (lc2[0][0] >= new_x2d) and (lc2[0][1] >= new_y2d):
-                lc2.insert(0, (new_x2d, new_y2d))
+            if (len(lc2) > 0 and (lc2[0][0] >= new_x2d)
+                             and (lc2[0][1] >= new_y2d)):
+                lc2 = concatenate((new_xy2, lc2))
+                #lc2.insert(0, (new_x2d, new_y2d))
         else:
-            if len(lc1) > 0 and ((lc1[-1][0] <= new_x1d) and (lc1[-1][1] >= new_y1d)):
-                lc1.append((new_x1d, new_y1d))
+            if (len(lc1) > 0 and ((lc1[-1][0] <= new_x1d)
+                             and (lc1[-1][1] >= new_y1d))):
+                lc1 = concatenate((lc1, new_xy1))
+                #lc1.append((new_x1d, new_y1d))
 
-            if len(lc2) > 0 and ((lc2[0][0] >= new_x2d) and (lc2[0][1] <= new_y2d)):
-                lc2.insert(0, (new_x2d, new_y2d))
+            if (len(lc2) > 0 and ((lc2[0][0] >= new_x2d)
+                             and (lc2[0][1] <= new_y2d))):
+                lc2 = concatenate((new_xy2, lc2))
+                #lc2.insert(0, (new_x2d, new_y2d))
 
         return [lc1,lc2]
 
@@ -289,8 +302,8 @@ class ContourLabeler:
         else:
             ysize = labelwidth
 
-        XX = resize(array(linecontour)[:,0],(xsize, ysize))
-        YY = resize(array(linecontour)[:,1],(xsize,ysize))
+        XX = resize(asarray(linecontour)[:,0],(xsize, ysize))
+        YY = resize(asarray(linecontour)[:,1],(xsize,ysize))
 
         yfirst = YY[:,0]
         ylast = YY[:,-1]
@@ -303,6 +316,7 @@ class ContourLabeler:
         L=sqrt((xlast-xfirst)**2+(ylast-yfirst)**2)
         dist = add.reduce(([(abs(s)[i]/L[i]) for i in range(xsize)]),-1)
         x,y,ind = self.get_label_coords(dist, XX, YY, ysize, labelwidth)
+        #print 'ind, x, y', ind, x, y
         angle = arctan2(ylast - yfirst, xlast - xfirst)
         rotation = angle[ind]*180/pi
         if rotation > 90:
@@ -310,7 +324,11 @@ class ContourLabeler:
         if rotation < -90:
             rotation = 180 + rotation
 
-        dind = list(linecontour).index((x,y))
+        # There must be a more efficient way...
+        lc = [tuple(l) for l in linecontour]
+        dind = lc.index((x,y))
+        #print 'dind', dind
+        #dind = list(linecontour).index((x,y))
 
         return x,y, rotation, dind
 
@@ -325,14 +343,15 @@ class ContourLabeler:
                                           colors,
                                           self.label_cvalues, fslist):
             con = self.collections[icon]
-            toremove = []
-            toadd = []
             lw = self.get_label_width(lev, fmt, fsize)
+            additions = []
             for segNum, linecontour in enumerate(con._segments):
                 # for closed contours add one more point to
                 # avoid division by zero
-                if linecontour[0] == linecontour[-1]:
-                    linecontour.append(linecontour[1])
+                if all(linecontour[0] == linecontour[-1]):
+                    linecontour = concatenate((linecontour,
+                                               linecontour[1][newaxis,:]))
+                    #linecontour.append(linecontour[1])
                 # transfer all data points to screen coordinates
                 slc = trans.seq_xy_tups(linecontour)
                 if self.print_label(slc,lw):
@@ -350,15 +369,9 @@ class ContourLabeler:
                     if inline:
                         new = self.break_linecontour(linecontour, rotation,
                                                        lw, ind)
-                        toadd.extend(new)
-                        #for c in new: toadd.append(c)
-                        toremove.append(linecontour)
-            for c in toremove:
-                con._segments.remove(c)
-            for c in toadd:
-                con._segments.append(c)
-
-
+                        con._segments[segNum] = new[0]
+                        additions.append(new[1])
+            con._segments.extend(additions)
 
 class ContourSet(ScalarMappable, ContourLabeler):
     """
@@ -386,6 +399,7 @@ class ContourSet(ScalarMappable, ContourLabeler):
 
         """
         self.ax = ax
+        self.levels = kwargs.get('levels', None)
         self.filled = kwargs.get('filled', False)
         self.linewidths = kwargs.get('linewidths', None)
 
@@ -395,9 +409,15 @@ class ContourSet(ScalarMappable, ContourLabeler):
         cmap = kwargs.get('cmap', None)
         self.colors = kwargs.get('colors', None)
         norm = kwargs.get('norm', None)
-        self.clip_ends = kwargs.get('clip_ends', True)
+        self.clip_ends = kwargs.get('clip_ends', None)      ########
+        self.extend = kwargs.get('extend', 'neither')
+        if self.clip_ends is not None:
+            warnings.warn("'clip_ends' has been replaced by 'extend'")
+            self.levels = self.levels[1:-1] # discard specified end levels
+            self.extend = 'both'            # regenerate end levels
         self.antialiased = kwargs.get('antialiased', True)
         self.nchunk = kwargs.get('nchunk', 0)
+        self.locator = kwargs.get('locator', None)
 
         if self.origin is not None: assert(self.origin in
                                             ['lower', 'upper', 'image'])
@@ -431,44 +451,46 @@ class ContourSet(ScalarMappable, ContourLabeler):
                 self.linewidths = self.linewidths[0]
             #C = _contour.Cntr(x, y, z.filled(), z.mask())
             C = _contour.Cntr(x, y, z.filled(), ma.getmaskorNone(z))
-            lowers = self.levels[:-1]
-            uppers = self.levels[1:]
+            lowers = self._levels[:-1]
+            uppers = self._levels[1:]
             for level, level_upper, color in zip(lowers, uppers, self.tcolors):
-                nlist = C.trace(level, level_upper, points = 1,
+                nlist = C.trace(level, level_upper, points = 0,
                         nchunk = self.nchunk)
                 col = PolyCollection(nlist,
                                      linewidths = (self.linewidths,),
-                                     antialiaseds = (self.antialiased,))
-                col.set_color(color) # sets both facecolor and edgecolor
+                                     antialiaseds = (self.antialiased,),
+                                     facecolors= color,
+                                     edgecolors= 'None')
                 self.ax.add_collection(col)
                 self.collections.append(col)
 
         else:
             tlinewidths = self._process_linewidths()
+            self.tlinewidths = tlinewidths
             #C = _contour.Cntr(x, y, z.filled(), z.mask())
             C = _contour.Cntr(x, y, z.filled(), ma.getmaskorNone(z))
             for level, color, width in zip(self.levels, self.tcolors, tlinewidths):
-                nlist = C.trace(level, points = 1)
-                col = LineCollection(nlist)
-                col.set_color(color)
-                col.set_linewidth(width)
+                nlist = C.trace(level, points = 0)
+                col = LineCollection(nlist,
+                                     colors = color,
+                                     linewidths = width)
 
                 if level < 0.0 and self.monochrome:
-                    col.set_linestyle((0, (6.,6.)),)
+                    col.set_linestyle((0, rcParams['contour.negative_linestyle']))
                 col.set_label(str(level))         # only for self-documentation
                 self.ax.add_collection(col)
                 self.collections.append(col)
-
-        ## check: seems like set_xlim should also be inside
-        if not self.ax.ishold():
-            self.ax.cla()
-        self.ax.set_xlim((ma.minimum(x), ma.maximum(x)))
-        self.ax.set_ylim((ma.minimum(y), ma.maximum(y)))
-
-
+        x0 = ma.minimum(x)
+        x1 = ma.maximum(x)
+        y0 = ma.minimum(y)
+        y1 = ma.maximum(y)
+        self.ax.update_datalim([(x0,y0), (x1,y1)])
+        self.ax.set_xlim((x0, x1))
+        self.ax.set_ylim((y0, y1))
 
     def changed(self):
-        tcolors = [ (tuple(rgba),) for rgba in self.to_rgba(self.cvalues)]
+        tcolors = [ (tuple(rgba),) for rgba in
+                                self.to_rgba(self.cvalues, alpha=self.alpha)]
         self.tcolors = tcolors
         contourNum = 0
         for color, collection in zip(tcolors, self.collections):
@@ -490,14 +512,20 @@ class ContourSet(ScalarMappable, ContourLabeler):
         one contour line, but two filled regions, and therefore
         three levels to provide boundaries for both regions.
         '''
-        zmax = ma.maximum(z)
-        zmin = ma.minimum(z)
+        zmax = self.zmax
+        zmin = self.zmin
         zmargin = (zmax - zmin) * 0.001 # so z < (zmax + zmargin)
+        zmax = zmax + zmargin
+        intv = Interval(Value(zmin), Value(zmax))
+        if self.locator is None:
+            self.locator = MaxNLocator(N+1)
+        self.locator.set_view_interval(intv)
+        self.locator.set_data_interval(intv)
+        lev = self.locator()
+        self._auto = True
         if self.filled:
-            lev = linspace(zmin, zmax + zmargin, N+2)
-        else:
-            lev = linspace(zmin, zmax + zmargin, N+2)[1:-1]
-        return lev
+            return lev
+        return lev[1:-1]
 
     def _initialize_x_y(self, z):
         '''
@@ -509,14 +537,22 @@ class ContourSet(ScalarMappable, ContourLabeler):
         if origin is 'upper', x = j + 0.5, y = Nrows - i - 0.5
         If extent is not None, x and y will be scaled to match,
         as in imshow.
+        If origin is None and extent is not None, then extent
+        will give the minimum and maximum values of x and y.
         '''
         if len(shape(z)) != 2:
             raise TypeError("Input must be a 2D array.")
         else:
             Ny, Nx = shape(z)
-        if self.origin is None:
-            return meshgrid(arange(Nx), arange(Ny))
-
+        if self.origin is None:  # Not for image-matching.
+            if self.extent is None:
+                return meshgrid(arange(Nx), arange(Ny))
+            else:
+                x0,x1,y0,y1 = self.extent
+                x = linspace(x0, x1, Nx)
+                y = linspace(y0, y1, Ny)
+                return meshgrid(x, y)
+        # Match image behavior:
         if self.extent is None:
             x0,x1,y0,y1 = (0, Nx, 0, Ny)
         else:
@@ -570,26 +606,50 @@ class ContourSet(ScalarMappable, ContourLabeler):
         else:
             raise TypeError("Too many arguments to %s; see help(%s)" % (fn,fn))
         z = ma.asarray(z)  # Convert to native masked array format if necessary.
-        if Nargs == 1 or Nargs == 3:
-            lev = self._autolev(z, 7)
-        else:   # 2 or 4 args
-            level_arg = args[-1]
-            if type(level_arg) == int:
-                lev = self._autolev(z, level_arg)
-            elif iterable(level_arg) and len(shape(level_arg)) == 1:
-                lev = array([float(fl) for fl in level_arg])
-            else:
-                raise TypeError("Last %s arg must give levels; see help(%s)" % (fn,fn))
-        if self.filled and len(lev) < 2:
-            raise ValueError("Filled contours require at least 2 levels.")
-        # Workaround for cntr.c bug wrt masked interior regions:
-        #if filled:
-        #    z = ma.masked_array(z.filled(-1e38))
-        # It's not clear this is any better than the original bug.
-        self.levels = lev
-        self.layers = self.levels # contour: a line is a thin layer
+        self.zmax = ma.maximum(z)
+        self.zmin = ma.minimum(z)
+        self._auto = False
+        if self.levels is None:
+            if Nargs == 1 or Nargs == 3:
+                lev = self._autolev(z, 7)
+            else:   # 2 or 4 args
+                level_arg = args[-1]
+                if type(level_arg) == int:
+                    lev = self._autolev(z, level_arg)
+                elif iterable(level_arg) and len(shape(level_arg)) == 1:
+                    lev = array([float(fl) for fl in level_arg])
+                else:
+                    raise TypeError("Last %s arg must give levels; see help(%s)" % (fn,fn))
+            if self.filled and len(lev) < 2:
+                raise ValueError("Filled contours require at least 2 levels.")
+            # Workaround for cntr.c bug wrt masked interior regions:
+            #if filled:
+            #    z = ma.masked_array(z.filled(-1e38))
+            # It's not clear this is any better than the original bug.
+            self.levels = lev
+        #if self._auto and self.extend in ('both', 'min', 'max'):
+        #    raise TypeError("Auto level selection is inconsistent "
+        #                             + "with use of 'extend' kwarg")
+        self._levels = list(self.levels)
+        if self.extend in ('both', 'min'):
+            self._levels.insert(0, self.zmin - 1)
+        if self.extend in ('both', 'max'):
+            self._levels.append(self.zmax + 1)
+        self._levels = asarray(self._levels)
+        self.vmin = amin(self.levels)  # alternative would be self.layers
+        self.vmax = amax(self.levels)
+        if self.extend in ('both', 'min') or self.clip_ends:
+            self.vmin = 2 * self.levels[0] - self.levels[1]
+        if self.extend in ('both', 'max') or self.clip_ends:
+            self.vmax = 2 * self.levels[-1] - self.levels[-2]
+        self.layers = self._levels # contour: a line is a thin layer
         if self.filled:
-            self.layers = 0.5 * (self.levels[:-1] + self.levels[1:])
+            self.layers = 0.5 * (self._levels[:-1] + self._levels[1:])
+            if self.extend in ('both', 'min') or self.clip_ends:
+                self.layers[0] = 0.5 * (self.vmin + self._levels[1])
+            if self.extend in ('both', 'max') or self.clip_ends:
+                self.layers[-1] = 0.5 * (self.vmax + self._levels[-2])
+
         return (x, y, z)
 
     def _process_colors(self):
@@ -602,21 +662,23 @@ class ContourSet(ScalarMappable, ContourLabeler):
         the full dynamic range available for the selected levels.
 
         The color is based on the midpoint of the layer, except for
-        the end layers when clip_ends is True.
+        an extended end layers.
         """
         self.monochrome = self.cmap.monochrome
         if self.colors is not None:
-            self.cvalues = range(len(self.layers))
+            i0, i1 = 0, len(self.layers)
+            if self.extend in ('both', 'min'):
+                i0 = -1
+            if self.extend in ('both', 'max'):
+                i1 = i1 + 1
+            self.cvalues = range(i0, i1)
             self.set_norm(no_norm())
         else:
             self.cvalues = self.layers
-        if self.filled and len(self.layers) > 2 and self.clip_ends:
-            vmin = 2 * self.levels[1] - self.levels[2]
-            vmax = 2 * self.levels[-2] - self.levels[-3]
-        else:
-            vmin = amin(self.levels)  # alternative would be self.layers
-            vmax = amax(self.levels)
-        self.set_clim(vmin, vmax)
+        if not self.norm.scaled():
+            self.set_clim(self.vmin, self.vmax)
+        if self.extend in ('both', 'max', 'min'):
+            self.norm.clip = False
         self.set_array(self.layers)
         self.tcolors = [ (tuple(rgba),) for rgba in self.to_rgba(self.cvalues)]
 
@@ -624,7 +686,7 @@ class ContourSet(ScalarMappable, ContourLabeler):
         linewidths = self.linewidths
         Nlev = len(self.levels)
         if linewidths is None:
-            tlinewidths = [rcParams['lines.linewidth']] *Nlev
+            tlinewidths = [(rcParams['lines.linewidth'],)] *Nlev
         else:
             if iterable(linewidths) and len(linewidths) < Nlev:
                 linewidths = list(linewidths) * int(ceil(Nlev/len(linewidths)))
@@ -702,7 +764,29 @@ class ContourSet(ScalarMappable, ContourLabeler):
               specifying X and Y.
 
             * extent = None: (x0,x1,y0,y1); also active only if X and Y
-              are not specified.
+              are not specified.  If origin is not None, then extent is
+              interpreted as in imshow: it gives the outer pixel boundaries.
+              In this case, the position of Z[0,0] is the center of the
+              pixel, not a corner.
+              If origin is None, then (x0,y0) is the position of Z[0,0],
+              and (x1,y1) is the position of Z[-1,-1].
+
+            * locator = None: an instance of a ticker.Locator subclass;
+              default is MaxNLocator.  It is used to determine the
+              contour levels if they are not given explicitly via the
+              V argument.
+
+            ***** New: *****
+            * extend = 'neither', 'both', 'min', 'max'
+              Unless this is 'neither' (default), contour levels are
+              automatically added to one or both ends of the range so that
+              all data are included.  These added ranges are then
+              mapped to the special colormap values which default to
+              the ends of the colormap range, but can be set via
+              Colormap.set_under() and Colormap.set_over() methods.
+              To replace clip_ends=True and V = [-100, 2, 1, 0, 1, 2, 100],
+              use extend='both' and V = [2, 1, 0, 1, 2].
+            ****************
 
             contour only:
             * linewidths = None: or one of these:
@@ -717,6 +801,7 @@ class ContourSet(ScalarMappable, ContourLabeler):
                 .matplotlibrc is used
 
             contourf only:
+            ***** Obsolete: ****
             * clip_ends = True
               If False, the limits for color scaling are set to the
               minimum and maximum contour levels.

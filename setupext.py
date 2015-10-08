@@ -18,7 +18,7 @@ DARWIN
   addition to the packages listed there, You will also need libpng,
   libjpeg, and libtiff if you want output to these formats from GTK.
 
-WIN32
+WIN32 - MINGW
 
   If you are sufficiently masochistic that you want to build this
   yourself, download the win32_static dir from
@@ -29,6 +29,16 @@ WIN32
 
   NOTE, if you are building on python24 on win32, see
   http://mail.python.org/pipermail/python-list/2004-December/254826.html
+
+WIN32 - VISUAL STUDIO 7.1 (2003)
+
+  This build is similar to the mingw.  Download the visual studio static
+  dependencies from
+  http://matplotlib.sourceforge.net/win32_static_vs.tar.gz and
+  see the README in that dir
+  
+  > python setup.py build bdist_wininst
+  
 """
 
 import os
@@ -97,12 +107,28 @@ def temp_copy(_from, _to):
     os.utime(_to, (stats.st_atime, stats.st_mtime))
     # Make an object to eliminate the temporary file at exit time.
     globals()["_cleanup_"+_to] = CleanUpFile(_to)
+    
+def get_win32_compiler():
+    # Used to determine mingw32 or msvc
+    # This is pretty bad logic, someone know a better way?
+    for v in sys.argv:
+        if 'mingw32' in v:
+            return 'mingw32'
+    return 'msvc'
+win32_compiler = get_win32_compiler()
+if win32_compiler == 'msvc':
+    std_libs = []
+else:
+    std_libs = ['stdc++', 'm']
 
 def add_base_flags(module):
-    incdirs = [os.path.join(p, 'include') for p in basedir[sys.platform]
-               if os.path.exists(p)]
-    libdirs = [os.path.join(p, 'lib')     for p in basedir[sys.platform]
-               if os.path.exists(p)]
+
+    incdirs = filter(os.path.exists,
+                     [os.path.join(p, 'include') for p in basedir[sys.platform] ])
+    libdirs = filter(os.path.exists,
+                     [os.path.join(p, 'lib')     for p in basedir[sys.platform] ]+ 
+                     [os.path.join(p, 'lib64')     for p in basedir[sys.platform] ] )
+
     module.include_dirs.extend(incdirs)
     module.include_dirs.append('.')    
     module.library_dirs.extend(libdirs)
@@ -115,8 +141,12 @@ def getoutput(s):
 
 def add_numpy_flags(module):
     "Add the modules flags to build extensions which use numpy"
-    import numpy 
-    module.include_dirs.append(numpy.get_numpy_include())
+    import numpy
+    # TODO: Remove this try statement when it is no longer needed
+    try:
+        module.include_dirs.append(numpy.get_include())
+    except AttributeError:
+        module.include_dirs.append(numpy.get_numpy_include())
 
 def add_agg_flags(module):
     'Add the module flags to build extensions which use agg'
@@ -130,7 +160,7 @@ def add_agg_flags(module):
 
 
     # put these later for correct link order
-    module.libraries.extend(['stdc++', 'm'])
+    module.libraries.extend(std_libs)
 
 def add_gd_flags(module):
     'Add the module flags to build extensions which use gd'
@@ -155,11 +185,11 @@ def add_ft2font_flags(module):
         p = os.path.join(d, 'freetype2/lib')
         if os.path.exists(p): module.library_dirs.append(p)
             
-    if sys.platform == 'win32':
+    if sys.platform == 'win32' and win32_compiler == 'mingw32':
         module.libraries.append('gw32c')
 
-    # put this last for library link order     
-    module.libraries.extend(['stdc++', 'm'])
+    # put this last for library link order
+    module.libraries.extend(std_libs)
 
     
 
@@ -187,6 +217,10 @@ def add_pygtk_flags(module):
              ])
 
     add_base_flags(module)
+    
+    # set for msvc compiler if not present
+    if not os.environ.has_key('PKG_CONFIG_PATH'):
+        os.environ['PKG_CONFIG_PATH'] = 'C:\GTK\lib\pkgconfig'
 
     pygtkIncludes = getoutput('pkg-config --cflags-only-I pygtk-2.0').split()
     gtkIncludes = getoutput('pkg-config --cflags-only-I gtk+-2.0').split()
@@ -208,6 +242,10 @@ def add_pygtk_flags(module):
     module.extra_link_args.extend(
         [flag for flag in linkerFlags if not
          (flag.startswith('-l') or flag.startswith('-L'))])
+    
+    # visual studio doesn't need the math library
+    if sys.platform=='win32' and win32_compiler != 'mingw32' and 'm' in module.libraries:
+        module.libraries.remove('m')
 
 
 def find_wx_config():
@@ -295,45 +333,58 @@ class FoundTclTk:
 def find_tcltk():
     """Finds Tcl/Tk includes/libraries/version by interrogating Tkinter."""
     try:
-	import Tkinter
+        import Tkinter
     except:
-	print "Tkinter not properly installed\n"
-	sys.exit(1)
+        print "Tkinter not properly installed\n"
+        sys.exit(1)
     if Tkinter.TkVersion < 8.3:
-	print "Tcl/Tk v8.3 or later required\n"
-	sys.exit(1)
+        print "Tcl/Tk v8.3 or later required\n"
+        sys.exit(1)
     o = FoundTclTk()
     try:
-	tk=Tkinter.Tk()	
+        tk=Tkinter.Tk() 
     except Tkinter.TclError:
-	print "Using default library and include directories for Tcl and Tk because a"
-	print "Tk window failed to open.  You may need to define DISPLAY for Tk to work"
-	print "so that setup can determine where your libraries are located."
-	o.tcl_lib = "/usr/local/lib"
-	o.tcl_inc = "/usr/local/include"
-	o.tk_lib = "/usr/local/lib"
+        print "Using default library and include directories for Tcl and Tk because a"
+        print "Tk window failed to open.  You may need to define DISPLAY for Tk to work"
+        print "so that setup can determine where your libraries are located."
+        o.tcl_lib = "/usr/local/lib"
+        o.tcl_inc = "/usr/local/include"
+        o.tk_lib = "/usr/local/lib"
         o.tk_inc = "/usr/local/include"
-	o.tkv = ""
+        o.tkv = ""
     else:
-	tk.withdraw()
-	o.tcl_lib = os.path.join((tk.getvar('tcl_library')), '../')
-	o.tk_lib = os.path.join((tk.getvar('tk_library')), '../')
-	o.tkv = str(Tkinter.TkVersion)[:3]
-	o.tcl_inc = os.path.join((tk.getvar('tcl_library')), 
-				 '../../include/tcl'+o.tkv)        
+        tk.withdraw()
+        o.tcl_lib = os.path.normpath(os.path.join((tk.getvar('tcl_library')), '../'))
+        o.tk_lib = os.path.normpath(os.path.join(str(tk.getvar('tk_library')), '../'))
+        o.tkv = str(Tkinter.TkVersion)[:3]
+        o.tcl_inc = os.path.normpath(os.path.join((tk.getvar('tcl_library')), 
+                    '../../include/tcl'+o.tkv))
         if not os.path.exists(o.tcl_inc):
-	    o.tcl_inc = os.path.join((tk.getvar('tcl_library')), 
-				     '../../include')
-	o.tk_inc = os.path.join((tk.getvar('tk_library')), 
-				 '../../include/tk'+o.tkv)        
+            o.tcl_inc = os.path.normpath(os.path.join((tk.getvar('tcl_library')), 
+                        '../../include'))
+        o.tk_inc = os.path.normpath(os.path.join((tk.getvar('tk_library')), 
+                    '../../include/tk'+o.tkv))
         if not os.path.exists(o.tk_inc):
-	    o.tk_inc = os.path.join((tk.getvar('tk_library')), 
-				     '../../include')
+            o.tk_inc = os.path.normpath(os.path.join((tk.getvar('tk_library')), 
+                        '../../include'))
+            
+        if ((not os.path.exists(os.path.join(o.tk_inc,'tk.h'))) and
+            os.path.exists(os.path.join(o.tcl_inc,'tk.h'))):
+            o.tk_inc = o.tcl_inc
+            
+        if not os.path.exists(o.tcl_inc):            
+            # this is a hack for suse linux, which is broken
+            if (sys.platform.startswith('linux') and
+                os.path.exists('/usr/include/tcl.h') and
+                os.path.exists('/usr/include/tk.h')):
+                o.tcl_inc = '/usr/include/'
+                o.tk_inc = '/usr/include/'
+                
         if not os.path.exists(o.tcl_inc):
             print 'cannot find tcl/tk headers. giving up.'
             sys.exit()
     return o
-	
+
 
 def add_tk_flags(module):
     'Add the module flags to build extensions which use tk'
@@ -374,7 +425,7 @@ def add_tk_flags(module):
         # Find the directory that contains the Tcl.framwork and Tk.framework
         # bundles.
         # XXX distutils should support -F!
-	tk_framework_found = 0
+        tk_framework_found = 0
         for F in framework_dirs:
             # both Tcl.framework and Tk.framework should be present
             for fw in 'Tcl', 'Tk':
@@ -501,8 +552,12 @@ def build_wxagg(ext_modules, packages, numerix, abortOnFailure):
      # Avoid aborting the whole build process if `wx-config' can't be found and
      # BUILD_WXAGG in setup.py is set to "auto"
      if sys.platform == 'win32':
-         #pass # don't need config
-         return # TODO: Fix _wxagg build on windows (linking issues)
+         # mingw32 cannot link against distributed wx libs
+         # since they are built with VisualStudio
+         if win32_compiler == 'mingw32':
+             return
+         else:
+             pass
      
      elif wxconfig is None:
          print """
@@ -709,7 +764,7 @@ def build_swigagg(ext_modules, packages):
                     )
 
     agg.include_dirs.extend(['%s/include'%AGG_VERSION, 'src', 'swig'])
-    agg.libraries.extend(['stdc++', 'm'])
+    agg.libraries.extend(std_libs)
     ext_modules.append(agg)
 
 def build_transforms(ext_modules, packages, numerix):
@@ -720,7 +775,7 @@ def build_transforms(ext_modules, packages, numerix):
         module = Extension('matplotlib._na_transforms',
                              ['src/_na_transforms.cpp',
                               'src/mplutils.cpp'] + cxx,
-                             libraries = ['stdc++', 'm'],
+                             libraries = std_libs,
                              include_dirs = ['src', '.']+numarray_inc_dirs,
                              )
         
@@ -735,7 +790,7 @@ def build_transforms(ext_modules, packages, numerix):
         module = Extension('matplotlib._nc_transforms',
                              ['src/_nc_transforms.cpp',
                               'src/mplutils.cpp'] + cxx,
-                             libraries = ['stdc++', 'm'],
+                             libraries = std_libs,
                              include_dirs = ['src', '.']+numeric_inc_dirs,
                              )
 
@@ -752,7 +807,7 @@ def build_transforms(ext_modules, packages, numerix):
         module = Extension('matplotlib._ns_transforms',
                              ['src/_ns_transforms.cpp',
                               'src/mplutils.cpp'] + cxx,
-                             libraries = ['stdc++', 'm'],
+                             libraries = std_libs,
                              include_dirs = ['src', '.']+numeric_inc_dirs,
                              )
 
@@ -786,7 +841,6 @@ def build_contour(ext_modules, packages, numerix):
         module = Extension(
             'matplotlib._na_cntr',
             [  'src/_na_cntr.c',],
-            #libraries = ['stdc++'],
             include_dirs=numarray_inc_dirs,
             )
         module.extra_compile_args.append('-DNUMARRAY=1')
@@ -798,7 +852,6 @@ def build_contour(ext_modules, packages, numerix):
         module = Extension(
             'matplotlib._nc_cntr',
             [ 'src/_nc_cntr.c'],
-            #libraries = ['stdc++'],
             include_dirs=numeric_inc_dirs,
             )
         module.extra_compile_args.append('-DNUMERIC=1')
@@ -809,7 +862,6 @@ def build_contour(ext_modules, packages, numerix):
         module = Extension(
             'matplotlib._ns_cntr',
             [ 'src/_ns_cntr.c'],
-            #libraries = ['stdc++'],
             include_dirs=numeric_inc_dirs,
             )
         add_numpy_flags(module)
@@ -868,3 +920,19 @@ def build_gdk(ext_modules, packages, numerix):
         ext_modules.append(module)
 
     BUILT_GDK = True
+
+def build_subprocess(ext_modules, packages):
+    module = Extension(
+        'subprocess._subprocess',
+        ['src/_subprocess.c', ],
+        )
+    add_base_flags(module)
+    ext_modules.append(module)
+
+def build_isnan(ext_modules, packages):
+    module = Extension(
+        'matplotlib._isnan',
+        [ 'src/_isnan.c'],
+        )
+    add_base_flags(module)
+    ext_modules.append(module)

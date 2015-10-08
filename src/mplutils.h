@@ -1,7 +1,7 @@
 /* mplutils.h	-- 
  *
- * $Header: /cvsroot/matplotlib/matplotlib/src/mplutils.h,v 1.2 2004/11/24 15:26:12 jdh2358 Exp $
- * $Log: mplutils.h,v $
+ * $Header$
+ * $Log$
  * Revision 1.2  2004/11/24 15:26:12  jdh2358
  * added Printf
  *

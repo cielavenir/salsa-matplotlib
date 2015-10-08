@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: ascii -*-
 '''
-$Id: test_tzinfo.py,v 1.1 2004/09/24 15:24:40 jdh2358 Exp $
+$Id: test_tzinfo.py 540 2004-09-24 10:24:50 -0500 (Fri, 24 Sep 2004) jdh2358 $
 '''
 
-__rcs_id__  = '$Id: test_tzinfo.py,v 1.1 2004/09/24 15:24:40 jdh2358 Exp $'
-__version__ = '$Revision: 1.1 $'[11:-2]
+__rcs_id__  = '$Id: test_tzinfo.py 540 2004-09-24 10:24:50 -0500 (Fri, 24 Sep 2004) jdh2358 $'
+__version__ = '$Revision: 540 $'[11:-2]
 
 import sys, os
 sys.path.insert(0, os.pardir)

@@ -2,7 +2,7 @@ from __future__ import division
 import math
 from matplotlib import rcParams
 from numerix import array, arange, sin, cos, pi, Float, sqrt, \
-     matrixmultiply, sqrt, nonzero, equal, asarray, dot
+     matrixmultiply, sqrt, nonzero, equal, asarray, dot, concatenate
 from artist import Artist, setp
 from cbook import enumerate, popd
 from colors import colorConverter
@@ -117,14 +117,14 @@ class Patch(Artist):
     def set_hatch(self, h):
         """
         Set the hatching pattern
- 
+
         hatch can be one of:
         /   - diagonal hatching
         \   - back diagonal
         |   - vertical
         -   - horizontal
         #   - crossed
-        X   - crossed diagonal
+        x   - crossed diagonal
         letters can be combined, in which case all the specified
         hatchings are done
         if same letter repeats, it increases the density of hatching
@@ -137,7 +137,7 @@ class Patch(Artist):
         2. Hatching is done with solid black lines of width 0.
         """
         self._hatch = h
- 
+
     def get_hatch(self):
         'return the current hatching pattern'
         return self._hatch
@@ -417,6 +417,7 @@ class Wedge(Polygon):
 
         Polygon.__init__(self, verts, **kwargs)
 
+
 class Arrow(Polygon):
     """
     An arrow patch
@@ -438,6 +439,71 @@ class Arrow(Polygon):
         M = array( [ [ cx, sx],[ -sx, cx ] ] )
         verts = matrixmultiply( arrow, M )+ [x,y]
         Polygon.__init__( self, [ tuple(t) for t in verts ], **kwargs )
+
+
+class FancyArrow(Polygon):
+    """Like Arrow, but lets you set head width and head height independently."""
+
+    def __init__(self, x, y, dx, dy, width=0.001, length_includes_head=False, \
+        head_width=None, head_length=None, shape='full', overhang=0, \
+        head_starts_at_zero=False,**kwargs):
+        """Returns a new Arrow.
+
+        length_includes_head: True if head is counted in calculating the length.
+
+        shape: ['full', 'left', 'right']
+
+        overhang: distance that the arrow is swept back (0 overhang means
+        triangular shape).
+
+        head_starts_at_zero: if True, the head starts being drawn at coordinate
+        0 instead of ending at coordinate 0.
+        """
+        if head_width is None:
+            head_width = 3 * width
+        if head_length is None:
+            head_length = 1.5 * head_width
+
+        distance = sqrt(dx**2 + dy**2)
+        if length_includes_head:
+            length=distance
+        else:
+            length=distance+head_length
+        if not length:
+            verts = [] #display nothing if empty
+        else:
+            #start by drawing horizontal arrow, point at (0,0)
+            hw, hl, hs, lw = head_width, head_length, overhang, width
+            left_half_arrow = array([
+                [0.0,0.0],                  #tip
+                [-hl, -hw/2.0],             #leftmost
+                [-hl*(1-hs), -lw/2.0], #meets stem
+                [-length, -lw/2.0],          #bottom left
+                [-length, 0],
+            ])
+            #if we're not including the head, shift up by head length
+            if not length_includes_head:
+                left_half_arrow += [head_length, 0]
+            #if the head starts at 0, shift up by another head length
+            if head_starts_at_zero:
+                left_half_arrow += [head_length/2.0, 0]
+            #figure out the shape, and complete accordingly
+            if shape == 'left':
+                coords = left_half_arrow
+            else:
+                right_half_arrow = left_half_arrow*[1,-1]
+                if shape == 'right':
+                    coords = right_half_arrow
+                elif shape == 'full':
+                    coords=concatenate([left_half_arrow,right_half_arrow[::-1]])
+                else:
+                    raise ValueError, "Got unknown shape: %s" % shape
+            cx = float(dx)/distance
+            sx = float(dy)/distance
+            M = array([[cx, sx],[-sx,cx]])
+            verts = matrixmultiply(coords, M) + (x+dx, y+dy)
+
+        Polygon.__init__(self, map(tuple, verts), **kwargs)
 
 
 class Circle(RegularPolygon):
@@ -465,11 +531,11 @@ class PolygonInteractor:
       't' toggle vertex markers on and off.  When vertex markers are on,
           you can move them, delete them
 
-      'd' delete the vertex under point      
+      'd' delete the vertex under point
 
       'i' insert a vertex at point.  You must be within epsilon of the
           line connecting two existing vertices
-          
+
     """
 
     showverts = True
@@ -484,16 +550,16 @@ class PolygonInteractor:
         x, y = zip(*self.poly.verts)
         self.line = Line2D(x,y,marker='o', markerfacecolor='r')
         #self._update_line(poly)
-        
+
         cid = self.poly.add_callback(self.poly_changed)
         self._ind = None # the active vert
 
         canvas.mpl_connect('button_press_event', self.button_press_callback)
-        canvas.mpl_connect('key_press_event', self.key_press_callback)        
+        canvas.mpl_connect('key_press_event', self.key_press_callback)
         canvas.mpl_connect('button_release_event', self.button_release_callback)
-        canvas.mpl_connect('motion_notify_event', self.motion_notify_callback)                
+        canvas.mpl_connect('motion_notify_event', self.motion_notify_callback)
         self.canvas = canvas
-        
+
 
     def poly_changed(self, poly):
         'this method is called whenever the polygon object is called'
@@ -501,13 +567,13 @@ class PolygonInteractor:
         vis = self.line.get_visible()
         Artist.update_from(self.line, poly)
         self.line.set_visible(vis)  # don't use the poly visibility state
-        
+
 
     def get_ind_under_point(self, event):
         'get the index of the vertex under point if within epsilon tolerance'
         x, y = zip(*self.poly.verts)
-        
-        # display coords        
+
+        # display coords
         xt, yt = self.poly.get_transform().numerix_x_y(x, y)
         d = sqrt((xt-event.x)**2 + (yt-event.y)**2)
         indseq = nonzero(equal(d, amin(d)))
@@ -517,10 +583,10 @@ class PolygonInteractor:
             ind = None
 
         return ind
-        
+
     def button_press_callback(self, event):
         'whenever a mouse button is pressed'
-        if not self.showverts: return 
+        if not self.showverts: return
         if event.inaxes==None: return
         if event.button != 1: return
         self._ind = self.get_ind_under_point(event)
@@ -543,10 +609,10 @@ class PolygonInteractor:
             if ind is not None:
                 self.poly.verts = [tup for i,tup in enumerate(self.poly.verts) if i!=ind]
                 self.line.set_data(zip(*self.poly.verts))
-        elif event.key=='i':            
+        elif event.key=='i':
             xys = self.poly.get_transform().seq_xy_tups(self.poly.verts)
             p = event.x, event.y # display coords
-            for i in range(len(xys)-1):                
+            for i in range(len(xys)-1):
                 s0 = xys[i]
                 s1 = xys[i+1]
                 d = dist_point_to_segment(p, s0, s1)
@@ -554,13 +620,13 @@ class PolygonInteractor:
                     self.poly.verts.insert(i+1, (event.xdata, event.ydata))
                     self.line.set_data(zip(*self.poly.verts))
                     break
-                
-            
+
+
         self.canvas.draw()
 
     def motion_notify_callback(self, event):
         'on mouse movement'
-        if not self.showverts: return 
+        if not self.showverts: return
         if self._ind is None: return
         if event.inaxes is None: return
         if event.button != 1: return

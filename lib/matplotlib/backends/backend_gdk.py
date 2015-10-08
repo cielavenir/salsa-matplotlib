@@ -9,7 +9,7 @@ def fn_name(): return sys._getframe(1).f_code.co_name
 import gobject
 import gtk; gdk = gtk.gdk
 import pango
-pygtk_version_required = (2,0,0)
+pygtk_version_required = (2,2,0)
 if gtk.pygtk_version < pygtk_version_required:
     raise SystemExit ("PyGTK %d.%d.%d is installed\n"
                       "PyGTK %d.%d.%d or later is required"
@@ -96,7 +96,8 @@ class RendererGDK(RendererBase):
             gc.gdkGC.foreground = gc.rgb_to_gdk_color(rgbFace)
             self.gdkDrawable.draw_arc(gc.gdkGC, True, x, y, w, h, a1, a2)
             gc.gdkGC.foreground = saveColor
-        self.gdkDrawable.draw_arc(gc.gdkGC, False, x, y, w, h, a1, a2)
+        if gc.gdkGC.line_width > 0:
+            self.gdkDrawable.draw_arc(gc.gdkGC, False, x, y, w, h, a1, a2)
 
 
     def draw_image(self, x, y, im, bbox):
@@ -140,14 +141,16 @@ class RendererGDK(RendererBase):
 
 
     def draw_line(self, gc, x1, y1, x2, y2):
-        self.gdkDrawable.draw_line(gc.gdkGC, int(x1), self.height-int(y1),
+        if gc.gdkGC.line_width > 0:
+            self.gdkDrawable.draw_line(gc.gdkGC, int(x1), self.height-int(y1),
                                    int(x2), self.height-int(y2))
 
 
     def draw_lines(self, gc, x, y, transform=None):
-        x = x.astype(nx.Int16)
-        y = self.height - y.astype(nx.Int16)
-        self.gdkDrawable.draw_lines(gc.gdkGC, zip(x,y))
+        if gc.gdkGC.line_width > 0:
+            x = x.astype(nx.Int16)
+            y = self.height - y.astype(nx.Int16)
+            self.gdkDrawable.draw_lines(gc.gdkGC, zip(x,y))
 
 
     def draw_point(self, gc, x, y):
@@ -161,7 +164,8 @@ class RendererGDK(RendererBase):
             gc.gdkGC.foreground = gc.rgb_to_gdk_color(rgbFace)
             self.gdkDrawable.draw_polygon(gc.gdkGC, True, points)
             gc.gdkGC.foreground = saveColor
-        self.gdkDrawable.draw_polygon(gc.gdkGC, False, points)
+        if gc.gdkGC.line_width > 0:
+            self.gdkDrawable.draw_polygon(gc.gdkGC, False, points)
 
 
     def draw_rectangle(self, gc, rgbFace, x, y, width, height):
@@ -174,7 +178,8 @@ class RendererGDK(RendererBase):
             gc.gdkGC.foreground = gc.rgb_to_gdk_color(rgbFace)
             self.gdkDrawable.draw_rectangle(gc.gdkGC, True, x, y, w, h)
             gc.gdkGC.foreground = saveColor
-        self.gdkDrawable.draw_rectangle(gc.gdkGC, False, x, y, w, h)
+        if gc.gdkGC.line_width > 0:
+            self.gdkDrawable.draw_rectangle(gc.gdkGC, False, x, y, w, h)
 
 
     def draw_text(self, gc, x, y, s, prop, angle, ismath):
@@ -444,15 +449,19 @@ class GraphicsContextGDK(GraphicsContextBase):
 
     def set_linewidth(self, w):
         GraphicsContextBase.set_linewidth(self, w)
-        pixels = self.renderer.points_to_pixels(w)
-        self.gdkGC.line_width = max(1, int(round(pixels)))
+        if w == 0:
+            self.gdkGC.line_width = 0
+        else:
+            pixels = self.renderer.points_to_pixels(w)
+            self.gdkGC.line_width = max(1, int(round(pixels)))
 
 
 def new_figure_manager(num, *args, **kwargs):
     """
     Create a new figure manager instance
     """
-    thisFig = Figure(*args, **kwargs)
+    FigureClass = kwargs.pop('FigureClass', Figure)
+    thisFig = FigureClass(*args, **kwargs)
     canvas  = FigureCanvasGDK(thisFig)
     manager = FigureManagerBase(canvas, num)
     # equals:
@@ -476,7 +485,7 @@ class FigureCanvasGDK (FigureCanvasBase):
         self.figure.draw (self._renderer)
 
     def print_figure(self, filename, dpi=150, facecolor='w', edgecolor='w',
-                     orientation='portrait'):
+                     orientation='portrait', **kwargs):
         root, ext = os.path.splitext(filename)
         ext = ext[1:]
         if ext == '':
@@ -513,12 +522,14 @@ class FigureCanvasGDK (FigureCanvasBase):
 
 
             fc = self.switch_backends(FigureCanvas)
-            fc.print_figure(filename, dpi, facecolor, edgecolor, orientation)
+            fc.print_figure(filename, dpi, facecolor, edgecolor, orientation,
+                            **kwargs)
         elif ext in ('bmp', 'raw', 'rgb',):
 
             from backend_agg import FigureCanvasAgg  as FigureCanvas
             fc = self.switch_backends(FigureCanvas)
-            fc.print_figure(filename, dpi, facecolor, edgecolor, orientation)
+            fc.print_figure(filename, dpi, facecolor, edgecolor, orientation,
+                            **kwargs)
 
         else:
             raise ValueError('Format "%s" is not supported.\nSupported formats are %s.' %

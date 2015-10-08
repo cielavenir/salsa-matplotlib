@@ -75,6 +75,11 @@ def is_file_like(obj):
 def is_scalar(obj):
     return is_string_like(obj) or not iterable(obj)
 
+def is_numlike(obj):
+    try: obj+1
+    except TypeError: return False
+    else: return True
+
 def flatten(seq, scalarp=is_scalar):
     """
     this generator flattens nested containers such as
@@ -487,7 +492,7 @@ class maxdict(dict):
 class Stack:
     """
     Implement a stack where elements can be pushed on and you can move
-    back and forth.  But no pop.  Should mimib home / back / forward
+    back and forth.  But no pop.  Should mimic home / back / forward
     in a browser
     """
 
@@ -536,9 +541,13 @@ class Stack:
         self._elements = []
 
     def bubble(self, o):
-        'raise o to the top of the stack and return o.  o must b in the stack'
+        """
+        raise o to the top of the stack and return o.  o must be in
+        the stack
+        """
 
-        if o not in self._elements: raise ValueError('Unknown element o')
+        if o not in self._elements:
+            raise ValueError('Unknown element o')
         old = self._elements[:]
         self.clear()
         bubbles = []
@@ -551,7 +560,8 @@ class Stack:
 
     def remove(self, o):
         'remove element o from the stack'
-        if o not in self._elements: raise ValueError('Unknown element o')
+        if o not in self._elements:
+            raise ValueError('Unknown element o')
         old = self._elements[:]
         self.clear()
         for thiso in old:

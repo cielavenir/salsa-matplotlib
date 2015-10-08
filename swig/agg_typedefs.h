@@ -1,7 +1,7 @@
 /* typedefs.h	-- John Hunter
  *
- * $Header: /cvsroot/matplotlib/matplotlib/swig/agg_typedefs.h,v 1.2 2005/06/23 22:25:10 jdh2358 Exp $
- * $Log: agg_typedefs.h,v $
+ * $Header$
+ * $Log$
  * Revision 1.2  2005/06/23 22:25:10  jdh2358
  * some work on agg swig wrapper
  *

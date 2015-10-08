@@ -8,6 +8,7 @@ from __future__ import division
 try:
     import pyemf
 except ImportError:
+    import sys
     print >>sys.stderr, 'You must first install pyemf from http://pyemf.sf.net'
     sys.exit()
 
@@ -81,7 +82,8 @@ class EMFPen:
         else:
             styles={'solid':pyemf.PS_SOLID, 'dashed':pyemf.PS_DASH,
                     'dashdot':pyemf.PS_DASHDOT, 'dotted':pyemf.PS_DOT}
-            style=styles.get(self.gc.get_linestyle('solid'))
+            #style=styles.get(self.gc.get_linestyle('solid'))
+            style=self.gc.get_linestyle('solid')
             if debugHandle: print "EMFPen: style=%d" % style
             if style in styles:
                 self.style=styles[style]
@@ -177,15 +179,13 @@ class RendererEMF(RendererBase):
             self.emf.Arc(int(x-hw),int(self.height-(y-hh)),int(x+hw),int(self.height-(y+hh)),int(x+math.cos(angle1*math.pi/180.0)*hw),int(self.height-(y+math.sin(angle1*math.pi/180.0)*hh)),int(x+math.cos(angle2*math.pi/180.0)*hw),int(self.height-(y+math.sin(angle2*math.pi/180.0)*hh)))
 
     
-    def draw_image(self, x, y, im, origin, bbox):
+    def draw_image(self, x, y, im, bbox):
         """
         Draw the Image instance into the current axes; x is the
         distance in pixels from the left hand side of the canvas. y is
         the distance from the origin.  That is, if origin is upper, y
         is the distance from top.  If origin is lower, y is the
         distance from bottom
-
-        origin is 'upper' or 'lower'
 
         bbox is a matplotlib.transforms.BBox instance for clipping, or
         None
@@ -576,8 +576,8 @@ def new_figure_manager(num, *args, **kwargs):
     # do it -- see backend_wx, backend_wxagg and backend_tkagg for
     # examples.  Not all GUIs require explicit instantiation of a
     # main-level app (egg backend_gtk, backend_gtkagg) for pylab
-
-    thisFig = Figure(*args, **kwargs)
+    FigureClass = kwargs.pop('FigureClass', Figure)
+    thisFig = FigureClass(*args, **kwargs)
     canvas = FigureCanvasEMF(thisFig)
     manager = FigureManagerEMF(canvas, num)
     return manager
@@ -600,7 +600,7 @@ class FigureCanvasEMF(FigureCanvasBase):
         pass
         
     def print_figure(self, filename, dpi=300, facecolor='w', edgecolor='w',
-                     orientation='portrait'):
+                     orientation='portrait', **kwargs):
         """
         Render the figure to hardcopy. Set the figure patch face and edge
         colors.  This is useful because some of the GUIs have a gray figure

@@ -59,7 +59,7 @@ public:
 
 class GCAgg {
 public:
-  GCAgg(const Py::Object& gc, double dpi);
+  GCAgg(const Py::Object& gc, double dpi, bool snapto=false);
 
   ~GCAgg() {
     delete [] dasha;
@@ -67,6 +67,7 @@ public:
   }
 
   double dpi;
+  bool snapto;
   bool isaa;
   
   agg::line_cap_e cap; 
@@ -161,9 +162,10 @@ protected:
   agg::rect bbox_to_rect( const Py::Object& o);
   double points_to_pixels( const Py::Object& points);
   double points_to_pixels_snapto( const Py::Object& points);
-  void DrawQuadMesh(int, int, const Py::SeqBase<Py::Object>&, double[], double[]);
+  void DrawQuadMesh(int, int, const agg::rgba8[], const double[], const double[]);
+  void DrawQuadMeshEdges(int, int, const agg::rgba8[], const double[], const double[]);
   int intersectCheck(double, double, double, double, double, int*);
-  int inPolygon(int, double, double, double, double, double, double, double, double, int*);
+  int inPolygon(int, const double[4], const double[4], int[4]);
   void set_clip_from_bbox(const Py::Object& o);
   agg::rgba rgb_to_color(const Py::SeqBase<Py::Object>& rgb, double alpha);
   facepair_t _get_rgba_face(const Py::Object& rgbFace, double alpha);

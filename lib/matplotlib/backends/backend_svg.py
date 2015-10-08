@@ -13,8 +13,9 @@ from matplotlib.mathtext import math_parse_s_ft2font_svg
 
 backend_version = __version__
 
-def new_figure_manager(num, *args):
-    thisFig = Figure(*args)
+def new_figure_manager(num, *args, **kwargs):
+    FigureClass = kwargs.pop('FigureClass', Figure)
+    thisFig = FigureClass(*args)
     canvas  = FigureCanvasSVG(thisFig)
     manager = FigureManagerSVG(canvas, num)
     return manager
@@ -72,18 +73,23 @@ class RendererSVG(RendererBase):
             dashes = 'stroke-dasharray: %s; stroke-dashoffset: %f;' % (
                 ' '.join(['%f'%val for val in seq]), offset)
 
-        return 'style="fill: %s; stroke: %s; stroke-width: %f; ' \
-               'stroke-linejoin: %s; stroke-linecap: %s; %s opacity: %f; ' \
-               '%s"' % (
-                   fill,
-                   rgb2hex(gc.get_rgb()),
-                   gc.get_linewidth(),
-                   gc.get_joinstyle(),
-                   _capstyle_d[gc.get_capstyle()],
-                   dashes,
-                   gc.get_alpha(),
-                   clippath,
-                   )
+        linewidth = gc.get_linewidth()
+        if linewidth:
+            return 'style="fill: %s; stroke: %s; stroke-width: %f; ' \
+                'stroke-linejoin: %s; stroke-linecap: %s; %s opacity: %f; ' \
+                '%s"' % (fill,
+                         rgb2hex(gc.get_rgb()),
+                         linewidth,
+                         gc.get_joinstyle(),
+                         _capstyle_d[gc.get_capstyle()],
+                         dashes,
+                         gc.get_alpha(),
+                         clippath,)
+        else:
+            return 'style="fill: %s; opacity: %f; ' \
+                '%s"' % (fill,
+                         gc.get_alpha(),
+                         clippath,)
 
     def _get_gc_clip_svg(self, gc):
         cliprect = gc.get_clip_rectangle()
@@ -144,10 +150,10 @@ class RendererSVG(RendererBase):
         y = self.height-y-h
         im.write_png(filename)
 
-	imfile = file (filename, 'r')
-	image64 = base64.b64encode (imfile.read())
-	imfile.close()
-	os.remove(filename)
+        imfile = file (filename, 'r')
+        image64 = base64.b64encode (imfile.read())
+        imfile.close()
+        os.remove(filename)
         lines = [image64[i:i+76] for i in range(0, len(image64), 76)]
 
         self._svgwriter.write (
@@ -263,9 +269,8 @@ class RendererSVG(RendererBase):
 
 class FigureCanvasSVG(FigureCanvasBase):
 
-    def print_figure(self, filename, dpi=80,
-                     facecolor='w', edgecolor='w',
-                     orientation='portrait'):
+    def print_figure(self, filename, dpi, facecolor='w', edgecolor='w',
+                     orientation='portrait', **kwargs):
         # save figure settings
         origDPI       = self.figure.dpi.get()
         origfacecolor = self.figure.get_facecolor()

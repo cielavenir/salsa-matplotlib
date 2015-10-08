@@ -6,7 +6,7 @@ def fn_name(): return sys._getframe(1).f_code.co_name
 import gobject
 import gtk; gdk = gtk.gdk
 import pango
-pygtk_version_required = (2,0,0)
+pygtk_version_required = (2,2,0)
 if gtk.pygtk_version < pygtk_version_required:
     raise SystemExit ("PyGTK %d.%d.%d is installed\n"
                       "PyGTK %d.%d.%d or later is required"
@@ -55,7 +55,7 @@ cursord = {
 # ref gtk+/gtk/gtkwidget.h
 def GTK_WIDGET_DRAWABLE(w):
     flags = w.flags();
-    return flags & gtk.VISIBLE !=0 and flags & gtk.MAPPED != 0
+    return flags & gtk.VISIBLE != 0 and flags & gtk.MAPPED != 0
 
 
 def draw_if_interactive():
@@ -64,7 +64,7 @@ def draw_if_interactive():
     """
     if matplotlib.is_interactive():
         figManager =  Gcf.get_active()
-        if figManager != None:
+        if figManager is not None:
             figManager.canvas.draw()
 
 def show(mainloop=True):
@@ -78,12 +78,12 @@ def show(mainloop=True):
     if mainloop and gtk.main_level() == 0:
         gtk.main()
 
-
 def new_figure_manager(num, *args, **kwargs):
     """
     Create a new figure manager instance
     """
-    thisFig = Figure(*args, **kwargs)
+    FigureClass = kwargs.pop('FigureClass', Figure)    
+    thisFig = FigureClass(*args, **kwargs)
     canvas = FigureCanvasGTK(thisFig)
     manager = FigureManagerGTK(canvas, num)
     # equals:
@@ -137,14 +137,6 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         self.set_flags(gtk.CAN_FOCUS)
         self._renderer_init()
 
-
-    #def resize(self, w, h):
-    #    'set the drawing area size in pixels'
-    #    winw, winh = self.parent.parent.get_size()
-    #    tmp, tmp, myw, myh = self.allocation
-    #    padw = winw-myw
-    #    padh = winh-myh
-    #    self.parent.parent.resize(w+padw, h+padh)
 
     def button_press_event(self, widget, event):
         if _debug: print 'FigureCanvasGTK.%s' % fn_name()
@@ -206,7 +198,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         if widget.window is None:
             return
         w, h = event.width, event.height
-        if w<3 or h<3:
+        if w < 3 or h < 3:
             return # empty fig
 
         # resize the figure (in inches)
@@ -214,37 +206,26 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         self.figure.set_figsize_inches (w/dpi, h/dpi)
         self._need_redraw = True
 
-        #self.resize_event()
         return False  # finish event propagation?
 
 
     def draw(self):
-        # synchronous window redraw (like GTK+ 1.2 used to do)
-        # Note: this does not follow the usual way that GTK redraws,
-        # which is asynchronous redraw using calls to gtk_widget_queue_draw(),
-        # which triggers an expose-event
+        # Note: FigureCanvasBase.draw() is inconveniently named as it clashes
+        # with the deprecated gtk.Widget.draw()
 
-        # GTK+ 2.x style draw()
-        #self._need_redraw = True
-        #self.queue_draw()
-
-        # synchronous draw (needed for animation)
-        x, y, w, h = self.allocation
-        if w<3 or h<3: return # empty fig
-
-        self._pixmap_prepare (w, h)
-        self._render_figure(self._pixmap, w, h)
-        self._need_redraw = False
-        self.window.draw_drawable (self.style.fg_gc[self.state],
-                                   self._pixmap, 0, 0, 0, 0, w, h)
-
+        self._need_redraw = True
+        if GTK_WIDGET_DRAWABLE(self):
+            self.queue_draw()
+            # do a synchronous draw (its less efficient than an async draw,
+            # but is required if/when animation is used)
+            self.window.process_updates (False)
 
     def draw_idle(self):
         def idle_draw(*args):
             self.draw()
             self._idleID = 0
             return False
-        if self._idleID==0:
+        if self._idleID == 0:
             self._idleID = gobject.idle_add(idle_draw)
 
 
@@ -310,7 +291,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
 
 
     def print_figure(self, filename, dpi=150, facecolor='w', edgecolor='w',
-                     orientation='portrait'):
+                     orientation='portrait', **kwargs):
         # TODO - use gdk/cairo/agg print_figure?
         root, ext = os.path.splitext(filename)
         ext = ext[1:]
@@ -362,7 +343,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
             try:
                 fc = self.switch_backends(FigureCanvas)
                 fc.print_figure(filename, dpi, facecolor, edgecolor,
-                                orientation)
+                                orientation, **kwargs)
             except IOError, exc:
                 error_msg_gtk("Save figure failure:\n%s: %s" %
                           (exc.filename, exc.strerror), parent=self)
@@ -379,7 +360,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
             else:
                 fc = self.switch_backends(FigureCanvas)
                 fc.print_figure(filename, dpi, facecolor, edgecolor,
-                                orientation)
+                                orientation, **kwargs)
 
         elif ext in ('pdf',):
             try:
@@ -391,7 +372,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
             else:
                 fc = self.switch_backends(FigureCanvas)
                 fc.print_figure(filename, dpi, facecolor, edgecolor,
-                                orientation)
+                                orientation, **kwargs)
 
         else:
             error_msg_gtk('Format "%s" is not supported.\nSupported formats are %s.' %
@@ -436,7 +417,7 @@ class FigureManagerGTK(FigureManagerBase):
         w = int (self.canvas.figure.bbox.width())
         h = int (self.canvas.figure.bbox.height())
 
-        if self.toolbar != None:
+        if self.toolbar is not None:
             self.toolbar.show()
             self.vbox.pack_end(self.toolbar, False, False)
 
@@ -453,7 +434,7 @@ class FigureManagerGTK(FigureManagerBase):
 
         def notify_axes_change(fig):
             'this will be called whenever the current axes is changed'
-            if self.toolbar != None: self.toolbar.update()
+            if self.toolbar is not None: self.toolbar.update()
         self.canvas.figure.add_axobserver(notify_axes_change)
 
         self.canvas.grab_focus()
@@ -461,26 +442,28 @@ class FigureManagerGTK(FigureManagerBase):
     def destroy(self, *args):
         if _debug: print 'FigureManagerGTK.%s' % fn_name()
         self.window.destroy()
-        if Gcf.get_num_fig_managers()==0 and not matplotlib.is_interactive():
+
+        if Gcf.get_num_fig_managers()==0 and \
+               not matplotlib.is_interactive() and \
+               gtk.main_level() >= 1:
             gtk.main_quit()
 
 
     def full_screen_toggle (self):
-        if gtk.pygtk_version >= (2,2,0):
-            self._full_screen_flag = not self._full_screen_flag
-            if self._full_screen_flag:
-                self.window.fullscreen()
-            else:
-                self.window.unfullscreen()
+        self._full_screen_flag = not self._full_screen_flag
+        if self._full_screen_flag:
+            self.window.fullscreen()
+        else:
+            self.window.unfullscreen()
     _full_screen_flag = False
 
 
     def _get_toolbar(self, canvas):
         # must be inited after the window, drawingArea and figure
         # attrs are set
-        if matplotlib.rcParams['toolbar']=='classic':
+        if matplotlib.rcParams['toolbar'] == 'classic':
             toolbar = NavigationToolbar (canvas, self.window)
-        elif matplotlib.rcParams['toolbar']=='toolbar2':
+        elif matplotlib.rcParams['toolbar'] == 'toolbar2':
             toolbar = NavigationToolbar2GTK (canvas, self.window)
         else:
             toolbar = None
@@ -515,8 +498,8 @@ class NavigationToolbar2GTK(NavigationToolbar2, gtk.Toolbar):
         self._idleId = 0
 
     def set_message(self, s):
-        if self._idleId==0: self.message.set_label(s)
-
+        if self._idleId == 0:
+            self.message.set_label(s)
 
     def set_cursor(self, cursor):
         self.canvas.window.set_cursor(cursord[cursor])
@@ -565,7 +548,7 @@ class NavigationToolbar2GTK(NavigationToolbar2, gtk.Toolbar):
                 drawable.draw_rectangle(gc, False, *rect)
                 self._idleId = 0
                 return False
-            if self._idleId==0:
+            if self._idleId == 0:
                 self._idleId = gobject.idle_add(idle_draw)
 
 
@@ -1028,14 +1011,13 @@ if gtk.pygtk_version >= (2,4,0):
 
 
         def get_filename_from_user (self):
-            filename = None
             while True:
+                filename = None
                 if self.run() != gtk.RESPONSE_OK:
-                    filename = None
                     break
                 filename = self.get_filename()
                 menu_ext  = IMAGE_FORMAT[self.cbox.get_active()]
-                root, ext = os.path.splitext(filename)
+                root, ext = os.path.splitext (filename)
                 ext = ext[1:]
                 if ext == '':
                     ext = menu_ext
@@ -1045,9 +1027,10 @@ if gtk.pygtk_version >= (2,4,0):
                     self.path = filename
                     break
                 else:
-                    error_msg_gtk('Image format "%s" is not supported' % ext,
-                              parent=self)
-                    self.set_current_name(os.path.split(root)[1] + '.' + menu_ext)
+                    error_msg_gtk ('Image format "%s" is not supported' % ext,
+                                   parent=self)
+                    self.set_current_name (os.path.split(root)[1] + '.' +
+                                           menu_ext)
 
             self.hide()
             return filename
@@ -1059,12 +1042,12 @@ class DialogLineprops:
     """
     signals = (
         'on_combobox_lineprops_changed',
-        'on_combobox_linestyle_changed',                        
+        'on_combobox_linestyle_changed',
         'on_combobox_marker_changed',
         'on_colorbutton_linestyle_color_set',
         'on_colorbutton_markerface_color_set',
         'on_dialog_lineprops_okbutton_clicked',
-        'on_dialog_lineprops_cancelbutton_clicked',            
+        'on_dialog_lineprops_cancelbutton_clicked',
         )
 
     linestyles = (
@@ -1080,28 +1063,28 @@ class DialogLineprops:
 
 
     markers =  (
-        'None', 
-        '.'  , 
-        ','  , 
-        'o'  , 
-        'v'  , 
-        '^'  , 
-        '<'  , 
-        '>'  , 
-        '1'  , 
-        '2'  , 
-        '3'  , 
-        '4'  , 
-        's'  , 
-        'p'  , 
-        'h'  , 
-        'H'  , 
-        '+'  , 
-        'x'  , 
-        'D'  , 
-        'd'  , 
-        '|'  , 
-        '_'  , 
+        'None',
+        '.'  ,
+        ','  ,
+        'o'  ,
+        'v'  ,
+        '^'  ,
+        '<'  ,
+        '>'  ,
+        '1'  ,
+        '2'  ,
+        '3'  ,
+        '4'  ,
+        's'  ,
+        'p'  ,
+        'h'  ,
+        'H'  ,
+        '+'  ,
+        'x'  ,
+        'D'  ,
+        'd'  ,
+        '|'  ,
+        '_'  ,
         )
 
     markerd = dict([(s,i) for i,s in enumerate(markers)])
@@ -1112,13 +1095,13 @@ class DialogLineprops:
         gladefile = os.path.join(datadir, 'lineprops.glade')
         if not os.path.exists(gladefile):
             raise IOError('Could not find gladefile lineprops.glade in %s'%datadir)
-        
+
         self._inited = False
         self._updateson = True # suppress updates when setting widgets manually
-        self.wtree = gtk.glade.XML(gladefile, 'dialog_lineprops')        
+        self.wtree = gtk.glade.XML(gladefile, 'dialog_lineprops')
         self.wtree.signal_autoconnect(dict([(s, getattr(self, s)) for s in self.signals]))
 
-        self.dlg = self.wtree.get_widget('dialog_lineprops') 
+        self.dlg = self.wtree.get_widget('dialog_lineprops')
 
         self.lines = lines
 
@@ -1179,7 +1162,7 @@ class DialogLineprops:
 
     def _update(self):
         'update the active line props from the widgets'
-        if not self._inited or not self._updateson: return 
+        if not self._inited or not self._updateson: return
         line = self.get_active_line()
         ls = self.get_active_linestyle()
         marker = self.get_active_marker()
@@ -1202,7 +1185,7 @@ class DialogLineprops:
 
     def on_combobox_lineprops_changed(self, item):
         'update the widgets from the active line'
-        if not self._inited: return 
+        if not self._inited: return
         self._updateson = False
         line = self.get_active_line()
 
@@ -1255,10 +1238,9 @@ except:
 
 
 def error_msg_gtk(msg, parent=None):
-
-    if parent: # find the toplevel gtk.Window
+    if parent is not None: # find the toplevel gtk.Window
         parent = parent.get_toplevel()
-        if not parent.flags() & gtk.TOPLEVEL:
+        if parent.flags() & gtk.TOPLEVEL == 0:
             parent = None
 
     if not is_string_like(msg):

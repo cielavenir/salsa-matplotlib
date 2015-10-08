@@ -7,7 +7,8 @@ See also contour_image.py.
 '''
 from pylab import *
 
-rcParams['tick.direction'] = 'out'
+rcParams['xtick.direction'] = 'out'
+rcParams['ytick.direction'] = 'out'
 
 delta = 0.025
 x = arange(-3.0, 3.0, delta)
@@ -45,7 +46,7 @@ title('Single color')
 figure()
 CS = contour(X, Y, Z, 6,
              linewidths=arange(.5, 4, .5),
-             colors=('r', 'green', 'blue', (1,1,0), '#afeeee', 0.5)
+             colors=('r', 'green', 'blue', (1,1,0), '#afeeee', '0.5')
              )
 clabel(CS, fontsize=9, inline=1)
 title('Crazy lines')
@@ -71,15 +72,23 @@ clabel(CS, levels[1::2],  # label every second level
        fmt='%1.1f',
        fontsize=14)
 
-colorbar(CS)  # make a colorbar for the contour lines
+# make a colorbar for the contour lines
+CB = colorbar(CS, shrink=0.8, extend='both')
+
 title('Lines with colorbar')
 hot()  # Now change the colormap for the contour lines and colorbar
 flag()
 
 # We can still add a colorbar for the image, too.
-colorbar(im, orientation='horizontal')
-# We could manipulate the colorbar axes sizes for better
-# appearance, but we'll leave that for a later demo.
+CBI = colorbar(im, orientation='horizontal', shrink=0.8)
+
+# This makes the original colorbar look a bit out of place,
+# so let's improve its position.
+
+l,b,w,h = gca().get_position()
+ll,bb,ww,hh = CB.ax.get_position()
+CB.ax.set_position([ll, b+0.1*h, ww, h*0.8])
+
 
 savefig('contour_demo')
 show()

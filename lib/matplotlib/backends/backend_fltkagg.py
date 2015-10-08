@@ -111,7 +111,8 @@ def new_figure_manager(num, *args, **kwargs):
     """
     Create a new figure manager instance
     """
-    figure = Figure(*args, **kwargs)
+    FigureClass = kwargs.pop('FigureClass', Figure)
+    figure = FigureClass(*args, **kwargs)
     window = Fltk.Fl_Double_Window(10,10,30,30)
     canvas = FigureCanvasFltkAgg(figure)   
     window.end()    
@@ -245,12 +246,12 @@ class FigureCanvasFltkAgg(FigureCanvasAgg):
 
     show = draw
 
-    def print_figure(self, filename, dpi=150,
-                     facecolor='w', edgecolor='w',
-                     orientation='portrait'):
+    def print_figure(self, filename, dpi=150, facecolor='w', edgecolor='w',
+                     orientation='portrait', **kwargs):
 
         agg = self.switch_backends(FigureCanvasAgg)
-        agg.print_figure(filename, dpi, facecolor, edgecolor, orientation)
+        agg.print_figure(filename, dpi, facecolor, edgecolor, orientation,
+                         **kwargs)
         self.figure.set_canvas(self)
         
     def widget(self):
