@@ -152,18 +152,6 @@ def get_base_dirs():
     return basedir_map.get(sys.platform, ['/usr/local', '/usr'])
 
 
-def run_child_process(cmd):
-    """
-    Run a subprocess as a sanity check.
-    """
-    p = subprocess.Popen(cmd, shell=True,
-                         stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT,
-                         close_fds=(sys.platform != 'win32'))
-    return p.stdin, p.stdout
-
-
 def is_min_version(found, minversion):
     """
     Returns `True` if `found` is at least as high a version as
@@ -226,7 +214,7 @@ def make_extension(name, files, *args, **kwargs):
     Any additional arguments are passed to the
     `distutils.core.Extension` constructor.
     """
-    ext = Extension(name, files, *args, **kwargs)
+    ext = DelayedExtension(name, files, *args, **kwargs)
     for dir in get_base_dirs():
         include_dir = os.path.join(dir, 'include')
         if os.path.exists(include_dir):
@@ -402,6 +390,14 @@ class SetupPackage(object):
         """
         return []
 
+    def get_setup_requires(self):
+        """
+        Get a list of Python packages that we require at build time.
+        pip/easy_install will attempt to download and install this
+        package if it is not installed.
+        """
+        return []
+
     def _check_for_pkg_config(self, package, include_file, min_version=None,
                               version=None):
         """
@@ -447,38 +443,66 @@ class SetupPackage(object):
 
 class OptionalPackage(SetupPackage):
     optional = True
+    force = False
+    config_category = "packages"
 
     def get_config(self):
-        install = True
-        if config is not None:
-            try:
-                install = config.getboolean(
-                    'packages', self.name)
-            except:
-                pass
-        return install
+        """
+        Look at `setup.cfg` and return one of ["auto", True, False] indicating
+        if the package is at default state ("auto"), forced by the user (True)
+        or opted-out (False).
+        """
+        try:
+            return config.getboolean(self.config_category, self.name)
+        except:
+            return "auto"
 
     def check(self):
-        self.install = self.get_config()
-        if not self.install:
-            raise CheckFailed("skipping due to configuration")
-        return "installing"
+        """
+        Do not override this method!
+
+        For custom dependency checks override self.check_requirements().
+        Two things are checked: Configuration file and requirements.
+        """
+        # Check configuration file
+        conf = self.get_config()
+        # Default "auto" state or install forced by user
+        if conf in [True, 'auto']:
+            message = "installing"
+            # Set non-optional if user sets `True` in config
+            if conf is True:
+                self.optional = False
+        # Configuration opt-out by user
+        else:
+            # Some backend extensions (e.g. Agg) need to be built for certain
+            # other GUI backends (e.g. TkAgg) even when manually disabled
+            if self.force is True:
+                message = "installing forced (config override)"
+            else:
+                raise CheckFailed("skipping due to configuration")
+
+        # Check requirements and add extra information (if any) to message.
+        # If requirements are not met a CheckFailed should be raised in there.
+        additional_info = self.check_requirements()
+        if additional_info:
+            message += ", " + additional_info
+
+        # No CheckFailed raised until now, return install message.
+        return message
+
+    def check_requirements(self):
+        """
+        Override this method to do custom dependency checks.
+
+         - Raise CheckFailed() if requirements are not met.
+         - Return message with additional information, or an empty string
+           (or None) for no additional information.
+        """
+        return ""
 
 
-class OptionalBackendPackage(SetupPackage):
-    optional = True
-
-    def get_config(self):
-        install = 'auto'
-        if config is not None:
-            try:
-                install = config.getboolean(
-                    'gui_support', self.name)
-            except:
-                install = 'auto'
-        if install is True:
-            self.optional = False
-        return install
+class OptionalBackendPackage(OptionalPackage):
+    config_category = "gui_support"
 
 
 class Platform(SetupPackage):
@@ -631,42 +655,113 @@ class Tests(OptionalPackage):
         return ['nose']
 
 
+class DelayedExtension(Extension, object):
+    """
+    A distutils Extension subclass where some of its members
+    may have delayed computation until reaching the build phase.
+
+    This is so we can, for example, get the Numpy include dirs
+    after pip has installed Numpy for us if it wasn't already
+    on the system.
+    """
+    def __init__(self, *args, **kwargs):
+        super(DelayedExtension, self).__init__(*args, **kwargs)
+        self._finalized = False
+        self._hooks = {}
+
+    def add_hook(self, member, func):
+        """
+        Add a hook to dynamically compute a member.
+
+        Parameters
+        ----------
+        member : string
+            The name of the member
+
+        func : callable
+            The function to call to get dynamically-computed values
+            for the member.
+        """
+        self._hooks[member] = func
+
+    def finalize(self):
+        self._finalized = True
+
+    class DelayedMember(property):
+        def __init__(self, name):
+            self._name = name
+
+        def __get__(self, obj, objtype=None):
+            result = getattr(obj, '_' + self._name, [])
+
+            if obj._finalized:
+                if self._name in obj._hooks:
+                    result = obj._hooks[self._name]() + result
+
+            return result
+
+        def __set__(self, obj, value):
+            setattr(obj, '_' + self._name, value)
+
+    include_dirs = DelayedMember('include_dirs')
+
+
 class Numpy(SetupPackage):
     name = "numpy"
+
+    @staticmethod
+    def include_dirs_hook():
+        if sys.version_info[0] >= 3:
+            import builtins
+            if hasattr(builtins, '__NUMPY_SETUP__'):
+                del builtins.__NUMPY_SETUP__
+            import imp
+            import numpy
+            imp.reload(numpy)
+        else:
+            import __builtin__
+            if hasattr(__builtin__, '__NUMPY_SETUP__'):
+                del __builtin__.__NUMPY_SETUP__
+            import numpy
+            reload(numpy)
+
+        ext = Extension('test', [])
+        ext.include_dirs.append(numpy.get_include())
+        if not has_include_file(
+                ext.include_dirs, os.path.join("numpy", "arrayobject.h")):
+            warnings.warn(
+                "The C headers for numpy could not be found. "
+                "You may need to install the development package")
+
+        return [numpy.get_include()]
 
     def check(self):
         min_version = extract_versions()['__version__numpy__']
         try:
             import numpy
         except ImportError:
-            raise SystemExit(
-                "Requires numpy %s or later to build.  (Numpy not found)" %
-                min_version)
+            return 'not found. pip may install it below.'
 
         if not is_min_version(numpy.__version__, min_version):
             raise SystemExit(
                 "Requires numpy %s or later to build.  (Found %s)" %
                 (min_version, numpy.__version__))
 
-        ext = make_extension('test', [])
-        ext.include_dirs.append(numpy.get_include())
-        if not has_include_file(
-            ext.include_dirs, os.path.join("numpy", "arrayobject.h")):
-            raise CheckFailed(
-                "The C headers for numpy could not be found.  You"
-                "may need to install the development package.")
-
         return 'version %s' % numpy.__version__
 
     def add_flags(self, ext):
-        import numpy
-
         # Ensure that PY_ARRAY_UNIQUE_SYMBOL is uniquely defined for
         # each extension
         array_api_name = 'MPL_' + ext.name.replace('.', '_') + '_ARRAY_API'
 
-        ext.include_dirs.append(numpy.get_include())
         ext.define_macros.append(('PY_ARRAY_UNIQUE_SYMBOL', array_api_name))
+        ext.add_hook('include_dirs', self.include_dirs_hook)
+
+    def get_setup_requires(self):
+        return ['numpy>=1.5']
+
+    def get_install_requires(self):
+        return ['numpy>=1.5']
 
 
 class CXX(SetupPackage):
@@ -682,7 +777,11 @@ class CXX(SetupPackage):
 
         self.__class__.found_external = True
         old_stdout = sys.stdout
-        sys.stdout = io.BytesIO()
+        if sys.version_info[0] >= 3:
+            sys.stdout = io.StringIO()
+        else:
+            sys.stdout = io.BytesIO()
+
         try:
             import CXX
         except ImportError:
@@ -695,17 +794,12 @@ class CXX(SetupPackage):
             return self._check_for_pkg_config(
                 'PyCXX', 'CXX/Extensions.hxx', min_version='6.2.4')
         except CheckFailed as e:
-            # Since there is no .pc file for PyCXX upstream, many
-            # distros don't package it either.  We don't necessarily
-            # need to fall back to a local build in that scenario if
-            # the header files can be found.
-            base_include_dirs = [
-                os.path.join(x, 'include') for x in get_base_dirs()]
-            if has_include_file(base_include_dirs, 'CXX/Extensions.hxx'):
-                return 'Using system CXX (version unknown, no pkg-config info)'
-            else:
-                self.__class__.found_external = False
-                return str(e) + ' Using local copy.'
+            # It's ok to just proceed here, since the `import CXX`
+            # worked above, and PyCXX (at least upstream) ensures that
+            # its header files are on the default distutils include
+            # path (either in a standard C place such as /usr/include,
+            # or in /usr/include/pythonX.Y.
+            return 'Using system CXX (version unknown, no pkg-config info)'
 
     def add_flags(self, ext):
         if self.found_external and not 'sdist' in sys.argv:
@@ -926,10 +1020,21 @@ class Tri(SetupPackage):
 class Dateutil(SetupPackage):
     name = "dateutil"
 
+    def __init__(self, version=None):
+        self.version = version
+
     def check(self):
         try:
             import dateutil
         except ImportError:
+            # dateutil 2.1 has a file encoding bug that breaks installation on
+            # python 3.3
+            # https://github.com/matplotlib/matplotlib/issues/2373
+            # hack around the problem by installing the the (working) v2.0
+            major, minor1, _, _, _ = sys.version_info
+            if self.version is None and (major, minor1) == (3, 3):
+                self.version = '!=2.1'
+
             return (
                 "dateutil was not found. It is required for date axis "
                 "support. pip/easy_install may attempt to install it "
@@ -938,7 +1043,10 @@ class Dateutil(SetupPackage):
         return "using dateutil version %s" % dateutil.__version__
 
     def get_install_requires(self):
-        return ['python-dateutil']
+        dateutil = 'python-dateutil'
+        if self.version is not None:
+            dateutil += self.version
+        return [dateutil]
 
 
 class Tornado(SetupPackage):
@@ -962,6 +1070,16 @@ class Tornado(SetupPackage):
 class Pyparsing(SetupPackage):
     name = "pyparsing"
 
+    def is_ok(self):
+        # pyparsing 2.0.0 bug, but it may be patched in distributions
+        try:
+            import pyparsing
+            f = pyparsing.Forward()
+            f <<= pyparsing.Literal('a')
+            return f is not None
+        except:
+            return False
+
     def check(self):
         try:
             import pyparsing
@@ -971,44 +1089,29 @@ class Pyparsing(SetupPackage):
                 "support. pip/easy_install may attempt to install it "
                 "after matplotlib.")
 
-        if sys.version_info[0] >= 3:
-            required = [2, 0, 0]
-            if [int(x) for x in pyparsing.__version__.split('.')] < required:
-                return (
-                    "matplotlib requires pyparsing >= {0} on Python 3.x".format(
-                        '.'.join(str(x) for x in required)))
-        else:
-            required = [1, 5, 6]
-            if [int(x) for x in pyparsing.__version__.split('.')] < required:
-                return (
-                    "matplotlib requires pyparsing >= {0} on Python 2.x".format(
-                        '.'.join(str(x) for x in required)))
-            if pyparsing.__version__ == "2.0.0":
-                return (
-                    "pyparsing 2.0.0 is not compatible with Python 2.x")
+        required = [1, 5, 6]
+        if [int(x) for x in pyparsing.__version__.split('.')] < required:
+            return (
+                "matplotlib requires pyparsing >= {0}".format(
+                    '.'.join(str(x) for x in required)))
+
+        if not self.is_ok():
+            return (
+                "Your pyparsing contains a bug that will be monkey-patched by "
+                "matplotlib.  For best results, upgrade to pyparsing 2.0.1 or "
+                "later.")
 
         return "using pyparsing version %s" % pyparsing.__version__
 
     def get_install_requires(self):
-        if sys.version_info[0] >= 3:
+        if self.is_ok():
             return ['pyparsing>=1.5.6']
         else:
-            # pyparsing >= 2.0.0 is not compatible with Python 2
             return ['pyparsing>=1.5.6,!=2.0.0']
 
 
 class BackendAgg(OptionalBackendPackage):
     name = "agg"
-    force = False
-
-    def check(self):
-        # The Agg backend extension needs to be built even
-        # for certain GUI backends, such as TkAgg
-        config = self.get_config()
-        if config is False and self.force is False:
-            raise CheckFailed("skipping due to configuration")
-        else:
-            return "installing"
 
     def get_extension(self):
         sources = [
@@ -1030,10 +1133,7 @@ class BackendTkAgg(OptionalBackendPackage):
     def __init__(self):
         self.tcl_tk_cache = None
 
-    def check(self):
-        if self.get_config() is False:
-            raise CheckFailed("skipping due to configuration")
-
+    def check_requirements(self):
         try:
             if sys.version_info[0] < 3:
                 import Tkinter
@@ -1319,10 +1419,7 @@ class BackendTkAgg(OptionalBackendPackage):
 class BackendGtk(OptionalBackendPackage):
     name = "gtk"
 
-    def check(self):
-        if self.get_config() is False:
-            raise CheckFailed("skipping due to configuration")
-
+    def check_requirements(self):
         try:
             import gtk
         except ImportError:
@@ -1460,10 +1557,12 @@ def backend_gtk3agg_internal_check(x):
         gi.require_version("Gtk", "3.0")
     except ValueError:
         return (False, "Requires gtk3 development files to be installed.")
+    except AttributeError:
+        return (False, "pygobject version too old.")
 
     try:
         from gi.repository import Gtk, Gdk, GObject
-    except ImportError:
+    except (ImportError, RuntimeError):
         return (False, "Requires pygobject to be installed.")
 
     return (True, "version %s.%s.%s" % (
@@ -1475,7 +1574,7 @@ def backend_gtk3agg_internal_check(x):
 class BackendGtk3Agg(OptionalBackendPackage):
     name = "gtk3agg"
 
-    def check(self):
+    def check_requirements(self):
         if 'TRAVIS' in os.environ:
             raise CheckFailed("Can't build with Travis")
 
@@ -1489,9 +1588,14 @@ class BackendGtk3Agg(OptionalBackendPackage):
             p = multiprocessing.Pool()
         except:
             return "unknown (can not use multiprocessing to determine)"
-        success, msg = p.map(backend_gtk3agg_internal_check, [0])[0]
-        p.close()
-        p.join()
+        try:
+            success, msg = p.map(backend_gtk3agg_internal_check, [0])[0]
+        except:
+            success = False
+            msg = "Could not determine"
+        finally:
+            p.close()
+            p.join()
         if success:
             BackendAgg.force = True
 
@@ -1518,10 +1622,12 @@ def backend_gtk3cairo_internal_check(x):
         gi.require_version("Gtk", "3.0")
     except ValueError:
         return (False, "Requires gtk3 development files to be installed.")
+    except AttributeError:
+        return (False, "pygobject version too old.")
 
     try:
         from gi.repository import Gtk, Gdk, GObject
-    except ImportError:
+    except (RuntimeError, ImportError):
         return (False, "Requires pygobject to be installed.")
 
     return (True, "version %s.%s.%s" % (
@@ -1533,7 +1639,7 @@ def backend_gtk3cairo_internal_check(x):
 class BackendGtk3Cairo(OptionalBackendPackage):
     name = "gtk3cairo"
 
-    def check(self):
+    def check_requirements(self):
         if 'TRAVIS' in os.environ:
             raise CheckFailed("Can't build with Travis")
 
@@ -1561,7 +1667,7 @@ class BackendGtk3Cairo(OptionalBackendPackage):
 class BackendWxAgg(OptionalBackendPackage):
     name = "wxagg"
 
-    def check(self):
+    def check_requirements(self):
         try:
             import wxversion
         except ImportError:
@@ -1599,10 +1705,7 @@ class BackendWxAgg(OptionalBackendPackage):
 class BackendMacOSX(OptionalBackendPackage):
     name = 'macosx'
 
-    def check(self):
-        if self.get_config() is False:
-            raise CheckFailed("skipping due to configuration")
-
+    def check_requirements(self):
         if sys.platform != 'darwin':
             raise CheckFailed("Mac OS-X only")
 
@@ -1629,7 +1732,7 @@ class Windowing(OptionalBackendPackage):
     """
     name = "windowing"
 
-    def check(self):
+    def check_requirements(self):
         if sys.platform != 'win32':
             raise CheckFailed("Microsoft Windows only")
         config = self.get_config()
@@ -1660,25 +1763,27 @@ class BackendQt4(OptionalBackendPackage):
             temp.insert(0, str(int(chunk, 16)))
         return '.'.join(temp)
 
-    def check(self):
+    def check_requirements(self):
         try:
             from PyQt4 import pyqtconfig
         except ImportError:
             raise CheckFailed("PyQt4 not found")
-        else:
-
-            BackendAgg.force = True
-
-            return ("Qt: %s, PyQt4: %s" %
-                    (self.convert_qt_version(
-                        pyqtconfig.Configuration().qt_version),
-                     pyqtconfig.Configuration().pyqt_version_str))
+        # Import may still be broken for our python
+        try:
+            qtconfig = pyqtconfig.Configuration()
+        except AttributeError:
+            raise CheckFailed('PyQt4 not correctly imported')
+        BackendAgg.force = True
+        return ("Qt: %s, PyQt4: %s" %
+                (self.convert_qt_version(
+                    qtconfig.qt_version),
+                    qtconfig.pyqt_version_str))
 
 
 class BackendPySide(OptionalBackendPackage):
     name = "pyside"
 
-    def check(self):
+    def check_requirements(self):
         try:
             from PySide import __version__
             from PySide import QtCore
@@ -1694,7 +1799,7 @@ class BackendPySide(OptionalBackendPackage):
 class BackendCairo(OptionalBackendPackage):
     name = "cairo"
 
-    def check(self):
+    def check_requirements(self):
         try:
             import cairo
         except ImportError:
@@ -1709,9 +1814,10 @@ class DviPng(SetupPackage):
 
     def check(self):
         try:
-            stdin, stdout = run_child_process('dvipng -version')
-            return "version %s" % stdout.readlines()[1].decode().split()[-1]
-        except (IndexError, ValueError):
+            output = check_output('dvipng -version', shell=True,
+                                  stderr=subprocess.STDOUT)
+            return "version %s" % output.splitlines()[1].decode().split()[-1]
+        except (IndexError, ValueError, subprocess.CalledProcessError):
             raise CheckFailed()
 
 
@@ -1723,11 +1829,19 @@ class Ghostscript(SetupPackage):
         try:
             if sys.platform == 'win32':
                 command = 'gswin32c --version'
+                try:
+                    output = check_output(command, shell=True,
+                                          stderr=subprocess.STDOUT)
+                except subprocess.CalledProcessError:
+                    command = 'gswin64c --version'
+                    output = check_output(command, shell=True,
+                                          stderr=subprocess.STDOUT)
             else:
                 command = 'gs --version'
-            stdin, stdout = run_child_process(command)
-            return "version %s" % stdout.read().decode()[:-1]
-        except (IndexError, ValueError):
+                output = check_output(command, shell=True,
+                                      stderr=subprocess.STDOUT)
+            return "version %s" % output.decode()[:-1]
+        except (IndexError, ValueError, subprocess.CalledProcessError):
             raise CheckFailed()
 
 
@@ -1737,12 +1851,13 @@ class LaTeX(SetupPackage):
 
     def check(self):
         try:
-            stdin, stdout = run_child_process('latex -version')
-            line = stdout.readlines()[0].decode()
+            output = check_output('latex -version', shell=True,
+                                  stderr=subprocess.STDOUT)
+            line = output.splitlines()[0].decode()
             pattern = '(3\.1\d+)|(MiKTeX \d+.\d+)'
             match = re.search(pattern, line)
             return "version %s" % match.group(0)
-        except (IndexError, ValueError, AttributeError):
+        except (IndexError, ValueError, AttributeError, subprocess.CalledProcessError):
             raise CheckFailed()
 
 
@@ -1752,12 +1867,13 @@ class PdfToPs(SetupPackage):
 
     def check(self):
         try:
-            stdin, stdout = run_child_process('pdftops -v')
-            for line in stdout.readlines():
+            output = check_output('pdftops -v', shell=True,
+                                  stderr=subprocess.STDOUT)
+            for line in output.splitlines():
                 line = line.decode()
                 if 'version' in line:
                     return "version %s" % line.split()[2]
-        except (IndexError, ValueError):
+        except (IndexError, ValueError, subprocess.CalledProcessError):
             pass
 
         raise CheckFailed()

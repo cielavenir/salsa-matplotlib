@@ -578,11 +578,13 @@ def test_fill_between_interpolate():
     fig = plt.figure()
     ax = fig.add_subplot(211)
     ax.plot(x, y1, x, y2, color='black')
-    ax.fill_between(x, y1, y2, where=y2>=y1, facecolor='green', interpolate=True)
+    ax.fill_between(x, y1, y2, where=y2>=y1, facecolor='white', hatch='/', interpolate=True)
     ax.fill_between(x, y1, y2, where=y2<=y1, facecolor='red', interpolate=True)
 
     # Test support for masked arrays.
     y2 = np.ma.masked_greater(y2, 1.0)
+    # Test that plotting works for masked arrays with the first element masked
+    y2[0] = np.ma.masked
     ax1 = fig.add_subplot(212, sharex=ax)
     ax1.plot(x, y1, x, y2, color='black')
     ax1.fill_between(x, y1, y2, where=y2>=y1, facecolor='green', interpolate=True)
@@ -1060,6 +1062,17 @@ def test_hist_offset():
     ax.hist(d2, bottom=15)
 
 
+@image_comparison(baseline_images=['hist_step'], extensions=['png'], remove_text=True)
+def test_hist_step():
+    # make some data
+    d1 = np.linspace(1, 3, 20)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.hist( d1, histtype="step")
+    ax.set_ylim(0, 10)
+    ax.set_xlim(-1, 5)
+
+
 @image_comparison(baseline_images=['hist_stacked_weights'])
 def test_hist_stacked_weighted():
     # make some data
@@ -1133,6 +1146,14 @@ def test_transparent_markers():
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.plot(data, 'D', mfc='none', markersize=100)
+
+@image_comparison(baseline_images=['mollweide_grid'], remove_text=True)
+def test_mollweide_grid():
+    # test that both horizontal and vertical gridlines appear on the Mollweide
+    # projection
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='mollweide')
+    ax.grid()
 
 @cleanup
 def test_mollweide_forward_inverse_closure():
