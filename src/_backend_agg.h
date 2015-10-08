@@ -195,6 +195,10 @@ public:
     Py::Object restore_region(const Py::Tuple & args);
     Py::Object restore_region2(const Py::Tuple & args);
 
+    #if PY3K
+    virtual int buffer_get( Py_buffer *, int flags );
+    #endif
+
     virtual ~RendererAgg();
 
     static const size_t PIXELS_PER_INCH;
@@ -260,7 +264,8 @@ protected:
      const Py::Object&              edgecolors_obj,
      const Py::SeqBase<Py::Float>&  linewidths,
      const Py::SeqBase<Py::Object>& linestyles_obj,
-     const Py::SeqBase<Py::Int>&    antialiaseds);
+     const Py::SeqBase<Py::Int>&    antialiaseds,
+     const bool                     data_offsets);
 
     void
     _draw_gouraud_triangle(
@@ -296,4 +301,3 @@ private:
 
 
 #endif
-

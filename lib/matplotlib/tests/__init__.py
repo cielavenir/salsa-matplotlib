@@ -1,3 +1,4 @@
+from __future__ import print_function
 from matplotlib import rcParams, rcdefaults, use
 
 _multiprocess_can_split_ = True
@@ -11,4 +12,5 @@ def setup():
     rcdefaults() # Start with all defaults
     rcParams['font.family'] = 'Bitstream Vera Sans'
     rcParams['text.hinting'] = False
+    rcParams['text.hinting_factor'] = 8
     rcParams['text.antialiased'] = False

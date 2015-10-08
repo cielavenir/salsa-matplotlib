@@ -1,7 +1,7 @@
 """
 Classes for including text in a figure.
 """
-from __future__ import division
+from __future__ import division, print_function
 import math
 
 import numpy as np
@@ -21,8 +21,6 @@ from matplotlib.transforms import Affine2D, Bbox, Transform ,\
 from matplotlib.lines import Line2D
 
 from matplotlib.artist import allow_rasterization
-
-import matplotlib.nxutils as nxutils
 
 from matplotlib.path import Path
 import matplotlib.font_manager as font_manager
@@ -209,14 +207,20 @@ class Text(Artist):
             return False,{}
 
         l,b,w,h = self.get_window_extent().bounds
-
-        r = l+w
-        t = b+h
-        xyverts = (l,b), (l, t), (r, t), (r, b)
+        r, t = l+w, b+h
+        
         x, y = mouseevent.x, mouseevent.y
-        inside = nxutils.pnpoly(x, y, xyverts)
+        inside = (l <= x <= r and b <= y <= t)
+        cattr = {}
 
-        return inside,{}
+        # if the text has a surrounding patch, also check containment for it,
+        # and merge the results with the results for the text.
+        if self._bbox_patch:
+            patch_inside, patch_cattr =  self._bbox_patch.contains(mouseevent)
+            inside = inside or patch_inside
+            cattr["bbox_patch"] = patch_cattr
+
+        return inside, cattr 
 
     def _get_xy_display(self):
         'get the (possibly unit converted) transformed x, y in display coords'
@@ -365,7 +369,8 @@ class Text(Artist):
         width  = xmax - xmin
         height = ymax - ymin
 
-        # Now move the box to the targe position offset the display bbox by alignment
+        # Now move the box to the target position offset the display 
+        # bbox by alignment
         halign = self._horizontalalignment
         valign = self._verticalalignment
 
@@ -1007,7 +1012,7 @@ class Text(Artist):
         self.set_fontproperties(fp)
 
 docstring.interpd.update(Text = artist.kwdoc(Text))
-docstring.dedent_interpd(Text.__init__.im_func)
+docstring.dedent_interpd(Text.__init__)
 
 
 class TextWithDash(Text):
@@ -1801,7 +1806,7 @@ class Annotation(Text, _AnnotationBase):
 
         self.arrow = None
 
-        if arrowprops and arrowprops.has_key("arrowstyle"):
+        if arrowprops and "arrowstyle" in arrowprops:
             arrowprops = self.arrowprops.copy()
             self._arrow_relpos = arrowprops.pop("relpos", (0.5, 0.5))
             self.arrow_patch = FancyArrowPatch((0, 0), (1,1),
@@ -1809,17 +1814,14 @@ class Annotation(Text, _AnnotationBase):
         else:
             self.arrow_patch = None
 
-
     def contains(self,event):
-        t,tinfo = Text.contains(self,event)
+        contains, tinfo = Text.contains(self,event)
         if self.arrow is not None:
-            a,ainfo=self.arrow.contains(event)
-            t = t or a
-
+            in_arrow, _ = self.arrow.contains(event)
+            contains = contains or in_arrow
         # self.arrow_patch is currently not checked as this can be a line - JJ
 
-        return t,tinfo
-
+        return contains, tinfo
 
     def set_figure(self, fig):
 
@@ -1920,11 +1922,11 @@ class Annotation(Text, _AnnotationBase):
 
                 # pick the x,y corner of the text bbox closest to point
                 # annotated
-                dsu = [(abs(val-x0), val) for val in l, r, xc]
+                dsu = [(abs(val-x0), val) for val in (l, r, xc)]
                 dsu.sort()
                 _, x = dsu[0]
 
-                dsu = [(abs(val-y0), val) for val in b, t, yc]
+                dsu = [(abs(val-y0), val) for val in (b, t, yc)]
                 dsu.sort()
                 _, y = dsu[0]
 

@@ -26,6 +26,7 @@
 #include "agg_scanline_storage_aa.h"
 #include "agg_scanline_storage_bin.h"
 #include "agg_span_allocator.h"
+#include "agg_span_converter.h"
 #include "agg_span_image_filter_gray.h"
 #include "agg_span_image_filter_rgba.h"
 #include "agg_span_interpolator_linear.h"
@@ -102,7 +103,12 @@ Py::Object
 BufferRegion::to_string(const Py::Tuple &args)
 {
     // owned=true to prevent memory leak
-    return Py::String(PyString_FromStringAndSize((const char*)data, height*stride), true);
+    #if PY3K
+    return Py::Bytes
+    #else
+    return Py::String
+    #endif
+        (PyBytes_FromStringAndSize((const char*)data, height*stride), true);
 }
 
 
@@ -152,9 +158,8 @@ BufferRegion::to_string_argb(const Py::Tuple &args)
     unsigned char tmp;
     size_t i, j;
 
-    PyObject* str = PyString_FromStringAndSize(
-                        (const char*)data, height * stride);
-    if (PyString_AsStringAndSize(str, (char**)&begin, &length))
+    PyObject* str = PyBytes_FromStringAndSize((const char*)data, height * stride);
+    if (PyBytes_AsStringAndSize(str, (char**)&begin, &length))
     {
         throw Py::TypeError("Could not create memory for blit");
     }
@@ -174,7 +179,12 @@ BufferRegion::to_string_argb(const Py::Tuple &args)
         }
     }
 
-    return Py::String(str, true);
+    #if PY3K
+    return Py::Bytes
+    #else
+    return Py::String
+    #endif
+        (str, true);
 }
 
 
@@ -200,7 +210,7 @@ void
 GCAgg::_set_antialiased(const Py::Object& gc)
 {
     _VERBOSE("GCAgg::antialiased");
-    isaa = Py::Int(gc.getAttr("_antialiased"));
+    isaa = Py::Boolean(gc.getAttr("_antialiased"));
 }
 
 
@@ -910,7 +920,8 @@ RendererAgg::draw_text_image(const Py::Tuple& args)
     }
     else
     {
-        FT2Image *image = static_cast<FT2Image*>(image_obj.ptr());
+        FT2Image* image = static_cast<FT2Image *>(
+            Py::getPythonExtensionBase(image_obj.ptr()));
         if (!image->get_buffer())
         {
             throw Py::ValueError(
@@ -973,6 +984,30 @@ RendererAgg::draw_text_image(const Py::Tuple& args)
 
     return Py::Object();
 }
+
+class span_conv_alpha
+{
+public:
+    typedef agg::rgba8 color_type;
+
+    double m_alpha;
+
+    span_conv_alpha(double alpha) :
+        m_alpha(alpha)
+    {
+    }
+
+    void prepare() {}
+    void generate(color_type* span, int x, int y, unsigned len) const
+    {
+        do
+            {
+                span->a = (agg::int8u)((double)span->a * m_alpha);
+                ++span;
+            }
+        while(--len);
+    }
+};
 
 
 Py::Object
@@ -1058,11 +1093,14 @@ RendererAgg::draw_image(const Py::Tuple& args)
         typedef agg::span_interpolator_linear<> interpolator_type;
         typedef agg::span_image_filter_rgba_nn<image_accessor_type,
                                                interpolator_type> image_span_gen_type;
+        typedef agg::span_converter<image_span_gen_type, span_conv_alpha> span_conv;
 
         color_span_alloc_type sa;
         image_accessor_type ia(pixf, agg::rgba8(0, 0, 0, 0));
         interpolator_type interpolator(inv_mtx);
         image_span_gen_type image_span_generator(ia, interpolator);
+        span_conv_alpha conv_alpha(alpha);
+        span_conv spans(image_span_generator, conv_alpha);
 
         if (has_clippath)
         {
@@ -1071,12 +1109,12 @@ RendererAgg::draw_image(const Py::Tuple& args)
             typedef agg::renderer_base<pixfmt_amask_type> amask_ren_type;
             typedef agg::renderer_scanline_aa<amask_ren_type,
                                               color_span_alloc_type,
-                                              image_span_gen_type>
+                                              span_conv>
                 renderer_type_alpha;
 
             pixfmt_amask_type pfa(pixFmt, alphaMask);
             amask_ren_type r(pfa);
-            renderer_type_alpha ri(r, sa, image_span_generator);
+            renderer_type_alpha ri(r, sa, spans);
 
             theRasterizer.add_path(rect2);
             agg::render_scanlines(theRasterizer, slineP8, ri);
@@ -1086,11 +1124,11 @@ RendererAgg::draw_image(const Py::Tuple& args)
             typedef agg::renderer_base<pixfmt> ren_type;
             typedef agg::renderer_scanline_aa<ren_type,
                                               color_span_alloc_type,
-                                              image_span_gen_type>
+                                              span_conv>
                 renderer_type;
 
             ren_type r(pixFmt);
-            renderer_type ri(r, sa, image_span_generator);
+            renderer_type ri(r, sa, spans);
 
             theRasterizer.add_path(rect2);
             agg::render_scanlines(theRasterizer, slineP8, ri);
@@ -1101,7 +1139,8 @@ RendererAgg::draw_image(const Py::Tuple& args)
     {
         set_clipbox(gc.cliprect, rendererBase);
         rendererBase.blend_from(
-            pixf, 0, (int)x, (int)(height - (y + image->rowsOut)), alpha * 255);
+            pixf, 0, (int)x, (int)(height - (y + image->rowsOut)),
+            (agg::int8u)(alpha * 255));
     }
 
     rendererBase.reset_clipping(true);
@@ -1362,7 +1401,8 @@ RendererAgg::_draw_path_collection_generic
  const Py::Object&              edgecolors_obj,
  const Py::SeqBase<Py::Float>&  linewidths,
  const Py::SeqBase<Py::Object>& linestyles_obj,
- const Py::SeqBase<Py::Int>&    antialiaseds)
+ const Py::SeqBase<Py::Int>&    antialiaseds,
+ const bool                     data_offsets)
 {
     typedef agg::conv_transform<typename PathGenerator::path_iterator> transformed_path_t;
     typedef PathNanRemover<transformed_path_t>                         nan_removed_t;
@@ -1476,7 +1516,11 @@ RendererAgg::_draw_path_collection_generic
             double xo = *(double*)PyArray_GETPTR2(offsets, i % Noffsets, 0);
             double yo = *(double*)PyArray_GETPTR2(offsets, i % Noffsets, 1);
             offset_trans.transform(&xo, &yo);
-            trans *= agg::trans_affine_translation(xo, yo);
+            if (data_offsets) {
+                trans = agg::trans_affine_translation(xo, yo) * trans;
+            } else {
+                trans *= agg::trans_affine_translation(xo, yo);
+            }
         }
 
         // These transformations must be done post-offsets
@@ -1521,7 +1565,7 @@ RendererAgg::_draw_path_collection_generic
 
         if (check_snap)
         {
-            gc.isaa = bool(Py::Int(antialiaseds[i % Naa]));
+            gc.isaa = Py::Boolean(antialiaseds[i % Naa]);
 
             transformed_path_t tpath(path, trans);
             nan_removed_t      nan_removed(tpath, true, has_curves);
@@ -1540,7 +1584,7 @@ RendererAgg::_draw_path_collection_generic
         }
         else
         {
-            gc.isaa = bool(Py::Int(antialiaseds[i % Naa]));
+            gc.isaa = Py::Boolean(antialiaseds[i % Naa]);
 
             transformed_path_t tpath(path, trans);
             nan_removed_t      nan_removed(tpath, true, has_curves);
@@ -1594,7 +1638,7 @@ Py::Object
 RendererAgg::draw_path_collection(const Py::Tuple& args)
 {
     _VERBOSE("RendererAgg::draw_path_collection");
-    args.verify_length(12);
+    args.verify_length(13);
 
     Py::Object gc_obj = args[0];
     GCAgg gc(gc_obj, dpi);
@@ -1611,6 +1655,9 @@ RendererAgg::draw_path_collection(const Py::Tuple& args)
     Py::SeqBase<Py::Int>    antialiaseds     = args[10];
     // We don't actually care about urls for Agg, so just ignore it.
     // Py::SeqBase<Py::Object> urls             = args[11];
+    std::string             offset_position  = Py::String(args[12]);
+
+    bool data_offsets = (offset_position == "data");
 
     try
     {
@@ -1628,7 +1675,8 @@ RendererAgg::draw_path_collection(const Py::Tuple& args)
          edgecolors_obj,
          linewidths,
          linestyles_obj,
-         antialiaseds);
+         antialiaseds,
+         data_offsets);
     }
     catch (const char *e)
     {
@@ -1754,28 +1802,18 @@ RendererAgg::draw_quad_mesh(const Py::Tuple& args)
     agg::trans_affine offset_trans     = py_to_agg_transformation_matrix(args[6].ptr());
     Py::Object        facecolors_obj   = args[7];
     bool              antialiased      = (bool)Py::Boolean(args[8]);
-    bool              showedges        = (bool)Py::Boolean(args[9]);
-    bool              free_edgecolors  = false;
+    Py::Object        edgecolors_obj   = args[9];
 
     QuadMeshGenerator path_generator(mesh_width, mesh_height, coordinates.ptr());
 
     Py::SeqBase<Py::Object> transforms_obj;
-    Py::Object edgecolors_obj;
     Py::Tuple linewidths(1);
     linewidths[0] = Py::Float(gc.linewidth);
     Py::SeqBase<Py::Object> linestyles_obj;
     Py::Tuple antialiaseds(1);
     antialiaseds[0] = Py::Int(antialiased ? 1 : 0);
 
-    if (showedges)
-    {
-        npy_intp dims[] = { 1, 4, 0 };
-        double data[] = { 0, 0, 0, 1 };
-        edgecolors_obj = Py::Object(PyArray_SimpleNewFromData(2, dims, PyArray_DOUBLE,
-                                                              (char*)data), true);
-    }
-    else
-    {
+    if (edgecolors_obj.isNone()) {
         if (antialiased)
         {
             edgecolors_obj = facecolors_obj;
@@ -1784,7 +1822,6 @@ RendererAgg::draw_quad_mesh(const Py::Tuple& args)
         {
             npy_intp dims[] = { 0, 0 };
             edgecolors_obj = PyArray_SimpleNew(1, dims, PyArray_DOUBLE);
-            free_edgecolors = true;
         }
     }
 
@@ -1804,7 +1841,8 @@ RendererAgg::draw_quad_mesh(const Py::Tuple& args)
              edgecolors_obj,
              linewidths,
              linestyles_obj,
-             antialiaseds);
+             antialiaseds,
+             false);
     }
     catch (const char* e)
     {
@@ -1993,6 +2031,12 @@ RendererAgg::write_rgba(const Py::Tuple& args)
     FILE *fp = NULL;
     bool close_file = false;
     Py::Object py_fileobj = Py::Object(args[0]);
+
+    #if PY3K
+    int fd = PyObject_AsFileDescriptor(py_fileobj.ptr());
+    PyErr_Clear();
+    #endif
+
     if (py_fileobj.isString())
     {
         std::string fileName = Py::String(py_fileobj);
@@ -2008,6 +2052,15 @@ RendererAgg::write_rgba(const Py::Tuple& args)
         }
         close_file = true;
     }
+    #if PY3K
+    else if (fd != -1)
+    {
+        if (write(fd, pixBuffer, NUMBYTES) != (ssize_t)NUMBYTES)
+        {
+            throw Py::RuntimeError("Error writing to file");
+        }
+    }
+    #else
     else if (PyFile_CheckExact(py_fileobj.ptr()))
     {
         fp = PyFile_AsFile(py_fileobj.ptr());
@@ -2016,6 +2069,7 @@ RendererAgg::write_rgba(const Py::Tuple& args)
             throw Py::RuntimeError("Error writing to file");
         }
     }
+    #endif
     else
     {
         PyObject* write_method = PyObject_GetAttrString(py_fileobj.ptr(),
@@ -2071,7 +2125,11 @@ RendererAgg::tostring_rgb(const Py::Tuple& args)
     }
 
     //todo: how to do this with native CXX
+    #if PY3K
+    PyObject* o = Py_BuildValue("y#", buf_tmp, row_len * height);
+    #else
     PyObject* o = Py_BuildValue("s#", buf_tmp, row_len * height);
+    #endif
 
     delete [] buf_tmp;
     return Py::asObject(o);
@@ -2107,7 +2165,12 @@ RendererAgg::tostring_argb(const Py::Tuple& args)
     }
 
     //todo: how to do this with native CXX
+
+    #if PY3K
+    PyObject* o = Py_BuildValue("y#", buf_tmp, row_len * height);
+    #else
     PyObject* o = Py_BuildValue("s#", buf_tmp, row_len * height);
+    #endif
     delete [] buf_tmp;
     return Py::asObject(o);
 }
@@ -2146,9 +2209,11 @@ RendererAgg::tostring_bgra(const Py::Tuple& args)
     }
 
     //todo: how to do this with native CXX
-    PyObject* o = Py_BuildValue("s#",
-                                buf_tmp,
-                                row_len * height);
+    #if PY3K
+    PyObject* o = Py_BuildValue("y#", buf_tmp, row_len * height);
+    #else
+    PyObject* o = Py_BuildValue("s#", buf_tmp, row_len * height);
+    #endif
     delete [] buf_tmp;
     return Py::asObject(o);
 }
@@ -2161,12 +2226,15 @@ RendererAgg::buffer_rgba(const Py::Tuple& args)
 
     _VERBOSE("RendererAgg::buffer_rgba");
 
-    args.verify_length(2);
-    int startw = Py::Int(args[0]);
-    int starth = Py::Int(args[1]);
+    args.verify_length(0);
+
+    #if PY3K
+    return Py::asObject(PyMemoryView_FromObject(this));
+    #else
     int row_len = width * 4;
-    int start = row_len * starth + startw * 4;
-    return Py::asObject(PyBuffer_FromMemory(pixBuffer + start, row_len*height - start));
+    return Py::asObject(PyBuffer_FromReadWriteMemory(
+                            pixBuffer, row_len*height));
+    #endif
 }
 
 
@@ -2199,7 +2267,12 @@ RendererAgg::tostring_rgba_minimized(const Py::Tuple& args)
 
     int newwidth = 0;
     int newheight = 0;
+    #if PY3K
+    Py::Bytes data;
+    #else
     Py::String data;
+    #endif
+
     if (xmin < xmax && ymin < ymax)
     {
         // Expand the bounds by 1 pixel on all sides
@@ -2229,7 +2302,11 @@ RendererAgg::tostring_rgba_minimized(const Py::Tuple& args)
         }
 
         // The Py::String will take over the buffer
-        data = Py::String((const char *)buf, (int)newsize);
+        #if PY3K
+        data = Py::Bytes((const char *)buf, (int) newsize);
+        #else
+        data = Py::String((const char *)buf, (int) newsize);
+        #endif
     }
 
     Py::Tuple bounds(4);
@@ -2280,6 +2357,14 @@ RendererAgg::points_to_pixels(const Py::Object& points)
     return p * dpi / 72.0;
 }
 
+#if PY3K
+int
+RendererAgg::buffer_get( Py_buffer* buf, int flags )
+{
+    return PyBuffer_FillInfo(buf, this, pixBuffer, width * height * 4, 1,
+                             PyBUF_SIMPLE);
+}
+#endif
 
 RendererAgg::~RendererAgg()
 {
@@ -2310,8 +2395,8 @@ Py::Object _backend_agg_module::new_renderer(const Py::Tuple &args,
         debug = 0;
     }
 
-    unsigned int width = (unsigned int)Py::Int(args[0]);
-    unsigned int height = (unsigned int)Py::Int(args[1]);
+    unsigned int width = (int)Py::Int(args[0]);
+    unsigned int height = (int)Py::Int(args[1]);
     double dpi = Py::Float(args[2]);
 
     if (width > 1 << 15 || height > 1 << 15)
@@ -2401,11 +2486,18 @@ void RendererAgg::init_type()
                        "restore_region(region)");
     add_varargs_method("restore_region2", &RendererAgg::restore_region2,
                        "restore_region(region, x1, y1, x2, y2, x3, y3)");
+
+    #if PY3K
+    behaviors().supportBufferType();
+    #endif
 }
 
-extern "C"
-    DL_EXPORT(void)
-    init_backend_agg(void)
+PyMODINIT_FUNC
+#if PY3K
+PyInit__backend_agg(void)
+#else
+init_backend_agg(void)
+#endif
 {
     //static _backend_agg_module* _backend_agg = new _backend_agg_module;
 
@@ -2415,4 +2507,8 @@ extern "C"
 
     static _backend_agg_module* _backend_agg = NULL;
     _backend_agg = new _backend_agg_module;
+
+    #if PY3K
+    return _backend_agg->module().ptr();
+    #endif
 }

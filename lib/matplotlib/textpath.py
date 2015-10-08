@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import print_function
+
 import urllib
 from matplotlib.path import Path
 import matplotlib.font_manager as font_manager
@@ -297,8 +299,10 @@ class TextToPath(object):
         else:
             dvifile = texmanager.make_dvi(s, self.FONT_SCALE)
             dvi = dviread.Dvi(dvifile, self.DPI)
-        page = iter(dvi).next()
-        dvi.close()
+        try:
+            page = next(iter(dvi))
+        finally:
+            dvi.close()
 
 
         if glyph_map is None:
@@ -355,7 +359,7 @@ class TextToPath(object):
                 if enc: charcode = enc.get(glyph, None)
                 else: charcode = glyph
 
-                if charcode:
+                if charcode is not None:
                     glyph0 = font.load_char(charcode, flags=ft2font_flag)
                 else:
                     warnings.warn("The glyph (%d) of font (%s) cannot be converted with the encoding. Glyph may be wrong" % (glyph, font_bunch.filename))

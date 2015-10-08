@@ -34,9 +34,21 @@ class FixedAxisArtistHelper(AxisArtistHelper.Fixed):
         self.nth_coord_ticks = nth_coord_ticks
 
         self.side = side
+        self._limits_inverted = False
 
     def update_lim(self, axes):
         self.grid_helper.update_lim(axes)
+
+        if self.nth_coord == 0:
+            xy1, xy2 = axes.get_ylim()
+        else:
+            xy1, xy2 = axes.get_xlim()
+
+        if xy1 > xy2:
+            self._limits_inverted = True
+        else:
+            self._limits_inverted = False
+
 
     def change_tick_coord(self, coord_number=None):
         if coord_number is None:
@@ -55,12 +67,19 @@ class FixedAxisArtistHelper(AxisArtistHelper.Fixed):
 
         g = self.grid_helper
 
-        ti1 = g.get_tick_iterator(self.nth_coord_ticks, self.side)
-        ti2 = g.get_tick_iterator(1-self.nth_coord_ticks, self.side, minor=True)
+        if self._limits_inverted:
+            side = {"left":"right","right":"left",
+                    "top":"bottom", "bottom":"top"}[self.side]
+        else:
+            side = self.side
+
+        ti1 = g.get_tick_iterator(self.nth_coord_ticks, side)
+        ti2 = g.get_tick_iterator(1-self.nth_coord_ticks, side, minor=True)
 
         #ti2 = g.get_tick_iterator(1-self.nth_coord_ticks, self.side, minor=True)
 
         return chain(ti1, ti2), iter([])
+
 
 
 class FloatingAxisArtistHelper(AxisArtistHelper.Floating):
@@ -201,7 +220,10 @@ class FloatingAxisArtistHelper(AxisArtistHelper.Floating):
             xx0 = lon_levs
             dx = 0.01
 
-        e0, e1 = sorted(self._extremes)
+        if None in self._extremes:
+            e0, e1 = self._extremes
+        else:
+            e0, e1 = sorted(self._extremes)
         if e0 is None:
             e0 = -np.inf
         if e1 is None:
@@ -413,12 +435,15 @@ class GridHelperCurveLinear(GridHelperBase):
         self.grid_info = self.grid_finder.get_grid_info(x1, y1, x2, y2)
 
 
-    def get_gridlines(self):
+    def get_gridlines(self, which="major", axis="both"):
         grid_lines = []
-        for gl in self.grid_info["lat"]["lines"]:
-            grid_lines.extend(gl)
-        for gl in self.grid_info["lon"]["lines"]:
-            grid_lines.extend(gl)
+
+        if axis in ["both", "x"]:
+            for gl in self.grid_info["lon"]["lines"]:
+                grid_lines.extend(gl)
+        if axis in ["both", "y"]:
+            for gl in self.grid_info["lat"]["lines"]:
+                grid_lines.extend(gl)
 
         return grid_lines
 

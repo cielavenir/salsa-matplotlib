@@ -1,3 +1,4 @@
+from __future__ import print_function
 from matplotlib.contour import ContourSet
 from matplotlib.tri.triangulation import Triangulation
 import matplotlib._tri as _tri
@@ -91,10 +92,10 @@ class TriContourSet(ContourSet):
         return (tri, z)
 
     tricontour_doc = """
+        Draw contours on an unstructured triangular grid.
         :func:`~matplotlib.pyplot.tricontour` and
         :func:`~matplotlib.pyplot.tricontourf` draw contour lines and
-        filled contours, respectively, on an unstructured triangular
-        grid.  Except as noted, function
+        filled contours, respectively.  Except as noted, function
         signatures and return values are the same for both versions.
 
         The triangulation can be specified in one of two ways; either::

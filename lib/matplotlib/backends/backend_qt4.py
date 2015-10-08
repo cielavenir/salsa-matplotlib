@@ -1,6 +1,7 @@
-from __future__ import division
+from __future__ import division, print_function
 import math
 import os
+import signal
 import sys
 
 import matplotlib
@@ -48,7 +49,7 @@ def _create_qApp():
     Only one qApp can exist at a time, so check before creating one.
     """
     if QtGui.QApplication.startingUp():
-        if DEBUG: print "Starting up QApplication"
+        if DEBUG: print("Starting up QApplication")
         global qApp
         app = QtGui.QApplication.instance()
         if app is None:
@@ -60,8 +61,10 @@ def _create_qApp():
 
 class Show(ShowBase):
     def mainloop(self):
-        QtGui.qApp.exec_()
+        # allow KeyboardInterrupt exceptions to close the plot window.
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
 
+        QtGui.qApp.exec_()
 show = Show()
 
 
@@ -69,9 +72,16 @@ def new_figure_manager( num, *args, **kwargs ):
     """
     Create a new figure manager instance
     """
-    thisFig = Figure( *args, **kwargs )
-    canvas = FigureCanvasQT( thisFig )
-    manager = FigureManagerQT( canvas, num )
+    thisFig = Figure(*args, **kwargs)
+    return new_figure_manager_given_figure(num, thisFig)
+
+
+def new_figure_manager_given_figure(num, figure):
+    """
+    Create a new figure manager instance for the given figure.
+    """
+    canvas = FigureCanvasQT(figure)
+    manager = FigureManagerQT(canvas, num)
     return manager
 
 
@@ -96,12 +106,17 @@ class TimerQT(TimerBase):
         self._timer = QtCore.QTimer()
         QtCore.QObject.connect(self._timer, QtCore.SIGNAL('timeout()'),
             self._on_timer)
+        self._timer_set_interval()
 
     def __del__(self):
         # Probably not necessary in practice, but is good behavior to disconnect
-        TimerBase.__del__(self)
-        QtCore.QObject.disconnect(self._timer , QtCore.SIGNAL('timeout()'),
-            self._on_timer)
+        try:
+            TimerBase.__del__(self)
+            QtCore.QObject.disconnect(self._timer,
+                    QtCore.SIGNAL('timeout()'), self._on_timer)
+        except RuntimeError:
+            # Timer C++ object already deleted
+            pass
 
     def _timer_set_single_shot(self):
         self._timer.setSingleShot(self._single)
@@ -120,8 +135,57 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
     keyvald = { QtCore.Qt.Key_Control : 'control',
                 QtCore.Qt.Key_Shift : 'shift',
                 QtCore.Qt.Key_Alt : 'alt',
-                QtCore.Qt.Key_Return : 'enter'
+                QtCore.Qt.Key_Meta : 'super',
+                QtCore.Qt.Key_Return : 'enter',
+                QtCore.Qt.Key_Left : 'left',
+                QtCore.Qt.Key_Up : 'up',
+                QtCore.Qt.Key_Right : 'right',
+                QtCore.Qt.Key_Down : 'down',
+                QtCore.Qt.Key_Escape : 'escape',
+                QtCore.Qt.Key_F1 : 'f1',
+                QtCore.Qt.Key_F2 : 'f2',
+                QtCore.Qt.Key_F3 : 'f3',
+                QtCore.Qt.Key_F4 : 'f4',
+                QtCore.Qt.Key_F5 : 'f5',
+                QtCore.Qt.Key_F6 : 'f6',
+                QtCore.Qt.Key_F7 : 'f7',
+                QtCore.Qt.Key_F8 : 'f8',
+                QtCore.Qt.Key_F9 : 'f9',
+                QtCore.Qt.Key_F10 : 'f10',
+                QtCore.Qt.Key_F11 : 'f11',
+                QtCore.Qt.Key_F12 : 'f12',
+                QtCore.Qt.Key_Home : 'home',
+                QtCore.Qt.Key_End : 'end',
+                QtCore.Qt.Key_PageUp : 'pageup',
+                QtCore.Qt.Key_PageDown : 'pagedown',
                }
+
+    # define the modifier keys which are to be collected on keyboard events.
+    # format is: [(modifier_flag, modifier_name, equivalent_key)
+    _modifier_keys = [
+                      (QtCore.Qt.MetaModifier, 'super', QtCore.Qt.Key_Meta),
+                      (QtCore.Qt.AltModifier, 'alt', QtCore.Qt.Key_Alt),
+                      (QtCore.Qt.ControlModifier, 'ctrl', QtCore.Qt.Key_Control)
+                      ]
+
+    _ctrl_modifier = QtCore.Qt.ControlModifier
+
+    if sys.platform == 'darwin':
+        # in OSX, the control and super (aka cmd/apple) keys are switched, so
+        # switch them back.
+        keyvald.update({
+                        QtCore.Qt.Key_Control : 'super', # cmd/apple key
+                        QtCore.Qt.Key_Meta : 'control',
+                        })
+
+        _modifier_keys = [
+                          (QtCore.Qt.ControlModifier, 'super', QtCore.Qt.Key_Control),
+                          (QtCore.Qt.AltModifier, 'alt', QtCore.Qt.Key_Alt),
+                          (QtCore.Qt.MetaModifier, 'ctrl', QtCore.Qt.Key_Meta),
+                         ]
+
+        _ctrl_modifier = QtCore.Qt.MetaModifier
+
     # map Qt button codes to MouseEvent's ones:
     buttond = {QtCore.Qt.LeftButton  : 1,
                QtCore.Qt.MidButton   : 2,
@@ -129,8 +193,9 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
                # QtCore.Qt.XButton1 : None,
                # QtCore.Qt.XButton2 : None,
                }
+
     def __init__( self, figure ):
-        if DEBUG: print 'FigureCanvasQt: ', figure
+        if DEBUG: print('FigureCanvasQt: ', figure)
         _create_qApp()
 
         QtGui.QWidget.__init__( self )
@@ -171,23 +236,32 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
         # flipy so y=0 is bottom of canvas
         y = self.figure.bbox.height - event.pos().y()
         button = self.buttond.get(event.button())
-        if button is not None: # only three buttons supported by MouseEvent
+        if button is not None:
             FigureCanvasBase.button_press_event( self, x, y, button )
         if DEBUG: print('button pressed:', event.button())
+
+    def mouseDoubleClickEvent(self, event):
+        x = event.pos().x()
+        # flipy so y=0 is bottom of canvas
+        y = self.figure.bbox.height - event.pos().y()
+        button = self.buttond.get(event.button())
+        if button is not None:
+            FigureCanvasBase.button_press_event( self, x, y, button, dblclick=True )
+        if DEBUG: print ('button doubleclicked:', event.button())
 
     def mouseMoveEvent( self, event ):
         x = event.x()
         # flipy so y=0 is bottom of canvas
         y = self.figure.bbox.height - event.y()
         FigureCanvasBase.motion_notify_event( self, x, y )
-        #if DEBUG: print 'mouse move'
+        #if DEBUG: print('mouse move')
 
     def mouseReleaseEvent( self, event ):
         x = event.x()
         # flipy so y=0 is bottom of canvas
         y = self.figure.bbox.height - event.y()
         button = self.buttond.get(event.button())
-        if button is not None: # only three buttons supported by MouseEvent
+        if button is not None:
             FigureCanvasBase.button_release_event( self, x, y, button )
         if DEBUG: print('button released')
 
@@ -199,27 +273,27 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
         steps = event.delta()/120
         if (event.orientation() == QtCore.Qt.Vertical):
             FigureCanvasBase.scroll_event( self, x, y, steps)
-            if DEBUG: print 'scroll event : delta = %i, steps = %i ' % (event.delta(),steps)
+            if DEBUG: print('scroll event : delta = %i, steps = %i ' % (event.delta(),steps))
 
     def keyPressEvent( self, event ):
         key = self._get_key( event )
         if key is None:
             return
         FigureCanvasBase.key_press_event( self, key )
-        if DEBUG: print 'key press', key
+        if DEBUG: print('key press', key)
 
     def keyReleaseEvent( self, event ):
         key = self._get_key(event)
         if key is None:
             return
         FigureCanvasBase.key_release_event( self, key )
-        if DEBUG: print 'key release', key
+        if DEBUG: print('key release', key)
 
     def resizeEvent( self, event ):
-        if DEBUG: print 'resize (%d x %d)' % (event.size().width(), event.size().height())
+        if DEBUG: print('resize (%d x %d)' % (event.size().width(), event.size().height()))
         w = event.size().width()
         h = event.size().height()
-        if DEBUG: print "FigureCanvasQtAgg.resizeEvent(", w, ",", h, ")"
+        if DEBUG: print("FigureCanvasQtAgg.resizeEvent(", w, ",", h, ")")
         dpival = self.figure.dpi
         winch = w/dpival
         hinch = h/dpival
@@ -238,12 +312,32 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
     def _get_key( self, event ):
         if event.isAutoRepeat():
             return None
+
         if event.key() < 256:
-            key = str(event.text())
-        elif event.key() in self.keyvald:
-            key = self.keyvald[ event.key() ]
+            key = unicode(event.text())
+            # if the control key is being pressed, we don't get the correct
+            # characters, so interpret them directly from the event.key().
+            # Unfortunately, this means that we cannot handle key's case
+            # since event.key() is not case sensitive, whereas event.text() is,
+            # Finally, since it is not possible to get the CapsLock state
+            # we cannot accurately compute the case of a pressed key when
+            # ctrl+shift+p is pressed.
+            if int(event.modifiers()) & self._ctrl_modifier:
+                # we always get an uppercase character
+                key = chr(event.key())
+                # if shift is not being pressed, lowercase it (as mentioned,
+                # this does not take into account the CapsLock state)
+                if not int(event.modifiers()) & QtCore.Qt.ShiftModifier:
+                    key = key.lower()
+
         else:
-            key = None
+            key = self.keyvald.get(event.key())
+
+        if key is not None:
+            # prepend the ctrl, alt, super keys if appropriate (sorted in that order)
+            for modifier, prefix, Qt_key in self._modifier_keys:
+                if event.key() != Qt_key and int(event.modifiers()) & modifier == modifier:
+                    key = u'{}+{}'.format(prefix, key)
 
         return key
 
@@ -294,7 +388,7 @@ class FigureManagerQT( FigureManagerBase ):
     """
 
     def __init__( self, canvas, num ):
-        if DEBUG: print 'FigureManagerQT.%s' % fn_name()
+        if DEBUG: print('FigureManagerQT.%s' % fn_name())
         FigureManagerBase.__init__( self, canvas, num )
         self.canvas = canvas
         self.window = QtGui.QMainWindow()
@@ -304,8 +398,13 @@ class FigureManagerQT( FigureManagerBase ):
         image = os.path.join( matplotlib.rcParams['datapath'],'images','matplotlib.png' )
         self.window.setWindowIcon(QtGui.QIcon( image ))
 
-        # Give the keyboard focus to the figure instead of the manager
-        self.canvas.setFocusPolicy( QtCore.Qt.ClickFocus )
+        # Give the keyboard focus to the figure instead of the
+        # manager; StrongFocus accepts both tab and click to focus and
+        # will enable the canvas to process event w/o clicking.
+        # ClickFocus only takes the focus is the window has been
+        # clicked
+        # on. http://developer.qt.nokia.com/doc/qt-4.8/qt.html#FocusPolicy-enum
+        self.canvas.setFocusPolicy( QtCore.Qt.StrongFocus )
         self.canvas.setFocus()
 
         QtCore.QObject.connect( self.window, QtCore.SIGNAL( 'destroyed()' ),
@@ -334,19 +433,22 @@ class FigureManagerQT( FigureManagerBase ):
         if matplotlib.is_interactive():
             self.window.show()
 
-        # attach a show method to the figure for pylab ease of use
-        self.canvas.figure.show = lambda *args: self.window.show()
-
         def notify_axes_change( fig ):
-           # This will be called whenever the current axes is changed
-           if self.toolbar is not None:
-               self.toolbar.update()
+            # This will be called whenever the current axes is changed
+            if self.toolbar is not None:
+                self.toolbar.update()
         self.canvas.figure.add_axobserver( notify_axes_change )
 
     @QtCore.Slot()
     def _show_message(self,s):
         # Fixes a PySide segfault.
         self.window.statusBar().showMessage(s)
+
+    def full_screen_toggle(self):
+        if self.window.isFullScreen():
+            self.window.showNormal()
+        else:
+            self.window.showFullScreen()
 
     def _widgetclosed( self ):
         if self.window._destroying: return
@@ -359,12 +461,11 @@ class FigureManagerQT( FigureManagerBase ):
             # Gcf can get destroyed before the Gcf.destroy
             # line is run, leading to a useless AttributeError.
 
-
     def _get_toolbar(self, canvas, parent):
         # must be inited after the window, drawingArea and figure
         # attrs are set
         if matplotlib.rcParams['toolbar'] == 'classic':
-            print "Classic toolbar is not supported"
+            print("Classic toolbar is not supported")
         elif matplotlib.rcParams['toolbar'] == 'toolbar2':
             toolbar = NavigationToolbar2QT(canvas, parent, False)
         else:
@@ -386,8 +487,11 @@ class FigureManagerQT( FigureManagerBase ):
         QtCore.QObject.disconnect( self.window, QtCore.SIGNAL( 'destroyed()' ),
                                    self._widgetclosed )
         if self.toolbar: self.toolbar.destroy()
-        if DEBUG: print "destroy figure manager"
+        if DEBUG: print("destroy figure manager")
         self.window.close()
+
+    def get_window_title(self):
+        return str(self.window.windowTitle())
 
     def set_window_title(self, title):
         self.window.setWindowTitle(title)
@@ -397,6 +501,9 @@ class NavigationToolbar2QT( NavigationToolbar2, QtGui.QToolBar ):
         """ coordinates: should we show the coordinates on the right? """
         self.canvas = canvas
         self.coordinates = coordinates
+        self._actions = {}
+        """A mapping of toolitem method names to their QActions"""
+
         QtGui.QToolBar.__init__( self, parent )
         NavigationToolbar2.__init__( self, canvas )
 
@@ -406,31 +513,22 @@ class NavigationToolbar2QT( NavigationToolbar2, QtGui.QToolBar ):
     def _init_toolbar(self):
         self.basedir = os.path.join(matplotlib.rcParams[ 'datapath' ],'images')
 
-        a = self.addAction(self._icon('home.png'), 'Home', self.home)
-        a.setToolTip('Reset original view')
-        a = self.addAction(self._icon('back.png'), 'Back', self.back)
-        a.setToolTip('Back to previous view')
-        a = self.addAction(self._icon('forward.png'), 'Forward', self.forward)
-        a.setToolTip('Forward to next view')
-        self.addSeparator()
-        a = self.addAction(self._icon('move.png'), 'Pan', self.pan)
-        a.setToolTip('Pan axes with left mouse, zoom with right')
-        a = self.addAction(self._icon('zoom_to_rect.png'), 'Zoom', self.zoom)
-        a.setToolTip('Zoom to rectangle')
-        self.addSeparator()
-        a = self.addAction(self._icon('subplots.png'), 'Subplots',
-                self.configure_subplots)
-        a.setToolTip('Configure subplots')
+        for text, tooltip_text, image_file, callback in self.toolitems:
+            if text is None:
+                self.addSeparator()
+            else:
+                a = self.addAction(self._icon(image_file + '.png'),
+                                         text, getattr(self, callback))
+                self._actions[callback] = a
+                if callback in ['zoom', 'pan']:
+                    a.setCheckable(True)
+                if tooltip_text is not None:
+                    a.setToolTip(tooltip_text)
 
         if figureoptions is not None:
             a = self.addAction(self._icon("qt4_editor_options.png"),
                                'Customize', self.edit_parameters)
             a.setToolTip('Edit curves line and axes parameters')
-
-        a = self.addAction(self._icon('filesave.png'), 'Save',
-                self.save_figure)
-        a.setToolTip('Save the figure')
-
 
         self.buttons = {}
 
@@ -482,6 +580,18 @@ class NavigationToolbar2QT( NavigationToolbar2, QtGui.QToolBar ):
 
             figureoptions.figure_edit(axes, self)
 
+    def _update_buttons_checked(self):
+        #sync button checkstates to match active mode
+        self._actions['pan'].setChecked(self._active == 'PAN')
+        self._actions['zoom'].setChecked(self._active == 'ZOOM')
+
+    def pan(self, *args):
+        super(NavigationToolbar2QT, self).pan(*args)
+        self._update_buttons_checked()
+
+    def zoom(self, *args):
+        super(NavigationToolbar2QT, self).zoom(*args)
+        self._update_buttons_checked()
 
     def dynamic_update( self ):
         self.canvas.draw()
@@ -492,7 +602,7 @@ class NavigationToolbar2QT( NavigationToolbar2, QtGui.QToolBar ):
             self.locLabel.setText(s.replace(', ', '\n'))
 
     def set_cursor( self, cursor ):
-        if DEBUG: print 'Set cursor' , cursor
+        if DEBUG: print('Set cursor' , cursor)
         QtGui.QApplication.restoreOverrideCursor()
         QtGui.QApplication.setOverrideCursor( QtGui.QCursor( cursord[cursor] ) )
 
@@ -504,7 +614,7 @@ class NavigationToolbar2QT( NavigationToolbar2, QtGui.QToolBar ):
         w = abs(x1 - x0)
         h = abs(y1 - y0)
 
-        rect = [ int(val)for val in min(x0,x1), min(y0, y1), w, h ]
+        rect = [ int(val)for val in (min(x0,x1), min(y0, y1), w, h) ]
         self.canvas.drawRectangle( rect )
 
     def configure_subplots(self):
@@ -531,7 +641,7 @@ class NavigationToolbar2QT( NavigationToolbar2, QtGui.QToolBar ):
         sorted_filetypes.sort()
         default_filetype = self.canvas.get_default_filetype()
 
-        start = "image." + default_filetype
+        start = self.canvas.get_default_filename()
         filters = []
         selectedFilter = None
         for name, exts in sorted_filetypes:
@@ -541,13 +651,12 @@ class NavigationToolbar2QT( NavigationToolbar2, QtGui.QToolBar ):
                 selectedFilter = filter
             filters.append(filter)
         filters = ';;'.join(filters)
-
         fname = _getSaveFileName(self, "Choose a filename to save to",
                                         start, filters, selectedFilter)
         if fname:
             try:
                 self.canvas.print_figure( unicode(fname) )
-            except Exception, e:
+            except Exception as e:
                 QtGui.QMessageBox.critical(
                     self, "Error saving file", str(e),
                     QtGui.QMessageBox.Ok, QtGui.QMessageBox.NoButton)

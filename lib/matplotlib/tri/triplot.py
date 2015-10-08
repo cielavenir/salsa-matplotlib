@@ -1,3 +1,4 @@
+from __future__ import print_function
 from matplotlib.cbook import ls_mapper
 from matplotlib.patches import PathPatch
 from matplotlib.path import Path
@@ -6,8 +7,7 @@ import numpy as np
 
 def triplot(ax, *args, **kwargs):
     """
-    Draw a unstructured triangular grid as lines and/or markers to
-    the :class:`~matplotlib.axes.Axes`.
+    Draw a unstructured triangular grid as lines and/or markers.
 
     The triangulation to plot can be specified in one of two ways;
     either::

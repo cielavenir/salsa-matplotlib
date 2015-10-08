@@ -1,4 +1,4 @@
-
+from __future__ import print_function
 import matplotlib
 import inspect
 import warnings
@@ -52,6 +52,6 @@ or with matplotlib.use()""" %
 
     matplotlib.verbose.report('backend %s version %s' % (backend,backend_version))
 
-    return new_figure_manager, draw_if_interactive, show
+    return backend_mod, new_figure_manager, draw_if_interactive, show
 
 

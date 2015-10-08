@@ -141,16 +141,17 @@ care--function signatures may differ):
 
 """
 
-from __future__ import division
+from __future__ import division, print_function
 import csv, warnings, copy, os, operator
+from itertools import izip
 
 import numpy as np
 ma = np.ma
 from matplotlib import verbose
 
-import matplotlib.nxutils as nxutils
 import matplotlib.cbook as cbook
 from matplotlib import docstring
+from matplotlib.path import Path
 
 
 def logspace(xmin,xmax,N):
@@ -331,10 +332,6 @@ docstring.interpd.update(PSD=cbook.dedent("""
           argument, it must take a data segment as an argument and
           return the windowed version of the segment.
 
-      *noverlap*: integer
-          The number of points of overlap between blocks.  The default value
-          is 0 (no overlap).
-
       *pad_to*: integer
           The number of points to which the data segment is padded when
           performing the FFT.  This can be different from *NFFT*, which
@@ -376,6 +373,10 @@ def psd(x, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
 
     %(PSD)s
 
+      *noverlap*: integer
+          The number of points of overlap between blocks.  The default value
+          is 0 (no overlap).
+
     Returns the tuple (*Pxx*, *freqs*).
 
     Refs:
@@ -408,6 +409,10 @@ def csd(x, y, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
 
     %(PSD)s
 
+      *noverlap*: integer
+          The number of points of overlap between blocks.  The default value
+          is 0 (no overlap).
+
     Returns the tuple (*Pxy*, *freqs*).
 
     Refs:
@@ -435,6 +440,10 @@ def specgram(x, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
     spectrum is returned.
 
     %(PSD)s
+
+      *noverlap*: integer
+          The number of points of overlap between blocks.  The default value
+          is 128.
 
     Returns a tuple (*Pxx*, *freqs*, *t*):
 
@@ -480,6 +489,10 @@ def cohere(x, y, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
         Array or sequence containing the data
 
     %(PSD)s
+
+      *noverlap*: integer
+          The number of points of overlap between blocks.  The default value
+          is 0 (no overlap).
 
     The return value is the tuple (*Cxy*, *f*), where *f* are the
     frequencies of the coherence vector. For cohere, scaling the
@@ -686,16 +699,15 @@ def entropy(y, bins):
       x = mu + sigma * randn(200000)
       Sanalytic = 0.5 * ( 1.0 + log(2*pi*sigma**2.0) )
     """
-    n,bins = np.histogram(y, bins)
+    n, bins = np.histogram(y, bins)
     n = n.astype(np.float_)
 
     n = np.take(n, np.nonzero(n)[0])         # get the positive
 
     p = np.divide(n, len(y))
 
-    delta = bins[1]-bins[0]
-    S = -1.0*np.sum(p*log(p)) + log(delta)
-    #S = -1.0*np.sum(p*log(p))
+    delta = bins[1] - bins[0]
+    S = -1.0 * np.sum(p * np.log(p)) + np.log(delta)
     return S
 
 def normpdf(x, *args):
@@ -709,22 +721,20 @@ def levypdf(x, gamma, alpha):
 
     N = len(x)
 
-    if N%2 != 0:
-        raise ValueError, 'x must be an event length array; try\n' + \
-              'x = np.linspace(minx, maxx, N), where N is even'
+    if N % 2 != 0:
+        raise ValueError('x must be an event length array; try\n' + \
+              'x = np.linspace(minx, maxx, N), where N is even')
 
+    dx = x[1] - x[0]
 
-    dx = x[1]-x[0]
+    f = 1/(N*dx)*np.arange(-N / 2, N / 2, np.float_)
 
+    ind = np.concatenate([np.arange(N / 2, N, int),
+                          np.arange(0, N / 2, int)])
+    df = f[1] - f[0]
+    cfl = np.exp(-gamma * np.absolute(2 * np.pi * f) ** alpha)
 
-    f = 1/(N*dx)*np.arange(-N/2, N/2, np.float_)
-
-    ind = np.concatenate([np.arange(N/2, N, int),
-                           np.arange(0, N/2, int)])
-    df = f[1]-f[0]
-    cfl = exp(-gamma*np.absolute(2*pi*f)**alpha)
-
-    px = np.fft.fft(np.take(cfl,ind)*df).astype(np.float_)
+    px = np.fft.fft(np.take(cfl, ind) * df).astype(np.float_)
     return np.take(px, ind)
 
 
@@ -1256,7 +1266,7 @@ class FIFOBuffer:
         self._xs[ind] = x
         self._ys[ind] = y
 
-        for N,funcs in self.callbackd.items():
+        for N,funcs in self.callbackd.iteritems():
             if (self._ind%N)==0:
                 for func in funcs:
                     func(self)
@@ -1336,7 +1346,7 @@ def save(fname, X, fmt='%.18e',delimiter=' '):
             import gzip
             fh = gzip.open(fname,'wb')
         else:
-            fh = file(fname,'w')
+            fh = open(fname,'w')
     elif hasattr(fname, 'seek'):
         fh = fname
     else:
@@ -1445,7 +1455,6 @@ def load(fname,comments='#',delimiter=None, converters=None,skiprows=0,
         else:
             row = [converterseq[j](val)
                       for j,val in enumerate(splitfunc(line))]
-        thisLen = len(row)
         X.append(row)
 
     X = np.array(X, dtype)
@@ -1498,7 +1507,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 """
 
-import operator
 import math
 
 
@@ -1520,7 +1528,7 @@ def exp_safe(x):
     """
 
     if type(x) is np.ndarray:
-        return exp(np.clip(x,exp_safe_MIN,exp_safe_MAX))
+        return np.exp(np.clip(x,exp_safe_MIN,exp_safe_MAX))
     else:
         return math.exp(x)
 
@@ -1774,7 +1782,7 @@ def rec_append_fields(rec, names, arrs, dtypes=None):
     if (not cbook.is_string_like(names) and cbook.iterable(names) \
             and len(names) and cbook.is_string_like(names[0])):
         if len(names) != len(arrs):
-            raise ValueError, "number of arrays do not match number of names"
+            raise ValueError("number of arrays do not match number of names")
     else: # we have only 1 name and 1 array
         names = [names]
         arrs = [arrs]
@@ -1787,7 +1795,7 @@ def rec_append_fields(rec, names, arrs, dtypes=None):
         if len(dtypes) == 1:
             dtypes = dtypes * len(arrs)
         else:
-            raise ValueError, "dtypes must be None, a single dtype or a list"
+            raise ValueError("dtypes must be None, a single dtype or a list")
 
     newdtype = np.dtype(rec.dtype.descr + zip(names, dtypes))
     newrec = np.recarray(rec.shape, dtype=newdtype)
@@ -1804,7 +1812,6 @@ def rec_drop_fields(rec, names):
     """
 
     names = set(names)
-    Nr = len(rec)
 
     newdtype = np.dtype([(name, rec.dtype[name]) for name in rec.dtype.names
                        if name not in names])
@@ -2004,7 +2011,7 @@ def rec_join(key, r1, r2, jointype='inner', defaults=None, r1postfix='1', r2post
 
     if jointype != 'inner' and defaults is not None: # fill in the defaults enmasse
         newrec_fields = newrec.dtype.fields.keys()
-        for k, v in defaults.items():
+        for k, v in defaults.iteritems():
             if k in newrec_fields:
                 newrec[k] = v
 
@@ -2133,8 +2140,6 @@ def csv2rec(fname, comments='#', skiprows=0, checkrows=0, delimiter=',',
 
     import dateutil.parser
     import datetime
-    parsedate = dateutil.parser.parse
-
 
     fh = cbook.to_filehandle(fname)
 
@@ -2160,8 +2165,8 @@ def csv2rec(fname, comments='#', skiprows=0, checkrows=0, delimiter=',',
             return ' '.join(s.split())
 
 
-        def next(self):
-            return self.fix(self.fh.next())
+        def __next__(self):
+            return self.fix(next(self.fh))
 
         def __iter__(self):
             for line in self.fh:
@@ -2246,7 +2251,7 @@ def csv2rec(fname, comments='#', skiprows=0, checkrows=0, delimiter=',',
                 break
             #print i, len(names), len(row)
             #print 'converters', zip(converters, row)
-            for j, (name, item) in enumerate(zip(names, row)):
+            for j, (name, item) in enumerate(izip(names, row)):
                 func = converterd.get(j)
                 if func is None:
                     func = converterd.get(name)
@@ -2309,7 +2314,7 @@ def csv2rec(fname, comments='#', skiprows=0, checkrows=0, delimiter=',',
     if needheader:
         while 1:
             # skip past any comments and consume one line of column header
-            row = reader.next()
+            row = next(reader)
             if len(row) and row[0].startswith(comments):
                 continue
             break
@@ -2755,7 +2760,7 @@ def griddata(x,y,z,xi,yi,interp='nn'):
         xo = xi.astype(np.float)
         yo = yi.astype(np.float)
         if min(xo[1:]-xo[0:-1]) < 0 or min(yo[1:]-yo[0:-1]) < 0:
-            raise ValueError, 'output grid defined by xi,yi must be monotone increasing'
+            raise ValueError('output grid defined by xi,yi must be monotone increasing')
         # allocate array for output (buffer will be overwritten by nagridd)
         zo = np.empty((yo.shape[0],xo.shape[0]), np.float)
         _natgrid.natgridd(x,y,z,xo,yo,zo)
@@ -2925,7 +2930,6 @@ def stineman_interp(xi,x,y,yp=None):
     x=np.asarray(x, np.float_)
     y=np.asarray(y, np.float_)
     assert x.shape == y.shape
-    N=len(y)
 
     if yp is None:
         yp = slopes(x,y)
@@ -2980,8 +2984,11 @@ def inside_poly(points, verts):
     Return value is a sequence of indices into points for the points
     that are inside the polygon.
     """
-    res, =  np.nonzero(nxutils.points_inside_poly(points, verts))
-    return res
+    # Make a closed polygon path
+    poly = Path( verts )
+
+    # Check to see which points are contained withing the Path
+    return [ idx for idx, p in enumerate(points) if poly.contains_point(p) ]
 
 def poly_below(xmin, xs, ys):
     """
@@ -2995,17 +3002,17 @@ def poly_below(xmin, xs, ys):
       ax.fill(xv, yv)
     """
     if ma.isMaskedArray(xs) or ma.isMaskedArray(ys):
-        nx = ma
+        numpy = ma
     else:
-        nx = np
+        numpy = np
 
-    xs = nx.asarray(xs)
-    ys = nx.asarray(ys)
+    xs = numpy.asarray(xs)
+    ys = numpy.asarray(ys)
     Nx = len(xs)
     Ny = len(ys)
     assert(Nx==Ny)
-    x = xmin*nx.ones(2*Nx)
-    y = nx.ones(2*Nx)
+    x = xmin*numpy.ones(2*Nx)
+    y = numpy.ones(2*Nx)
     x[:Nx] = xs
     y[:Nx] = ys
     y[Nx:] = ys[::-1]
@@ -3024,19 +3031,19 @@ def poly_between(x, ylower, yupper):
     :meth:`matplotlib.axes.Axes.fill`.
     """
     if ma.isMaskedArray(ylower) or ma.isMaskedArray(yupper) or ma.isMaskedArray(x):
-        nx = ma
+        numpy = ma
     else:
-        nx = np
+        numpy = np
 
     Nx = len(x)
     if not cbook.iterable(ylower):
-        ylower = ylower*nx.ones(Nx)
+        ylower = ylower*numpy.ones(Nx)
 
     if not cbook.iterable(yupper):
-        yupper = yupper*nx.ones(Nx)
+        yupper = yupper*numpy.ones(Nx)
 
-    x = nx.concatenate( (x, x[::-1]) )
-    y = nx.concatenate( (yupper, ylower[::-1]) )
+    x = numpy.concatenate( (x, x[::-1]) )
+    y = numpy.concatenate( (yupper, ylower[::-1]) )
     return x,y
 
 
@@ -3178,3 +3185,33 @@ def quad2cubic(q0x, q0y, q1x, q1y, q2x, q2y):
     c2x, c2y = c1x + 1./3. * (q2x - q0x), c1y + 1./3. * (q2y - q0y)
     # c3x, c3y = q2x, q2y
     return q0x, q0y, c1x, c1y, c2x, c2y, q2x, q2y
+
+def offset_line(y, yerr):
+    """
+    Offsets an array *y* by +/- an error and returns a tuple (y - err, y + err).
+
+    The error term can be:
+
+    * A scalar. In this case, the returned tuple is obvious.
+    * A vector of the same length as *y*. The quantities y +/- err are computed
+      component-wise.
+    * A tuple of length 2. In this case, yerr[0] is the error below *y* and
+      yerr[1] is error above *y*. For example::
+
+        from pylab import *
+        x = linspace(0, 2*pi, num=100, endpoint=True)
+        y = sin(x)
+        y_minus, y_plus = mlab.offset_line(y, 0.1)
+        plot(x, y)
+        fill_between(x, ym, y2=yp)
+        show()
+
+    """
+    if cbook.is_numlike(yerr) or (cbook.iterable(yerr) and len(yerr) == len(y)):
+        ymin = y - yerr
+        ymax = y + yerr
+    elif len(yerr) == 2:
+        ymin, ymax = y - yerr[0], y + yerr[1]
+    else:
+        raise ValueError("yerr must be scalar, 1xN or 2xN")
+    return ymin, ymax

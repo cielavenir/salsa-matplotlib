@@ -4,7 +4,9 @@ variety of line styles, markers and colors.
 """
 
 # TODO: expose cap and join style attrs
-from __future__ import division
+from __future__ import division, print_function
+
+import warnings
 
 import numpy as np
 from numpy import ma
@@ -237,10 +239,11 @@ class Line2D(Artist):
 
         TODO: sort returned indices by distance
         """
-        if callable(self._contains): return self._contains(self,mouseevent)
+        if callable(self._contains):
+            return self._contains(self,mouseevent)
 
         if not is_numlike(self.pickradius):
-            raise ValueError,"pick radius should be a distance"
+            raise ValueError("pick radius should be a distance")
 
         # Make sure we have data to plot
         if self._invalidy or self._invalidx:
@@ -248,39 +251,45 @@ class Line2D(Artist):
         if len(self._xy)==0: return False,{}
 
         # Convert points to pixels
-        if self._transformed_path is None:
-            self._transform_path()
-        path, affine = self._transformed_path.get_transformed_path_and_affine()
+        path, affine = self._get_transformed_path().get_transformed_path_and_affine()
         path = affine.transform_path(path)
         xy = path.vertices
         xt = xy[:, 0]
         yt = xy[:, 1]
 
         # Convert pick radius from points to pixels
-        if self.figure == None:
-            warning.warn('no figure set when check if mouse is on line')
+        if self.figure is None:
+            warnings.warn('no figure set when check if mouse is on line')
             pixels = self.pickradius
         else:
             pixels = self.figure.dpi/72. * self.pickradius
 
-        # Check for collision
-        if self._linestyle in ['None',None]:
-            # If no line, return the nearby point(s)
-            d = (xt-mouseevent.x)**2 + (yt-mouseevent.y)**2
-            ind, = np.nonzero(np.less_equal(d, pixels**2))
-        else:
-            # If line, return the nearby segment(s)
-            ind = segment_hits(mouseevent.x,mouseevent.y,xt,yt,pixels)
+        # the math involved in checking for containment (here and inside of segment_hits) assumes
+        # that it is OK to overflow.  In case the application has set the error flags such that
+        # an exception is raised on overflow, we temporarily set the appropriate error flags here
+        # and set them back when we are finished. 
+        olderrflags = np.seterr(all='ignore')
+        try:
+            # Check for collision
+            if self._linestyle in ['None',None]:
+                # If no line, return the nearby point(s)
+                d = (xt-mouseevent.x)**2 + (yt-mouseevent.y)**2
+                ind, = np.nonzero(np.less_equal(d, pixels**2))
+            else:
+                # If line, return the nearby segment(s)
+                ind = segment_hits(mouseevent.x,mouseevent.y,xt,yt,pixels)
+        finally:
+            np.seterr(**olderrflags)
 
         ind += self.ind_offset
 
         # Debugging message
-        if False and self._label != u'':
-            print "Checking line",self._label,"at",mouseevent.x,mouseevent.y
-            print 'xt', xt
-            print 'yt', yt
+        if False and self._label != '':
+            print("Checking line",self._label,"at",mouseevent.x,mouseevent.y)
+            print('xt', xt)
+            print('yt', yt)
             #print 'dx,dy', (xt-mouseevent.x)**2., (yt-mouseevent.y)**2.
-            print 'ind',ind
+            print('ind',ind)
 
         # Return the point(s) within radius
         return len(ind)>0,dict(ind=ind)
@@ -305,9 +314,9 @@ class Line2D(Artist):
     def set_fillstyle(self, fs):
         """
         Set the marker fill style; 'full' means fill the whole marker.
-        The other options are for half filled markers
+        'none' means no filling; other options are for half-filled markers.
 
-        ACCEPTS: ['full' | 'left' | 'right' | 'bottom' | 'top']
+        ACCEPTS: ['full' | 'left' | 'right' | 'bottom' | 'top' | 'none']
         """
         self._marker.set_fillstyle(fs)
 
@@ -437,6 +446,11 @@ class Line2D(Artist):
         self._invalidy = False
 
     def _transform_path(self, subslice=None):
+        """
+        Puts a TransformedPath instance at self._transformed_path,
+        all invalidation of the transform is then handled by the 
+        TransformedPath instance.
+        """
         # Masked arrays are now handled by the Path class itself
         if subslice is not None:
             _path = Path(self._xy[subslice,:])
@@ -444,6 +458,14 @@ class Line2D(Artist):
             _path = self._path
         self._transformed_path = TransformedPath(_path, self.get_transform())
 
+    def _get_transformed_path(self):
+        """
+        Return the :class:`~matplotlib.transforms.TransformedPath` instance
+        of this line.
+        """
+        if self._transformed_path is None:
+            self._transform_path()
+        return self._transformed_path
 
     def set_transform(self, t):
         """
@@ -473,8 +495,8 @@ class Line2D(Artist):
             subslice = slice(max(i0-1, 0), i1+1)
             self.ind_offset = subslice.start
             self._transform_path(subslice)
-        if self._transformed_path is None:
-            self._transform_path()
+
+        transformed_path = self._get_transformed_path()
 
         if not self.get_visible(): return
 
@@ -498,7 +520,7 @@ class Line2D(Artist):
 
         funcname = self._lineStyles.get(self._linestyle, '_draw_nothing')
         if funcname != '_draw_nothing':
-            tpath, affine = self._transformed_path.get_transformed_path_and_affine()
+            tpath, affine = transformed_path.get_transformed_path_and_affine()
             if len(tpath.vertices):
                 self._lineFunc = getattr(self, funcname)
                 funcname = self.drawStyles.get(self._drawstyle, '_draw_lines')
@@ -519,7 +541,7 @@ class Line2D(Artist):
                 gc.set_linewidth(self._markeredgewidth)
             gc.set_alpha(self._alpha)
             marker = self._marker
-            tpath, affine = self._transformed_path.get_transformed_points_and_affine()
+            tpath, affine = transformed_path.get_transformed_points_and_affine()
             if len(tpath.vertices):
                 # subsample the markers if markevery is not None
                 markevery = self.get_markevery()
@@ -576,15 +598,16 @@ class Line2D(Artist):
     def get_marker(self): return self._marker.get_marker()
 
     def get_markeredgecolor(self):
-        if (is_string_like(self._markeredgecolor) and
-                                    self._markeredgecolor == 'auto'):
+        mec = self._markeredgecolor
+        if (is_string_like(mec) and mec == 'auto'):
             if self._marker.get_marker() in ('.', ','):
                 return self._color
-            if self._marker.is_filled():
+            if self._marker.is_filled() and self.get_fillstyle() != 'none':
                 return 'k'  # Bad hard-wired default...
             else:
                 return self._color
-        return self._markeredgecolor
+        else:
+            return mec
 
     def get_markeredgewidth(self): return self._markeredgewidth
 
@@ -594,10 +617,11 @@ class Line2D(Artist):
         else:
             fc = self._markerfacecolor
 
-        if (fc is None or (is_string_like(fc) and fc.lower()=='none') ):
-            return fc
-        elif (is_string_like(fc) and fc.lower() == 'auto'):
-            return self._color
+        if (is_string_like(fc) and fc.lower() == 'auto'):
+            if self.get_fillstyle() == 'none':
+                return 'none'
+            else:
+                return self._color
         else:
             return fc
 
@@ -1188,4 +1212,4 @@ docstring.interpd.update(Line2D = artist.kwdoc(Line2D))
 
 # You can not set the docstring of an instancemethod,
 # but you can on the underlying function.  Go figure.
-docstring.dedent_interpd(Line2D.__init__.im_func)
+docstring.dedent_interpd(Line2D.__init__)
