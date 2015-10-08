@@ -1,4 +1,4 @@
-.. _coding-guide:
+M.. _coding-guide:
 
 ************
 Coding guide
@@ -29,10 +29,10 @@ Branch checkouts, eg the maintenance branch::
    svn co https://matplotlib.svn.sourceforge.net/svnroot/matplotlib/branches/\
    v0_91_maint mpl91 --username=youruser --password=yourpass
 
-The current release of the trunk is in the 0.98.4 maintenance branch::
+The current release of the trunk is in the 0.98.5 maintenance branch::
 
    svn co https://matplotlib.svn.sourceforge.net/svnroot/matplotlib/branches/\
-   v0_98_4_maint mpl98.4 --username=youruser --password=yourpass
+   v0_98_5_maint mpl98.5 --username=youruser --password=yourpass
 
 
 Committing changes
@@ -118,6 +118,9 @@ The basic procedure is:
 
      > svn commit -F svnmerge-commit-message.txt
 
+
+.. _setting-up-svnmerge:
+
 Setting up svnmerge
 ~~~~~~~~~~~~~~~~~~~
 
@@ -174,7 +177,7 @@ enter the following commands::
   git svn init --branches=branches --trunk=trunk/matplotlib --tags=tags https://matplotlib.svn.sourceforge.net/svnroot/matplotlib
 
   # Now just get the latest svn revisions from the SourceForge SVN repository
-  git svn fetch -r 6300:HEAD
+  git svn fetch -r 6800:HEAD
 
 .. _matplotlib github mirror: http://github.com/astraw/matplotlib
 
@@ -220,6 +223,14 @@ rebase it to the new master::
 
   git checkout whizbang-branch
   git rebase master
+
+If you get the dreaded "Unable to determine upstream SVN information
+from working tree history" error when running "git svn rebase", try
+creating a new git branch based on subversion trunk and cherry pick
+your patches onto that::
+
+  git checkout -b work remotes/trunk # create a new "work" branch
+  git cherry-pick <commit> # where <commit> will get applied to new branch
 
 Working on a maintenance branch from git
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

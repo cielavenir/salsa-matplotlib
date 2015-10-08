@@ -29,18 +29,20 @@ import matplotlib.lines as lines
 import matplotlib.patches as patches
 import matplotlib.collections as collections
 import matplotlib.contour as contour
+import matplotlib.artist as martist
 
 make_axes_kw_doc = '''
 
-    ==========   ====================================================
-    Property     Description
-    ==========   ====================================================
-    *fraction*   0.15; fraction of original axes to use for colorbar
-    *pad*        0.05 if vertical, 0.15 if horizontal; fraction
-                 of original axes between colorbar and new image axes
-    *shrink*     1.0; fraction by which to shrink the colorbar
-    *aspect*     20; ratio of long to short dimensions
-    ==========   ====================================================
+    ============= ====================================================
+    Property      Description
+    ============= ====================================================
+    *orientation* vertical or horizontal
+    *fraction*    0.15; fraction of original axes to use for colorbar
+    *pad*         0.05 if vertical, 0.15 if horizontal; fraction
+                  of original axes between colorbar and new image axes
+    *shrink*      1.0; fraction by which to shrink the colorbar
+    *aspect*      20; ratio of long to short dimensions
+    ============= ====================================================
 
 '''
 
@@ -625,9 +627,10 @@ class Colorbar(ColorbarBase):
         self.mappable = mappable
         kw['cmap'] = mappable.cmap
         kw['norm'] = mappable.norm
-        kw['alpha'] = mappable.get_alpha()
+
         if isinstance(mappable, contour.ContourSet):
             CS = mappable
+            kw['alpha'] = mappable.get_alpha()
             kw['boundaries'] = CS._levels
             kw['values'] = CS.cvalues
             kw['extend'] = CS.extend
@@ -638,6 +641,9 @@ class Colorbar(ColorbarBase):
             if not CS.filled:
                 self.add_lines(CS)
         else:
+            if isinstance(mappable, martist.Artist):
+                kw['alpha'] = mappable.get_alpha()
+
             ColorbarBase.__init__(self, ax, **kw)
 
 

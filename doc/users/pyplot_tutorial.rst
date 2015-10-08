@@ -117,6 +117,7 @@ markeredgecolor or mec	any matplotlib color
 markeredgewidth or mew	float value in points
 markerfacecolor or mfc	any matplotlib color
 markersize or ms	float
+markevery               None | integer | (startind, stride)
 picker			used in interactive line selection
 pickradius		the line pick selection radius
 solid_capstyle		['butt' | 'round' |  'projecting']
@@ -270,4 +271,4 @@ locations (text location) are in data coordinates.  There are a
 variety of other coordinate systems one can choose -- see
 :ref:`annotations-tutorial` for details.  More examples can be found
 in the `annotations demo
-<http://matplotlib.sf.net/examples/pylab_examples/annotation_demo.py>`_
+<http://matplotlib.sf.net/examples/pylab_examples/annotation_demo.html>`_

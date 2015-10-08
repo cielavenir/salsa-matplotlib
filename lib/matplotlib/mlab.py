@@ -54,12 +54,22 @@ Functions that don't exist in matlab(TM), but are useful anyway:
     yourself stranded without scipy (and the far superior
     scipy.integrate tools)
 
+:meth:`contiguous_regions`
+    return the indices of the regions spanned by some logical mask
+
+:meth:`cross_from_below`
+    return the indices where a 1D array crosses a threshold from below
+
+:meth:`cross_from_above`
+    return the indices where a 1D array crosses a threshold from above
+
+
 record array helper functions
 -------------------------------
 
 A collection of helper methods for numpyrecord arrays
 
-.. _htmlonly::
+.. _htmlonly:
 
     See :ref:`misc-examples-index`
 
@@ -120,38 +130,11 @@ The following are deprecated; please import directly from numpy (with
 care--function signatures may differ):
 
 
-:meth:`conv`
-    convolution  (numpy.convolve)
-
-:meth:`corrcoef`
-    The matrix of correlation coefficients
-
-:meth:`hist`
-    Histogram (numpy.histogram)
-
-:meth:`linspace`
-    Linear spaced array from min to max
-
 :meth:`load`
     load ASCII file - use numpy.loadtxt
 
-:meth:`meshgrid`
-    Make a 2D grid from 2 1 arrays (numpy.meshgrid)
-
-:meth:`polyfit`
-    least squares best polynomial fit of x to y (numpy.polyfit)
-
-:meth:`polyval`
-    evaluate a vector for a vector of polynomial coeffs (numpy.polyval)
-
 :meth:`save`
     save ASCII file - use numpy.savetxt
-
-:meth:`trapz`
-    trapeziodal integration (trapz(x,y) -> numpy.trapz(y,x))
-
-:meth:`vander`
-    the Vandermonde matrix (numpy.vander)
 
 """
 
@@ -164,27 +147,6 @@ from matplotlib import verbose
 
 import matplotlib.nxutils as nxutils
 import matplotlib.cbook as cbook
-
-# set is a new builtin function in 2.4; delete the following when
-# support for 2.3 is dropped.
-try:
-    set
-except NameError:
-    from sets import Set as set
-
-
-def linspace(*args, **kw):
-    warnings.warn("use numpy.linspace", DeprecationWarning)
-    return np.linspace(*args, **kw)
-
-def meshgrid(x,y):
-    warnings.warn("use numpy.meshgrid", DeprecationWarning)
-    return np.meshgrid(x,y)
-
-def mean(x, dim=None):
-    warnings.warn("Use numpy.mean(x) or x.mean()", DeprecationWarning)
-    if len(x)==0: return None
-    return np.mean(x, axis=dim)
 
 
 def logspace(xmin,xmax,N):
@@ -201,12 +163,6 @@ def window_hanning(x):
 def window_none(x):
     "No window function; simply return x"
     return x
-
-#from numpy import convolve as conv
-def conv(x, y, mode=2):
-    'convolve x with y'
-    warnings.warn("Use numpy.convolve(x, y, mode='full')", DeprecationWarning)
-    return np.convolve(x,y,mode)
 
 def detrend(x, key=None):
     if key is None or key=='constant':
@@ -323,6 +279,11 @@ def _spectral_helper(x, y, NFFT=256, Fs=2, detrend=detrend_none,
     Pxy *= scaling_factor / (np.abs(windowVals)**2).sum()
     t = 1./Fs * (ind + NFFT / 2.)
     freqs = float(Fs) / pad_to * np.arange(numFreqs)
+
+    if (np.iscomplexobj(x) and sides == 'default') or sides == 'twosided':
+        # center the frequency range at zero
+        freqs = np.concatenate((freqs[numFreqs//2:] - Fs, freqs[:numFreqs//2]))
+        Pxy = np.concatenate((Pxy[numFreqs//2:, :], Pxy[:numFreqs//2, :]), 0)
 
     return Pxy, freqs, t
 
@@ -470,7 +431,8 @@ def specgram(x, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
            segments.
 
     .. seealso::
-        :func:`psd`:
+
+        :func:`psd`
             :func:`psd` differs in the default overlap; in returning
             the mean of the segment periodograms; and in not returning
             times.
@@ -480,11 +442,6 @@ def specgram(x, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
     Pxx, freqs, t = _spectral_helper(x, x, NFFT, Fs, detrend, window,
         noverlap, pad_to, sides, scale_by_freq)
     Pxx = Pxx.real #Needed since helper implements generically
-
-    if (np.iscomplexobj(x) and sides == 'default') or sides == 'twosided':
-        # center the frequency range at zero
-        freqs = np.concatenate((freqs[NFFT/2:]-Fs,freqs[:NFFT/2]))
-        Pxx   = np.concatenate((Pxx[NFFT/2:,:],Pxx[:NFFT/2,:]),0)
 
     return Pxx, freqs, t
 
@@ -512,7 +469,8 @@ def cohere(x, y, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
     the factors cancel out.
 
     .. seealso::
-        :func:`psd` and :func:`csd`:
+
+        :func:`psd` and :func:`csd`
             For information about the methods used to compute
             :math:`P_{xy}`, :math:`P_{xx}` and :math:`P_{yy}`.
     """
@@ -531,108 +489,6 @@ def cohere(x, y, NFFT=256, Fs=2, detrend=detrend_none, window=window_hanning,
     return Cxy, f
 
 cohere.__doc__ = cohere.__doc__ % kwdocd
-
-def corrcoef(*args):
-    """
-    corrcoef(*X*) where *X* is a matrix returns a matrix of correlation
-    coefficients for the columns of *X*
-
-    corrcoef(*x*, *y*) where *x* and *y* are vectors returns the matrix of
-    correlation coefficients for *x* and *y*.
-
-    Numpy arrays can be real or complex.
-
-    The correlation matrix is defined from the covariance matrix *C*
-    as
-
-    .. math::
-
-      r_{ij} = \\frac{C_{ij}}{\\sqrt{C_{ii}C_{jj}}}
-    """
-    warnings.warn("Use numpy.corrcoef", DeprecationWarning)
-    kw = dict(rowvar=False)
-    return np.corrcoef(*args, **kw)
-
-
-def polyfit(*args, **kwargs):
-    u"""
-    polyfit(*x*, *y*, *N*)
-
-    Do a best fit polynomial of order *N* of *y* to *x*.  Return value
-    is a vector of polynomial coefficients [pk ... p1 p0].  Eg, for
-    *N*=2::
-
-      p2*x0^2 +  p1*x0 + p0 = y1
-      p2*x1^2 +  p1*x1 + p0 = y1
-      p2*x2^2 +  p1*x2 + p0 = y2
-      .....
-      p2*xk^2 +  p1*xk + p0 = yk
-
-
-    Method: if *X* is a the Vandermonde Matrix computed from *x* (see
-    `vandermonds
-    <http://mathworld.wolfram.com/VandermondeMatrix.html>`_), then the
-    polynomial least squares solution is given by the '*p*' in
-
-      X*p = y
-
-    where *X* is a (len(*x*) \N{MULTIPLICATION SIGN} *N* + 1) matrix,
-    *p* is a *N*+1 length vector, and *y* is a (len(*x*)
-    \N{MULTIPLICATION SIGN} 1) vector.
-
-    This equation can be solved as
-
-    .. math::
-
-      p = (X_t X)^-1 X_t y
-
-    where :math:`X_t` is the transpose of *X* and -1 denotes the
-    inverse.  Numerically, however, this is not a good method, so we
-    use :func:`numpy.linalg.lstsq`.
-
-    For more info, see `least squares fitting
-    <http://mathworld.wolfram.com/LeastSquaresFittingPolynomial.html>`_,
-    but note that the *k*'s and *n*'s in the superscripts and
-    subscripts on that page.  The linear algebra is correct, however.
-
-    .. seealso::
-        :func:`polyval`
-    """
-    warnings.warn("use numpy.poyfit", DeprecationWarning)
-    return np.polyfit(*args, **kwargs)
-
-
-
-
-def polyval(*args, **kwargs):
-    """
-    *y* = polyval(*p*, *x*)
-
-    *p* is a vector of polynomial coeffients and *y* is the polynomial
-    evaluated at *x*.
-
-    Example code to remove a polynomial (quadratic) trend from y::
-
-      p = polyfit(x, y, 2)
-      trend = polyval(p, x)
-      resid = y - trend
-
-    .. seealso::
-        :func:`polyfit`
-    """
-    warnings.warn("use numpy.polyval", DeprecationWarning)
-    return np.polyval(*args, **kwargs)
-
-def vander(*args, **kwargs):
-    """
-    *X* = vander(*x*, *N* = *None*)
-
-    The Vandermonde matrix of vector *x*.  The *i*-th column of *X* is the
-    the *i*-th power of *x*.  *N* is the maximum power to compute; if *N* is
-    *None* it defaults to len(*x*).
-    """
-    warnings.warn("Use numpy.vander()", DeprecationWarning)
-    return np.vander(*args, **kwargs)
 
 
 def donothing_callback(*args):
@@ -704,7 +560,8 @@ def cohere_pairs( X, ij, NFFT=256, Fs=2, detrend=detrend_none,
     cohere.
 
     .. seealso::
-        :file:`test/cohere_pairs_test.py` in the src tree:
+
+        :file:`test/cohere_pairs_test.py` in the src tree
             For an example script that shows that this
             :func:`cohere_pairs` and :func:`cohere` give the same
             results for a given pair.
@@ -818,24 +675,6 @@ def entropy(y, bins):
     #S = -1.0*np.sum(p*log(p))
     return S
 
-def hist(y, bins=10, normed=0):
-    """
-    Return the histogram of *y* with *bins* equally sized bins.  If
-    bins is an array, use those bins.  Return value is (*n*, *x*)
-    where *n* is the count for each bin in *x*.
-
-    If *normed* is *False*, return the counts in the first element of
-    the returned tuple.  If *normed* is *True*, return the probability
-    density :math:`\\frac{n}{(len(y)\mathrm{dbin}}`.
-
-    If *y* has rank > 1, it will be raveled.  If *y* is masked, only the
-    unmasked values will be used.
-
-    Credits: the Numeric 22 documentation
-    """
-    warnings.warn("Use numpy.histogram()", DeprecationWarning)
-    return np.histogram(y, bins=bins, range=None, normed=normed)
-
 def normpdf(x, *args):
     "Return the normal pdf evaluated at *x*; args provides *mu*, *sigma*"
     mu, sigma = args
@@ -870,19 +709,6 @@ def find(condition):
     "Return the indices where ravel(condition) is true"
     res, = np.nonzero(np.ravel(condition))
     return res
-
-def trapz(x, y):
-    """
-    Trapezoidal integral of *y*(*x*).
-    """
-    warnings.warn("Use numpy.trapz(y,x) instead of trapz(x,y)", DeprecationWarning)
-    return np.trapz(y, x)
-    #if len(x)!=len(y):
-    #    raise ValueError, 'x and y must have the same length'
-    #if len(x)<2:
-    #    raise ValueError, 'x and y must have > 1 element'
-    #return np.sum(0.5*np.diff(x)*(y[1:]+y[:-1]))
-
 
 
 def longest_contiguous_ones(x):
@@ -1201,16 +1027,19 @@ def liaupunov(x, fprime):
     *x* is a very long trajectory from a map, and *fprime* returns the
     derivative of *x*.
 
+    This function will be removed from matplotlib.
+
     Returns :
     .. math::
 
         \lambda = \\frac{1}{n}\\sum \\ln|f^'(x_i)|
 
     .. seealso::
-        Sec 10.5 Strogatz (1994) "Nonlinear Dynamics and Chaos".
 
-        `Wikipedia article on Lyapunov Exponent
-        <http://en.wikipedia.org/wiki/Lyapunov_exponent>`_.
+        Lyapunov Exponent
+           Sec 10.5 Strogatz (1994) "Nonlinear Dynamics and Chaos".
+           `Wikipedia article on Lyapunov Exponent
+           <http://en.wikipedia.org/wiki/Lyapunov_exponent>`_.
 
     .. note::
         What the function here calculates may not be what you really want;
@@ -1218,6 +1047,9 @@ def liaupunov(x, fprime):
 
         It also seems that this function's name is badly misspelled.
     """
+
+    warnings.warn("This does not belong in matplotlib and will be removed", DeprecationWarning) # 2009/06/13
+
     return np.mean(np.log(np.absolute(fprime(x))))
 
 class FIFOBuffer:
@@ -1327,6 +1159,8 @@ def save(fname, X, fmt='%.18e',delimiter=' '):
     Save the data in *X* to file *fname* using *fmt* string to convert the
     data to strings.
 
+    Deprecated.  Use numpy.savetxt.
+
     *fname* can be a filename or a file handle.  If the filename ends
     in '.gz', the file is automatically saved in compressed gzip
     format.  The :func:`load` function understands gzipped files
@@ -1342,6 +1176,8 @@ def save(fname, X, fmt='%.18e',delimiter=' '):
     *delimiter* is used to separate the fields, eg. *delimiter* ','
     for comma-separated values.
     """
+
+    warnings.warn("use numpy.savetxt", DeprecationWarning)  # 2009/06/13
 
     if cbook.is_string_like(fname):
         if fname.endswith('.gz'):
@@ -1373,6 +1209,8 @@ def load(fname,comments='#',delimiter=None, converters=None,skiprows=0,
          usecols=None, unpack=False, dtype=np.float_):
     """
     Load ASCII data from *fname* into an array and return the array.
+
+    Deprecated: use numpy.loadtxt.
 
     The data must be regular, same number of values in every row
 
@@ -1421,9 +1259,12 @@ def load(fname,comments='#',delimiter=None, converters=None,skiprows=0,
     - *dtype*: the array will have this dtype.  default: ``numpy.float_``
 
     .. seealso::
-        See :file:`examples/pylab_examples/load_converter.py` in the source tree:
+
+        See :file:`examples/pylab_examples/load_converter.py` in the source tree
            Exercises many of these options.
     """
+
+    warnings.warn("use numpy.loadtxt", DeprecationWarning)  # 2009/06/13
 
     if converters is None: converters = {}
     fh = cbook.to_filehandle(fname)
@@ -1716,33 +1557,6 @@ def amap(fn,*args):
     return np.array(map(fn,*args))
 
 
-#from numpy import zeros_like
-def zeros_like(a):
-    """
-    Return an array of zeros of the shape and typecode of *a*.
-    """
-    warnings.warn("Use numpy.zeros_like(a)", DeprecationWarning)
-    return np.zeros_like(a)
-
-#from numpy import sum as sum_flat
-def sum_flat(a):
-    """
-    Return the sum of all the elements of *a*, flattened out.
-
-    It uses ``a.flat``, and if *a* is not contiguous, a call to
-    ``ravel(a)`` is made.
-    """
-    warnings.warn("Use numpy.sum(a) or a.sum()", DeprecationWarning)
-    return np.sum(a)
-
-#from numpy import mean as mean_flat
-def mean_flat(a):
-    """
-    Return the mean of all the elements of *a*, flattened out.
-    """
-    warnings.warn("Use numpy.mean(a) or a.mean()", DeprecationWarning)
-    return np.mean(a)
-
 def rms_flat(a):
     """
     Return the root mean square of all the elements of *a*, flattened out.
@@ -1848,14 +1662,6 @@ def frange(xini,xfin=None,delta=None,**kw):
     return np.arange(npts)*delta+xini
 # end frange()
 
-#import numpy.diag as diagonal_matrix
-def diagonal_matrix(diag):
-    """
-    Return square diagonal matrix whose non-zero elements are given by the
-    input array.
-    """
-    warnings.warn("Use numpy.diag(d)", DeprecationWarning)
-    return np.diag(diag)
 
 def identity(n, rank=2, dtype='l', typecode=None):
     """
@@ -1958,72 +1764,10 @@ def isvector(X):
     """
     return np.prod(X.shape)==np.max(X.shape)
 
-#from numpy import fromfunction as fromfunction_kw
-def fromfunction_kw(function, dimensions, **kwargs):
-    """
-    Drop-in replacement for :func:`numpy.fromfunction`.
-
-    Allows passing keyword arguments to the desired function.
-
-    Call it as (keywords are optional)::
-
-      fromfunction_kw(MyFunction, dimensions, keywords)
-
-    The function ``MyFunction`` is responsible for handling the
-    dictionary of keywords it will receive.
-    """
-    warnings.warn("Use numpy.fromfunction()", DeprecationWarning)
-    return np.fromfunction(function, dimensions, **kwargs)
-
 ### end fperez numutils code
 
 
-def rem(x,y):
-    """
-    Deprecated - see :func:`numpy.remainder`
-    """
-    raise NotImplementedError('Deprecated - see numpy.remainder')
-
-def norm(x,y=2):
-    """
-    Deprecated - see :func:`numpy.linalg.norm`
-    """
-    raise NotImplementedError('Deprecated - see numpy.linalg.norm')
-
-
-def orth(A):
-    """
-    Deprecated - needs clean room implementation
-    """
-    raise NotImplementedError('Deprecated - needs clean room implementation')
-
-def rank(x):
-    """
-    Deprecated - see :func:`numpy.rank`
-    """
-    raise NotImplementedError('Deprecated - see numpy.rank')
-
-def sqrtm(x):
-    """
-    Deprecated - needs clean room implementation
-    """
-    raise NotImplementedError('Deprecated - see scipy.linalg.sqrtm')
-
-
-def mfuncC(f, x):
-    """
-    Deprecated
-    """
-    raise NotImplementedError('Deprecated - needs clean room implementation')
-
-def approx_real(x):
-    """
-    Deprecated - needs clean room implementation
-    """
-    raise NotImplementedError('Deprecated - needs clean room implementation')
-
 #helpers for loading, saving, manipulating and viewing numpy record arrays
-
 
 def safe_isnan(x):
     ':func:`numpy.isnan` for arbitrary types'
@@ -2042,26 +1786,6 @@ def safe_isinf(x):
     except NotImplementedError: return False
     except TypeError: return False
     else: return b
-
-def rec_view(rec):
-    """
-    Return a view of an ndarray as a recarray
-
-    .. seealso::
-
-       http://projects.scipy.org/pipermail/numpy-discussion/2008-August/036429.html
-    """
-    return rec.view(np.recarray)
-    #return rec.view(dtype=(np.record, rec.dtype), type=np.recarray)
-
-def rec_append_field(rec, name, arr, dtype=None):
-    """
-    Return a new record array with field name populated with data from
-    array *arr*.  This function is Deprecated. Please use
-    :func:`rec_append_fields`.
-    """
-    warnings.warn("use rec_append_fields", DeprecationWarning)
-    return rec_append_fields(rec, name, arr, dtype)
 
 def rec_append_fields(rec, names, arrs, dtypes=None):
     """
@@ -2089,12 +1813,12 @@ def rec_append_fields(rec, names, arrs, dtypes=None):
             raise ValueError, "dtypes must be None, a single dtype or a list"
 
     newdtype = np.dtype(rec.dtype.descr + zip(names, dtypes))
-    newrec = np.empty(rec.shape, dtype=newdtype)
+    newrec = np.recarray(rec.shape, dtype=newdtype)
     for field in rec.dtype.fields:
         newrec[field] = rec[field]
     for name, arr in zip(names, arrs):
         newrec[name] = arr
-    return rec_view(newrec)
+    return newrec
 
 
 def rec_drop_fields(rec, names):
@@ -2108,11 +1832,25 @@ def rec_drop_fields(rec, names):
     newdtype = np.dtype([(name, rec.dtype[name]) for name in rec.dtype.names
                        if name not in names])
 
-    newrec = np.empty(Nr, dtype=newdtype)
+    newrec = np.recarray(rec.shape, dtype=newdtype)
     for field in newdtype.names:
         newrec[field] = rec[field]
 
-    return rec_view(newrec)
+    return newrec
+
+def rec_keep_fields(rec, names):
+    """
+    Return a new numpy record array with only fields listed in names
+    """
+
+    if cbook.is_string_like(names):
+        names = names.split(',')
+
+    arrays = []
+    for name in names:
+        arrays.append(rec[name])
+
+    return np.rec.fromarrays(arrays, names=names)
 
 
 
@@ -2274,7 +2012,18 @@ def rec_join(key, r1, r2, jointype='inner', defaults=None, r1postfix='1', r2post
     r2desc = [(mapped_r2field(desc[0]), desc[1]) for desc in r2.dtype.descr if desc[0] not in key]
     newdtype = np.dtype(keydesc + r1desc + r2desc)
 
-    newrec = np.empty(common_len + left_len + right_len, dtype=newdtype)
+    newrec = np.recarray((common_len + left_len + right_len,), dtype=newdtype)
+
+    if defaults is not None:
+        for thiskey in defaults:
+            if thiskey not in newdtype.names:
+                warnings.warn('rec_join defaults key="%s" not in new dtype names "%s"'%(
+                    thiskey, newdtype.names))
+
+    for name in newdtype.names:
+        dt = newdtype[name]
+        if dt.kind in ('f', 'i'):
+            newrec[name] = 0
 
     if jointype != 'inner' and defaults is not None: # fill in the defaults enmasse
         newrec_fields = newrec.dtype.fields.keys()
@@ -2298,12 +2047,12 @@ def rec_join(key, r1, r2, jointype='inner', defaults=None, r1postfix='1', r2post
 
     newrec.sort(order=key)
 
-    return rec_view(newrec)
+    return newrec
 
 
 def csv2rec(fname, comments='#', skiprows=0, checkrows=0, delimiter=',',
             converterd=None, names=None, missing='', missingd=None,
-            use_mrecords=True):
+            use_mrecords=False):
     """
     Load data from comma/space/tab delimited file in *fname* into a
     numpy record array and return the record array.
@@ -2695,7 +2444,7 @@ def csvformat_factory(format):
         format.fmt = '%r'
     return format
 
-def rec2txt(r, header=None, padding=3, precision=3):
+def rec2txt(r, header=None, padding=3, precision=3, fields=None):
     """
     Returns a textual representation of a record array.
 
@@ -2710,6 +2459,10 @@ def rec2txt(r, header=None, padding=3, precision=3):
         list of integers to apply precision individually.
         Precision for non-floats is simply ignored.
 
+    *fields* : if not None, a list of field names to print.  fields
+    can be a list of strings like ['field1', 'field2'] or a single
+    comma separated string like 'field1,field2'
+
     Example::
 
       precision=[0,2,3]
@@ -2720,6 +2473,9 @@ def rec2txt(r, header=None, padding=3, precision=3):
       ABC   12.54    0.234
       XYZ    6.32   -0.076
     """
+
+    if fields is not None:
+        r = rec_keep_fields(r, fields)
 
     if cbook.is_numlike(precision):
         precision = [precision]*len(r.dtype)
@@ -2804,7 +2560,7 @@ def rec2txt(r, header=None, padding=3, precision=3):
 
 
 def rec2csv(r, fname, delimiter=',', formatd=None, missing='',
-            missingd=None):
+            missingd=None, withheader=True):
     """
     Save the data from numpy recarray *r* into a
     comma-/space-/tab-delimited file.  The record array dtype names
@@ -2813,8 +2569,12 @@ def rec2csv(r, fname, delimiter=',', formatd=None, missing='',
     *fname*: can be a filename or a file handle.  Support for gzipped
       files is automatic, if the filename ends in '.gz'
 
+    *withheader*: if withheader is False, do not write the attribute
+      names in the first row
+
     .. seealso::
-        :func:`csv2rec`:
+
+        :func:`csv2rec`
             For information about *missing* and *missingd*, which can
             be used to fill in masked values into your CSV file.
     """
@@ -2835,10 +2595,11 @@ def rec2csv(r, fname, delimiter=',', formatd=None, missing='',
     for i, name in enumerate(r.dtype.names):
         funcs.append(with_mask(csvformat_factory(formatd[name]).tostr))
 
-    fh, opened = cbook.to_filehandle(fname, 'w', return_opened=True)
+    fh, opened = cbook.to_filehandle(fname, 'wb', return_opened=True)
     writer = csv.writer(fh, delimiter=delimiter)
     header = r.dtype.names
-    writer.writerow(header)
+    if withheader:
+        writer.writerow(header)
 
     # Our list of specials for missing values
     mvals = []
@@ -2860,7 +2621,7 @@ def rec2csv(r, fname, delimiter=',', formatd=None, missing='',
     if opened:
         fh.close()
 
-def griddata(x,y,z,xi,yi):
+def griddata(x,y,z,xi,yi,interp='nn'):
     """
     ``zi = griddata(x,y,z,xi,yi)`` fits a surface of the form *z* =
     *f*(*x*, *y*) to the data in the (usually) nonuniformly spaced
@@ -2872,7 +2633,8 @@ def griddata(x,y,z,xi,yi):
     A masked array is returned if any grid points are outside convex
     hull defined by input data (no extrapolation is done).
 
-    Uses natural neighbor interpolation based on Delaunay
+    If interp keyword is set to '`nn`' (default),
+    uses natural neighbor interpolation based on Delaunay
     triangulation.  By default, this algorithm is provided by the
     :mod:`matplotlib.delaunay` package, written by Robert Kern.  The
     triangulation algorithm in this package is known to fail on some
@@ -2884,6 +2646,14 @@ def griddata(x,y,z,xi,yi):
     installed, this function will use the :mod:`mpl_toolkits.natgrid`
     algorithm, otherwise it will use the built-in
     :mod:`matplotlib.delaunay` package.
+
+    If the interp keyword is set to '`linear`', then linear interpolation
+    is used instead of natural neighbor. In this case, the output grid
+    is assumed to be regular with a constant grid spacing in both the x and
+    y directions. For regular grids with nonconstant grid spacing, you
+    must use natural neighbor interpolation.  Linear interpolation is only valid if
+    :mod:`matplotlib.delaunay` package is used - :mod:`mpl_tookits.natgrid`
+    only provides natural neighbor interpolation.
 
     The natgrid matplotlib toolkit can be downloaded from
     http://sourceforge.net/project/showfiles.php?group_id=80706&package_id=142792
@@ -2913,6 +2683,9 @@ def griddata(x,y,z,xi,yi):
         y = y.compress(z.mask == False)
         z = z.compressed()
     if _use_natgrid: # use natgrid toolkit if available.
+        if interp != 'nn':
+            raise ValueError("only natural neighor interpolation"
+            " allowed when using natgrid toolkit in griddata.")
         if xi.ndim == 2:
             xi = xi[0,:]
             yi = yi[:,0]
@@ -2940,8 +2713,25 @@ def griddata(x,y,z,xi,yi):
         # triangulate data
         tri = delaunay.Triangulation(x,y)
         # interpolate data
-        interp = tri.nn_interpolator(z)
-        zo = interp(xi,yi)
+        if interp == 'nn':
+            interp = tri.nn_interpolator(z)
+            zo = interp(xi,yi)
+        elif interp == 'linear':
+            # make sure grid has constant dx, dy
+            dx = xi[0,1:]-xi[0,0:-1]
+            dy = yi[1:,0]-yi[0:-1,0]
+            epsx = np.finfo(xi.dtype).resolution
+            epsy = np.finfo(yi.dtype).resolution
+            if dx.max()-dx.min() > epsx or dy.max()-dy.min() > epsy:
+                raise ValueError("output grid must have constant spacing"
+                                 " when using interp='linear'")
+            interp = tri.linear_interpolator(z)
+            zo = interp[yi.min():yi.max():complex(0,yi.shape[0]),
+                        xi.min():xi.max():complex(0,xi.shape[1])]
+        else:
+            raise ValueError("interp keyword must be one of"
+            " 'linear' (for linear interpolation) or 'nn'"
+            " (for natural neighbor interpolation). Default is 'nn'.")
     # mask points on grid outside convex hull of input data.
     if np.any(np.isnan(zo)):
         zo = np.ma.masked_where(np.isnan(zo),zo)
@@ -3223,6 +3013,63 @@ def contiguous_regions(mask):
     if in_region is not None:
         boundaries.append((in_region, i+1))
     return boundaries
+
+
+def cross_from_below(x, threshold):
+    """
+    return the indices into *x* where *x* crosses some threshold from
+    below, eg the i's where::
+
+      x[i-1]<threshold and x[i]>=threshold
+
+    Example code::
+
+        import matplotlib.pyplot as plt
+
+        t = np.arange(0.0, 2.0, 0.1)
+        s = np.sin(2*np.pi*t)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.plot(t, s, '-o')
+        ax.axhline(0.5)
+        ax.axhline(-0.5)
+
+        ind = cross_from_below(s, 0.5)
+        ax.vlines(t[ind], -1, 1)
+
+        ind = cross_from_above(s, -0.5)
+        ax.vlines(t[ind], -1, 1)
+
+        plt.show()
+
+    .. seealso::
+
+        :func:`cross_from_above` and :func:`contiguous_regions`
+
+    """
+    x = np.asarray(x)
+    threshold = threshold
+    ind = np.nonzero( (x[:-1]<threshold) & (x[1:]>=threshold))[0]
+    if len(ind): return ind+1
+    else: return ind
+
+def cross_from_above(x, threshold):
+    """
+    return the indices into *x* where *x* crosses some threshold from
+    below, eg the i's where::
+
+      x[i-1]>threshold and x[i]<=threshold
+
+    .. seealso::
+
+        :func:`cross_from_below` and :func:`contiguous_regions`
+
+    """
+    x = np.asarray(x)
+    ind = np.nonzero( (x[:-1]>=threshold) & (x[1:]<threshold))[0]
+    if len(ind): return ind+1
+    else: return ind
 
 ##################################################
 # Vector and path length geometry calculations

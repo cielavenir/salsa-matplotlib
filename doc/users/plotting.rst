@@ -144,8 +144,13 @@ Creating figure and axes legends
 ==================================
 :func:`~matplotlib.pyplot.legend` and :func:`~matplotlib.pyplot.figlegend`
 
+:ref:`plotting-guide-legend`
+
+Annotating plot
+===============
+:func:`~matplotlib.pyplot.text` and :func:`~matplotlib.pyplot.annotate`
+
+:ref:`plotting-guide-annotation`
+
 TODO; see :ref:`how-to-contribute-docs`.
-
-
-
 

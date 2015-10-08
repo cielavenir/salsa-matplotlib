@@ -3,30 +3,40 @@
 This is used to drive many of the examples across the backends, for
 regression testing, and comparing backend efficiency.
 
-The script takes one or more arguments specifying backends
-to be tested, e.g.
+You can specify the backends to be tested either via the --backends
+switch, which takes a comma-separated list, or as separate arguments,
+e.g.
 
     python backend_driver.py agg ps cairo.png cairo.ps
 
-would test the agg and ps backends, and the cairo backend with
-output to png and ps files.
+would test the agg and ps backends, and the cairo backend with output
+to png and ps files. If no arguments are given, a default list of
+backends will be tested.
 
-If no arguments are given, a default list of backends will be
-tested.
+Interspersed with the backend arguments can be switches for the Python
+interpreter executing the tests. If entering such arguments causes an
+option parsing error with the driver script, separate them from driver
+switches with a --.
 """
 
 from __future__ import division
-import os, time, sys, glob
-
+import os, time, sys, glob, string
+from optparse import OptionParser
 import matplotlib.rcsetup as rcsetup
+from matplotlib.cbook import Bunch, dedent
 
 all_backends = list(rcsetup.all_backends)  # to leave the original list alone
 all_backends.extend(['cairo.png', 'cairo.ps', 'cairo.pdf', 'cairo.svg'])
 
-pylab_dir = os.path.join('..', 'pylab_examples')
-pylab_files = [
+# actual physical directory for each dir
+dirs = dict(pylab = os.path.join('..', 'pylab_examples'),
+            api = os.path.join('..', 'api'),
+            units = os.path.join('..', 'units'),
+            mplot3d = os.path.join('..', 'mplot3d'))
 
-
+# files in each dir
+files = dict()
+files['pylab'] = [
     'accented_text.py',
     'alignment_test.py',
     'annotation_demo.py',
@@ -86,7 +96,7 @@ pylab_files = [
     'figimage_demo.py',
     'figlegend_demo.py',
     'figure_title.py',
-    'fill_between.py',
+    'fill_between_demo.py',
     'fill_demo.py',
     'fill_demo2.py',
     'fill_spiral.py',
@@ -173,6 +183,7 @@ pylab_files = [
     'simple_plot.py',
     'simplification_clipping_test.py',
     'specgram_demo.py',
+    'spine_placement_demo.py',
     'spy_demos.py',
     'stem_plot.py',
     'step_demo.py',
@@ -195,8 +206,7 @@ pylab_files = [
     ]
 
 
-api_dir = os.path.join('..', 'api')
-api_files = [
+files['api'] = [
     'agg_oo.py',
     'barchart_demo.py',
     'bbox_intersect.py',
@@ -211,6 +221,7 @@ api_files = [
     'font_family_rc.py',
     'histogram_demo.py',
     'image_zcoord.py',
+    'joinstyle.py',
     'legend_demo.py',
     'line_with_text.py',
     'logo2.py',
@@ -226,8 +237,7 @@ api_files = [
     'watermark_text.py',
 ]
 
-units_dir = os.path.join('..', 'units')
-units_files = [
+files['units'] = [
     'annotate_with_units.py',
     #'artist_tests.py',  # broken, fixme
     'bar_demo2.py',
@@ -239,14 +249,29 @@ units_files = [
 
     ]
 
+files['mplot3d'] = [
+    '2dcollections3d_demo.py',
+    'bars3d_demo.py',
+    'contour3d_demo.py',
+    'contour3d_demo2.py',
+    'contourf3d_demo.py',
+    'lines3d_demo.py',
+    'polys3d_demo.py',
+    'scatter3d_demo.py',
+    'surface3d_demo.py',
+    'surface3d_demo2.py',
+    'text3d_demo.py',
+    'wire3d_demo.py',
+    ]
+
 # dict from dir to files we know we don't want to test (eg examples
 # not using pyplot, examples requiring user input, animation examples,
 # examples that may only work in certain environs (usetex examples?),
 # examples that generate multiple figures
 
 excluded = {
-    pylab_dir : ['__init__.py', 'toggle_images.py',],
-    units_dir : ['__init__.py', 'date_support.py',],
+    'pylab' : ['__init__.py', 'toggle_images.py',],
+    'units' : ['__init__.py', 'date_support.py',],
 }
 
 def report_missing(dir, flist):
@@ -260,21 +285,15 @@ def report_missing(dir, flist):
     flist = set(flist)
     missing = list(pyfiles-flist-exclude)
     missing.sort()
-    print '%s files not tested: %s'%(dir, ', '.join(missing))
+    if missing:
+        print '%s files not tested: %s'%(dir, ', '.join(missing))
 
+def report_all_missing(directories):
+    for f in directories:
+        report_missing(dirs[f], files[f])
 
-report_missing(pylab_dir, pylab_files)
-report_missing(api_dir, api_files)
-report_missing(units_dir, units_files)
-
-files = (
-    [os.path.join(api_dir, fname) for fname in api_files] +
-    [os.path.join(pylab_dir, fname) for fname in pylab_files] +
-    [os.path.join(units_dir, fname) for fname in units_files]
-     )
 
 # tests known to fail on a given backend
-
 
 failbackend = dict(
     svg = ('tex_demo.py', ),
@@ -297,7 +316,7 @@ except ImportError:
     def run(arglist):
         os.system(' '.join(arglist))
 
-def drive(backend, python=['python'], switches = []):
+def drive(backend, directories, python=['python'], switches = []):
     exclude = failbackend.get(backend, [])
 
     # Clear the destination directory for the examples
@@ -309,8 +328,12 @@ def drive(backend, python=['python'], switches = []):
     else:
         os.mkdir(backend)
     failures = []
-    for fullpath in files:
 
+    testcases = [os.path.join(dirs[d], fname)
+                 for d in directories
+                 for fname in files[d]]
+
+    for fullpath in testcases:
         print ('\tdriving %-40s' % (fullpath)),
         sys.stdout.flush()
 
@@ -351,26 +374,70 @@ def drive(backend, python=['python'], switches = []):
         if backend in rcsetup.interactive_bk:
             tmpfile.write('show()')
         else:
-            tmpfile.write('\nsavefig("%s", dpi=150)' % outfile)
+            tmpfile.write('\nsavefig(r"%s", dpi=150)' % outfile)
 
         tmpfile.close()
         start_time = time.time()
         program = [x % {'name': basename} for x in python]
-        ret = run(program + [tmpfile_name, switchstring])
+        ret = run(program + [tmpfile_name] + switches)
         end_time = time.time()
         print (end_time - start_time), ret
-        #os.system('%s %s %s' % (python, tmpfile_name, switchstring))
+        #os.system('%s %s %s' % (python, tmpfile_name, ' '.join(switches)))
         os.remove(tmpfile_name)
         if ret:
             failures.append(fullpath)
     return failures
 
+def parse_options():
+    doc = __doc__.split('\n\n')
+    op = OptionParser(description=doc[0].strip(),
+                      usage='%prog [options] [--] [backends and switches]',
+                      #epilog='\n'.join(doc[1:])  # epilog not supported on my python2.4 machine: JDH
+                      )
+    op.disable_interspersed_args()
+    op.set_defaults(dirs='pylab,api,units,mplot3d',
+                    clean=False, coverage=False, valgrind=False)
+    op.add_option('-d', '--dirs', '--directories', type='string',
+                  dest='dirs', help=dedent('''
+      Run only the tests in these directories; comma-separated list of
+      one or more of: pylab (or pylab_examples), api, units, mplot3d'''))
+    op.add_option('-b', '--backends', type='string', dest='backends',
+                  help=dedent('''
+      Run tests only for these backends; comma-separated list of
+      one or more of: agg, ps, svg, pdf, template, cairo,
+      cairo.png, cairo.ps, cairo.pdf, cairo.svg. Default is everything
+      except cairo.'''))
+    op.add_option('--clean', action='store_true', dest='clean',
+                  help='Remove result directories, run no tests')
+    op.add_option('-c', '--coverage', action='store_true', dest='coverage',
+                  help='Run in coverage.py')
+    op.add_option('-v', '--valgrind', action='store_true', dest='valgrind',
+                  help='Run in valgrind')
+
+    options, args = op.parse_args()
+    switches = [x for x in args if x.startswith('--')]
+    backends = [x.lower() for x in args if not x.startswith('--')]
+    if options.backends:
+        backends += map(string.lower, options.backends.split(','))
+
+    result = Bunch(
+        dirs = options.dirs.split(','),
+        backends = backends or ['agg', 'ps', 'svg', 'pdf', 'template'],
+        clean = options.clean,
+        coverage = options.coverage,
+        valgrind = options.valgrind,
+        switches = switches)
+    if 'pylab_examples' in result.dirs:
+        result.dirs[result.dirs.index('pylab_examples')] = 'pylab'
+    #print result
+    return result
 
 if __name__ == '__main__':
     times = {}
     failures = {}
-    default_backends = ['agg', 'ps', 'svg', 'pdf', 'template']
-    if len(sys.argv)==2 and sys.argv[1]=='--clean':
+    options = parse_options()
+
+    if options.clean:
         localdirs = [d for d in glob.glob('*') if os.path.isdir(d)]
         all_backends_set = set(all_backends)
         for d in localdirs:
@@ -385,38 +452,31 @@ if __name__ == '__main__':
 
         print 'all clean...'
         raise SystemExit
-    if '--coverage' in sys.argv:
+    if options.coverage:
         python = ['coverage.py', '-x']
-        sys.argv.remove('--coverage')
-    elif '--valgrind' in sys.argv:
+    elif options.valgrind:
         python = ['valgrind', '--tool=memcheck', '--leak-check=yes',
                   '--log-file=%(name)s', 'python']
-        sys.argv.remove('--valgrind')
     elif sys.platform == 'win32':
-        python = [r'c:\Python24\python.exe']
+        python = [sys.executable]
     else:
         python = ['python']
-    backends = []
-    switches = []
-    if sys.argv[1:]:
-        backends = [b.lower() for b in sys.argv[1:] if b.lower() in all_backends]
-        switches = [s for s in sys.argv[1:] if s.startswith('--')]
-    if not backends:
-        backends = default_backends
-    for backend in backends:
-        switchstring = ' '.join(switches)
-        print 'testing %s %s' % (backend, switchstring)
+
+    report_all_missing(options.dirs)
+    for backend in options.backends:
+        print 'testing %s %s' % (backend, ' '.join(options.switches))
         t0 = time.time()
-        failures[backend] = drive(backend, python, switches)
+        failures[backend] = \
+            drive(backend, options.dirs, python, options.switches)
         t1 = time.time()
         times[backend] = (t1-t0)/60.0
 
     # print times
     for backend, elapsed in times.items():
-        print 'Backend %s took %1.2f minutes to complete' % ( backend, elapsed)
+        print 'Backend %s took %1.2f minutes to complete' % (backend, elapsed)
         failed = failures[backend]
         if failed:
             print '  Failures: ', failed
-        if 'Template' in times:
+        if 'template' in times:
             print '\ttemplate ratio %1.3f, template residual %1.3f' % (
-                elapsed/times['Template'], elapsed-times['Template'])
+                elapsed/times['template'], elapsed-times['template'])

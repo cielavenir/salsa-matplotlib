@@ -8,15 +8,15 @@ import numpy as np
 
 from matplotlib import cbook
 from matplotlib import rcParams
-import artist
-from artist import Artist
-from cbook import is_string_like, maxdict
-from font_manager import FontProperties
-from patches import bbox_artist, YAArrow, FancyBboxPatch, \
+import matplotlib.artist as artist
+from matplotlib.artist import Artist
+from matplotlib.cbook import is_string_like, maxdict
+from matplotlib.font_manager import FontProperties
+from matplotlib.patches import bbox_artist, YAArrow, FancyBboxPatch, \
      FancyArrowPatch, Rectangle
-import transforms as mtransforms
-from transforms import Affine2D, Bbox
-from lines import Line2D
+import matplotlib.transforms as mtransforms
+from matplotlib.transforms import Affine2D, Bbox
+from matplotlib.lines import Line2D
 
 import matplotlib.nxutils as nxutils
 
@@ -69,6 +69,7 @@ artist.kwdocd['Text'] =  """
     name or fontname           string eg, ['Sans' | 'Courier' | 'Helvetica' ...]
     position                   (x,y)
     rotation                   [ angle in degrees 'vertical' | 'horizontal'
+    rotation_mode              [ None | 'anchor']
     size or fontsize           [ size in points | relative size eg 'smaller', 'x-large' ]
     style or fontstyle         [ 'normal' | 'italic' | 'oblique']
     text                       string
@@ -144,6 +145,7 @@ class Text(Artist):
                  fontproperties=None, # defaults to FontProperties()
                  rotation=None,
                  linespacing=None,
+                 rotation_mode=None,
                  **kwargs
                  ):
         """
@@ -175,6 +177,7 @@ class Text(Artist):
         if linespacing is None:
             linespacing = 1.2   # Maybe use rcParam later.
         self._linespacing = linespacing
+        self.set_rotation_mode(rotation_mode)
         self.update(kwargs)
         #self.set_bbox(dict(pad=0))
 
@@ -214,6 +217,24 @@ class Text(Artist):
         'return the text angle as float in degrees'
         return get_rotation(self._rotation)  # string_or_number -> number
 
+    def set_rotation_mode(self, m):
+        """
+        set text rotation mode. If "anchor", the un-rotated text
+        will first aligned according to their *ha* and
+        *va*, and then will be rotated with the alignement
+        reference point as a origin. If None (default), the text will be
+        rotated first then will be aligned.
+        """
+        if m is None or m in ["anchor", "default"]:
+            self._rotation_mode = m
+        else:
+            raise ValueError("Unknown rotation_mode : %s" % repr(m))
+
+    def get_rotation_mode(self):
+        "get text rotation mode"
+        return self._rotation_mode
+
+
     def update_from(self, other):
         'Copy properties from other to self'
         Artist.update_from(self, other)
@@ -227,6 +248,11 @@ class Text(Artist):
         self._linespacing = other._linespacing
 
     def _get_layout(self, renderer):
+        """
+        return the extent (bbox) of the text together with
+        multile-alignment information. Note that it returns a extent
+        of a rotated text when necessary.
+        """
         key = self.get_prop_tup()
         if key in self.cached: return self.cached[key]
 
@@ -235,16 +261,16 @@ class Text(Artist):
         thisx, thisy  = 0.0, 0.0
         xmin, ymin    = 0.0, 0.0
         width, height = 0.0, 0.0
-        lines = self._text.split('\n')
+        lines = self.get_text().split('\n')
 
         whs = np.zeros((len(lines), 2))
         horizLayout = np.zeros((len(lines), 4))
 
         # Find full vertical extent of font,
         # including ascenders and descenders:
-        tmp, heightt, bl = renderer.get_text_width_height_descent(
+        tmp, lp_h, lp_bl = renderer.get_text_width_height_descent(
                 'lp', self._fontproperties, ismath=False)
-        offsety = heightt * self._linespacing
+        offsety = lp_h * self._linespacing
 
         baseline = None
         for i, line in enumerate(lines):
@@ -254,8 +280,22 @@ class Text(Artist):
             if baseline is None:
                 baseline = h - d
             whs[i] = w, h
-            horizLayout[i] = thisx, thisy, w, h
-            thisy -= offsety
+
+            # For general multiline text, we will have a fixed spacing
+            # between the "baseline" of the upper line and "top" of
+            # the lower line (instead of the "bottom" of the upper
+            # line and "top" of the lower line)
+
+            # For multiline text, increase the line spacing when the
+            # text net-height(excluding baseline) is larger than that
+            # of a "l" (e.g., use of superscripts), which seems
+            # what TeX does.
+
+            d_yoffset = max(0, (h-d)-(lp_h-lp_bl))
+
+            horizLayout[i] = thisx, thisy-(d + d_yoffset), \
+                             w, h
+            thisy -= offsety + d_yoffset
             width = max(width, w)
 
         ymin = horizLayout[-1][1]
@@ -296,16 +336,33 @@ class Text(Artist):
         halign = self._horizontalalignment
         valign = self._verticalalignment
 
-        # compute the text location in display coords and the offsets
-        # necessary to align the bbox with that location
-        if halign=='center':  offsetx = (xmin + width/2.0)
-        elif halign=='right': offsetx = (xmin + width)
-        else: offsetx = xmin
+        rotation_mode = self.get_rotation_mode()
+        if  rotation_mode != "anchor":
+            # compute the text location in display coords and the offsets
+            # necessary to align the bbox with that location
+            if halign=='center':  offsetx = (xmin + width/2.0)
+            elif halign=='right': offsetx = (xmin + width)
+            else: offsetx = xmin
 
-        if valign=='center': offsety = (ymin + height/2.0)
-        elif valign=='top': offsety  = (ymin + height)
-        elif valign=='baseline': offsety = (ymin + height) - baseline
-        else: offsety = ymin
+            if valign=='center': offsety = (ymin + height/2.0)
+            elif valign=='top': offsety  = (ymin + height)
+            elif valign=='baseline': offsety = (ymin + height) - baseline
+            else: offsety = ymin
+        else:
+            xmin1, ymin1 = cornersHoriz[0]
+            xmax1, ymax1 = cornersHoriz[2]
+
+            if halign=='center':  offsetx = (xmin1 + xmax1)/2.0
+            elif halign=='right': offsetx = xmax1
+            else: offsetx = xmin1
+
+            if valign=='center': offsety = (ymin1 + ymax1)/2.0
+            elif valign=='top': offsety  = ymax1
+            elif valign=='baseline': offsety = ymax1 - baseline
+            else: offsety = ymin1
+
+            offsetx, offsety = M.transform_point((offsetx, offsety))
+
 
         xmin -= offsetx
         ymin -= offsety
@@ -406,6 +463,10 @@ class Text(Artist):
             props = props.copy() # don't want to alter the pad externally
             pad = props.pop('pad', 4)
             pad = renderer.points_to_pixels(pad)
+            if self.get_text() == "":
+                self.arrow_patch.set_patchA(None)
+                return
+
             bbox = self.get_window_extent(renderer)
             l,b,w,h = bbox.bounds
             l-=pad/2.
@@ -447,7 +508,9 @@ class Text(Artist):
         if renderer is not None:
             self._renderer = renderer
         if not self.get_visible(): return
-        if self._text=='': return
+        if self.get_text()=='': return
+
+        renderer.open_group('text', self.get_gid())
 
         bbox, info = self._get_layout(renderer)
         trans = self.get_transform()
@@ -466,8 +529,8 @@ class Text(Artist):
             self._draw_bbox(renderer, posx, posy)
 
         gc = renderer.new_gc()
-        gc.set_foreground(self._color)
-        gc.set_alpha(self._alpha)
+        gc.set_foreground(self.get_color())
+        gc.set_alpha(self.get_alpha())
         gc.set_url(self._url)
         if self.get_clip_on():
             gc.set_clip_rectangle(self.clipbox)
@@ -500,6 +563,9 @@ class Text(Artist):
             renderer.draw_text(gc, x, y, clean_line,
                                self._fontproperties, angle,
                                ismath=ismath)
+
+        gc.restore()
+        renderer.close_group('text')
 
     def get_color(self):
         "Return the color of the text"
@@ -596,7 +662,7 @@ class Text(Artist):
         need to know if the text has changed.
         """
         x, y = self.get_position()
-        return (x, y, self._text, self._color,
+        return (x, y, self.get_text(), self._color,
                 self._verticalalignment, self._horizontalalignment,
                 hash(self._fontproperties), self._rotation,
                 self.figure.dpi, id(self._renderer),
@@ -642,7 +708,7 @@ class Text(Artist):
         if dpi is not None:
             dpi_orig = self.figure.dpi
             self.figure.dpi = dpi
-        if self._text == '':
+        if self.get_text() == '':
             tx, ty = self._get_xy_display()
             return Bbox.from_bounds(tx,ty,0,0)
 
@@ -664,7 +730,9 @@ class Text(Artist):
         Set the background color of the text by updating the bbox.
 
         .. seealso::
+
             :meth:`set_bbox`
+               To change the position of the bounding box.
 
         ACCEPTS: any matplotlib color
         """
@@ -1397,6 +1465,8 @@ class Annotation(Text):
         else:
             self.arrow_patch = None
 
+        # if True, draw annotation only if self.xy is inside the axes
+        self._annotation_clip = None
 
     __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
@@ -1514,15 +1584,44 @@ class Annotation(Text):
             trans = self.axes.transAxes
             return trans.transform_point((x, y))
 
+    def set_annotation_clip(self, b):
+        """
+        set *annotation_clip* attribute.
+
+          * True : the annotation will only be drawn when self.xy is inside the axes.
+          * False : the annotation will always be drawn regardless of its position.
+          * None : the self.xy will be checked only if *xycoords* is "data"
+        """
+        self._annotation_clip = b
+
+    def get_annotation_clip(self):
+        """
+        Return *annotation_clip* attribute.
+        See :meth:`set_annotation_clip` for the meaning of return values.
+        """
+        return self._annotation_clip
+
 
     def update_positions(self, renderer):
+        "Update the pixel positions of the annotated point and the text."
+        xy_pixel = self._get_position_xy(renderer)
+        self._update_position_xytext(renderer, xy_pixel)
+
+
+    def _get_position_xy(self, renderer):
+        "Return the pixel position of the the annotated point."
+        x, y = self.xy
+        return self._get_xy(x, y, self.xycoords)
+
+
+    def _update_position_xytext(self, renderer, xy_pixel):
+        "Update the pixel positions of the annotation text and the arrow patch."
 
         x, y = self.xytext
         self._x, self._y = self._get_xy(x, y, self.textcoords)
 
 
-        x, y = self.xy
-        x, y = self._get_xy(x, y, self.xycoords)
+        x, y = xy_pixel
 
         ox0, oy0 = self._x, self._y
         ox1, oy1 = x, y
@@ -1598,6 +1697,22 @@ class Annotation(Text):
 
                 self.arrow.set_clip_box(self.get_clip_box())
 
+
+    def _check_xy(self, renderer, xy_pixel):
+        """
+        given the xy pixel coordinate, check if the annotation need to
+        be drawn.
+        """
+
+        b = self.get_annotation_clip()
+        if b or (b is None and self.xycoords == "data"):
+            # check if self.xy is inside the axes.
+            if not self.axes.contains_point(xy_pixel):
+                return False
+
+        return True
+
+
     def draw(self, renderer):
         """
         Draw the :class:`Annotation` object to the given *renderer*.
@@ -1607,7 +1722,13 @@ class Annotation(Text):
             self._renderer = renderer
         if not self.get_visible(): return
 
-        self.update_positions(renderer)
+        xy_pixel = self._get_position_xy(renderer)
+
+        if not self._check_xy(renderer, xy_pixel):
+            return
+
+        self._update_position_xytext(renderer, xy_pixel)
+
         self.update_bbox_position_size(renderer)
 
         if self.arrow is not None:
@@ -1624,3 +1745,4 @@ class Annotation(Text):
 
 
 artist.kwdocd['Annotation'] = Annotation.__init__.__doc__
+

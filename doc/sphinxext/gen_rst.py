@@ -96,7 +96,8 @@ Matplotlib Examples
 
 """%(subdir, subdir))
 
-        print subdir
+        sys.stdout.write(subdir + ", ")
+        sys.stdout.flush()
 
         data = datad[subdir]
         data.sort()
@@ -116,8 +117,6 @@ Matplotlib Examples
                 not out_of_date(fullpath, outrstfile)):
                 continue
 
-            print '    %s'%fname
-
             fh = file(outrstfile, 'w')
             fh.write('.. _%s-%s:\n\n'%(subdir, basename))
             title = '%s example code: %s'%(subdir, fname)
@@ -129,7 +128,10 @@ Matplotlib Examples
 
             do_plot = (subdir in ('api',
                                   'pylab_examples',
-                                  'units') and
+                                  'units',
+                                  'mplot3d',
+                                  'axes_grid',
+                                  ) and
                        not noplot_regex.search(contents))
 
             if do_plot:
@@ -150,6 +152,8 @@ Matplotlib Examples
         fhsubdirIndex.close()
 
     fhindex.close()
+
+    print
 
 def setup(app):
     app.connect('builder-inited', generate_example_rst)

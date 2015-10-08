@@ -91,6 +91,10 @@ class ContourLabeler:
             placement, delete or backspace act like the third mouse button,
             and any other key will select a label location).
 
+          *rightside_up*:
+            if *True* (default), label rotations will always be plus
+            or minus 90 degrees from level.
+
         .. plot:: mpl_examples/pylab_examples/contour_demo.py
         """
 
@@ -115,6 +119,8 @@ class ContourLabeler:
 
         # Detect if manual selection is desired and remove from argument list
         self.labelManual=kwargs.get('manual',False)
+
+        self.rightside_up = kwargs.get('rightside_up', True)
 
         if len(args) == 0:
             levels = self.levels
@@ -381,11 +387,12 @@ class ContourLabeler:
         else:
             rotation = np.arctan2(dd[1], dd[0]) * 180.0 / np.pi
 
-        # Fix angle so text is never upside-down
-        if rotation > 90:
-            rotation = rotation - 180.0
-        if rotation < -90:
-            rotation = 180.0 + rotation
+        if self.rightside_up:
+            # Fix angle so text is never upside-down
+            if rotation > 90:
+                rotation = rotation - 180.0
+            if rotation < -90:
+                rotation = 180.0 + rotation
 
         # Break contour if desired
         nlc = []
@@ -756,6 +763,7 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             x,y,z = self._check_xyz(args[:3])
         else:
             raise TypeError("Too many arguments to %s; see help(%s)" % (fn,fn))
+        z = ma.masked_invalid(z, copy=False)
         self.zmax = ma.maximum(z)
         self.zmin = ma.minimum(z)
         if self.logscale and self.zmin <= 0:
@@ -842,12 +850,17 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         linewidths = self.linewidths
         Nlev = len(self.levels)
         if linewidths is None:
-            tlinewidths = [(mpl.rcParams['lines.linewidth'],)] *Nlev
+            tlinewidths = [(mpl.rcParams['lines.linewidth'],)] * Nlev
         else:
-            if cbook.iterable(linewidths) and len(linewidths) < Nlev:
-                linewidths = list(linewidths) * int(np.ceil(Nlev/len(linewidths)))
-            elif not cbook.iterable(linewidths) and type(linewidths) in [int, float]:
+            if not cbook.iterable(linewidths):
                 linewidths = [linewidths] * Nlev
+            else:
+                linewidths = list(linewidths)
+                if len(linewidths) < Nlev:
+                    nreps = int(np.ceil(Nlev/len(linewidths)))
+                    linewidths = linewidths * nreps
+                if len(linewidths) > Nlev:
+                    linewidths = linewidths[:Nlev]
             tlinewidths = [(w,) for w in linewidths]
         return tlinewidths
 
@@ -864,10 +877,15 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         else:
             if cbook.is_string_like(linestyles):
                 tlinestyles = [linestyles] * Nlev
-            elif cbook.iterable(linestyles) and len(linestyles) < Nlev:
-                tlinestyles = list(linestyles) * int(np.ceil(Nlev/len(linestyles)))
-            elif cbook.iterable(linestyles): # len(linestyles) >= Nlev
-                tlinestyles = list(linestyles)[:Nlev]
+            elif cbook.iterable(linestyles):
+                tlinestyles = list(linestyles)
+                if len(tlinestyles) < Nlev:
+                    nreps = int(np.ceil(Nlev/len(linestyles)))
+                    tlinestyles = tlinestyles * nreps
+                if len(tlinestyles) > Nlev:
+                    tlinestyles = tlinestyles[:Nlev]
+            else:
+                raise ValueError("Unrecognized type for linestyles kwarg")
         return tlinestyles
 
     def get_alpha(self):

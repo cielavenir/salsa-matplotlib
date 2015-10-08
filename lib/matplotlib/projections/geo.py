@@ -10,6 +10,8 @@ from matplotlib.axes import Axes
 from matplotlib import cbook
 from matplotlib.patches import Circle
 from matplotlib.path import Path
+import matplotlib.spines as mspines
+import matplotlib.axis as maxis
 from matplotlib.ticker import Formatter, Locator, NullLocator, FixedLocator, NullFormatter
 from matplotlib.transforms import Affine2D, Affine2DBase, Bbox, \
     BboxTransformTo, IdentityTransform, Transform, TransformWrapper
@@ -35,6 +37,14 @@ class GeoAxes(Axes):
                 return u"%0.0f\u00b0" % degrees
 
     RESOLUTION = 75
+
+    def _init_axis(self):
+        self.xaxis = maxis.XAxis(self)
+        self.yaxis = maxis.YAxis(self)
+        # Do not register xaxis or yaxis with spines -- as done in
+        # Axes._init_axis() -- until GeoAxes.xaxis.cla() works.
+        # self.spines['geo'].register_axis(self.yaxis)
+        self._update_transScale()
 
     def cla(self):
         Axes.cla(self)
@@ -111,7 +121,8 @@ class GeoAxes(Axes):
             .scale(0.5 / xscale, 0.5 / yscale) \
             .translate(0.5, 0.5)
 
-    def get_xaxis_transform(self):
+    def get_xaxis_transform(self,which='grid'):
+        assert which in ['tick1','tick2','grid']
         return self._xaxis_transform
 
     def get_xaxis_text1_transform(self, pad):
@@ -120,7 +131,8 @@ class GeoAxes(Axes):
     def get_xaxis_text2_transform(self, pad):
         return self._xaxis_text2_transform, 'top', 'center'
 
-    def get_yaxis_transform(self):
+    def get_yaxis_transform(self,which='grid'):
+        assert which in ['tick1','tick2','grid']
         return self._yaxis_transform
 
     def get_yaxis_text1_transform(self, pad):
@@ -131,6 +143,10 @@ class GeoAxes(Axes):
 
     def _gen_axes_patch(self):
         return Circle((0.5, 0.5), 0.5)
+
+    def _gen_axes_spines(self):
+        return {'geo':mspines.Spine.circular_spine(self,
+                                                   (0.5, 0.5), 0.5)}
 
     def set_yscale(self, *args, **kwargs):
         if args[0] != 'linear':
@@ -406,10 +422,21 @@ class MollweideAxes(GeoAxes):
             self._resolution = resolution
 
         def transform(self, ll):
+            def d(theta):
+                delta = -(theta + np.sin(theta) - pi_sin_l) / (1 + np.cos(theta))
+                return delta, abs(delta) > 0.001
+
             longitude = ll[:, 0:1]
             latitude  = ll[:, 1:2]
 
-            aux = 2.0 * np.arcsin((2.0 * latitude) / np.pi)
+            pi_sin_l = np.pi * np.sin(latitude)
+            theta = 2.0 * latitude
+            delta, large_delta = d(theta)
+            while np.any(large_delta):
+                theta += np.where(large_delta, delta, 0)
+                delta, large_delta = d(theta)
+            aux = theta / 2
+
             x = (2.0 * np.sqrt(2.0) * longitude * np.cos(aux)) / np.pi
             y = (np.sqrt(2.0) * np.sin(aux))
 

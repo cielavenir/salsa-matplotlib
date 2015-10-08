@@ -15,7 +15,7 @@ import numpy as np
 import time
 
 import artist
-from artist import Artist
+from artist import Artist, allow_rasterization
 from axes import Axes, SubplotBase, subplot_class_factory
 from cbook import flatten, allequal, Stack, iterable, dedent
 import _image
@@ -32,6 +32,7 @@ from projections import projection_factory, get_projection_names, \
 from matplotlib.blocking_input import BlockingMouseInput, BlockingKeyMouseInput
 
 import matplotlib.cbook as cbook
+
 
 class SubplotParams:
     """
@@ -726,6 +727,7 @@ class Figure(Artist):
         """
         self.clf()
 
+    @allow_rasterization
     def draw(self, renderer):
         """
         Render the figure using :class:`matplotlib.backend_bases.RendererBase` instance renderer
@@ -827,28 +829,59 @@ class Figure(Artist):
         (0,0) is the left, bottom of the figure and 1,1 is the right,
         top.
 
-        The legend instance is returned.  The following kwargs are supported
+        Keyword arguments:
 
-        *loc*
-            the location of the legend
-        *numpoints*
-            the number of points in the legend line
-        *prop*
-            a :class:`matplotlib.font_manager.FontProperties` instance
-        *pad*
-            the fractional whitespace inside the legend border
-        *markerscale*
-            the relative size of legend markers vs. original
-        *shadow*
-            if True, draw a shadow behind legend
-        *labelsep*
-            the vertical space between the legend entries
-        *handlelen*
-            the length of the legend lines
-        *handletextsep*
-            the space between the legend line and legend text
-        *axespad*
-            the border between the axes and legend edge
+          *prop*: [ None | FontProperties | dict ]
+            A :class:`matplotlib.font_manager.FontProperties`
+            instance. If *prop* is a dictionary, a new instance will be
+            created with *prop*. If *None*, use rc settings.
+
+          *numpoints*: integer
+            The number of points in the legend line, default is 4
+
+          *scatterpoints*: integer
+            The number of points in the legend line, default is 4
+
+          *scatteroffsets*: list of floats
+            a list of yoffsets for scatter symbols in legend
+
+          *markerscale*: [ None | scalar ]
+            The relative size of legend markers vs. original. If *None*, use rc
+            settings.
+
+          *fancybox*: [ None | False | True ]
+            if True, draw a frame with a round fancybox.  If None, use rc
+            
+          *shadow*: [ None | False | True ]
+            If *True*, draw a shadow behind legend. If *None*, use rc settings.
+
+          *ncol* : integer
+            number of columns. default is 1
+
+          *mode* : [ "expand" | None ]
+            if mode is "expand", the legend will be horizontally expanded
+            to fill the axes area (or *bbox_to_anchor*)
+
+          *title* : string
+            the legend title
+
+        Padding and spacing between various elements use following keywords
+        parameters. The dimensions of these values are given as a fraction
+        of the fontsize. Values from rcParams will be used if None.
+
+        ================   ==================================================================
+        Keyword            Description
+        ================   ==================================================================
+        borderpad          the fractional whitespace inside the legend border
+        labelspacing       the vertical space between the legend entries
+        handlelength       the length of the legend handles
+        handletextpad      the pad between the legend handle and text
+        borderaxespad      the pad between the axes and legend border
+        columnspacing      the spacing between columns
+        ================   ==================================================================
+
+
+        **Example:**
 
         .. plot:: mpl_examples/pylab_examples/figlegend_demo.py
         """
@@ -971,6 +1004,16 @@ class Figure(Artist):
             a plot on top of a colored background on a web page.  The
             transparency of these patches will be restored to their
             original values upon exit of this function.
+
+          *bbox_inches*:
+            Bbox in inches. Only the given portion of the figure is
+            saved. If 'tight', try to figure out the tight bbox of
+            the figure.
+
+          *pad_inches*:
+            Amount of padding around the figure when bbox_inches is
+            'tight'.
+
         """
 
         for key in ('dpi', 'facecolor', 'edgecolor'):
@@ -1089,6 +1132,29 @@ class Figure(Artist):
 
         blocking_input = BlockingKeyMouseInput(self)
         return blocking_input(timeout=timeout)
+
+
+
+    def get_tightbbox(self, renderer):
+        """
+        Return a (tight) bounding box of the figure in inches.
+
+        It only accounts axes title, axis labels, and axis
+        ticklabels. Needs improvement.
+        """
+
+        bb = []
+        for ax in self.axes:
+            if ax.get_visible():
+                bb.append(ax.get_tightbbox(renderer))
+
+        _bbox = Bbox.union([b for b in bb if b.width!=0 or b.height!=0])
+
+        bbox_inches = TransformedBbox(_bbox,
+                                      Affine2D().scale(1./self.dpi))
+
+        return bbox_inches
+
 
 
 def figaspect(arg):

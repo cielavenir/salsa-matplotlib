@@ -106,9 +106,17 @@ def validate_backend(s):
     if s.startswith('module://'): return s
     else: return _validate_standard_backends(s)
 
-validate_numerix = ValidateInStrings('numerix',[
-    'Numeric','numarray','numpy',
-    ], ignorecase=True)
+
+def validate_numerix(v):
+    # 2009/02/24: start warning; later, remove all traces
+    try:
+        if v == 'obsolete':
+            return v
+    except ValueError:
+        pass
+    warnings.warn('rcParams key "numerix" is obsolete and has no effect;\n'
+                  ' please delete it from your matplotlibrc file')
+
 
 validate_toolbar = ValidateInStrings('toolbar',[
     'None','classic','toolbar2',
@@ -117,6 +125,16 @@ validate_toolbar = ValidateInStrings('toolbar',[
 def validate_autolayout(v):
     if v:
         warnings.warn("figure.autolayout is not currently supported")
+
+def validate_maskedarray(v):
+    # 2008/12/12: start warning; later, remove all traces of maskedarray
+    try:
+        if v == 'obsolete':
+            return v
+    except ValueError:
+        pass
+    warnings.warn('rcParams key "maskedarray" is obsolete and has no effect;\n'
+                  ' please delete it from your matplotlibrc file')
 
 class validate_nseq_float:
     def __init__(self, n):
@@ -159,8 +177,11 @@ class validate_nseq_int:
 
 def validate_color(s):
     'return a valid color arg'
-    if s.lower() == 'none':
-        return 'None'
+    try:
+        if s.lower() == 'none':
+            return 'None'
+    except AttributeError:
+        pass
     if is_color_like(s):
         return s
     stmp = '#' + s
@@ -222,6 +243,9 @@ def validate_font_properties(s):
     return s
 
 validate_fontset = ValidateInStrings('fontset', ['cm', 'stix', 'stixsans', 'custom'])
+
+validate_mathtext_default = ValidateInStrings(
+    'default', "rm cal it tt sf bf default bb frak circled scr regular".split())
 
 validate_verbose = ValidateInStrings('verbose',[
     'silent', 'helpful', 'debug', 'debug-annoying',
@@ -310,8 +334,8 @@ class ValidateInterval:
 defaultParams = {
     'backend'           : ['Agg', validate_backend], # agg is certainly present
     'backend_fallback'  : [True, validate_bool], # agg is certainly present
-    'numerix'           : ['numpy', validate_numerix],
-    'maskedarray'       : [False, validate_bool],
+    'numerix'           : ['obsolete', validate_numerix],
+    'maskedarray'       : ['obsolete', validate_maskedarray], #to be removed
     'toolbar'           : ['toolbar2', validate_toolbar],
     'datapath'          : [None, validate_path_exists],   # handled by _get_data_path_cached
     'units'             : [False, validate_bool],
@@ -330,8 +354,8 @@ defaultParams = {
     'lines.markeredgewidth' : [0.5, validate_float],
     'lines.markersize'      : [6, validate_float],       # markersize, in points
     'lines.antialiased'     : [True, validate_bool],     # antialised (no jaggies)
-    'lines.dash_joinstyle'  : ['miter', validate_joinstyle],
-    'lines.solid_joinstyle' : ['miter', validate_joinstyle],
+    'lines.dash_joinstyle'  : ['round', validate_joinstyle],
+    'lines.solid_joinstyle' : ['round', validate_joinstyle],
     'lines.dash_capstyle'   : ['butt', validate_capstyle],
     'lines.solid_capstyle'  : ['projecting', validate_capstyle],
 
@@ -373,6 +397,7 @@ defaultParams = {
     'text.usetex'         : [False, validate_bool],
     'text.latex.unicode'  : [False, validate_bool],
     'text.latex.preamble' : [[''], validate_stringlist],
+    'text.latex.preview' : [False, validate_bool],
     'text.dvipnghack'     : [None, validate_bool_maybe_none],
     'text.fontstyle'      : ['normal', str],
     'text.fontangle'      : ['normal', str],
@@ -387,6 +412,7 @@ defaultParams = {
     'mathtext.bf'         : ['serif:bold', validate_font_properties],
     'mathtext.sf'         : ['sans\-serif', validate_font_properties],
     'mathtext.fontset'    : ['cm', validate_fontset],
+    'mathtext.default'    : ['it', validate_mathtext_default],
     'mathtext.fallback_to_cm' : [True, validate_bool],
 
     'image.aspect'        : ['equal', validate_aspect],  # equal, auto, a number
@@ -415,6 +441,7 @@ defaultParams = {
     'axes.unicode_minus'        : [True, validate_bool],
 
     'polaraxes.grid'        : [True, validate_bool],   # display polar grid or not
+    'axes3d.grid'           : [True, validate_bool],   # display 3d grid
 
     #legend properties
     'legend.fancybox'         : [False,validate_bool],
@@ -504,7 +531,8 @@ defaultParams = {
     'docstring.hardcopy' : [False, validate_bool],  # set this when you want to generate hardcopy docstring
     'plugins.directory' : ['.matplotlib_plugins', str], # where plugin directory is locate
 
-    'path.simplify' : [False, validate_bool],
+    'path.simplify' : [True, validate_bool],
+    'path.simplify_threshold' : [1.0 / 9.0, ValidateInterval(0.0, 1.0)],
     'agg.path.chunksize' : [0, validate_int]       # 0 to disable chunking;
                                                    # recommend about 20000 to
                                                    # enable. Experimental.

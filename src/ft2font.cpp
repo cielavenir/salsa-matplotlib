@@ -2,7 +2,6 @@
 #include "mplutils.h"
 #include <sstream>
 
-#define PY_ARRAY_TYPES_PREFIX NumPy
 #include "numpy/arrayobject.h"
 
 #define FIXED_MAJOR(val) (*((short *) &val+1))
@@ -1258,8 +1257,8 @@ FT2Font::draw_glyph_to_bitmap(const Py::Tuple & args) {
 
   double xd = Py::Float(args[1]);
   double yd = Py::Float(args[2]);
-  long x = (long)mpl_round(xd);
-  long y = (long)mpl_round(yd);
+  long x = (long)xd;
+  long y = (long)yd;
   FT_Vector sub_offset;
   sub_offset.x = int((xd - (double)x) * 64.0);
   sub_offset.y = int((yd - (double)y) * 64.0);

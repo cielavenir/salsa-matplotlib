@@ -33,6 +33,10 @@
  * See LICENSE.txt in the scipy source directory.
  */
 
+#include <Python.h>
+#define NO_IMPORT_ARRAY
+#include "numpy/arrayobject.h"
+
 #include "VoronoiDiagramGenerator.h"
 
 VoronoiDiagramGenerator::VoronoiDiagramGenerator()

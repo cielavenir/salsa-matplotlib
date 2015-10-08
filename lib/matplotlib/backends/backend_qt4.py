@@ -37,7 +37,7 @@ def draw_if_interactive():
     if matplotlib.is_interactive():
         figManager =  Gcf.get_active()
         if figManager != None:
-            figManager.canvas.draw()
+            figManager.canvas.draw_idle()
 
 def _create_qApp():
     """
@@ -97,6 +97,7 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
         FigureCanvasBase.__init__( self, figure )
         self.figure = figure
         self.setMouseTracking( True )
+        self._idle = True
         # hide until we can test and fix
         #self.startTimer(backend_IdleEvent.milliseconds)
         w,h = self.get_width_height()
@@ -135,6 +136,16 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
         FigureCanvasBase.button_release_event( self, x, y, button )
         if DEBUG: print 'button released'
 
+    def wheelEvent( self, event ):
+        x = event.x()
+        # flipy so y=0 is bottom of canvas
+        y = self.figure.bbox.height - event.y()
+        # from QWheelEvent::delta doc
+        steps = event.delta()/120
+        if (event.orientation() == Qt.Qt.Vertical):
+            FigureCanvasBase.scroll_event( self, x, y, steps)
+            if DEBUG: print 'scroll event : delta = %i, steps = %i ' % (event.delta(),steps)
+
     def keyPressEvent( self, event ):
         key = self._get_key( event )
         FigureCanvasBase.key_press_event( self, key )
@@ -147,7 +158,6 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
 
     def resizeEvent( self, event ):
         if DEBUG: print 'resize (%d x %d)' % (event.size().width(), event.size().height())
-        QtGui.QWidget.resizeEvent( self, event )
         w = event.size().width()
         h = event.size().height()
         if DEBUG: print "FigureCanvasQtAgg.resizeEvent(", w, ",", h, ")"
@@ -156,19 +166,8 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
         hinch = h/dpival
         self.figure.set_size_inches( winch, hinch )
         self.draw()
-
-    def resize( self, w, h ):
-        # Pass through to Qt to resize the widget.
-        QtGui.QWidget.resize( self, w, h )
-
-        # Resize the figure by converting pixels to inches.
-        pixelPerInch = self.figure.dpi
-        wInch = w / pixelPerInch
-        hInch = h / pixelPerInch
-        self.figure.set_size_inches( wInch, hInch )
-
-        # Redraw everything.
-        self.draw()
+        self.update()
+        QtGui.QWidget.resizeEvent(self, event)
 
     def sizeHint( self ):
         w, h = self.get_width_height()
@@ -197,6 +196,15 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
     def stop_event_loop(self):
         FigureCanvasBase.stop_event_loop_default(self)
     stop_event_loop.__doc__=FigureCanvasBase.stop_event_loop_default.__doc__
+
+    def draw_idle(self):
+        'update drawing area only if idle'
+        d = self._idle
+        self._idle = False
+        def idle_draw(*args):
+            self.draw()
+            self._idle = True
+        if d: QtCore.QTimer.singleShot(0, idle_draw)
 
 class FigureManagerQT( FigureManagerBase ):
     """

@@ -34,10 +34,6 @@ backend      : %(backend)s
 # conflicts, we will automatically try and find a compatible one for
 # you if backend_fallback is True
 #backend_fallback: True
-numerix      : %(numerix)s  # numpy, Numeric or numarray
-#maskedarray : False       # True to use external maskedarray module
-                           # instead of numpy.ma; this is a temporary
-                           # setting for testing maskedarray.
 #interactive  : False
 #toolbar      : toolbar2   # None | classic | toolbar2
 #timezone     : UTC        # a pytz timezone string, eg US/Central or Europe/Paris
@@ -188,6 +184,11 @@ numerix      : %(numerix)s  # numpy, Numeric or numarray
 			         # fonts when a symbol can not be found in one of
 				 # the custom math fonts.
 
+#mathtext.default : it # The default font to use for math.
+                       # Can be any of the LaTeX font names, including
+                       # the special name "regular" for the same font
+                       # used in regular text.
+
 ### AXES
 # default face and edge color, default tick sizes,
 # default fontsizes for ticklabels, and so on.  See
@@ -209,6 +210,7 @@ numerix      : %(numerix)s  # numpy, Numeric or numarray
                                # rather than hypen.  See http://en.wikipedia.org/wiki/Plus_sign#Plus_sign
 
 #polaraxes.grid      : True    # display grid on polar axes
+#axes3d.grid         : True    # display grid on 3d axes
 
 ### TICKS
 # see http://matplotlib.sourceforge.net/api/axis_api.html#matplotlib.axis.Tick
@@ -288,7 +290,12 @@ numerix      : %(numerix)s  # numpy, Numeric or numarray
                                   # A value of 20000 is probably a good
                                   # starting point.
 ### SAVING FIGURES
-#path.simplify : False  # When True, simplify paths in vector backends, such as PDF, PS and SVG
+#path.simplify : False  # When True, simplify paths by removing "invisible" 
+                        # points to reduce file size and increase rendering
+                        # speed
+#path.simplify_threshold : 0.1  # The threshold of similarity below which
+                                # vertices will be removed in the simplification
+                                # process
 
 # the default savefig params can be different from the display params
 # Eg, you may want a higher resolution, or to make the figure

@@ -1,4 +1,5 @@
 import math
+import warnings
 
 import numpy as npy
 
@@ -6,12 +7,14 @@ import matplotlib
 rcParams = matplotlib.rcParams
 from matplotlib.artist import kwdocd
 from matplotlib.axes import Axes
+import matplotlib.axis as maxis
 from matplotlib import cbook
 from matplotlib.patches import Circle
 from matplotlib.path import Path
 from matplotlib.ticker import Formatter, Locator
 from matplotlib.transforms import Affine2D, Affine2DBase, Bbox, \
     BboxTransformTo, IdentityTransform, Transform, TransformWrapper
+import matplotlib.spines as mspines
 
 class PolarAxes(Axes):
     """
@@ -32,15 +35,6 @@ class PolarAxes(Axes):
         output_dims = 2
         is_separable = False
 
-        def __init__(self, resolution):
-            """
-            Create a new polar transform.  Resolution is the number of steps
-            to interpolate between each input line segment to approximate its
-            path in curved polar space.
-            """
-            Transform.__init__(self)
-            self._resolution = resolution
-
         def transform(self, tr):
             xy   = npy.zeros(tr.shape, npy.float_)
             t    = tr[:, 0:1]
@@ -59,7 +53,7 @@ class PolarAxes(Axes):
             vertices = path.vertices
             if len(vertices) == 2 and vertices[0, 0] == vertices[1, 0]:
                 return Path(self.transform(vertices), path.codes)
-            ipath = path.interpolated(self._resolution)
+            ipath = path.interpolated(path._interpolation_steps)
             return Path(self.transform(ipath.vertices), ipath.codes)
         transform_path.__doc__ = Transform.transform_path.__doc__
 
@@ -67,7 +61,7 @@ class PolarAxes(Axes):
         transform_path_non_affine.__doc__ = Transform.transform_path_non_affine.__doc__
 
         def inverted(self):
-            return PolarAxes.InvertedPolarTransform(self._resolution)
+            return PolarAxes.InvertedPolarTransform()
         inverted.__doc__ = Transform.inverted.__doc__
 
     class PolarAffine(Affine2DBase):
@@ -109,10 +103,6 @@ class PolarAxes(Axes):
         output_dims = 2
         is_separable = False
 
-        def __init__(self, resolution):
-            Transform.__init__(self)
-            self._resolution = resolution
-
         def transform(self, xy):
             x = xy[:, 0:1]
             y = xy[:, 1:]
@@ -123,7 +113,7 @@ class PolarAxes(Axes):
         transform.__doc__ = Transform.transform.__doc__
 
         def inverted(self):
-            return PolarAxes.PolarTransform(self._resolution)
+            return PolarAxes.PolarTransform()
         inverted.__doc__ = Transform.inverted.__doc__
 
     class ThetaFormatter(Formatter):
@@ -177,8 +167,6 @@ class PolarAxes(Axes):
             return 0, vmax
 
 
-    RESOLUTION = 75
-
     def __init__(self, *args, **kwargs):
         """
         Create a new Polar Axes for a polar plot.
@@ -192,8 +180,11 @@ class PolarAxes(Axes):
 
         self._rpad = 0.05
         self.resolution = kwargs.pop('resolution', None)
-        if self.resolution is None:
-            self.resolution = self.RESOLUTION
+        if self.resolution not in (None, 1):
+            warnings.warn(
+                """The resolution kwarg to Polar plots is now ignored.
+If you need to interpolate data points, consider running
+cbook.simple_linear_interpolation on the data before passing to matplotlib.""")
         Axes.__init__(self, *args, **kwargs)
         self.set_aspect('equal', adjustable='box', anchor='C')
         self.cla()
@@ -213,6 +204,16 @@ class PolarAxes(Axes):
         self.xaxis.set_ticks_position('none')
         self.yaxis.set_ticks_position('none')
 
+    def _init_axis(self):
+        "move this out of __init__ because non-separable axes don't use it"
+        self.xaxis = maxis.XAxis(self)
+        self.yaxis = maxis.YAxis(self)
+        # Calling polar_axes.xaxis.cla() or polar_axes.xaxis.cla()
+        # results in weird artifacts. Therefore we disable this for
+        # now.
+        # self.spines['polar'].register_axis(self.yaxis)
+        self._update_transScale()
+
     def _set_lim_and_transforms(self):
         self.transAxes = BboxTransformTo(self.bbox)
 
@@ -221,7 +222,7 @@ class PolarAxes(Axes):
         self.transScale = TransformWrapper(IdentityTransform())
 
         # A (possibly non-linear) projection on the (already scaled) data
-        self.transProjection = self.PolarTransform(self.resolution)
+        self.transProjection = self.PolarTransform()
 
         # An affine transformation on the data, generally to limit the
         # range of the axes
@@ -269,7 +270,8 @@ class PolarAxes(Axes):
             self._yaxis_transform
             )
 
-    def get_xaxis_transform(self):
+    def get_xaxis_transform(self,which='grid'):
+        assert which in ['tick1','tick2','grid']
         return self._xaxis_transform
 
     def get_xaxis_text1_transform(self, pad):
@@ -278,7 +280,8 @@ class PolarAxes(Axes):
     def get_xaxis_text2_transform(self, pad):
         return self._xaxis_text2_transform, 'center', 'center'
 
-    def get_yaxis_transform(self):
+    def get_yaxis_transform(self,which='grid'):
+        assert which in ['tick1','tick2','grid']
         return self._yaxis_transform
 
     def get_yaxis_text1_transform(self, pad):
@@ -289,6 +292,10 @@ class PolarAxes(Axes):
 
     def _gen_axes_patch(self):
         return Circle((0.5, 0.5), 0.5)
+
+    def _gen_axes_spines(self):
+        return {'polar':mspines.Spine.circular_spine(self,
+                                                     (0.5, 0.5), 0.5)}
 
     def set_rmax(self, rmax):
         self.viewLim.y0 = 0
@@ -390,7 +397,7 @@ class PolarAxes(Axes):
         self._r_label2_position.clear().translate(angle, -self._rpad * rmax)
         for t in self.yaxis.get_ticklabels():
             t.update(kwargs)
-        return self.yaxis.get_ticklines(), self.yaxis.get_ticklabels()
+        return self.yaxis.get_gridlines(), self.yaxis.get_ticklabels()
 
     set_rgrids.__doc__ = cbook.dedent(set_rgrids.__doc__) % kwdocd
 

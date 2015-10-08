@@ -17,6 +17,7 @@ import matplotlib.colors as _colors # avoid conflict with kwarg
 import matplotlib.cm as cm
 import matplotlib.transforms as transforms
 import matplotlib.artist as artist
+from matplotlib.artist import allow_rasterization
 import matplotlib.backend_bases as backend_bases
 import matplotlib.path as mpath
 import matplotlib.mlab as mlab
@@ -90,6 +91,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         self.set_antialiased(antialiaseds)
         self.set_urls(urls)
 
+
         self._uniform_offsets = None
         self._offsets = np.array([], np.float_)
         if offsets is not None:
@@ -105,12 +107,14 @@ class Collection(artist.Artist, cm.ScalarMappable):
         self._pickradius = pickradius
         self.update(kwargs)
 
+
     def _get_value(self, val):
         try: return (float(val), )
         except TypeError:
             if cbook.iterable(val) and len(val):
                 try: float(val[0])
                 except TypeError: pass # raise below
+                except ValueError: pass
                 else: return val
 
         raise TypeError('val must be a float or nonzero sequence of floats')
@@ -189,6 +193,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
         return transform, transOffset, offsets, paths
 
+    @allow_rasterization
     def draw(self, renderer):
         if not self.get_visible(): return
         renderer.open_group(self.__class__.__name__)
@@ -231,7 +236,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
     def get_pickradius(self): return self.pickradius
 
     def set_urls(self, urls):
-	if urls is None:
+        if urls is None:
             self._urls = [None,]
         else:
             self._urls = urls
@@ -354,7 +359,9 @@ class Collection(artist.Artist, cm.ScalarMappable):
         ACCEPTS: matplotlib color arg or sequence of rgba tuples
 
         .. seealso::
+
             :meth:`set_facecolor`, :meth:`set_edgecolor`
+               For setting the edge or face color individually.
         """
         self.set_facecolor(c)
         self.set_edgecolor(c)
@@ -363,11 +370,19 @@ class Collection(artist.Artist, cm.ScalarMappable):
         """
         Set the facecolor(s) of the collection.  *c* can be a
         matplotlib color arg (all patches have same color), or a
-        sequence or rgba tuples; if it is a sequence the patches will
-        cycle through the sequence
+        sequence of rgba tuples; if it is a sequence the patches will
+        cycle through the sequence.
+
+        If *c* is 'none', the patch will not be filled.
 
         ACCEPTS: matplotlib color arg or sequence of rgba tuples
         """
+        self._is_filled = True
+        try:
+            if c.lower() == 'none':
+                self._is_filled = False
+        except AttributeError:
+            pass
         if c is None: c = mpl.rcParams['patch.facecolor']
         self._facecolors_original = c
         self._facecolors = _colors.colorConverter.to_rgba_array(c, self._alpha)
@@ -391,14 +406,21 @@ class Collection(artist.Artist, cm.ScalarMappable):
         """
         Set the edgecolor(s) of the collection. *c* can be a
         matplotlib color arg (all patches have same color), or a
-        sequence or rgba tuples; if it is a sequence the patches will
+        sequence of rgba tuples; if it is a sequence the patches will
         cycle through the sequence.
 
         If *c* is 'face', the edge color will always be the same as
-        the face color.
+        the face color.  If it is 'none', the patch boundary will not
+        be drawn.
 
         ACCEPTS: matplotlib color arg or sequence of rgba tuples
         """
+        self._is_stroked = True
+        try:
+            if c.lower() == 'none':
+                self._is_stroked = False
+        except AttributeError:
+            pass
         if c == 'face':
             self._edgecolors = 'face'
             self._edgecolors_original = 'face'
@@ -406,6 +428,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
             if c is None: c = mpl.rcParams['patch.edgecolor']
             self._edgecolors_original = c
             self._edgecolors = _colors.colorConverter.to_rgba_array(c, self._alpha)
+
 
     def set_edgecolors(self, c):
         """alias for set_edgecolor"""
@@ -450,9 +473,9 @@ class Collection(artist.Artist, cm.ScalarMappable):
         if self._A is None: return
         if self._A.ndim > 1:
             raise ValueError('Collections can only map rank 1 arrays')
-        if len(self._facecolors):
+        if self._is_filled:
             self._facecolors = self.to_rgba(self._A, self._alpha)
-        else:
+        elif self._is_stroked:
             self._edgecolors = self.to_rgba(self._A, self._alpha)
 
     def update_from(self, other):
@@ -546,7 +569,7 @@ class QuadMesh(Collection):
                 self._meshWidth, self._meshHeight, self._coordinates)
         return self._paths
 
-    #@staticmethod
+    @staticmethod
     def convert_mesh_to_paths(meshWidth, meshHeight, coordinates):
         """
         Converts a given mesh into a sequence of
@@ -571,11 +594,11 @@ class QuadMesh(Collection):
                     ), axis=2)
         points = points.reshape((meshWidth * meshHeight, 5, 2))
         return [Path(x) for x in points]
-    convert_mesh_to_paths = staticmethod(convert_mesh_to_paths)
 
     def get_datalim(self, transData):
         return self._bbox
 
+    @allow_rasterization
     def draw(self, renderer):
         if not self.get_visible(): return
         renderer.open_group(self.__class__.__name__)
@@ -647,6 +670,9 @@ class PolyCollection(Collection):
 
     def set_verts(self, verts, closed=True):
         '''This allows one to delay initialization of the vertices.'''
+        if np.ma.isMaskedArray(verts):
+            verts = verts.astype(np.float_).filled(np.nan)
+            # This is much faster than having Path do it one at a time.
         if closed:
             self._paths = []
             for xy in verts:
@@ -702,8 +728,8 @@ class BrokenBarHCollection(PolyCollection):
         over the regions in *x* where *where* is True.  The bars range
         on the y-axis from *ymin* to *ymax*
 
-        A :class:`BrokenBarHCollection` is returned.
-        *kwargs* are passed on to the collection
+        A :class:`BrokenBarHCollection` is returned.  *kwargs* are
+        passed on to the collection.
         """
         xranges = []
         for ind0, ind1 in mlab.contiguous_regions(where):
@@ -763,6 +789,7 @@ class RegularPolyCollection(Collection):
 
     __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
+    @allow_rasterization
     def draw(self, renderer):
         self._transforms = [
             transforms.Affine2D().rotate(-self._rotation).scale(
@@ -885,6 +912,7 @@ class LineCollection(Collection):
         Collection.__init__(
             self,
             edgecolors=colors,
+            facecolors='none',
             linewidths=linewidths,
             linestyles=linestyles,
             antialiaseds=antialiaseds,
@@ -895,7 +923,6 @@ class LineCollection(Collection):
             pickradius=pickradius,
             **kwargs)
 
-        self.set_facecolors([])
         self.set_segments(segments)
 
     def get_paths(self):
@@ -932,7 +959,7 @@ class LineCollection(Collection):
         Set the color(s) of the line collection.  *c* can be a
         matplotlib color arg (all patches have same color), or a
         sequence or rgba tuples; if it is a sequence the patches will
-        cycle through the sequence
+        cycle through the sequence.
 
         ACCEPTS: matplotlib color arg or sequence of rgba tuples
         """
@@ -970,6 +997,10 @@ class CircleCollection(Collection):
         self.set_transform(transforms.IdentityTransform())
         self._paths = [mpath.Path.unit_circle()]
     __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
+
+    def get_sizes(self):
+        "return sizes of circles"
+        return self._sizes
 
     def draw(self, renderer):
         # sizes is the area of the circle circumscribing the polygon
