@@ -203,7 +203,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
 
         # resize the figure (in inches)
         dpi = self.figure.dpi.get()
-        self.figure.set_figsize_inches (w/dpi, h/dpi)
+        self.figure.set_size_inches (w/dpi, h/dpi)
         self._need_redraw = True
 
         return False  # finish event propagation?
@@ -383,7 +383,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         self.figure.dpi.set(origDPI)
         self.figure.set_facecolor(origfacecolor)
         self.figure.set_edgecolor(origedgecolor)
-        self.figure.set_figsize_inches(origWIn, origHIn)
+        self.figure.set_size_inches(origWIn, origHIn)
         self.figure.set_canvas(self)
 
 
@@ -470,11 +470,12 @@ class FigureManagerGTK(FigureManagerBase):
         return toolbar
 
 
-    def set_canvas_size(self, width, height):
+    def resize(self, width, height):
         'set the canvas size in pixels'
-        _, _, cw, ch = self.canvas.allocation
-        _, _, ww, wh = self.window.allocation
-        self.window.resize (width-cw+ww, height-ch+wh)
+        #_, _, cw, ch = self.canvas.allocation
+        #_, _, ww, wh = self.window.allocation
+        #self.window.resize (width-cw+ww, height-ch+wh)
+        self.window.resize(width, height)
 
 
 class NavigationToolbar2GTK(NavigationToolbar2, gtk.Toolbar):

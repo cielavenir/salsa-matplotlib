@@ -393,8 +393,6 @@ class Polygon(Patch):
         return self.xy
 
 
-
-
 class Wedge(Polygon):
     def __init__(self, center, r, theta1, theta2,
                  dtheta=0.1, **kwargs):
@@ -506,14 +504,13 @@ class FancyArrow(Polygon):
         Polygon.__init__(self, map(tuple, verts), **kwargs)
 
 
-class Circle(RegularPolygon):
+class CirclePolygon(RegularPolygon):
     """
     A circle patch
     """
     def __init__(self, xy, radius=5,
                  resolution=20,  # the number of vertices
-                 **kwargs
-                 ):
+                 **kwargs):
         self.center = xy
         self.radius = radius
         RegularPolygon.__init__(self, xy,
@@ -521,6 +518,75 @@ class Circle(RegularPolygon):
                                 radius,
                                 orientation=0,
                                 **kwargs)
+
+
+class Ellipse(Patch):
+    """
+    A scale-free ellipse
+    
+    xy - center of ellipse
+    width - length of horizontal axis
+    height - length of vertical axis
+    angle - rotation in degrees (anti-clockwise)
+    """
+    def __init__(self, xy, width, height, angle=0.0, **kwargs):
+        Patch.__init__(self, **kwargs)
+
+        self.center  = array(xy, Float)
+        self.width, self.height = width, height
+        self.angle = angle
+        
+        x,y = self.center
+        l,r = x-width/2.0, x+width/2.0
+        b,t = y-height/2.0, y+height/2.0
+        
+        self.verts = array(((x,y),(l,y),(x,t),(r,y),(x,b)), Float)
+        
+    def get_verts(self):
+        """
+        Not actually used for rendering.  Provided to conform to
+        Patch super class.
+        """
+        return self.verts
+        
+    def draw(self, renderer):
+        if not self.get_visible(): return
+        #renderer.open_group('patch')
+        gc = renderer.new_gc()
+        gc.set_foreground(self._edgecolor)
+        gc.set_linewidth(self._linewidth)
+        gc.set_alpha(self._alpha)
+        gc.set_antialiased(self._antialiased)
+        if self.get_clip_on(): gc.set_clip_rectangle(
+            self.clipbox.get_bounds())
+        gc.set_capstyle('projecting')
+
+        if not self.fill or self._facecolor is None: rgbFace = None
+        else: rgbFace = colorConverter.to_rgb(self._facecolor)
+
+        if self._hatch:
+            gc.set_hatch(self._hatch )
+
+        tverts = self._transform.seq_xy_tups(self.verts) # center is first vert
+        width = tverts[3,0] - tverts[1,0]
+        height = tverts[2,1] - tverts[4,1]
+
+        renderer.draw_arc(gc, rgbFace, tverts[0,0], tverts[0,1], width, height, 0.0, 360.0, self.angle)
+        
+class Circle(Ellipse):
+    """
+    A circle patch
+    """
+    def __init__(self, xy, radius=5,
+                 **kwargs):
+        if kwargs.has_key('resolution'):
+            import warnings
+            warnings.warn('Circle is now scale free.  Use CirclePolygon instead!', DeprecationWarning)
+            popd(kwargs, 'resolution')
+
+        self.radius = radius
+        Ellipse.__init__(self, xy, radius*2, radius*2, **kwargs)
+
 
 class PolygonInteractor:
     """

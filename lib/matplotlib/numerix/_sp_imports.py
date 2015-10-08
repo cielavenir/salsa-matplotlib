@@ -29,4 +29,6 @@ class _TypeNamespace:
 nx = _TypeNamespace()
 
 from numpy import inf, infty, Infinity
+from numpy.random import rand, randn
 infinity = Infinity
+from numpy import all, isnan, any

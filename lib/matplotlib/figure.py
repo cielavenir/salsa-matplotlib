@@ -241,15 +241,19 @@ class Figure(Artist):
         self.images.append(im)
         return im
 
-
     def set_figsize_inches(self, *args, **kwargs):
+        import warnings
+        warnings.warn('Use set_size_inches instead!', DeprecationWarning)
+        self.set_size_inches(*args, **kwargs)
+
+    def set_size_inches(self, *args, **kwargs):
         """
-        set_figsize_inches(w,h, forward=False)
+        set_size_inches(w,h, forward=False)
 
         Set the figure size in inches
 
-        Usage: set_figsize_inches(self, w,h)  OR
-               set_figsize_inches(self, (w,h) )
+        Usage: set_size_inches(self, w,h)  OR
+               set_size_inches(self, (w,h) )
 
         optional kwarg forward=True will cause the canvas size to be
         automatically updated; eg you can resize the figure window
@@ -272,7 +276,9 @@ class Figure(Artist):
             dpival = self.dpi.get()
             canvasw = w*dpival
             canvash = h*dpival
-            self.canvas.resize(int(canvasw), int(canvash))
+            manager = getattr(self.canvas, 'manager', None)
+            if manager is not None:
+                manager.resize(int(canvasw), int(canvash))
 
     def get_size_inches(self):
         return self.figwidth.get(), self.figheight.get()
@@ -636,15 +642,19 @@ class Figure(Artist):
     def savefig(self, *args, **kwargs):
         """
         SAVEFIG(fname, dpi=150, facecolor='w', edgecolor='w',
-        orientation='portrait', papertype=None):
+        orientation='portrait', papertype=None, format=None):
 
-        Save the current figure to filename fname.  dpi is the resolution
-        in dots per inch.
+        Save the current figure.
 
-        Output file types currently supported are jpeg and png and will be
-        deduced by the extension to fname
+        fname - the filename to save the current figure to.
+                The output formats supported depend on the backend being used.
+                and are deduced by the extension to fname.
+                Possibilities are eps, jpeg, pdf, png, ps, svg.
+                fname can also be a file or file-like object - cairo backend
+                only.
+        dpi - is the resolution in dots per inch.
 
-        facecolor and edgecolor are the colors os the figure rectangle
+        facecolor and edgecolor are the colors of the figure rectangle
 
         orientation is either 'landscape' or 'portrait' - not supported on
         all backends; currently only on postscript output
@@ -652,6 +662,10 @@ class Figure(Artist):
         papertype is is one of 'letter', 'legal', 'executive', 'ledger', 'a0'
         through 'a10', or 'b0' through 'b10' - only supported for postscript
         output
+
+        format - one of 'pdf', 'png', 'ps', 'svg'. It is used to specify the
+                 output when fname is a file or file-like object - cairo
+                 backend only.
         """
 
         for key in ('dpi', 'facecolor', 'edgecolor'):

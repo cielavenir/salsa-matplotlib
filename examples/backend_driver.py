@@ -86,7 +86,7 @@ failbackend = dict(
     SVG = ('tex_demo.py,'),
     )
 
-def drive(backend, python='python2.4'):
+def drive(backend, python='python'):
 
     exclude = failbackend.get(backend, [])
 
@@ -134,7 +134,10 @@ if __name__ == '__main__':
     # backends = [ 'GTK', 'WX', 'TkAgg']
     default_backends = ['Agg', 'PS', 'SVG', 'Template']
     #backends = ['Agg']
-    python = 'python2.4'
+    if sys.platform == 'win32':
+        python = r'c:\Python24\python.exe'
+    else:
+        python = 'python'
     if sys.argv[1:]:
         backends = [b for b in sys.argv[1:] if b in default_backends]
     else:

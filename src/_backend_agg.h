@@ -10,6 +10,7 @@
 
 #include "agg_arrowhead.h"
 #include "agg_basics.h"
+#include "agg_bezier_arc.h"
 #include "agg_color_rgba.h"
 #include "agg_conv_concat.h"
 #include "agg_conv_contour.h"
@@ -46,15 +47,22 @@ typedef agg::scanline_bin scanline_bin;
 // a class in the swig wrapper
 class BufferRegion : public Py::PythonExtension<BufferRegion> {
 public:
-  BufferRegion( agg::buffer& aggbuf, const agg::rect &r) : aggbuf(aggbuf), rect(r) {}
+  BufferRegion( agg::buffer& aggbuf, const agg::rect &r, bool freemem=true) : aggbuf(aggbuf), rect(r), freemem(freemem) {
+    //std::cout << "buffer region" << std::endl;
+  }
   agg::buffer aggbuf;
   agg::rect rect;
-  static void init_type(void) {
-    behaviors().name("BufferRegion");
-    behaviors().doc("A wrapper to pass agg buffer objects to and from the python level");
-  }
+  bool freemem;
+  Py::Object to_string(const Py::Tuple &args);
 
-  virtual ~BufferRegion() {};
+  static void init_type(void);
+  virtual ~BufferRegion() {
+    //std::cout << "buffer region bye bye" << std::endl;
+    if (freemem) {
+      delete [] aggbuf.data;
+      aggbuf.data = NULL;
+    }
+  };
 };
 
 class GCAgg {
@@ -69,17 +77,17 @@ public:
   double dpi;
   bool snapto;
   bool isaa;
-  
-  agg::line_cap_e cap; 
+
+  agg::line_cap_e cap;
   agg::line_join_e join;
 
-  
+
   double linewidth;
   double alpha;
   agg::rgba color;
 
   double *cliprect;
-  
+
   //dashes
   size_t Ndash;
   double dashOffset;
@@ -131,11 +139,11 @@ public:
   Py::Object copy_from_bbox(const Py::Tuple & args);
   Py::Object restore_region(const Py::Tuple & args);
 
-  
-  
 
 
-  virtual ~RendererAgg(); 
+
+
+  virtual ~RendererAgg();
 
   static const size_t PIXELS_PER_INCH;
   unsigned int width, height;
@@ -170,7 +178,7 @@ protected:
   agg::rgba rgb_to_color(const Py::SeqBase<Py::Object>& rgb, double alpha);
   facepair_t _get_rgba_face(const Py::Object& rgbFace, double alpha);
   void set_clipbox_rasterizer( double *cliprect);
-  template <class VS> void _fill_and_stroke(VS&, const GCAgg&, const facepair_t&, bool curvy=true);  
+  template <class VS> void _fill_and_stroke(VS&, const GCAgg&, const facepair_t&, bool curvy=true);
 
   template<class PathSource>
   void _render_lines_path(PathSource &ps, const GCAgg& gc);
@@ -188,19 +196,19 @@ public:
     BufferRegion::init_type();
     RendererAgg::init_type();
 
-    add_keyword_method("RendererAgg", &_backend_agg_module::new_renderer, 
+    add_keyword_method("RendererAgg", &_backend_agg_module::new_renderer,
 		       "RendererAgg(width, height, dpi)");
     initialize( "The agg rendering backend" );
   }
-  
+
   virtual ~_backend_agg_module() {}
-  
+
 private:
-  
+
   Py::Object new_renderer (const Py::Tuple &args, const Py::Dict &kws);
 
 
-  
+
 };
 
 

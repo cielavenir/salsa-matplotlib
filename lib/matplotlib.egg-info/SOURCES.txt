@@ -260,7 +260,6 @@ examples/.cvsignore
 examples/README
 examples/README.wx
 examples/__init__.py
-examples/_tmp_text_handles.py
 examples/accented_text.py
 examples/agg_oo.py
 examples/agg_resize.py
@@ -270,6 +269,8 @@ examples/anim.py
 examples/anim_tk.py
 examples/animation_blit.py
 examples/animation_blit_fltk.py
+examples/animation_blit_qt.py
+examples/animation_blit_qt4.py
 examples/animation_blit_tk.py
 examples/animation_blit_wx.py
 examples/anscombe.py
@@ -285,7 +286,7 @@ examples/barchart_demo.py
 examples/barh_demo.py
 examples/boxplot_demo.py
 examples/break.py
-examples/collections.py
+examples/collections_demo.py
 examples/color_by_yvalue.py
 examples/color_demo.py
 examples/colours.py
@@ -314,10 +315,13 @@ examples/dynamic_demo_wx.py
 examples/dynamic_image_gtkagg.py
 examples/dynamic_image_wxagg.py
 examples/dynamic_image_wxagg2.py
+examples/ellipse_demo.py
+examples/ellipse_rotated.py
 examples/embedding_in_gtk.py
 examples/embedding_in_gtk2.py
 examples/embedding_in_gtk3.py
 examples/embedding_in_qt.py
+examples/embedding_in_qt4.py
 examples/embedding_in_tk.py
 examples/embedding_in_tk2.py
 examples/embedding_in_wx.py
@@ -359,6 +363,7 @@ examples/interactive2.py
 examples/interp_demo.py
 examples/invert_axes.py
 examples/keypress_demo.py
+examples/lasso_demo.py
 examples/layer_images.py
 examples/legend_auto.py
 examples/legend_demo.py
@@ -375,6 +380,7 @@ examples/logo.py
 examples/major_minor_demo1.py
 examples/major_minor_demo2.py
 examples/masked_demo.py
+examples/mathtext2_demo.py
 examples/mathtext_demo.py
 examples/matplotlib_icon.py
 examples/matshow.py
@@ -430,6 +436,7 @@ examples/text_rotation.py
 examples/text_themes.py
 examples/to_numeric.py
 examples/toggle_images.py
+examples/transoffset.py
 examples/two_scales.py
 examples/unicode_demo.py
 examples/vertical_ticklabels.py
@@ -625,8 +632,10 @@ lib/matplotlib/legend.py
 lib/matplotlib/lines.py
 lib/matplotlib/lines.pyc
 lib/matplotlib/mathtext.py
+lib/matplotlib/mathtext2.py
 lib/matplotlib/mlab.py
 lib/matplotlib/mlab.pyc
+lib/matplotlib/nxutils.py
 lib/matplotlib/patches.py
 lib/matplotlib/proj3d.py
 lib/matplotlib/pylab.py
@@ -1327,6 +1336,7 @@ license/LICENSE_PIL
 license/LICENSE_YORICK
 license/LICENSE_enthought.txt
 license/PYTZ_LICENSE.txt
+license/pnpoly.license
 src/MPL_isnan.h
 src/_backend_agg.cpp
 src/_backend_agg.h
@@ -1339,16 +1349,19 @@ src/_na_backend_agg.cpp
 src/_na_backend_gdk.c
 src/_na_cntr.c
 src/_na_image.cpp
+src/_na_nxutils.c
 src/_na_transforms.cpp
 src/_nc_backend_agg.cpp
 src/_nc_backend_gdk.c
 src/_nc_cntr.c
 src/_nc_image.cpp
+src/_nc_nxutils.c
 src/_nc_transforms.cpp
 src/_ns_backend_agg.cpp
 src/_ns_backend_gdk.c
 src/_ns_cntr.c
 src/_ns_image.cpp
+src/_ns_nxutils.c
 src/_ns_transforms.cpp
 src/_subprocess.c
 src/_tkagg.cpp
@@ -1362,6 +1375,8 @@ src/ft2font.cpp
 src/ft2font.h
 src/mplutils.cpp
 src/mplutils.h
+src/numerix.h
+src/nxutils.c
 src/swig_runtime.h
 swig/agg.i
 swig/agg_basics.i
@@ -1384,6 +1399,8 @@ unit/auto_legend.py
 unit/dates_unit.py
 unit/ft2font_memleak.py
 unit/helpers.py
+unit/inside_poly_memleak.py
+unit/inside_poly_profile.py
 unit/longs_test.py
 unit/memleak_hawaii3.py
 unit/memleak_transforms.py

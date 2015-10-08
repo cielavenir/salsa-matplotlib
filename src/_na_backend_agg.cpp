@@ -38,6 +38,10 @@
 #endif
 #endif
 
+#define M_PI       3.14159265358979323846
+#define M_PI_4     0.785398163397448309616
+#define M_PI_2     1.57079632679489661923
+
 /* ------------ RendererAgg methods ------------- */
 
 
@@ -184,6 +188,13 @@ GCAgg::_set_clip_rectangle( const Py::Object& gc) {
   cliprect[1] = b;
   cliprect[2] = w;
   cliprect[3] = h;
+}
+
+
+Py::Object BufferRegion::to_string(const Py::Tuple &args) {
+
+  // owned=true to prevent memory leak
+  return Py::String(PyString_FromStringAndSize((const char*)aggbuf.data,aggbuf.height*aggbuf.stride), true);
 }
 
 
@@ -365,21 +376,43 @@ RendererAgg::draw_rectangle(const Py::Tuple & args) {
 Py::Object
 RendererAgg::draw_ellipse(const Py::Tuple& args) {
   _VERBOSE("RendererAgg::draw_ellipse");
-  args.verify_length(6);
+  args.verify_length(7);
 
   GCAgg gc = GCAgg(args[0], dpi);
   facepair_t face = _get_rgba_face(args[1], gc.alpha);
-
 
   double x = Py::Float( args[2] );
   double y = Py::Float( args[3] );
   double w = Py::Float( args[4] );
   double h = Py::Float( args[5] );
+  double rot = Py::Float( args[6] );
+  
+  double r; // rot in radians
 
   set_clipbox_rasterizer(gc.cliprect);
 
-  //last arg is num steps
-  agg::ellipse path(x, height-y, w, h, 100);
+  // Approximate the ellipse with 4 bezier paths
+  agg::path_storage path;
+  if (rot == 0.0) // simple case
+  {
+  	path.move_to(x, height-(y+h));
+	path.arc_to(w, h, 0.0, false, true, x+w, height-y);
+  	path.arc_to(w, h, 0.0, false, true, x,   height-(y-h));
+  	path.arc_to(w, h, 0.0, false, true, x-w, height-y);
+  	path.arc_to(w, h, 0.0, false, true, x,   height-(y+h));
+  	path.close_polygon();
+  }
+  else // rotate by hand :(
+  {
+  	// deg to rad
+  	r = rot * (M_PI/180.0);
+  	path.move_to(                      x+(cos(r)*w),          height-(y+(sin(r)*w)));
+  	path.arc_to(w, h, -r, false, true, x+(cos(r+M_PI_2*3)*h), height-(y+(sin(r+M_PI_2*3)*h)));
+  	path.arc_to(w, h, -r, false, true, x+(cos(r+M_PI)*w),     height-(y+(sin(r+M_PI)*w)));
+  	path.arc_to(w, h, -r, false, true, x+(cos(r+M_PI_2)*h),   height-(y+(sin(r+M_PI_2)*h)));
+	path.arc_to(w, h, -r, false, true, x+(cos(r)*w),          height-(y+(sin(r)*w)));
+  	path.close_polygon();
+  }
 
   _fill_and_stroke(path, gc, face);
   return Py::Object();
@@ -646,8 +679,8 @@ RendererAgg::copy_from_bbox(const Py::Tuple& args) {
   renderer_base rb(pf);
   //rb.clear(agg::rgba(1, 0, 0)); //todo remove me
   rb.copy_from(*renderingBuffer, &r, -r.x1, -r.y1);
-  BufferRegion* reg = new BufferRegion(buf, r);
-
+  BufferRegion* reg = new BufferRegion(buf, r, true);
+  //std::cout << "copy from bbox" << std::endl;
   return Py::asObject(reg);
 
 
@@ -1375,11 +1408,10 @@ RendererAgg::draw_lines(const Py::Tuple& args) {
 	moveto = true;
 	continue;
       }
-    else
-      if (MPL_isnan64(thisx) || MPL_isnan64(thisy)) {
-        moveto = true;
-        continue;
-      }
+    if (MPL_isnan64(thisx) || MPL_isnan64(thisy)) {
+      moveto = true;
+      continue;
+    }
 
     //use agg's transformer?
     xytrans.transform(&thisx, &thisy);
@@ -2268,6 +2300,17 @@ Py::Object _backend_agg_module::new_renderer (const Py::Tuple &args,
   double dpi = Py::Float(args[2]);
   return Py::asObject(new RendererAgg(width, height, dpi, debug));
 }
+
+
+void BufferRegion::init_type() {
+    behaviors().name("BufferRegion");
+    behaviors().doc("A wrapper to pass agg buffer objects to and from the python level");
+
+    add_varargs_method("to_string", &BufferRegion::to_string,
+		       "to_string()");
+
+  }
+
 
 void RendererAgg::init_type()
 {

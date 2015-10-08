@@ -429,13 +429,23 @@ class ColorConverter:
 
         return color
 
-    def to_rgba(self, arg, alpha=1.0, warn=True):
+    def to_rgba(self, arg, alpha=None, warn=True):
         """
         Returns an RGBA tuple of four floats from 0-1.
 
-        For acceptable values of arg, see to_rgb.
+        For acceptable values of arg, see to_rgb.  In
+        addition, arg may already be an rgba sequence, in which
+        case it is returned unchanged if the alpha kwarg is None,
+        or takes on the specified alpha.
         """
-        r,g,b = self.to_rgb(arg, warn)
+        if not is_string_like(arg) and iterable(arg):
+            if len(arg) == 4 and alpha is None:
+                return tuple(arg)
+            r,g,b = arg[:3]
+        else:
+            r,g,b = self.to_rgb(arg, warn)
+        if alpha is None:
+            alpha = 1.0
         return r,g,b,alpha
 
     def to_rgba_list(self, c):
@@ -697,7 +707,7 @@ class ListedColormap(LinearSegmentedColormap):
 
     def _init(self):
         rgb = array([colorConverter.to_rgb(c)
-                    for c in self.colors], typecode=Float)
+                    for c in self.colors], Float)
         self._lut = zeros((self.N + 3, 4), Float)
         self._lut[:-3, :-1] = rgb
         self._lut[:-3, -1] = 1

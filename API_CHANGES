@@ -1,3 +1,17 @@
+	Renderer.draw_arc now takes an additional parameter, rotation.
+	It specifies to draw the artist rotated in degrees anti-
+	clockwise.  It was added for rotated ellipses.
+
+	Renamed Figure.set_figsize_inches to Figure.set_size_inches to
+	better match the get method, Figure.get_size_inches.
+
+    Removed the copy_bbox_transform from transforms.py; added
+    shallowcopy methods to all transforms.  All transforms already
+    had deepcopy methods.
+
+    FigureManager.resize(width, height): resize the window
+    specified in pixels
+
     barh: x and y args have been renamed to width and bottom
     respectively, and their order has been swapped to maintain
     a (position, value) order.

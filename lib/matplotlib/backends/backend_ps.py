@@ -198,7 +198,7 @@ class RendererPS(RendererBase):
         \   - back diagonal
         |   - vertical
         -   - horizontal
-        #   - crossed
+        +   - crossed
         X   - crossed diagonal
         letters can be combined, in which case all the specified
         hatchings are done
@@ -215,7 +215,7 @@ class RendererPS(RendererBase):
             elif (letter == '+'):
                 hatches['horiz'] += 1
                 hatches['vert'] += 1
-            elif (letter == 'x'):
+            elif (letter.lower() == 'x'):
                 hatches['diag1'] += 1
                 hatches['diag2'] += 1
 
@@ -309,7 +309,7 @@ class RendererPS(RendererBase):
         font.set_size(size, 72.0)
         return font
 
-    def draw_arc(self, gc, rgbFace, x, y, width, height, angle1, angle2):
+    def draw_arc(self, gc, rgbFace, x, y, width, height, angle1, angle2, rotation):
         """
         Draw an arc centered at x,y with width and height and angles
         from 0.0 to 360.0
@@ -317,8 +317,8 @@ class RendererPS(RendererBase):
         If gcFace is not None, fill the arc slice with it.  gcEdge
         is a GraphicsContext instance
         """
-        ps = '%s ellipse' % _nums_to_str(angle1, angle2,
-                                         0.5*width, 0.5*height, x, y)
+        ps = '%f %f translate\n%f rotate\n%f %f translate\n%s ellipse' % \
+            (x, y, rotation, -x, -y, _nums_to_str(angle1, angle2, 0.5*width, 0.5*height, x, y))
         self._draw_ps(ps, gc, rgbFace, "arc")
 
     def _rgba(self, im):
@@ -511,7 +511,7 @@ grestore
                 drawone.state = 'l'
                 return ret
 
-        step = 50
+        step = 100000
         start = 0
         end = step
         skip = where(isnan(x) + isnan(y), 1, 0)
@@ -534,7 +534,7 @@ grestore
         if cliprect: write('grestore\n')
 
 
-    def draw_lines_less_old(self, gc, x, y, transform=None):
+    def draw_lines_old(self, gc, x, y, transform=None):
         """
         x and y are equal length arrays, draw lines connecting each
         point in x, y
@@ -1352,8 +1352,9 @@ def xpdf_distill(tmpfile, eps=False, ptype='letter', bbox=None):
     pdffile = tmpfile + '.pdf'
     psfile = tmpfile + '.ps'
     outfile = tmpfile + '.output'
-    command = 'ps2pdf -sPAPERSIZE=%s "%s" "%s" > "%s"'% \
-                (ptype, tmpfile, pdffile, outfile)
+    command = 'ps2pdf -dAutoFilterColorImages=false \
+-sColorImageFilter=FlateEncode -sPAPERSIZE=%s "%s" "%s" > "%s"'% \
+(ptype, tmpfile, pdffile, outfile)
     verbose.report(command, 'debug')
     exit_status = os.system(command)
     fh = file(outfile)

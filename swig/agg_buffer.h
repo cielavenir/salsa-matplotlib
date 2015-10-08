@@ -23,7 +23,13 @@ namespace agg {
       data = new int8u[height*stride];
       
     }
-    ~buffer() {if (freemem) delete [] data;}
+    ~buffer() {
+      //std::cout << "bye bye " << freemem << std::endl;
+      if (freemem) {
+	delete [] data;
+	data = NULL;      
+      }
+    }
     
 
     binary_data to_string() { 
