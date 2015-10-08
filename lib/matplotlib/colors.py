@@ -1,5 +1,5 @@
 """
-A class for converting color arguments to RGB
+A class for converting color arguments to RGB or RGBA
 
 This class instantiates a single instance colorConverter that is used
 to convert matlab color strings to RGB.  RGB is a tuple of float RGB
@@ -16,6 +16,11 @@ the colors.  For the basic builtin colors, you can use a single letter
       y  : yellow
       k  : black
       w  : white
+
+Gray shades can be given as a string encoding a float in the 0-1
+range, e.g.,
+
+    color = '0.75'
 
 For a greater range of colors, you have two options.  You can specify
 the color using an html hex string, as in
@@ -180,162 +185,14 @@ cnames = {
     'whitesmoke'           : '#F5F5F5',
     'yellow'               : '#FFFF00',
     'yellowgreen'          : '#9ACD32',
-    'black'                : '#000000',
-    'navy'                 : '#000080',
-    'darkblue'             : '#00008B',
-    'mediumblue'           : '#0000CD',
-    'blue'                 : '#0000FF',
-    'darkgreen'            : '#006400',
-    'green'                : '#008000',
-    'teal'                 : '#008080',
-    'darkcyan'             : '#008B8B',
-    'deepskyblue'          : '#00BFFF',
-    'darkturquoise'        : '#00CED1',
-    'mediumspringgreen'    : '#00FA9A',
-    'lime'                 : '#00FF00',
-    'springgreen'          : '#00FF7F',
-    'aqua'                 : '#00FFFF',
-    'cyan'                 : '#00FFFF',
-    'midnightblue'         : '#191970',
-    'dodgerblue'           : '#1E90FF',
-    'lightseagreen'        : '#20B2AA',
-    'forestgreen'          : '#228B22',
-    'seagreen'             : '#2E8B57',
-    'darkslategray'        : '#2F4F4F',
-    'limegreen'            : '#32CD32',
-    'mediumseagreen'       : '#3CB371',
-    'turquoise'            : '#40E0D0',
-    'royalblue'            : '#4169E1',
-    'steelblue'            : '#4682B4',
-    'darkslateblue'        : '#483D8B',
-    'mediumturquoise'      : '#48D1CC',
-    'indigo'               : '#4B0082',
-    'darkolivegreen'       : '#556B2F',
-    'cadetblue'            : '#5F9EA0',
-    'cornflowerblue'       : '#6495ED',
-    'mediumaquamarine'     : '#66CDAA',
-    'dimgray'              : '#696969',
-    'slateblue'            : '#6A5ACD',
-    'olivedrab'            : '#6B8E23',
-    'slategray'            : '#708090',
-    'lightslategray'       : '#778899',
-    'mediumslateblue'      : '#7B68EE',
-    'lawngreen'            : '#7CFC00',
-    'chartreuse'           : '#7FFF00',
-    'aquamarine'           : '#7FFFD4',
-    'maroon'               : '#800000',
-    'purple'               : '#800080',
-    'olive'                : '#808000',
-    'gray'                 : '#808080',
-    'skyblue'              : '#87CEEB',
-    'lightskyblue'         : '#87CEFA',
-    'blueviolet'           : '#8A2BE2',
-    'darkred'              : '#8B0000',
-    'darkmagenta'          : '#8B008B',
-    'saddlebrown'          : '#8B4513',
-    'darkseagreen'         : '#8FBC8F',
-    'lightgreen'           : '#90EE90',
-    'mediumpurple'         : '#9370DB',
-    'darkviolet'           : '#9400D3',
-    'palegreen'            : '#98FB98',
-    'darkorchid'           : '#9932CC',
-    'yellowgreen'          : '#9ACD32',
-    'sienna'               : '#A0522D',
-    'brown'                : '#A52A2A',
-    'darkgray'             : '#A9A9A9',
-    'lightblue'            : '#ADD8E6',
-    'greenyellow'          : '#ADFF2F',
-    'palevioletred'        : '#AFEEEE',
-    'lightsteelblue'       : '#B0C4DE',
-    'powderblue'           : '#B0E0E6',
-    'firebrick'            : '#B22222',
-    'darkgoldenrod'        : '#B8860B',
-    'mediumorchid'         : '#BA55D3',
-    'rosybrown'            : '#BC8F8F',
-    'darkkhaki'            : '#BDB76B',
-    'silver'               : '#C0C0C0',
-    'mediumvioletred'      : '#C71585',
-    'indianred'            : '#CD5C5C',
-    'peru'                 : '#CD853F',
-    'chocolate'            : '#D2691E',
-    'tan'                  : '#D2B48C',
-    'lightgrey'            : '#D3D3D3',
-    'thistle'              : '#D8BFD8',
-    'orchid'               : '#DA70D6',
-    'goldenrod'            : '#DAA520',
-    'crimson'              : '#DC143C',
-    'gainsboro'            : '#DCDCDC',
-    'plum'                 : '#DDA0DD',
-    'burlywood'            : '#DEB887',
-    'lightcyan'            : '#E0FFFF',
-    'lavender'             : '#E6E6FA',
-    'darksalmon'           : '#E9967A',
-    'violet'               : '#EE82EE',
-    'palegoldenrod'        : '#EEE8AA',
-    'lightcoral'           : '#F08080',
-    'khaki'                : '#F0E68C',
-    'aliceblue'            : '#F0F8FF',
-    'honeydew'             : '#F0FFF0',
-    'azure'                : '#F0FFFF',
-    'wheat'                : '#F5DEB3',
-    'beige'                : '#F5F5DC',
-    'whitesmoke'           : '#F5F5F5',
-    'mintcream'            : '#F5FFFA',
-    'ghostwhite'           : '#F8F8FF',
-    'salmon'               : '#FA8072',
-    'sandybrown'           : '#FAA460',
-    'antiquewhite'         : '#FAEBD7',
-    'linen'                : '#FAF0E6',
-    'lightgoldenrodyellow' : '#FAFAD2',
-    'oldlace'              : '#FDF5E6',
-    'red'                  : '#FF0000',
-    'fuchsia'              : '#FF00FF',
-    'magenta'              : '#FF00FF',
-    'deeppink'             : '#FF1493',
-    'orangered'            : '#FF4500',
-    'tomato'               : '#FF6347',
-    'hotpink'              : '#FF69B4',
-    'coral'                : '#FF7F50',
-    'darkorange'           : '#FF8C00',
-    'lightsalmon'          : '#FFA07A',
-    'orange'               : '#FFA500',
-    'lightpink'            : '#FFB6C1',
-    'pink'                 : '#FFC0CB',
-    'gold'                 : '#FFD700',
-    'peachpuff'            : '#FFDAB9',
-    'navajowhite'          : '#FFDEAD',
-    'moccasin'             : '#FFE4B5',
-    'bisque'               : '#FFE4C4',
-    'mistyrose'            : '#FFE4E1',
-    'blanchedalmond'       : '#FFEBCD',
-    'papayawhip'           : '#FFEFD5',
-    'lavenderblush'        : '#FFF0F5',
-    'seashell'             : '#FFF5EE',
-    'cornsilk'             : '#FFF8DC',
-    'lemonchiffon'         : '#FFFACD',
-    'floralwhite'          : '#FFFAF0',
-    'snow'                 : '#FFFAFA',
-    'yellow'               : '#FFFF00',
-    'lightyellow'          : '#FFFFE0',
-    'ivory'                : '#FFFFF0',
-    'white'                : '#FFFFFF',
     }
 
-def looks_like_color(c):
-    warnings.warn('Use is_color_like instead!', DeprecationWarning)
-    if is_string_like(c):
-        if cnames.has_key(c): return True
-        elif len(c)==1: return True
-        elif len(c)==7 and c.startswith('#') and len(c)==7: return True
-        else: return False
-    elif iterable(c) and len(c)==3:
-        try:
-            rgb = [float(val) for val in c]
-            return True
-        except:
-            return False
-    else:
-        return False
+
+# add british equivs
+for k, v in cnames.items():
+    if k.find('gray')>=0:
+        k = k.replace('gray', 'grey')
+        cnames[k] = v
 
 def is_color_like(c):
     try:
@@ -375,117 +232,106 @@ class ColorConverter:
         }
 
     cache = {}
-    def to_rgb(self, arg, warn=True):
+    def to_rgb(self, arg):
         """
         Returns an RGB tuple of three floats from 0-1.
 
-        arg can be an RGB sequence or a string in any of several forms:
+        arg can be an RGB or RGBA sequence or a string in any of several forms:
             1) a letter from the set 'rgbcmykw'
             2) a hex color string, like '#00FFFF'
             3) a standard name, like 'aqua'
             4) a float, like '0.4', indicating gray on a 0-1 scale
+
+        if arg is RGBA, the A will simply be discarded.
         """
-        # warn kwarg will go away when float-as-grayscale does
         try: return self.cache[arg]
         except KeyError: pass
         except TypeError: # could be unhashable rgb seq
             arg = tuple(arg)
-            try: self.cache[arg]
+            try: return self.cache[arg]
             except KeyError: pass
             except TypeError:
-                raise ValueError('to_rgb: unhashable even inside a tuple')
+                raise ValueError(
+                      'to_rgb: arg "%s" is unhashable even inside a tuple'
+                                    % (str(arg),))
 
         try:
             if is_string_like(arg):
-                str1 = cnames.get(arg, arg)
-                if str1.startswith('#'):
-                    color = hex2color(str1)
-                else:
-                    try:
-                        color = self.colors[arg]
-                    except KeyError:
-                        color = tuple([float(arg)]*3)
-            elif iterable(arg):   # streamline this after removing float case
+                color = self.colors.get(arg, None)
+                if color is None:
+                    str1 = cnames.get(arg, arg)
+                    if str1.startswith('#'):
+                        color = hex2color(str1)
+                    else:
+                        fl = float(arg)
+                        if fl < 0 or fl > 1:
+                            raise ValueError(
+                                   'gray (string) must be in range 0-1')
+                        color = tuple([fl]*3)
+            elif iterable(arg):
+                if len(arg) > 4 or len(arg) < 3:
+                    raise ValueError(
+                           'sequence length is %d; must be 3 or 4'%len(arg))
                 color = tuple(arg[:3])
-                if [x for x in color if (x < 0) or  (x > 1)]:
-                    raise ValueError('to_rgb: Invalid rgb arg "%s"' % (str(arg)))
-            elif isinstance(arg, (float,int)):
-                #raise Exception('number is %s' % str(arg))
-                if warn: warnings.warn(
-                    "For gray use a string, '%s', not a float, %s" %
-                                                (str(arg), str(arg)),
-                                                DeprecationWarning)
-                else: self._gray = True
-                if 0 <= arg <= 1:
-                    color = (arg,arg,arg)
-                else:
-                    raise ValueError('Floating point color arg must be between 0 and 1')
+                if [x for x in color if (float(x) < 0) or  (x > 1)]:
+                    # This will raise TypeError if x is not a number.
+                    raise ValueError('number in rbg sequence outside 0-1 range')
             else:
-                raise ValueError('to_rgb: Invalid rgb arg "%s"' % (str(arg)))
+                raise ValueError('cannot convert argument to rgb sequence')
 
             self.cache[arg] = color
 
         except (KeyError, ValueError, TypeError), exc:
             raise ValueError('to_rgb: Invalid rgb arg "%s"\n%s' % (str(arg), exc))
-
+            # Error messages could be improved by handling TypeError
+            # separately; but this should be rare and not too hard
+            # for the user to figure out as-is.
         return color
 
-    def to_rgba(self, arg, alpha=None, warn=True):
+    def to_rgba(self, arg, alpha=None):
         """
         Returns an RGBA tuple of four floats from 0-1.
 
-        For acceptable values of arg, see to_rgb.  In
-        addition, arg may already be an rgba sequence, in which
-        case it is returned unchanged if the alpha kwarg is None,
-        or takes on the specified alpha.
+        For acceptable values of arg, see to_rgb.
+        If arg is an RGBA sequence and alpha is not None,
+        alpha will replace the original A.
         """
-        if not is_string_like(arg) and iterable(arg):
-            if len(arg) == 4 and alpha is None:
-                return tuple(arg)
-            r,g,b = arg[:3]
-        else:
-            r,g,b = self.to_rgb(arg, warn)
-        if alpha is None:
-            alpha = 1.0
-        return r,g,b,alpha
+        try:
+            if not is_string_like(arg) and iterable(arg):
+                if len(arg) == 4 and alpha is None:
+                    if [x for x in arg if (float(x) < 0) or  (x > 1)]:
+                        # This will raise TypeError if x is not a number.
+                        raise ValueError('number in rbga sequence outside 0-1 range')
+                    return tuple(arg)
+                r,g,b = arg[:3]
+                if [x for x in (r,g,b) if (float(x) < 0) or  (x > 1)]:
+                    raise ValueError('number in rbg sequence outside 0-1 range')
+            else:
+                r,g,b = self.to_rgb(arg)
+            if alpha is None:
+                alpha = 1.0
+            return r,g,b,alpha
+        except (TypeError, ValueError), exc:
+            raise ValueError('to_rgba: Invalid rgba arg "%s"\n%s' % (str(arg), exc))
 
-    def to_rgba_list(self, c):
+    def to_rgba_list(self, c, alpha=None):
         """
         Returns a list of rgba tuples.
 
         Accepts a single mpl color spec or a sequence of specs.
         If the sequence is a list, the list items are changed in place.
         """
-        # This can be improved after removing float-as-grayscale.
-        if not is_string_like(c):
-            try:
-                N = len(c) # raises TypeError if it is not a sequence
-                # Temporary hack: keep single rgb or rgba from being
-                # treated as grayscale.
-                if N==3 or N==4:
-                    L = [x for x in c if x>=0 and x<=1]
-                    if len(L) == N:
-                        raise ValueError
-                # If c is a list, we need to return the same list but
-                # with modified items so that items can be appended to
-                # it. This is needed for examples/dynamic_collections.py.
-                if not isinstance(c, list): # specific; don't need duck-typing
-                    c = list(c)
-                self._gray = False
-                for i, cc in enumerate(c):
-                    c[i] = self.to_rgba(cc, warn=False)  # change in place
-                if self._gray:
-                    msg = "In argument %s: use string, not float, for grayscale" % str(c)
-                    warnings.warn(msg, DeprecationWarning)
-                return c
-            except (ValueError, TypeError):
-                pass
         try:
-            return [self.to_rgba(c)]
-        except (ValueError, TypeError):
-            raise TypeError('c must be a matplotlib color arg or a sequence of them')
-
-
+            return [self.to_rgba(c, alpha)]
+        except ValueError:
+            # If c is a list it must be maintained as the same list
+            # with modified items so that items can be appended to
+            # it. This is needed for examples/dynamic_collections.py.
+            if not isinstance(c, list): # specific; don't need duck-typing
+                c = list(c)
+            for i, cc in enumerate(c):
+                c[i] = self.to_rgba(cc, alpha)  # change in place
+            return c
 
 colorConverter = ColorConverter()
 
@@ -739,19 +585,20 @@ class Normalize:
     def __call__(self, value, clip=None):
         if clip is None:
             clip = self.clip
-        if isinstance(value, (int, float)):
-            vtype = 'scalar'
-            val = ma.array([value])
-        else:
-            vtype = 'array'
-            val = ma.asarray(value)
 
-        self.autoscale(val)
+        if iterable(value):
+            vtype = 'array'
+            val = ma.asarray(value).astype(Float)
+        else:
+            vtype = 'scalar'
+            val = ma.array([value]).astype(Float)
+
+        self.autoscale_None(val)
         vmin, vmax = self.vmin, self.vmax
         if vmin > vmax:
             raise ValueError("minvalue must be less than or equal to maxvalue")
         elif vmin==vmax:
-            return 0.*value
+            return 0.0 * val
         else:
             if clip:
                 mask = ma.getmask(val)
@@ -767,17 +614,24 @@ class Normalize:
             raise ValueError("Not invertible until scaled")
         vmin, vmax = self.vmin, self.vmax
 
-        if isinstance(value, (int, float)):
-            return vmin + value * (vmax - vmin)
-        else:
+        if iterable(value):
             val = ma.asarray(value)
             return vmin + val * (vmax - vmin)
+        else:
+            return vmin + value * (vmax - vmin)
 
 
     def autoscale(self, A):
-        if not self.scaled():
-            if self.vmin is None: self.vmin = ma.minimum(A)
-            if self.vmax is None: self.vmax = ma.maximum(A)
+        '''
+        Set vmin, vmax to min, max of A.
+        '''
+        self.vmin = ma.minimum(A)
+        self.vmax = ma.maximum(A)
+
+    def autoscale_None(self, A):
+        ' autoscale only None-valued vmin or vmax'
+        if self.vmin is None: self.vmin = ma.minimum(A)
+        if self.vmax is None: self.vmax = ma.maximum(A)
 
     def scaled(self):
         'return true if vmin and vmax set'
@@ -790,20 +644,22 @@ class LogNorm(Normalize):
     def __call__(self, value, clip=None):
         if clip is None:
             clip = self.clip
-        if isinstance(value, (int, float)):
-            vtype = 'scalar'
-            val = ma.array([value])
-        else:
+
+        if iterable(value):
             vtype = 'array'
-            val = ma.asarray(value)
-        self.autoscale(val)
+            val = ma.asarray(value).astype(Float)
+        else:
+            vtype = 'scalar'
+            val = ma.array([value]).astype(Float)
+
+        self.autoscale_None(val)
         vmin, vmax = self.vmin, self.vmax
         if vmin > vmax:
             raise ValueError("minvalue must be less than or equal to maxvalue")
         elif vmin<=0:
             raise ValueError("values must all be positive")
         elif vmin==vmax:
-            return 0.*value
+            return 0.0 * val
         else:
             if clip:
                 mask = ma.getmask(val)
@@ -819,12 +675,11 @@ class LogNorm(Normalize):
             raise ValueError("Not invertible until scaled")
         vmin, vmax = self.vmin, self.vmax
 
-        if isinstance(value, (int, float)):
-            return vmin * pow((vmax/vmin), value)
-        else:
+        if iterable(value):
             val = ma.asarray(value)
             return vmin * ma.power((vmax/vmin), val)
-
+        else:
+            return vmin * pow((vmax/vmin), value)
 
 
 class NoNorm(Normalize):

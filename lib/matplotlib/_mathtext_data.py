@@ -3,14 +3,11 @@ font data tables for truetype and afm computer modern fonts
 """
 
 # this dict maps symbol names to fontnames, glyphindex.  To get the
-# glyph index from the character code, you have to use a reverse
-# dictionary grom font.get_charmaps, eg,
+# glyph index from the character code, you have to use get_charmap
 """
 from matplotlib.ft2font import FT2Font
 font = FT2Font('/usr/local/share/matplotlib/cmr10.ttf')
-codes = font.get_charmap().items()
-rd = dict([(charcode, glyphind) for glyphind,charcode in codes])
-items = rd.items()
+items = font.get_charmap().items()
 items.sort()
 
 for charcode, glyphind in items:
@@ -151,7 +148,7 @@ latex_to_bakoma = {
     r'\combiningrightarrowabove' : ('cmmi10', 110), # for \vec
     r'\combiningdotabove' : ('cmr10', 26), # for \dot
 
-    r'\leftarrow'           : ('cmsy10',  12),
+    r'\leftarrow'           : ('cmsy10',  10),
     r'\uparrow'             : ('cmsy10',  25),
     r'\downarrow'           : ('cmsy10',  28),
     r'\leftrightarrow'      : ('cmsy10',  24),
@@ -249,7 +246,7 @@ latex_to_bakoma = {
     r'\gg'                  : ('cmsy10',  40),
     r'\prec'                : ('cmsy10',  93),
     r'\succ'                : ('cmsy10',  49),
-    r'\rightarrow'          : ('cmsy10',  10),
+    r'\rightarrow'          : ('cmsy10',  12),
     r'\spadesuit'           : ('cmsy10',   7),
     }
 

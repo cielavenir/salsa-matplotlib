@@ -4,9 +4,85 @@ from the Python Cookbook -- hence the name cbook
 """
 from __future__ import generators
 import re, os, errno, sys, StringIO, traceback
+import matplotlib.numerix as nx
 
+try: set
+except NameError:
+    from sets import Set as set
 
 major, minor1, minor2, s, tmp = sys.version_info
+
+class CallbackRegistry:
+    """
+    Handle registering and disconnecting for a set of signals and
+    callbacks
+
+       signals = 'eat', 'drink', 'be merry'
+
+       def oneat(x):
+           print 'eat', x
+
+       def ondrink(x):
+           print 'drink', x
+
+       callbacks = CallbackRegistry(signals)
+
+       ideat = callbacks.connect('eat', oneat)
+       iddrink = callbacks.connect('drink', ondrink)
+
+       #tmp = callbacks.connect('drunk', ondrink) # this will raise a ValueError
+
+       callbacks.process('drink', 123)    # will call oneat
+       callbacks.process('eat', 456)      # will call ondrink
+       callbacks.process('be merry', 456) # nothing will be called
+       callbacks.disconnect(ideat)        # disconnect oneat
+       callbacks.process('eat', 456)      # nothing will be called
+
+    """
+    def __init__(self, signals):
+        'signals is a sequence of valid signals'
+        self.signals = set(signals)
+        # callbacks is a dict mapping the signal to a dictionary
+        # mapping callback id to the callback function
+        self.callbacks = dict([(s, dict()) for s in signals])
+        self._cid = 0
+
+    def _check_signal(self, s):
+        'make sure s is a valid signal or raise a ValueError'
+        if s not in self.signals:
+            signals = list(self.signals)
+            signals.sort()
+            raise ValueError('Unknown signal "%s"; valid signals are %s'%(s, signals))
+
+    def connect(self, s, func):
+        """
+        register func to be called when a signal s is generated
+        func will be called with args and kwargs
+        """
+        self._check_signal(s)
+        self._cid +=1
+        self.callbacks[s][self._cid] = func
+        return self._cid
+
+    def disconnect(self, cid):
+        """
+        disconnect the callback registered with callback id cid
+        """
+        for eventname, callbackd in self.callbacks.items():
+            try: del callbackd[cid]
+            except KeyError: continue
+            else: return
+
+    def process(self, s, *args, **kwargs):
+        """
+        process signal s.  All of the functions registered to receive
+        callbacks on s will be called with *args and **kwargs
+        """
+        self._check_signal(s)
+        for func in self.callbacks[s].values():
+            func(*args, **kwargs)
+
+
 
 class silent_list(list):
     """
@@ -46,7 +122,8 @@ class Bunch:
    """
    def __init__(self, **kwds):
       self.__dict__.update(kwds)
-
+      
+      
 def unique(x):
    'Return a list of unique elements of x'
    return dict([ (val, 1) for val in x]).keys()
@@ -349,6 +426,8 @@ def dedent(s):
     deletion of leading blank lines and its use of the
     first non-blank line to determine the indentation.
     """
+    if not s:      # includes case of s is None
+        return ''
     lines = s.splitlines(True)
     ii = 0
     while lines[ii].strip() == '':
@@ -466,7 +545,7 @@ def allpairs(x):
 
 
 
-# python 2.2 dicts don't have pop
+# python 2.2 dicts don't have pop--but we don't support 2.2 any more
 def popd(d, *args):
     """
     Should behave like python2.3 pop method; d is a dict
@@ -608,6 +687,71 @@ def finddir(o, match, case=False):
 def reverse_dict(d):
     'reverse the dictionary -- may lose data if values are not uniq!'
     return dict([(v,k) for k,v in d.items()])
+
+
+def report_memory(i=0):  # argument may go away
+    'return the memory consumed by process'
+    pid = os.getpid()
+    if sys.platform=='sunos5':
+        a2 = os.popen('ps -p %d -o osz' % pid).readlines()
+        mem = int(a2[-1].strip())
+    elif sys.platform.startswith('linux'):
+        a2 = os.popen('ps -p %d -o rss,sz' % pid).readlines()
+        mem = int(a2[1].split()[1])
+    elif sys.platform.startswith('darwin'):
+        a2 = os.popen('ps -p %d -o rss,vsz' % pid).readlines()
+        mem = int(a2[1].split()[0])
+
+    return mem
+
+class MemoryMonitor:
+    def __init__(self, nmax=20000):
+        self._nmax = nmax
+        self._mem = nx.zeros((self._nmax,), nx.Int32)
+        self.clear()
+
+    def clear(self):
+        self._n = 0
+        self._overflow = False
+
+    def __call__(self):
+        mem = report_memory()
+        if self._n < self._nmax:
+            self._mem[self._n] = mem
+            self._n += 1
+        else:
+            self._overflow = True
+        return mem
+
+    def report(self, segments=4):
+        n = self._n
+        segments = min(n, segments)
+        dn = int(n/segments)
+        ii = range(0, n, dn)
+        ii[-1] = n-1
+        print
+        print 'memory report: i, mem, dmem, dmem/nloops'
+        print 0, self._mem[0]
+        for i in range(1, len(ii)):
+            di = ii[i] - ii[i-1]
+            if di == 0:
+                continue
+            dm = self._mem[ii[i]] - self._mem[ii[i-1]]
+            print '%5d %5d %3d %8.3f' % (ii[i], self._mem[ii[i]],
+                                            dm, dm / float(di))
+        if self._overflow:
+            print "Warning: array size was too small for the number of calls."
+
+    def xy(self, i0=0, isub=1):
+        x = nx.arange(i0, self._n, isub)
+        return x, self._mem[i0:self._n:isub]
+
+    def plot(self, i0=0, isub=1):
+        from pylab import figure, show
+        fig = figure()
+        ax = fig.add_subplot(111)
+        ax.plot(*self.xy(i0, isub))
+        show()
 
 
 if __name__=='__main__':

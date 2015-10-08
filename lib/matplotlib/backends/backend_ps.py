@@ -8,14 +8,14 @@ def _fn_name(): return sys._getframe(1).f_code.co_name
 
 from tempfile import gettempdir
 from cStringIO import StringIO
-from matplotlib import verbose, __version__, rcParams, get_data_path
+from matplotlib import verbose, __version__, rcParams
 from matplotlib._pylab_helpers import Gcf
 import matplotlib.agg as agg
 from matplotlib.afm import AFM
 from matplotlib.backend_bases import RendererBase, GraphicsContextBase,\
      FigureManagerBase, FigureCanvasBase
 
-from matplotlib.cbook import is_string_like, izip, reverse_dict
+from matplotlib.cbook import is_string_like, izip
 from matplotlib.figure import Figure
 
 from matplotlib.font_manager import fontManager
@@ -482,6 +482,7 @@ grestore
         step = 500
         start = 0
         end = step
+
         mask = where(isnan(x) + isnan(y), 0, 1)
 
         cliprect = gc.get_clip_rectangle()
@@ -525,6 +526,7 @@ grestore
         step = 100000
         start = 0
         end = step
+
         skip = where(isnan(x) + isnan(y), 1, 0)
         points = zip(x,y,skip)
 
@@ -753,14 +755,13 @@ grestore
         self.set_font(font.get_sfnt()[(1,0,0,6)], prop.get_size_in_points())
 
         cmap = font.get_charmap()
-        glyphd = reverse_dict(cmap)
         lastgind = None
         #print 'text', s
         lines = []
         thisx, thisy = 0,0
         for c in s:
             ccode = ord(c)
-            gind = glyphd.get(ccode)
+            gind = cmap.get(ccode)
             if gind is None:
                 ccode = ord('?')
                 name = '.notdef'
@@ -972,8 +973,6 @@ FontName currentdict end definefont pop""" % locals())
 
 
 class FigureCanvasPS(FigureCanvasBase):
-    basepath = get_data_path()
-
     def draw(self):
         pass
 
@@ -1233,9 +1232,11 @@ class FigureCanvasPS(FigureCanvasBase):
 paper will be used to prevent clipping.'%(papertype, temp_papertype), 'helpful')
 
         texmanager = renderer.get_texmanager()
+        font_preamble = texmanager.get_font_preamble()
+        custom_preamble = texmanager.get_custom_preamble()
 
-        convert_psfrags(tmpfile, renderer.psfrag,texmanager.get_font_preamble(),
-                        paperWidth, paperHeight, orientation)
+        convert_psfrags(tmpfile, renderer.psfrag, font_preamble, 
+                        custom_preamble, paperWidth, paperHeight, orientation)
 
         if rcParams['ps.usedistiller'] == 'ghostscript':
             gs_distill(tmpfile, ext=='.eps', ptype=papertype, bbox=bbox)
@@ -1250,8 +1251,8 @@ paper will be used to prevent clipping.'%(papertype, temp_papertype), 'helpful')
             print >>outfile, fh.read()
         else: shutil.move(tmpfile, outfile)
 
-def convert_psfrags(tmpfile, psfrags, font_preamble, paperWidth, paperHeight,
-                    orientation):
+def convert_psfrags(tmpfile, psfrags, font_preamble, custom_preamble, 
+                    paperWidth, paperHeight, orientation):
     """
     When we want to use the LaTeX backend with postscript, we write PSFrag tags
     to a temporary postscript file, each one marking a position for LaTeX to
@@ -1271,7 +1272,15 @@ def convert_psfrags(tmpfile, psfrags, font_preamble, paperWidth, paperHeight,
     if orientation=='landscape': angle = 90
     else: angle = 0
 
-    print >>latexh, r"""\documentclass{article}
+    if rcParams['text.latex.unicode']:
+        unicode_preamble = """\usepackage{ucs}
+\usepackage[utf8x]{inputenc}"""
+    else:
+        unicode_preamble = ''
+    
+    s = r"""\documentclass{article}
+%s
+%s
 %s
 \usepackage[dvips, papersize={%sin,%sin}, body={%sin,%sin}, margin={0in,0in}]{geometry}
 \usepackage{psfrag}
@@ -1286,8 +1295,21 @@ def convert_psfrags(tmpfile, psfrags, font_preamble, paperWidth, paperHeight,
 \includegraphics*[angle=%s]{%s}
 \end{figure}
 \end{document}
-"""% (font_preamble, paperWidth, paperHeight, paperWidth, paperHeight,
-'\n'.join(psfrags), angle, os.path.split(epsfile)[-1])
+"""% (font_preamble, unicode_preamble, custom_preamble, paperWidth, paperHeight,
+      paperWidth, paperHeight,
+      '\n'.join(psfrags), angle, os.path.split(epsfile)[-1])
+    
+    if rcParams['text.latex.unicode']:
+        latexh.write(s.encode('utf8'))
+    else:
+        try:
+            latexh.write(s)
+        except UnicodeEncodeError, err:
+            verbose.report("You are using unicode and latex, but have "
+                           "not enabled the matplotlib 'text.latex.unicode' "
+                           "rcParam.", 'helpful')
+            raise
+        
     latexh.close()
 
     # the split drive part of the command is necessary for windows users with 

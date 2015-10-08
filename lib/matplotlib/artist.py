@@ -2,7 +2,8 @@ from __future__ import division
 import sys
 from cbook import iterable, flatten
 from transforms import identity_transform
-import warnings
+import matplotlib.units as units
+
 ## Note, matplotlib artists use the doc strings for set and get
 # methods to enable the introspection methods of setp and getp.  Every
 # set_* method should have a docstring containing the line
@@ -36,6 +37,7 @@ class Artist:
         self._animated = False
         self._alpha = 1.0
         self.clipbox = None
+        self._clippath = None
         self._clipon = False
         self._lod = False
         self._label = ''
@@ -44,6 +46,44 @@ class Artist:
         self.eventson = False  # fire events only if eventson
         self._oid = 0  # an observer id
         self._propobservers = {} # a dict from oids to funcs
+        self.axes = None
+
+    def have_units(self):
+        'return True if units are set on the x or y axes'
+        ax = self.axes
+        if ax is None or ax.xaxis is None:
+            return False
+        return ax.xaxis.have_units() or ax.yaxis.have_units()
+
+    def convert_xunits(self, x):
+        """for artists in an axes, if the xaxis as units support,
+        convert x using xaxis unit type
+        """
+        ax = getattr(self, 'axes', None)        
+        if ax is None or ax.xaxis is None:
+            #print 'artist.convert_xunits no conversion: ax=%s'%ax
+            return x
+        return ax.xaxis.convert_units(x)
+
+    def convert_yunits(self, y):
+        """for artists in an axes, if the yaxis as units support,
+        convert y using yaxis unit type
+        """
+        ax = getattr(self, 'axes', None)        
+        if ax is None or ax.yaxis is None: return y
+        return ax.yaxis.convert_units(y)
+
+    def set_axes(self, axes):
+        """
+        set the axes instance the artist resides in, if any
+
+        ACCEPTS: an axes instance
+        """
+        self.axes = axes
+
+    def get_axes(self):
+        'return the axes instance the artist resides in, or None'
+        return self.axes
 
     def add_callback(self, func):
         oid = self._oid
@@ -94,7 +134,7 @@ class Artist:
         """
         # if mouseevent x, y are within picker call self.figure.canvas.pick_event(self, mouseevent)
         pass
-    
+
     def set_picker(self, picker):
         """
         set the epsilon for picking used by this artist
@@ -106,7 +146,7 @@ class Artist:
           boolean - if True then picking will be enabled and the
             artist will fire a pick event if the mouse event is over
             the artist
-        
+
           float - if picker is a number it is interpreted as an
             epsilon tolerance in points and the the artist will fire
             off an event if it's data is within epsilon of the mouse
@@ -133,6 +173,7 @@ class Artist:
         'return the Pickeration instance used by this artist'
         return self._picker
 
+
     def is_figure_set(self):
         return self.figure is not None
 
@@ -156,8 +197,19 @@ class Artist:
         ACCEPTS: a matplotlib.transform.Bbox instance
         """
         self.clipbox = clipbox
-        self._clipon = clipbox is not None
+        self._clipon = clipbox is not None or self._clippath is not None
         self.pchanged()
+
+    def set_clip_path(self, path):
+        """
+        Set the artist's clip path
+
+        ACCEPTS: an agg.path_storage instance
+        """
+        self._clippath = path
+        self._clipon = self.clipbox is not None or path is not None
+        self.pchanged()
+
 
     def get_alpha(self):
         """
@@ -176,11 +228,15 @@ class Artist:
 
     def get_clip_on(self):
         'Return whether artist uses clipping'
-        return self._clipon and self.clipbox is not None
+        return self._clipon and (self.clipbox is not None or self._clippath is not None)
 
     def get_clip_box(self):
         'Return artist clipbox'
         return self.clipbox
+
+    def get_clip_path(self):
+        'Return artist clip path'
+        return self._clippath
 
     def set_clip_on(self, b):
         """
@@ -189,8 +245,16 @@ class Artist:
         ACCEPTS: [True | False]
         """
         self._clipon = b
-        if not b: self.clipbox = None
+        if not b:
+            self.clipbox = None
+            self._clippath = None
         self.pchanged()
+
+    def _set_gc_clip(self, gc):
+        'set the clip properly for the gc'
+        if self.clipbox is not None:
+            gc.set_clip_rectangle(self.clipbox.get_bounds())
+        gc.set_clip_path(self._clippath)
 
     def draw(self, renderer, *args, **kwargs):
         'Derived classes drawing method'
@@ -262,6 +326,8 @@ class Artist:
         self._label = s
         self.pchanged()
 
+
+
     def get_zorder(self): return self.zorder
 
     def set_zorder(self, level):
@@ -297,6 +363,7 @@ class Artist:
             func = getattr(self,funcName)
             ret.extend( [func(v)] )
         return ret
+
 
 class ArtistInspector:
     """

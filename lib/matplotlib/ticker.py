@@ -14,16 +14,12 @@ Tick locating
 
 The Locator class is the base class for all tick locators.  The
 locators handle autoscaling of the view limits based on the data
-limits, and the choosing of tick locations.  The most generally useful
+limits, and the choosing of tick locations.  A useful semi-automatic
 tick locator is MultipleLocator.  You initialize this with a base, eg
 10, and it picks axis limits and ticks that are multiples of your
-base.  The class AutoLocator contains a MultipleLocator instance, and
-dynamically updates it based upon the data and zoom limits.  This
-should provide much more intelligent automatic tick locations both in
-figure creation and in navigation than in prior versions of
-matplotlib.
+base.
 
-The basic generic  locators are
+The Locator subclasses defined here are
 
   * NullLocator     - No ticks
 
@@ -38,8 +34,14 @@ The basic generic  locators are
   * MultipleLocator - ticks and range are a multiple of base;
                       either integer or float
 
-  * AutoLocator     - choose a MultipleLocator and dyamically reassign
+  * OldAutoLocator  - choose a MultipleLocator and dyamically reassign
                       it for intelligent ticking during navigation
+
+  * MaxNLocator     - finds up to a max number of ticks at nice
+                      locations
+
+  * AutoLocator     - MaxNLocator with simple defaults. This is the
+                      default tick locator for most plotting.
 
 There are a number of locators specialized for date locations - see
 the dates module
@@ -116,7 +118,7 @@ from numerix import absolute, arange, array, asarray, Float, floor, log, \
 from matplotlib.numerix.mlab import amin, amax, std, mean
 from matplotlib.mlab import frange
 from cbook import strip_math
-from transforms import nonsingular
+from transforms import nonsingular, Value, Interval
 
 class TickHelper:
 
@@ -136,6 +138,18 @@ class TickHelper:
 
     def set_data_interval(self, interval):
         self.dataInterval = interval
+
+    def set_bounds(self, vmin, vmax):
+        '''
+        Set dataInterval and viewInterval from numeric vmin, vmax.
+
+        This is for stand-alone use of Formatters and/or
+        Locators that require these intervals; that is, for
+        cases where the Intervals do not need to be updated
+        automatically.
+        '''
+        self.dataInterval = Interval(Value(vmin), Value(vmax))
+        self.viewInterval = Interval(Value(vmin), Value(vmax))
 
 class Formatter(TickHelper):
     """
@@ -812,9 +826,10 @@ class MaxNLocator(Locator):
     Select no more than N intervals at nice locations.
     """
 
-    def __init__(self, nbins = 10, steps = None, trim = True):
+    def __init__(self, nbins = 10, steps = None, trim = True, integer=False):
         self._nbins = int(nbins)
         self._trim = trim
+        self._integer = integer
         if steps is None:
             self._steps = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]
         else:
@@ -822,10 +837,14 @@ class MaxNLocator(Locator):
                 steps = list(steps)
                 steps.append(10)
             self._steps = steps
+        if integer:
+            self._steps = [n for n in self._steps if divmod(n,1)[1] < 0.001]
 
     def bin_boundaries(self, vmin, vmax):
         nbins = self._nbins
         scale, offset = scale_range(vmin, vmax, nbins)
+        if self._integer:
+            scale = max(1, scale)
         vmin -= offset
         vmax -= offset
         raw_step = (vmax-vmin)/nbins

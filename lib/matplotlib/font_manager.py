@@ -37,8 +37,12 @@ import os, sys, glob, shutil
 import matplotlib
 from matplotlib import afm
 from matplotlib import ft2font
-from matplotlib import rcParams, get_data_path, get_home, get_configdir
+from matplotlib import rcParams, get_home, get_configdir
 
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 
 verbose = matplotlib.verbose
 
@@ -98,11 +102,11 @@ def win32FontDirectory():
     return None
 
 def win32InstalledFonts(directory=None, fontext='ttf'):
-
-    """Search for fonts in the specified font directory, or use the
-system directories if none given.  A list of TrueType fonts are
-returned by default with AFM fonts as an option.
-"""
+    """
+    Search for fonts in the specified font directory, or use the
+    system directories if none given.  A list of TrueType fonts are
+    returned by default with AFM fonts as an option.
+    """
 
     import _winreg
     if directory is None:
@@ -180,12 +184,11 @@ def x11FontDirectory():
     return fontpaths
 
 def findSystemFonts(fontpaths=None, fontext='ttf'):
-
-    """Search for fonts in the specified font paths, or use the system
-paths if none given.  A list of TrueType fonts are returned by default
-with AFM fonts as an option.
-"""
-
+    """
+    Search for fonts in the specified font paths, or use the system
+    paths if none given.  A list of TrueType fonts are returned by default
+    with AFM fonts as an option.
+    """
     fontfiles = {}
 
     if fontpaths is None:
@@ -218,10 +221,10 @@ with AFM fonts as an option.
     return [fname for fname in fontfiles.keys() if os.path.exists(fname)]
 
 def weight_as_number(weight):
-    """Return the weight property as a numeric value.  String values
-are converted to their corresponding numeric value.
-"""
-
+    """
+    Return the weight property as a numeric value.  String values
+    are converted to their corresponding numeric value.
+    """
     if isinstance(weight, str):
         try:
             weight = weight_dict[weight.lower()]
@@ -235,9 +238,10 @@ are converted to their corresponding numeric value.
 
 
 class FontKey(object):
-    """A class for storing Font properties.  It is used when populating
-the font dictionary.
-"""
+    """
+    A class for storing Font properties.  It is used when populating
+    the font dictionary.
+    """
 
     def __init__(self,
                  name   ='',
@@ -259,7 +263,8 @@ the font dictionary.
 
 
 def ttfFontProperty(font):
-    """A function for populating the FontKey by extracting information
+    """
+    A function for populating the FontKey by extracting information
     from the TrueType font file.
     """
     name = font.family_name
@@ -351,9 +356,10 @@ def ttfFontProperty(font):
 
 
 def afmFontProperty(font):
-    """A function for populating the FontKey by extracting information
-from the AFM font file.
-"""
+    """
+    A function for populating the FontKey by extracting information
+    from the AFM font file.
+    """
 
     name = font.get_familyname()
 
@@ -408,11 +414,11 @@ from the AFM font file.
 
 
 def add_filename(fontdict, prop, fname):
-    """A function to add a font file name to the font dictionary using
-the FontKey properties.  If a font property has no dictionary, then
-create it.
-"""
-
+    """
+    A function to add a font file name to the font dictionary using
+    the FontKey properties.  If a font property has no dictionary, then
+    create it.
+    """
     try:
         size = str(float(prop.size))
     except ValueError:
@@ -428,10 +434,11 @@ create it.
 
 
 def createFontDict(fontfiles, fontext='ttf'):
-    """A function to create a dictionary of font file paths.  The
-default is to create a dictionary for TrueType fonts.  An AFM font
-dictionary can optionally be created.
-"""
+    """
+    A function to create a dictionary of font file paths.  The
+    default is to create a dictionary for TrueType fonts.  An AFM font
+    dictionary can optionally be created.
+    """
 
     fontdict = {}
     #  Add fonts from list of known font files.
@@ -443,9 +450,17 @@ dictionary can optionally be created.
         else: seen[fname] = 1
         if fontext == 'afm':
             try:
-                font = afm.AFM(file(fpath))
+                fh = open(fpath)
+            except:
+                verbose.report("Could not open font file %s" % fpath)
+                continue
+            try:
+                try:
+                    font = afm.AFM(fh)
+                finally:
+                    fh.close()
             except RuntimeError:
-                verbose.report("Could not open font file %s"%fpath)
+                verbose.report("Could not parse font file %s"%fpath)
                 continue
             prop = afmFontProperty(font)
         else:
@@ -483,10 +498,11 @@ dictionary can optionally be created.
     return fontdict
 
 def setWeights(font):
-    """A function to populate missing values in a font weight
-dictionary.  This proceedure is necessary since the font finding
-algorithm always matches on the weight property.
-"""
+    """
+    A function to populate missing values in a font weight
+    dictionary.  This proceedure is necessary since the font finding
+    algorithm always matches on the weight property.
+    """
 
     # !!!!  Not completely correct
     temp = font.copy()
@@ -530,59 +546,59 @@ algorithm always matches on the weight property.
 
 
 class FontProperties:
-    """A class for storing and manipulating font properties.
+    """
+    A class for storing and manipulating font properties.
 
-The font properties are those described in the W3C Cascading Style
-Sheet, Level 1 (CSS1; http://www.w3.org/TR/1998/REC-CSS2-19980512/)
-font specification.  The six properties are:
+    The font properties are those described in the W3C Cascading Style
+    Sheet, Level 1 (CSS1; http://www.w3.org/TR/1998/REC-CSS2-19980512/)
+    font specification.  The six properties are:
 
-  family  - A list of font names in decreasing order of priority.
-            The last item is the default font name and is given the
-            name of the font family, either serif, sans-serif,
-            cursive, fantasy, and monospace.
-  style   - Either normal, italic or oblique.
-  variant - Either normal or small-caps.
-  stretch - Either an absolute value of ultra-condensed, extra-
-            condensed, condensed, semi-condensed, normal, semi-
-            expanded, expanded, extra-expanded or ultra-expanded;
-            or a relative value of narrower or wider.
-            This property is currently not implemented and is set to
-            normal.
-  weight  - A numeric value in the range 100, 200, 300, ..., 900.
-  size    - Either an absolute value of xx-small, x-small, small,
-            medium, large, x-large, xx-large; or a relative value
-            of smaller or larger; or an absolute font size, e.g. 12;
-            or scalable.
+      family  - A list of font names in decreasing order of priority.
+                The last item is the default font name and is given the
+                name of the font family, either serif, sans-serif,
+                cursive, fantasy, and monospace.
+      style   - Either normal, italic or oblique.
+      variant - Either normal or small-caps.
+      stretch - Either an absolute value of ultra-condensed, extra-
+                condensed, condensed, semi-condensed, normal, semi-
+                expanded, expanded, extra-expanded or ultra-expanded;
+                or a relative value of narrower or wider.
+                This property is currently not implemented and is set to
+                normal.
+      weight  - A numeric value in the range 100, 200, 300, ..., 900.
+      size    - Either an absolute value of xx-small, x-small, small,
+                medium, large, x-large, xx-large; or a relative value
+                of smaller or larger; or an absolute font size, e.g. 12;
+                or scalable.
 
-The default font property for TrueType fonts is: sans-serif, normal,
-normal, normal, 400, scalable.
+    The default font property for TrueType fonts is: sans-serif, normal,
+    normal, normal, 400, scalable.
 
-The preferred usage of font sizes is to use the absolute values, e.g.
-large, instead of absolute font sizes, e.g. 12.  This approach allows
-all text sizes to be made larger or smaller based on the font manager's
-default font size, i.e. by using the set_default_size() method of the
-font manager.
+    The preferred usage of font sizes is to use the absolute values, e.g.
+    large, instead of absolute font sizes, e.g. 12.  This approach allows
+    all text sizes to be made larger or smaller based on the font manager's
+    default font size, i.e. by using the set_default_size() method of the
+    font manager.
 
+    Examples:
 
-Examples:
+      #  Load default font properties
+      >>> p = FontProperties()
+      >>> p.get_family()
+      ['Bitstream Vera Sans', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucida', 'Arial', 'Helvetica', 'sans-serif']
 
-  #  Load default font properties
-  >>> p = FontProperties()
-  >>> p.get_family()
-  ['Bitstream Vera Sans', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucida', 'Arial', 'Helvetica', 'sans-serif']
+      #  Change font family to 'fantasy'
+      >>> p.set_family('fantasy')
+      >>> p.get_family()
+      ['Comic Sans MS', 'Chicago', 'Charcoal', 'Impact', 'Western', 'fantasy']
 
-  #  Change font family to 'fantasy'
-  >>> p.set_family('fantasy')
-  >>> p.get_family()
-  ['Comic Sans MS', 'Chicago', 'Charcoal', 'Impact', 'Western', 'fantasy']
+      #  Make these fonts highest priority in font family
+      >>> p.set_name(['foo', 'fantasy', 'bar', 'baz'])
+      Font name 'fantasy' is a font family. It is being deleted from the list.
+      >>> p.get_family()
+      ['foo', 'bar', 'baz', 'Comic Sans MS', 'Chicago', 'Charcoal', 'Impact', 'Western', 'fantasy']
 
-  #  Make these fonts highest priority in font family
-  >>> p.set_name(['foo', 'fantasy', 'bar', 'baz'])
-  Font name 'fantasy' is a font family. It is being deleted from the list.
-  >>> p.get_family()
-  ['foo', 'bar', 'baz', 'Comic Sans MS', 'Chicago', 'Charcoal', 'Impact', 'Western', 'fantasy']
-
-"""
+    """
 
     def __init__(self,
                  family = None,
@@ -629,42 +645,40 @@ Examples:
         return self.__family
 
     def get_name(self):
-        """Return the name of the font that best matches the font
-properties.
-"""
+        """Return the name of the font that best matches the font properties."""
         return ft2font.FT2Font(str(fontManager.findfont(self))).family_name
 
     def get_style(self):
-        """Return the font style.  Values are: normal, italic or oblique.
-        """
+        """Return the font style.  Values are: normal, italic or oblique."""
         return self.__style
 
     def get_variant(self):
-        """Return the font variant.  Values are: normal or small-caps.
-        """
+        """Return the font variant.  Values are: normal or small-caps."""
         return self.__variant
 
     def get_weight(self):
-        """Return the font weight.  See the FontProperties class for a
-a list of possible values.
-"""
+        """
+        Return the font weight.  See the FontProperties class for a
+        a list of possible values.
+        """
         return self.__weight
 
     def get_stretch(self):
-        """Return the font stretch or width.  Options are: normal,
-narrow, condensed, or wide.
-"""
+        """
+        Return the font stretch or width.  Options are: normal,
+        narrow, condensed, or wide.
+        """
         return self.__stretch
 
     def get_size(self):
-        """Return the font size.
-        """
+        """Return the font size."""
         return self.__size
 
     def set_family(self, family):
-        """Change the font family.  Options are: serif, sans-serif, cursive,
-fantasy, or monospace."""
-
+        """
+        Change the font family.  Options are: serif, sans-serif, cursive,
+        fantasy, or monospace.
+        """
         try:
             self.__family = rcParams['font.'+family]
             if isinstance(self.__family, str):
@@ -673,12 +687,12 @@ fantasy, or monospace."""
             raise KeyError, '%s - use serif, sans-serif, cursive, fantasy, or monospace.' % family
 
     def set_name(self, names):
-
-        """Add one or more font names to the font family list.  If the
-font name is already in the list, then the font is given a higher
-priority in the font family list.  To change the font family, use the
-set_family() method.
-"""
+        """
+        Add one or more font names to the font family list.  If the
+    font name is already in the list, then the font is given a higher
+    priority in the font family list.  To change the font family, use the
+    set_family() method.
+    """
 
         msg = "Font name '%s' is a font family. It is being deleted from the list."
         font_family = ['serif', 'sans-serif', 'cursive', 'fantasy',
@@ -702,36 +716,36 @@ set_family() method.
         self.__family = names + self.__family
 
     def set_style(self, style):
-        """Set the font style.  Values are: normal, italic or oblique.
-        """
+        """Set the font style.  Values are: normal, italic or oblique."""
         self.__style = style
 
     def set_variant(self, variant):
-        """Set the font variant.  Values are: normal or small-caps.
-        """
+        """Set the font variant.  Values are: normal or small-caps."""
         self.__variant = variant
 
     def set_weight(self, weight):
-        """Set the font weight.  See the FontProperties class for a
-a list of possible values.
-"""
+        """
+        Set the font weight.  See the FontProperties class for a
+        a list of possible values.
+        """
         self.__weight = weight
 
     def set_stretch(self, stretch):
-        """Set the font stretch or width.  Options are: normal, narrow,
-condensed, or wide.
-"""
+        """
+        Set the font stretch or width.  Options are: normal, narrow,
+        condensed, or wide.
+        """
         self.__stretch = stretch
 
     def set_size(self, size):
-        """Set the font size.
-        """
+        """Set the font size."""
         self.__size = size
 
     def get_size_in_points(self, parent_size=None):
-        """Return the size property as a numeric value.  String values
-are converted to their corresponding numeric value.
-"""
+        """
+        Return the size property as a numeric value.  String values
+        are converted to their corresponding numeric value.
+        """
         if self.__size in font_scalings.keys():
             size = fontManager.get_default_size()*font_scalings[self.__size]
         elif self.__size == 'larger':
@@ -763,23 +777,43 @@ def ttfdict_to_fnames(d):
                             fnames.append(fname)
     return fnames
 
-class FontManager:
+def pickle_dump(data, filename):
+    """Equivalent to pickle.dump(data, open(filename, 'w'))
+    but closes the file to prevent filehandle leakage."""
+    fh = open(filename, 'w')
+    try:
+        pickle.dump(data, fh)
+    finally:
+        fh.close()
 
-    """On import, the FontManager creates a dictionary of TrueType
-fonts based on the font properties: name, style, variant, weight,
-stretch, and size.  The findfont() method searches this dictionary
-for a font file name that exactly matches the font properties of the
-specified text.  If none is found, a default font is returned.  By
-updating the dictionary with the properties of the found font, the
-font dictionary can act like a font cache.
-"""
+def pickle_load(filename):
+    """Equivalent to pickle.load(open(filename, 'r'))
+    but closes the file to prevent filehandle leakage."""
+    fh = open(filename, 'r')
+    try:
+        data = pickle.load(fh)
+    finally:
+        fh.close()
+    return data
+
+class FontManager:
+    """
+    On import, the FontManager creates a dictionary of TrueType
+    fonts based on the font properties: name, style, variant, weight,
+    stretch, and size.  The findfont() method searches this dictionary
+    for a font file name that exactly matches the font properties of the
+    specified text.  If none is found, a default font is returned.  By
+    updating the dictionary with the properties of the found font, the
+    font dictionary can act like a font cache.
+    """
 
     def __init__(self, size=None, weight='normal'):
         if not size : size = rcParams['font.size']
         self.__default_size = size
         self.__default_weight = weight
-
-        paths = [rcParams['datapath']]
+        
+        paths = [os.path.join(rcParams['datapath'],'fonts','ttf'),
+                 os.path.join(rcParams['datapath'],'fonts','afm')]
 
         #  Create list of font paths
 
@@ -811,29 +845,19 @@ font dictionary can act like a font cache.
 """Saving TTF font cache for non-PS backends to %s.
 Delete this file to have matplotlib rebuild the cache."""
 
-
-
         oldcache = os.path.join(get_home(), 'ttffont.cache')
         ttfcache = os.path.join(get_configdir(), 'ttffont.cache')
         if os.path.exists(oldcache):
             print >> sys.stderr, 'Moving old ttfcache location "%s" to new location "%s"'%(oldcache, ttfcache)
             shutil.move(oldcache, ttfcache)
 
-
-
-        try:
-            import cPickle as pickle
-        except ImportError:
-            import pickle
-
-
         def rebuild():
             self.ttfdict = createFontDict(self.ttffiles)
-            pickle.dump(self.ttfdict, file(ttfcache, 'w'))
+            pickle_dump(self.ttfdict, ttfcache)
             verbose.report(cache_message % ttfcache)
 
         try:
-            self.ttfdict = pickle.load(file(ttfcache))
+            self.ttfdict = pickle_load(ttfcache)
         except:
             rebuild()
         else:
@@ -844,14 +868,11 @@ Delete this file to have matplotlib rebuild the cache."""
                     break
             verbose.report('loaded ttfcache file %s'%ttfcache)
 
-
-
         #self.ttfdict = createFontDict(self.ttffiles)
 
         #  Load AFM fonts for PostScript
         #  Only load file names at this stage, the font dictionary will be
         #  created when needed.
-
         self.afmfiles = findSystemFonts(paths, fontext='afm') + \
                         findSystemFonts(fontext='afm')
         self.afmdict = {}
@@ -873,30 +894,27 @@ Delete this file to have matplotlib rebuild the cache."""
         self.__default_size = size
 
     def update_fonts(self, filenames):
-        """Update the font dictionary with new font files.
-Currently not implemented."""
+        """
+        Update the font dictionary with new font files.
+        Currently not implemented.
+        """
         #  !!!!  Needs implementing
         raise NotImplementedError
 
-
     def findfont(self, prop, fontext='ttf'):
+        """
+        Search the font dictionary for a font that exactly or closely
+        matches the specified font properties.  See the FontProperties class
+        for a description.
 
-        """Search the font dictionary for a font that exactly or closely
-matches the specified font properties.  See the FontProperties class
-for a description.
-
-The properties are searched in the following order: name, style,
-variant, weight, stretch, and size.  The font weight always matches
-returning the closest weight, and the font size always matches for
-scalable fonts.  An oblique style font will be used inplace of a
-missing italic style font if present.  See the W3C Cascading Style
-Sheet, Level 1 (CSS1; http://www.w3.org/TR/1998/REC-CSS2-19980512/)
-documentation for a description of the font finding algorithm.
-"""
-        cache_message = \
-"""Saving AFM font cache for PS backend to %s.
-Delete this file to have matplotlib rebuild the cache."""
-
+        The properties are searched in the following order: name, style,
+        variant, weight, stretch, and size.  The font weight always matches
+        returning the closest weight, and the font size always matches for
+        scalable fonts.  An oblique style font will be used inplace of a
+        missing italic style font if present.  See the W3C Cascading Style
+        Sheet, Level 1 (CSS1; http://www.w3.org/TR/1998/REC-CSS2-19980512/)
+        documentation for a description of the font finding algorithm.
+        """
         debug = False
         if prop.fname is not None:
             fname = prop.fname
@@ -905,17 +923,7 @@ Delete this file to have matplotlib rebuild the cache."""
 
         if fontext == 'afm':
             if len(self.afmdict) == 0:
-                afmcache = os.path.join(get_configdir(), '.afmfont.cache')
-                try:
-                    import cPickle as pickle
-                except ImportError:
-                    import pickle
-                try:
-                    self.afmdict = pickle.load(file(afmcache))
-                except:
-                    self.afmdict = createFontDict(self.afmfiles, fontext='afm')
-                    pickle.dump(self.afmdict, file(afmcache, 'w'))
-                    verbose.report(cache_message % afmcache)
+                self.afmdict = self._get_afm_font_dict()
             fontdict = self.afmdict
         else:
             fontdict = self.ttfdict
@@ -926,7 +934,6 @@ Delete this file to have matplotlib rebuild the cache."""
         weight  = weight_as_number(prop.get_weight())
         stretch = prop.get_stretch()
         size    = str(prop.get_size_in_points())
-
 
         try:
             fname = fontdict[name][style][variant][weight][stretch][size]
@@ -989,5 +996,38 @@ Delete this file to have matplotlib rebuild the cache."""
         verbose.report('Could not match %s, %s, %s.  Returning %s' % (name, style, variant, self.defaultFont))
 
         return self.defaultFont
+
+    def _get_afm_font_dict(self):
+        cache_message = "Saving AFM font cache for PS and PDF backends to %s.\n" \
+                        "Delete this file to have matplotlib rebuild the cache."
+        
+        if rcParams['pdf.use14corefonts']:
+            # Load only the 14 PDF core fonts. These fonts do not need to be 
+            # embedded; every PDF viewing application is required to have them:
+            # Helvetica, Helvetica-Bold, Helvetica-Oblique, Helvetica-BoldOblique, 
+            # Courier, Courier-Bold, Courier-Oblique, Courier-BoldOblique, 
+            # Times-Roman, Times-Bold, Times-Italic, Times-BoldItalic, Symbol, 
+            # ZapfDingbats.
+            afmcache = os.path.join(get_configdir(), 'pdfcorefont.cache')
+            try:
+                fontdict = pickle_load(afmcache)
+            except:
+                afmpath = os.path.join(rcParams['datapath'],'fonts','pdfcorefonts')
+                afmfiles = findSystemFonts(afmpath, fontext='afm')
+                fontdict = createFontDict(afmfiles, fontext='afm')
+                pickle_dump(fontdict, afmcache)
+                verbose.report(cache_message % afmcache)
+        else:
+            # Load all available AFM fonts
+            afmcache = os.path.join(get_configdir(), '.afmfont.cache')
+            try:
+                fontdict = pickle_load(afmcache)
+            except:
+                fontdict = createFontDict(self.afmfiles, fontext='afm')
+                pickle_dump(fontdict, afmcache)
+                verbose.report(cache_message % afmcache)
+        
+        return fontdict
+
 
 fontManager = FontManager()

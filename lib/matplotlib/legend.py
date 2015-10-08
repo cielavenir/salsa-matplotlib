@@ -52,7 +52,6 @@ def line_cuts_bbox(line, bbox):
 
     if n == 1:
         return bbox.contains(line[0][0], line[0][1])
-
     p1 = line[0]
     for p2 in line[1:]:
         segment = (p1, p2)
@@ -315,7 +314,7 @@ The following dimensions are in axes coords
             raise Exception, 'Auto legends not available for figure legends.'
 
         def get_handles(ax):
-            handles = ax.lines
+            handles = ax.lines[:]
             handles.extend(ax.patches)
             handles.extend([c for c in ax.collections if isinstance(c, LineCollection)])
 
@@ -332,8 +331,8 @@ The following dimensions are in axes coords
 
             if isinstance(handle, Line2D):
 
-                xdata = handle.get_xdata(valid_only = True)
-                ydata = handle.get_ydata(valid_only = True)
+                xdata = handle.get_xdata(orig=False)
+                ydata = handle.get_ydata(orig=False)
                 trans = handle.get_transform()
                 xt, yt = trans.numerix_x_y(xdata, ydata)
 
@@ -359,7 +358,7 @@ The following dimensions are in axes coords
                 for line in hlines:
                     tline = trans.seq_xy_tups(line)
                     aline = [inv(v) for v in tline]
-                    lines.extend(line)
+                    lines.append(aline)
 
         return [vertices, bboxes, lines]
 
@@ -418,7 +417,7 @@ The following dimensions are in axes coords
 
         for h in self.legendHandles:
             if isinstance(h, Line2D):
-                x,y = h.get_xdata(valid_only = True), h.get_ydata(valid_only = True)
+                x,y = h.get_xdata(orig=False), h.get_ydata(orig=False)
                 h.set_data( x+ox, y+oy)
             elif isinstance(h, Rectangle):
                 h.xy[0] = h.xy[0] + ox

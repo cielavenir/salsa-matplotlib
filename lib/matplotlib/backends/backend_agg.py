@@ -139,7 +139,7 @@ class RendererAgg(RendererBase):
                                      'debug-annoying')
 
     def draw_arc(self, gcEdge, rgbFace, x, y, width, height, angle1, angle2, rotation):
-        """        
+        """
         Draw an arc centered at x,y with width and height and angles
         from 0.0 to 360.0
 
@@ -172,8 +172,8 @@ class RendererAgg(RendererBase):
         if __debug__: verbose.report('RendererAgg.draw_point', 'debug-annoying')
         rgbFace = gc.get_rgb()
         self._renderer.draw_ellipse(
-            gc, rgbFace, x, y, 0.5, 0.5)
-
+            gc, rgbFace, x, y, 0.5, 0.5, 0.0)
+            
     def draw_mathtext(self, gc, x, y, s, prop, angle):
         """
         Draw the math text using matplotlib.mathtext
@@ -257,13 +257,13 @@ class RendererAgg(RendererBase):
         rgb = gc.get_rgb()
         size = prop.get_size_in_points()
         dpi = self.dpi.get()
-        
+
         flip = angle==90
         w,h = self.get_text_width_height(s, prop, 'TeX', rgb)
         if flip:
             w,h = h,w
             x -= w
-        
+
         texmanager = self.get_texmanager()
         key = s, size, dpi, rgb, angle, texmanager.get_font_config()
         im = self.texd.get(key)
@@ -455,6 +455,7 @@ class FigureCanvasAgg(FigureCanvasBase):
         # render the printed figure
         self.draw()
 
+        printfunc = None
         if not is_string_like(filename):
             # assume png and write to fileobject
             self.renderer._renderer.write_png(filename)
@@ -479,23 +480,33 @@ class FigureCanvasAgg(FigureCanvasBase):
             elif ext.find('svg')>=0:
                 from backend_svg import FigureCanvasSVG
                 svg = self.switch_backends(FigureCanvasSVG)
-                svg.print_figure(filename, dpi, facecolor, edgecolor,
-                                 orientation, **kwargs)
+                printfunc = svg.print_figure
             elif ext.find('ps')>=0 or ext.find('ep')>=0:
                 from backend_ps import FigureCanvasPS # lazy import
                 ps = self.switch_backends(FigureCanvasPS)
-                ps.print_figure(filename, dpi, facecolor, edgecolor,
-                                orientation, **kwargs)
-	    elif ext.find('pdf')>=0:
-		from backend_pdf import FigureCanvasPdf
-		pdf = self.switch_backends(FigureCanvasPdf)
-		pdf.print_figure(filename, dpi, facecolor, edgecolor,
-				 orientation, **kwargs)
+                printfunc = ps.print_figure
+            elif ext.find('pdf')>=0:
+                from backend_pdf import FigureCanvasPdf
+                pdf = self.switch_backends(FigureCanvasPdf)
+                printfunc = pdf.print_figure
             else:
                 raise IOError('Do not know know to handle extension *%s' % ext)
+
+        if printfunc is not None:
+            try:
+                printfunc(filename, dpi, facecolor, edgecolor, orientation, **kwargs)
+            except:
+                # restore the original figure properties
+                self.figure.dpi.set(origDPI)
+                self.figure.set_facecolor(origfacecolor)
+                self.figure.set_edgecolor(origedgecolor)
+                self.figure.set_canvas(self)            
+                raise
 
         # restore the original figure properties
         self.figure.dpi.set(origDPI)
         self.figure.set_facecolor(origfacecolor)
         self.figure.set_edgecolor(origedgecolor)
         self.figure.set_canvas(self)
+            
+            

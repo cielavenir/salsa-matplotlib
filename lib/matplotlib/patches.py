@@ -4,7 +4,7 @@ from matplotlib import rcParams
 from numerix import array, arange, sin, cos, pi, Float, sqrt, \
      matrixmultiply, sqrt, nonzero, equal, asarray, dot, concatenate
 from artist import Artist, setp, kwdocd
-from cbook import enumerate, popd, dedent
+from cbook import enumerate, dedent
 from colors import colorConverter
 from lines import Line2D
 from transforms import bound_vertices
@@ -95,8 +95,8 @@ class Patch(Artist):
                 inside = nxutils.pnpoly(x, y, xyverts)
                 if inside:
                     self.figure.canvas.pick_event(mouseevent, self)
-        
-        
+
+
     def update_from(self, other):
         Artist.update_from(self, other)
         self.set_edgecolor(other.get_edgecolor())
@@ -107,6 +107,7 @@ class Patch(Artist):
         self.set_transform(other.get_transform())
         self.set_figure(other.get_figure())
         self.set_alpha(other.get_alpha())
+
 
     def get_antialiased(self):
         return self._antialiased
@@ -201,8 +202,7 @@ class Patch(Artist):
         gc.set_linewidth(self._linewidth)
         gc.set_alpha(self._alpha)
         gc.set_antialiased(self._antialiased)
-        if self.get_clip_on(): gc.set_clip_rectangle(
-            self.clipbox.get_bounds())
+        self._set_gc_clip(gc)
         gc.set_capstyle('projecting')
 
         if not self.fill or self._facecolor is None: rgbFace = None
@@ -224,6 +224,7 @@ class Patch(Artist):
         Return the vertices of the patch
         """
         raise NotImplementedError('Derived must override')
+
 
     def get_window_extent(self, renderer=None):
         verts = self.get_verts()
@@ -266,6 +267,7 @@ class Patch(Artist):
         'alias for get_facecolor'
         return self.get_facecolor()
 
+
 class Shadow(Patch):
     def __init__(self, patch, ox, oy, props=None, **kwargs):
         """
@@ -283,6 +285,7 @@ class Shadow(Patch):
         self._update()
     __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
 
+
     def _update(self):
         self.update_from(self.patch)
         if self.props is not None:
@@ -299,8 +302,8 @@ class Shadow(Patch):
 
     def get_verts(self):
         verts = self.patch.get_verts()
-        xs = [x+self.ox for x,y in verts]
-        ys = [y+self.oy for x,y in verts]
+        xs = self.convert_xunits([x+self.ox for x,y in verts])
+        ys = self.convert_yunits([y+self.oy for x,y in verts])
         return zip(xs, ys)
 
     def _draw(self, renderer):
@@ -330,17 +333,22 @@ class Rectangle(Patch):
 
         Patch.__init__(self, **kwargs)
 
-        self.xy  = array(xy, Float)
+        self.xy  = list(xy)
         self.width, self.height = width, height
     __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
+
 
     def get_verts(self):
         """
         Return the vertices of the rectangle
         """
         x, y = self.xy
-        return ( (x, y), (x, y+self.height),
-                 (x+self.width, y+self.height), (x+self.width, y),
+
+        left, right = self.convert_xunits((x, x + self.width))
+        bottom, top = self.convert_yunits((y, y + self.height))
+
+        return ( (left, bottom), (left, top),
+                 (right, top), (right, bottom),
                  )
 
     def get_x(self):
@@ -401,7 +409,7 @@ class Rectangle(Patch):
             l,b,w,h = args[0]
         else:
             l,b,w,h = args
-        self.xy = array([float(l),float(b)])
+        self.xy = [l,b]
         self.width = w
         self.height = h
 
@@ -428,16 +436,25 @@ class RegularPolygon(Patch):
         self.radius = radius
         self.orientation = orientation
 
-        theta = 2*pi/self.numVertices*arange(self.numVertices) + \
-                self.orientation
-        r = self.radius
-        xs = self.xy[0] + r*cos(theta)
-        ys = self.xy[1] + r*sin(theta)
-
-        self.verts = zip(xs, ys)
     __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
 
+
+
     def get_verts(self):
+        theta = 2*pi/self.numVertices*arange(self.numVertices) + \
+                self.orientation
+        r = float(self.radius)
+        x, y = map(float, self.xy)
+
+        xs = x + r*cos(theta)
+        ys = y + r*sin(theta)
+
+        #xs = self.convert_xunits(xs)
+        #ys = self.convert_yunits(ys)
+
+
+        self.verts = zip(xs, ys)
+
         return self.verts
 
 class Polygon(Patch):
@@ -446,7 +463,7 @@ class Polygon(Patch):
     """
     def __init__(self, xy, **kwargs):
         """
-        xy is a sequence of x,y 2 tuples tuples
+        xy is a sequence of (x,y) 2 tuples
 
         Valid kwargs are:
         %(Patch)s
@@ -459,8 +476,13 @@ class Polygon(Patch):
         self.xy = xy
     __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
 
+
+
     def get_verts(self):
-        return self.xy
+        xs, ys = zip(*self.xy)[:2]
+        xs = self.convert_xunits(xs)
+        ys = self.convert_yunits(ys)
+        return zip(xs, ys)
 
 
 class Wedge(Polygon):
@@ -611,6 +633,8 @@ class YAArrow(Polygon):
         Polygon.__init__(self, verts, **kwargs)
     __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
 
+
+
     def get_verts(self):
         # the base vertices
         x1, y1 = self.xytip
@@ -628,8 +652,9 @@ class YAArrow(Polygon):
         xd1, yd1, xd2, yd2 = self.getpoints(x1, y1, xm, ym, k2)
 
 
-        verts = [(xb1,yb1), (xb2,yb2), (xc2, yc2), (xd2, yd2), (x1, y1), (xd1, yd1), (xc1, yc1)]
-        return verts
+        xs = self.convert_xunits([xb1, xb2, xc2, xd2, x1, xd1, xc1])
+        ys = self.convert_yunits([yb1, yb2, yc2, yd2, y1, yd1, yc1])
+        return zip(xs, ys)
 
 
     def getpoints(self, x1,y1,x2,y2, k):
@@ -680,7 +705,7 @@ class CirclePolygon(RegularPolygon):
 class Ellipse(Patch):
     """
     A scale-free ellipse
-        """
+    """
     def __init__(self, xy, width, height, angle=0.0, **kwargs):
         """
         xy - center of ellipse
@@ -693,23 +718,18 @@ class Ellipse(Patch):
         """
         Patch.__init__(self, **kwargs)
 
-        self.center  = array(xy, Float)
+        # self.center  = array(xy, Float)
+        self.center = xy
         self.width, self.height = width, height
         self.angle = angle
 
-        x,y = self.center
-        l,r = x-width/2.0, x+width/2.0
-        b,t = y-height/2.0, y+height/2.0
-
-        self.verts = array(((x,y),(l,y),(x,t),(r,y),(x,b)), Float)
-    __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
-
     def get_verts(self):
-        """
-        Not actually used for rendering.  Provided to conform to
-        Patch super class.
-        """
-        return self.verts
+        x,y = self.center
+        l,r = x-self.width/2.0, x+self.width/2.0
+        b,t = y-self.height/2.0, y+self.height/2.0
+        x,l,r = self.convert_xunits((x,l,r))
+        y,b,t = self.convert_yunits((y,b,t))
+        return array(((x,y),(l,y),(x,t),(r,y),(x,b)), Float)
 
     def draw(self, renderer):
         if not self.get_visible(): return
@@ -719,8 +739,8 @@ class Ellipse(Patch):
         gc.set_linewidth(self._linewidth)
         gc.set_alpha(self._alpha)
         gc.set_antialiased(self._antialiased)
-        if self.get_clip_on(): gc.set_clip_rectangle(
-            self.clipbox.get_bounds())
+        self._set_gc_clip(gc)
+
         gc.set_capstyle('projecting')
 
         if not self.fill or self._facecolor is None: rgbFace = None
@@ -729,11 +749,13 @@ class Ellipse(Patch):
         if self._hatch:
             gc.set_hatch(self._hatch )
 
-        tverts = self.get_transform().seq_xy_tups(self.verts) # center is first vert
+        tverts = self.get_transform().seq_xy_tups(self.get_verts())
+        # center is first vert
         width = tverts[3,0] - tverts[1,0]
         height = tverts[2,1] - tverts[4,1]
 
-        renderer.draw_arc(gc, rgbFace, tverts[0,0], tverts[0,1], width, height, 0.0, 360.0, self.angle)
+        renderer.draw_arc(gc, rgbFace, tverts[0,0], tverts[0,1],
+                          width, height, 0.0, 360.0, self.angle)
 
 class Circle(Ellipse):
     """
@@ -753,7 +775,7 @@ class Circle(Ellipse):
         if kwargs.has_key('resolution'):
             import warnings
             warnings.warn('Circle is now scale free.  Use CirclePolygon instead!', DeprecationWarning)
-            popd(kwargs, 'resolution')
+            kwargs.pop('resolution')
 
         self.radius = radius
         Ellipse.__init__(self, xy, radius*2, radius*2, **kwargs)
@@ -885,7 +907,7 @@ def bbox_artist(artist, renderer, props=None, fill=True):
     """
     if props is None: props = {}
     props = props.copy() # don't want to alter the pad externally
-    pad = popd(props, 'pad', 4)
+    pad = props.pop('pad', 4)
     pad = renderer.points_to_pixels(pad)
     bbox = artist.get_window_extent(renderer)
     l,b,w,h = bbox.get_bounds()
