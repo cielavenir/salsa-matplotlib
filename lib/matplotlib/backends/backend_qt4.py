@@ -5,7 +5,7 @@ import sys
 
 import matplotlib
 from matplotlib import verbose
-from matplotlib.cbook import is_string_like, enumerate, onetrue
+from matplotlib.cbook import is_string_like, onetrue
 from matplotlib.backend_bases import RendererBase, GraphicsContextBase, \
      FigureManagerBase, FigureCanvasBase, NavigationToolbar2, cursors
 from matplotlib._pylab_helpers import Gcf
@@ -13,7 +13,7 @@ from matplotlib.figure import Figure
 from matplotlib.mathtext import MathTextParser
 from matplotlib.widgets import SubplotTool
 
-from PyQt4 import QtCore, QtGui
+from PyQt4 import QtCore, QtGui, Qt
 
 backend_version = "0.9.1"
 def fn_name(): return sys._getframe(1).f_code.co_name
@@ -21,8 +21,8 @@ def fn_name(): return sys._getframe(1).f_code.co_name
 DEBUG = False
 
 cursord = {
-    cursors.MOVE          : QtCore.Qt.PointingHandCursor,
-    cursors.HAND          : QtCore.Qt.WaitCursor,
+    cursors.MOVE          : QtCore.Qt.SizeAllCursor,
+    cursors.HAND          : QtCore.Qt.PointingHandCursor,
     cursors.POINTER       : QtCore.Qt.ArrowCursor,
     cursors.SELECT_REGION : QtCore.Qt.CrossCursor,
     }
@@ -101,7 +101,7 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
     def mousePressEvent( self, event ):
         x = event.pos().x()
         # flipy so y=0 is bottom of canvas
-        y = self.figure.bbox.height() - event.pos().y()
+        y = self.figure.bbox.height - event.pos().y()
         button = self.buttond[event.button()]
         FigureCanvasBase.button_press_event( self, x, y, button )
         if DEBUG: print 'button pressed:', event.button()
@@ -109,18 +109,17 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
     def mouseMoveEvent( self, event ):
         x = event.x()
         # flipy so y=0 is bottom of canvas
-        y = self.figure.bbox.height() - event.y()
+        y = self.figure.bbox.height - event.y()
         FigureCanvasBase.motion_notify_event( self, x, y )
         #if DEBUG: print 'mouse move'
 
     def mouseReleaseEvent( self, event ):
         x = event.x()
         # flipy so y=0 is bottom of canvas
-        y = self.figure.bbox.height() - event.y()
+        y = self.figure.bbox.height - event.y()
         button = self.buttond[event.button()]
         FigureCanvasBase.button_release_event( self, x, y, button )
         if DEBUG: print 'button released'
-        self.draw()
 
     def keyPressEvent( self, event ):
         key = self._get_key( event )
@@ -138,7 +137,7 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
         w = event.size().width()
         h = event.size().height()
         if DEBUG: print "FigureCanvasQtAgg.resizeEvent(", w, ",", h, ")"
-        dpival = self.figure.dpi.get()
+        dpival = self.figure.dpi
         winch = w/dpival
         hinch = h/dpival
         self.figure.set_size_inches( winch, hinch )
@@ -149,7 +148,7 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
         QtGui.QWidget.resize( self, w, h )
 
         # Resize the figure by converting pixels to inches.
-        pixelPerInch = self.figure.dpi.get()
+        pixelPerInch = self.figure.dpi
         wInch = w / pixelPerInch
         hInch = h / pixelPerInch
         self.figure.set_size_inches( wInch, hInch )
@@ -174,6 +173,9 @@ class FigureCanvasQT( QtGui.QWidget, FigureCanvasBase ):
 
         return key
 
+    def flush_events(self):
+        Qt.qApp.processEvents()
+
 class FigureManagerQT( FigureManagerBase ):
     """
     Public attributes
@@ -195,9 +197,6 @@ class FigureManagerQT( FigureManagerBase ):
         image = os.path.join( matplotlib.rcParams['datapath'],'images','matplotlib.png' )
         self.window.setWindowIcon(QtGui.QIcon( image ))
 
-        centralWidget = QtGui.QWidget( self.window )
-        self.canvas.setParent( centralWidget )
-
         # Give the keyboard focus to the figure instead of the manager
         self.canvas.setFocusPolicy( QtCore.Qt.ClickFocus )
         self.canvas.setFocus()
@@ -206,30 +205,12 @@ class FigureManagerQT( FigureManagerBase ):
                             self._widgetclosed )
         self.window._destroying = False
 
-        self.toolbar = self._get_toolbar(self.canvas, centralWidget)
+        self.toolbar = self._get_toolbar(self.canvas, self.window)
+        self.window.addToolBar(self.toolbar)
+        QtCore.QObject.connect(self.toolbar, QtCore.SIGNAL("message"),
+                self.window.statusBar().showMessage)
 
-        # Use a vertical layout for the plot and the toolbar.  Set the
-        # stretch to all be in the plot so the toolbar doesn't resize.
-        layout = QtGui.QVBoxLayout( centralWidget )
-        layout.setMargin( 0 )
-        layout.addWidget( self.canvas, 1 )
-        if self.toolbar:
-           layout.addWidget( self.toolbar, 0 )
-
-        self.window.setCentralWidget( centralWidget )
-
-        # Reset the window height so the canvas will be the right
-        # size.  This ALMOST works right.  The first issue is that the
-        # reported toolbar height does not include the margin (so
-        # we add the margin).  The second is that the total width/height
-        # is slightly smaller that we actually want.  It seems like
-        # the border of the window is being included in the size but
-        # AFAIK there is no way to get that size.
-        w = self.canvas.width()
-        h = self.canvas.height()
-        if self.toolbar:
-           h += self.toolbar.height() + NavigationToolbar2QT.margin
-        self.window.resize( w, h )
+        self.window.setCentralWidget(self.canvas)
 
         if matplotlib.is_interactive():
             self.window.show()
@@ -240,7 +221,7 @@ class FigureManagerQT( FigureManagerBase ):
         def notify_axes_change( fig ):
            # This will be called whenever the current axes is changed
            if self.toolbar != None: self.toolbar.update()
-           self.canvas.figure.add_axobserver( notify_axes_change )
+        self.canvas.figure.add_axobserver( notify_axes_change )
 
     def _widgetclosed( self ):
         if self.window._destroying: return
@@ -251,9 +232,9 @@ class FigureManagerQT( FigureManagerBase ):
         # must be inited after the window, drawingArea and figure
         # attrs are set
         if matplotlib.rcParams['toolbar'] == 'classic':
-            print "Classic toolbar is not yet supported"
+            print "Classic toolbar is not supported"
         elif matplotlib.rcParams['toolbar'] == 'toolbar2':
-            toolbar = NavigationToolbar2QT(canvas, parent)
+            toolbar = NavigationToolbar2QT(canvas, parent, False)
         else:
             toolbar = None
         return toolbar
@@ -274,68 +255,53 @@ class FigureManagerQT( FigureManagerBase ):
     def set_window_title(self, title):
         self.window.setWindowTitle(title)
 
-class NavigationToolbar2QT( NavigationToolbar2, QtGui.QWidget ):
-    # list of toolitems to add to the toolbar, format is:
-    # text, tooltip_text, image_file, callback(str)
-    toolitems = (
-        ('Home', 'Reset original view', 'home.ppm', 'home'),
-        ('Back', 'Back to  previous view','back.ppm', 'back'),
-        ('Forward', 'Forward to next view','forward.ppm', 'forward'),
-        (None, None, None, None),
-        ('Pan', 'Pan axes with left mouse, zoom with right', 'move.ppm', 'pan'),
-        ('Zoom', 'Zoom to rectangle','zoom_to_rect.ppm', 'zoom'),
-        (None, None, None, None),
-        ('Subplots', 'Configure subplots','subplots.png', 'configure_subplots'),
-        ('Save', 'Save the figure','filesave.ppm', 'save_figure'),
-        )
-
-    margin = 12 # extra margin for the toolbar
-
-    def __init__(self, canvas, parent):
+class NavigationToolbar2QT( NavigationToolbar2, QtGui.QToolBar ):
+    def __init__(self, canvas, parent, coordinates=True):
+        """ coordinates: should we show the coordinates on the right? """
         self.canvas = canvas
-        QtGui.QWidget.__init__( self, parent )
-
-        # Layout toolbar buttons horizontally.
-        self.layout = QtGui.QHBoxLayout( self )
-        self.layout.setMargin( 2 )
-        self.layout.setSpacing( 0 )
-
+        self.coordinates = coordinates
+        QtGui.QToolBar.__init__( self, parent )
         NavigationToolbar2.__init__( self, canvas )
 
-    def _init_toolbar( self ):
-        basedir = os.path.join(matplotlib.rcParams[ 'datapath' ],'images')
+    def _icon(self, name):
+        return QtGui.QIcon(os.path.join(self.basedir, name))
+
+    def _init_toolbar(self):
+        self.basedir = os.path.join(matplotlib.rcParams[ 'datapath' ],'images')
+
+        a = self.addAction(self._icon('home.svg'), 'Home', self.home)
+        a.setToolTip('Reset original view')
+        a = self.addAction(self._icon('back.svg'), 'Back', self.back)
+        a.setToolTip('Back to previous view')
+        a = self.addAction(self._icon('forward.svg'), 'Forward', self.forward)
+        a.setToolTip('Forward to next view')
+        self.addSeparator()
+        a = self.addAction(self._icon('move.svg'), 'Pan', self.pan)
+        a.setToolTip('Pan axes with left mouse, zoom with right')
+        a = self.addAction(self._icon('zoom_to_rect.svg'), 'Zoom', self.zoom)
+        a.setToolTip('Zoom to rectangle')
+        self.addSeparator()
+        a = self.addAction(self._icon('subplots.png'), 'Subplots',
+                self.configure_subplots)
+        a.setToolTip('Configure subplots')
+        a = self.addAction(self._icon('filesave.svg'), 'Save',
+                self.save_figure)
+        a.setToolTip('Save the figure')
+
         self.buttons = {}
-
-        for text, tooltip_text, image_file, callback in self.toolitems:
-            if text == None:
-                self.layout.addSpacing( 8 )
-                continue
-
-            fname = os.path.join( basedir, image_file )
-            image = QtGui.QPixmap()
-            image.load( fname )
-
-            button = QtGui.QPushButton( QtGui.QIcon( image ), "", self )
-            button.setToolTip(tooltip_text)
-            self.buttons[ text ] = button
-
-            # The automatic layout doesn't look that good - it's too close
-            # to the images so add a margin around it.
-            margin = self.margin
-            button.setFixedSize( image.width()+margin, image.height()+margin )
-
-            QtCore.QObject.connect( button, QtCore.SIGNAL( 'clicked()' ),
-                                getattr( self, callback ) )
-            self.layout.addWidget( button )
 
         # Add the x,y location widget at the right side of the toolbar
         # The stretch factor is 1 which means any resizing of the toolbar
         # will resize this label instead of the buttons.
-        self.locLabel = QtGui.QLabel( "", self )
-        self.locLabel.setAlignment( QtCore.Qt.AlignRight | QtCore.Qt.AlignTop )
-        self.locLabel.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Ignored,
-                                                      QtGui.QSizePolicy.Ignored))
-        self.layout.addWidget( self.locLabel, 1 )
+        if self.coordinates:
+            self.locLabel = QtGui.QLabel( "", self )
+            self.locLabel.setAlignment(
+                    QtCore.Qt.AlignRight | QtCore.Qt.AlignTop )
+            self.locLabel.setSizePolicy(
+                QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding,
+                                  QtGui.QSizePolicy.Ignored))
+            labelAction = self.addWidget(self.locLabel)
+            labelAction.setVisible(True)
 
         # reference holder for subplots_adjust window
         self.adj_window = None
@@ -351,7 +317,9 @@ class NavigationToolbar2QT( NavigationToolbar2, QtGui.QWidget ):
         self.canvas.draw()
 
     def set_message( self, s ):
-        self.locLabel.setText( s.replace(', ', '\n') )
+        self.emit(QtCore.SIGNAL("message"), s)
+        if self.coordinates:
+            self.locLabel.setText(s.replace(', ', '\n'))
 
     def set_cursor( self, cursor ):
         if DEBUG: print 'Set cursor' , cursor
@@ -359,7 +327,7 @@ class NavigationToolbar2QT( NavigationToolbar2, QtGui.QWidget ):
         QtGui.QApplication.setOverrideCursor( QtGui.QCursor( cursord[cursor] ) )
 
     def draw_rubberband( self, event, x0, y0, x1, y1 ):
-        height = self.canvas.figure.bbox.height()
+        height = self.canvas.figure.bbox.height
         y1 = height - y1
         y0 = height - y0
 
@@ -383,28 +351,6 @@ class NavigationToolbar2QT( NavigationToolbar2, QtGui.QWidget ):
         win.setSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
 
         win.show()
-
-#        self.adj_window = QtGui.QDialog()
-#        win = self.adj_window
-#        win.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-#        win.setWindowTitle("Subplot Configuration Tool")
-#        image = os.path.join( matplotlib.rcParams['datapath'],'images','matplotlib.png' )
-#        win.setWindowIcon(QtGui.QIcon( image ))
-#
-#        toolfig = Figure(figsize=(6,3))
-#        toolfig.subplots_adjust(top=0.9)
-#        canvas = self._get_canvas(toolfig)
-#        tool = SubplotTool(self.canvas.figure, toolfig)
-#
-#        canvas.setParent(win)
-#        w = int (toolfig.bbox.width())
-#        h = int (toolfig.bbox.height())
-#
-#        win.resize(w, h)
-#        canvas.setFocus()
-#
-#        canvas.show()
-#        win.show()
 
     def _get_canvas(self, fig):
         return FigureCanvasQT(fig)

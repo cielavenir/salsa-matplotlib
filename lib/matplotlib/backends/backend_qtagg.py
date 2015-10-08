@@ -6,7 +6,6 @@ from __future__ import division
 import os, sys
 import matplotlib
 from matplotlib import verbose
-from matplotlib.cbook import enumerate
 from matplotlib.figure import Figure
 
 from backend_agg import FigureCanvasAgg
@@ -115,10 +114,9 @@ class FigureCanvasQTAgg( FigureCanvasAgg, FigureCanvasQT ):
         # we are blitting here
         else:
             bbox = self.replot
-            l, t = int(bbox.ll().x().get()), int(bbox.ur().y().get())
-            r, b = int(bbox.ur().x().get()), int(bbox.ll().y().get())
-            w = r - l
-            h = t - b
+            l, b, r, t = bbox.extents
+            w = int(r) - int(l)
+            h = int(t) - int(b)
             reg = self.copy_from_bbox(bbox)
             stringBuffer = reg.to_string_argb()
             qImage = qt.QImage(stringBuffer, w, h, 32, None, 0, qt.QImage.IgnoreEndian)

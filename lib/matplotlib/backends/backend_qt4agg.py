@@ -35,7 +35,7 @@ class FigureManagerQTAgg(FigureManagerQT):
         # must be inited after the window, drawingArea and figure
         # attrs are set
         if matplotlib.rcParams['toolbar']=='classic':
-            print "Classic toolbar is not yet supported"
+            print "Classic toolbar is not supported"
         elif matplotlib.rcParams['toolbar']=='toolbar2':
             toolbar = NavigationToolbar2QTAgg(canvas, parent)
         else:
@@ -109,10 +109,10 @@ class FigureCanvasQTAgg( FigureCanvasQT, FigureCanvasAgg ):
         # we are blitting here
         else:
             bbox = self.replot
-            l, t = int(bbox.ll().x().get()), int(bbox.ur().y().get())
-            r, b = int(bbox.ur().x().get()), int(bbox.ll().y().get())
-            w = r - l
-            h = t - b
+            l, b, r, t = bbox.extents
+            w = int(r) - int(l)
+            h = int(t) - int(b)
+            t = int(b) + h
             reg = self.copy_from_bbox(bbox)
             stringBuffer = reg.to_string_argb()
             qImage = QtGui.QImage(stringBuffer, w, h, QtGui.QImage.Format_ARGB32)
@@ -139,8 +139,8 @@ class FigureCanvasQTAgg( FigureCanvasQT, FigureCanvasAgg ):
         """
 
         self.replot = bbox
-        w, h = int(bbox.width()), int(bbox.height())
-        l, t = bbox.ll().x().get(), bbox.ur().y().get()
+        l, b, w, h = bbox.bounds
+        t = b + h
         self.update(l, self.renderer.height-t, w, h)
 
     def print_figure(self, *args, **kwargs):

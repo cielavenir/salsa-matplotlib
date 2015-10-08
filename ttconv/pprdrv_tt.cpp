@@ -140,7 +140,7 @@ BYTE *GetTable(struct TTFONT *font, const char *name)
 
 	      if( fread(table,sizeof(BYTE),length,font->file) != (sizeof(BYTE) * length))
 		throw TTException("TrueType font may be corrupt (reason 4)");
-	    } catch (TTException& e) {
+	    } catch (TTException& ) {
 	      free(table);
 	      throw;
 	    }
@@ -309,7 +309,7 @@ void Read_name(struct TTFONT *font)
 	    }
 
     	}
-    } catch (TTException& e) {
+    } catch (TTException& ) {
       free(table_ptr);
       throw;
     }
@@ -1133,7 +1133,7 @@ void read_font(const char *filename, font_type_enum target_type, std::vector<int
     	throw TTException("TrueType font is unusable because indexToLocFormat != 0");
       if( getSHORT(ptr+52) != 0 )
     	throw TTException("TrueType font is unusable because glyphDataFormat != 0");
-    } catch (TTException& e) {
+    } catch (TTException& ) {
       free(ptr);
       throw;
     }

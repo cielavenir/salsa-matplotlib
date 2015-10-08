@@ -55,9 +55,9 @@ gmail.com and a host of others).
 """
 from __future__ import generators
 
-__version__  = '0.91.3'
-__revision__ = '$Revision: 5313 $'
-__date__     = '$Date: 2008-05-29 23:07:39 -0400 (Thu, 29 May 2008) $'
+__version__  = '0.98.0'
+__revision__ = '$Revision: 5314 $'
+__date__     = '$Date: 2008-05-29 23:09:53 -0400 (Thu, 29 May 2008) $'
 
 import md5, os, re, shutil, sys, warnings
 import distutils.sysconfig
@@ -95,9 +95,7 @@ from rcsetup import defaultParams, validate_backend, validate_toolbar
 from rcsetup import validate_cairo_format
 
 major, minor1, minor2, s, tmp = sys.version_info
-_python23 = major>=2 and minor1>=3
-
-_havemath = _python23
+_python24 = major>=2 and minor1>=4
 
 try:
     import datetime
@@ -111,11 +109,14 @@ else: _havedate = True
 #except ImportError: _have_pkg_resources = False
 #else: _have_pkg_resources = True
 
-if not _python23:
-    def enumerate(seq):
-         for i in range(len(seq)):
-             yield i, seq[i]
+if not _python24:
+    raise SystemExit('matplotlib requires Python 2.4 or later')
 
+import numpy
+nn = numpy.__version__.split('.')
+if not (int(nn[0]) >= 1 and int(nn[1]) >= 1):
+    raise SystemExit(
+            'numpy 1.1 or later is required; you have %s' % numpy.__version__)
 
 def is_string_like(obj):
     if hasattr(obj, 'shape'): return 0
@@ -561,8 +562,10 @@ def rc_params(fail_on_error=False):
 
     fname = matplotlib_fname()
     if not os.path.exists(fname):
+        # this should never happen, default in mpl-data should always be found
         message = 'could not find rc file; returning defaults'
-        ret =  dict([ (key, tup[0]) for key, tup in defaultParams.items()])
+        ret = RcParams([ (key, default) for key, (default, converter) in \
+                        defaultParams.iteritems() ])
         warnings.warn(message)
         return ret
 
@@ -801,4 +804,3 @@ verbose.report('interactive is %s'%rcParams['interactive'])
 verbose.report('units is %s'%rcParams['units'])
 verbose.report('platform is %s'%sys.platform)
 verbose.report('loaded modules: %s'%sys.modules.keys(), 'debug')
-

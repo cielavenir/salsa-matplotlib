@@ -34,9 +34,8 @@ Finally, legal html names for colors, like 'red', 'burlywood' and
 'chartreuse' are supported.
 """
 import re
-import warnings
-import numpy as npy
-import matplotlib.numerix.npyma as ma
+import numpy as np
+from numpy import ma
 import matplotlib.cbook as cbook
 
 cnames = {
@@ -308,24 +307,36 @@ class ColorConverter:
         except (TypeError, ValueError), exc:
             raise ValueError('to_rgba: Invalid rgba arg "%s"\n%s' % (str(arg), exc))
 
-    def to_rgba_list(self, c, alpha=None):
+    def to_rgba_array(self, c, alpha=None):
         """
-        Returns a list of rgba tuples.
+        Returns an Numpy array of rgba tuples.
 
         Accepts a single mpl color spec or a sequence of specs.
-        If the sequence is a list, the list items are changed in place.
+        If the sequence is a list or array, the items are changed in place,
+        but an array copy is still returned.
+
+        Special case to handle "no color": if c is "none" (case-insensitive),
+        then an empty array will be returned.  Same for an empty list.
         """
         try:
-            return [self.to_rgba(c, alpha)]
+            if c.lower() == 'none':
+                return np.zeros((0,4), dtype=np.float_)
+        except AttributeError:
+            pass
+        if len(c) == 0:
+            return np.zeros((0,4), dtype=np.float_)
+        try:
+            result = [self.to_rgba(c, alpha)]
         except ValueError:
             # If c is a list it must be maintained as the same list
             # with modified items so that items can be appended to
             # it. This is needed for examples/dynamic_collections.py.
-            if not isinstance(c, list): # specific; don't need duck-typing
+            if not isinstance(c, (list, np.ndarray)): # specific; don't need duck-typing
                 c = list(c)
             for i, cc in enumerate(c):
                 c[i] = self.to_rgba(cc, alpha)  # change in place
-            return c
+            result = c
+        return np.asarray(result, np.float_)
 
 colorConverter = ColorConverter()
 
@@ -347,7 +358,7 @@ def makeMappingArray(N, data):
     gives the closest value for values of x between 0 and 1.
     """
     try:
-        adata = npy.array(data)
+        adata = np.array(data)
     except:
         raise TypeError("data must be convertable to an array")
     shape = adata.shape
@@ -361,21 +372,21 @@ def makeMappingArray(N, data):
     if x[0] != 0. or x[-1] != 1.0:
         raise ValueError(
            "data mapping points must start with x=0. and end with x=1")
-    if npy.sometrue(npy.sort(x)-x):
+    if np.sometrue(np.sort(x)-x):
         raise ValueError(
            "data mapping points must have x in increasing order")
     # begin generation of lookup table
     x = x * (N-1)
-    lut = npy.zeros((N,), npy.float)
-    xind = npy.arange(float(N))
-    ind = npy.searchsorted(x, xind)[1:-1]
+    lut = np.zeros((N,), np.float)
+    xind = np.arange(float(N))
+    ind = np.searchsorted(x, xind)[1:-1]
 
     lut[1:-1] = ( ((xind[1:-1] - x[ind-1]) / (x[ind] - x[ind-1]))
                   * (y0[ind] - y1[ind-1]) + y1[ind-1])
     lut[0] = y1[0]
     lut[-1] = y0[-1]
     # ensure that the lut is confined to values between 0 and 1 by clipping it
-    npy.clip(lut, 0.0, 1.0)
+    np.clip(lut, 0.0, 1.0)
     #lut = where(lut > 1., 1., lut)
     #lut = where(lut < 0., 0., lut)
     return lut
@@ -426,26 +437,30 @@ class Colormap:
         mask_bad = None
         if not cbook.iterable(X):
             vtype = 'scalar'
-            xa = npy.array([X])
+            xa = np.array([X])
         else:
             vtype = 'array'
             xma = ma.asarray(X)
             xa = xma.filled(0)
             mask_bad = ma.getmask(xma)
-        if xa.dtype.char in npy.typecodes['Float']:
-            npy.putmask(xa, xa==1.0, 0.9999999) #Treat 1.0 as slightly less than 1.
+        if xa.dtype.char in np.typecodes['Float']:
+            np.putmask(xa, xa==1.0, 0.9999999) #Treat 1.0 as slightly less than 1.
             xa = (xa * self.N).astype(int)
         # Set the over-range indices before the under-range;
         # otherwise the under-range values get converted to over-range.
-        npy.putmask(xa, xa>self.N-1, self._i_over)
-        npy.putmask(xa, xa<0, self._i_under)
+        np.putmask(xa, xa>self.N-1, self._i_over)
+        np.putmask(xa, xa<0, self._i_under)
         if mask_bad is not None and mask_bad.shape == xa.shape:
-            npy.putmask(xa, mask_bad, self._i_bad)
+            np.putmask(xa, mask_bad, self._i_bad)
         if bytes:
-            lut = (self._lut * 255).astype(npy.uint8)
+            lut = (self._lut * 255).astype(np.uint8)
         else:
             lut = self._lut
-        rgba = lut[xa]
+        rgba = np.empty(shape=xa.shape+(4,), dtype=lut.dtype)
+        lut.take(xa, axis=0, mode='clip', out=rgba)
+                    #  twice as fast as lut[xa];
+                    #  using the clip or wrap mode and providing an
+                    #  output array speeds it up a little more.
         if vtype == 'scalar':
             rgba = tuple(rgba[0,:])
         return rgba
@@ -486,8 +501,9 @@ class Colormap:
         raise NotImplementedError("Abstract class only")
 
     def is_gray(self):
-        return (npy.alltrue(self._lut[:,0] == self._lut[:,1])
-                    and npy.alltrue(self._lut[:,0] == self._lut[:,2]))
+        if not self._isinit: self._init()
+        return (np.alltrue(self._lut[:,0] == self._lut[:,1])
+                    and np.alltrue(self._lut[:,0] == self._lut[:,2]))
 
 
 class LinearSegmentedColormap(Colormap):
@@ -512,7 +528,7 @@ class LinearSegmentedColormap(Colormap):
         self._segmentdata = segmentdata
 
     def _init(self):
-        self._lut = npy.ones((self.N + 3, 4), npy.float)
+        self._lut = np.ones((self.N + 3, 4), np.float)
         self._lut[:-3, 0] = makeMappingArray(self.N, self._segmentdata['red'])
         self._lut[:-3, 1] = makeMappingArray(self.N, self._segmentdata['green'])
         self._lut[:-3, 2] = makeMappingArray(self.N, self._segmentdata['blue'])
@@ -529,6 +545,15 @@ class ListedColormap(LinearSegmentedColormap):
     """
     def __init__(self, colors, name = 'from_list', N = None):
         """
+        Make a colormap from a list of colors.
+
+        colors is a list of matplotlib color specifications
+        name is a string to identify the colormap
+        N is the number of entries in the map.  The default is None,
+            in which case there is one colormap entry for each
+            element in the list of colors.  If N < len(colors)
+            the list will be truncated at N.  If N > len(colors),
+            the list will be extended by repetition.
         """
         self.colors = colors
         self.monochrome = False  # True only if all colors in map are identical;
@@ -540,11 +565,12 @@ class ListedColormap(LinearSegmentedColormap):
                 self.colors = [self.colors] * N
                 self.monochrome = True
             elif cbook.iterable(self.colors):
+                self.colors = list(self.colors) # in case it was a tuple
                 if len(self.colors) == 1:
                     self.monochrome = True
                 if len(self.colors) < N:
                     self.colors = list(self.colors) * N
-                    del(self.colors[N:])
+                del(self.colors[N:])
             else:
                 try: gray = float(self.colors)
                 except TypeError: pass
@@ -554,9 +580,9 @@ class ListedColormap(LinearSegmentedColormap):
 
 
     def _init(self):
-        rgb = npy.array([colorConverter.to_rgb(c)
-                    for c in self.colors], npy.float)
-        self._lut = npy.zeros((self.N + 3, 4), npy.float)
+        rgb = np.array([colorConverter.to_rgb(c)
+                    for c in self.colors], np.float)
+        self._lut = np.zeros((self.N + 3, 4), np.float)
         self._lut[:-3, :-1] = rgb
         self._lut[:-3, -1] = 1
         self._isinit = True
@@ -590,10 +616,10 @@ class Normalize:
 
         if cbook.iterable(value):
             vtype = 'array'
-            val = ma.asarray(value).astype(npy.float)
+            val = ma.asarray(value).astype(np.float)
         else:
             vtype = 'scalar'
-            val = ma.array([value]).astype(npy.float)
+            val = ma.array([value]).astype(np.float)
 
         self.autoscale_None(val)
         vmin, vmax = self.vmin, self.vmax
@@ -604,7 +630,7 @@ class Normalize:
         else:
             if clip:
                 mask = ma.getmask(val)
-                val = ma.array(npy.clip(val.filled(vmax), vmin, vmax),
+                val = ma.array(np.clip(val.filled(vmax), vmin, vmax),
                                 mask=mask)
             result = (val-vmin) * (1.0/(vmax-vmin))
         if vtype == 'scalar':
@@ -649,10 +675,10 @@ class LogNorm(Normalize):
 
         if cbook.iterable(value):
             vtype = 'array'
-            val = ma.asarray(value).astype(npy.float)
+            val = ma.asarray(value).astype(np.float)
         else:
             vtype = 'scalar'
-            val = ma.array([value]).astype(npy.float)
+            val = ma.array([value]).astype(np.float)
 
         self.autoscale_None(val)
         vmin, vmax = self.vmin, self.vmax
@@ -665,9 +691,9 @@ class LogNorm(Normalize):
         else:
             if clip:
                 mask = ma.getmask(val)
-                val = ma.array(npy.clip(val.filled(vmax), vmin, vmax),
+                val = ma.array(np.clip(val.filled(vmax), vmin, vmax),
                                 mask=mask)
-            result = (ma.log(val)-npy.log(vmin))/(npy.log(vmax)-npy.log(vmin))
+            result = (ma.log(val)-np.log(vmin))/(np.log(vmax)-np.log(vmin))
         if vtype == 'scalar':
             result = result[0]
         return result
@@ -682,6 +708,66 @@ class LogNorm(Normalize):
             return vmin * ma.power((vmax/vmin), val)
         else:
             return vmin * pow((vmax/vmin), value)
+
+class BoundaryNorm(Normalize):
+    '''
+    Generate a colormap index based on discrete intervals.
+
+    Unlike Normalize or LogNorm, BoundaryNorm maps values
+    to integers instead of to the interval 0-1.
+
+    Mapping to the 0-1 interval could have been done via
+    piece-wise linear interpolation, but using integers seems
+    simpler, and reduces the number of conversions back and forth
+    between integer and floating point.
+    '''
+    def __init__(self, boundaries, ncolors, clip=False):
+        '''
+        args:
+            boundaries: a monotonically increasing sequence
+            ncolors: number of colors in the colormap to be used
+
+        If b[i] <= v < b[i+1] then v is mapped to color j;
+        as i varies from 0 to len(boundaries)-2,
+        j goes from 0 to ncolors-1.
+
+        Out-of-range values are mapped to -1 if low and ncolors
+        if high; these are converted to valid indices by
+        Colormap.__call__.
+        '''
+        self.clip = clip
+        self.vmin = boundaries[0]
+        self.vmax = boundaries[-1]
+        self.boundaries = np.asarray(boundaries)
+        self.N = len(self.boundaries)
+        self.Ncmap = ncolors
+        if self.N-1 == self.Ncmap:
+            self._interp = False
+        else:
+            self._interp = True
+
+    def __call__(self, x, clip=None):
+        if clip is None:
+            clip = self.clip
+        x = ma.asarray(x)
+        mask = ma.getmaskarray(x)
+        xx = x.filled(self.vmax+1)
+        if clip:
+            np.clip(xx, self.vmin, self.vmax)
+        iret = np.zeros(x.shape, dtype=np.int16)
+        for i, b in enumerate(self.boundaries):
+            iret[xx>=b] = i
+        if self._interp:
+            iret = (iret * (float(self.Ncmap-1)/(self.N-2))).astype(np.int16)
+        iret[xx<self.vmin] = -1
+        iret[xx>=self.vmax] = self.Ncmap
+        ret = ma.array(iret, mask=mask)
+        if ret.shape == () and not mask:
+            ret = int(ret)  # assume python scalar
+        return ret
+
+    def inverse(self, value):
+        return ValueError("BoundaryNorm is not invertible")
 
 
 class NoNorm(Normalize):
@@ -698,4 +784,3 @@ class NoNorm(Normalize):
 # compatibility with earlier class names that violated convention:
 normalize = Normalize
 no_norm = NoNorm
-

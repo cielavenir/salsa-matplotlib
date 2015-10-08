@@ -7,12 +7,12 @@ layout -- you have to figure out how wide and tall you want your Axes
 to be to accommodate your widget.
 """
 
-import numpy as npy
+import numpy as np
 
 from mlab import dist
 from patches import Circle, Rectangle
 from lines import Line2D
-from transforms import blend_xy_sep_transform
+from transforms import blended_transform_factory
 
 class LockDraw:
     """
@@ -245,8 +245,10 @@ class Slider(Widget):
         self.set_val(val)
 
     def set_val(self, val):
-        self.poly.xy[-1] = val, 0
-        self.poly.xy[-2] = val, 1
+        xy = self.poly.xy
+        xy[-1] = val, 0
+        xy[-2] = val, 1
+        self.poly.xy = xy
         self.valtext.set_text(self.valfmt%val)
         if self.drawon: self.ax.figure.canvas.draw()
         self.val = val
@@ -310,7 +312,7 @@ class CheckButtons(Widget):
 
         if len(labels)>1:
             dy = 1./(len(labels)+1)
-            ys = npy.linspace(1-dy, dy, len(labels))
+            ys = np.linspace(1-dy, dy, len(labels))
         else:
             dy = 0.25
             ys = [0.5]
@@ -427,7 +429,7 @@ class RadioButtons(Widget):
         ax.set_yticks([])
         ax.set_navigate(False)
         dy = 1./(len(labels)+1)
-        ys = npy.linspace(1-dy, dy, len(labels))
+        ys = np.linspace(1-dy, dy, len(labels))
         cnt = 0
         axcolor = ax.get_axis_bgcolor()
 
@@ -462,10 +464,10 @@ class RadioButtons(Widget):
     def _clicked(self, event):
         if event.button !=1 : return
         if event.inaxes != self.ax: return
-        xy = self.ax.transAxes.inverse_xy_tup((event.x, event.y))
-        pclicked = npy.array([xy[0], xy[1]])
+        xy = self.ax.transAxes.inverted().transform_point((event.x, event.y))
+        pclicked = np.array([xy[0], xy[1]])
         def inside(p):
-            pcirc = npy.array([p.center[0], p.center[1]])
+            pcirc = np.array([p.center[0], p.center[1]])
             return dist(pclicked, pcirc) < p.radius
 
         for p,t in zip(self.circles, self.labels):
@@ -830,16 +832,14 @@ class SpanSelector:
         assert direction in ['horizontal', 'vertical'], 'Must choose horizontal or vertical for direction'
         self.direction = direction
 
-        self.ax = ax
+        self.ax = None
+        self.canvas = None
         self.visible = True
-        self.canvas = ax.figure.canvas
-        self.canvas.mpl_connect('motion_notify_event', self.onmove)
-        self.canvas.mpl_connect('button_press_event', self.press)
-        self.canvas.mpl_connect('button_release_event', self.release)
-        self.canvas.mpl_connect('draw_event', self.update_background)
+        self.cids=[]
 
         self.rect = None
         self.background = None
+        self.pressv = None
 
         self.rectprops = rectprops
         self.onselect = onselect
@@ -851,11 +851,26 @@ class SpanSelector:
         self.buttonDown = False
         self.prev = (0, 0)
 
-        if self.direction == 'horizontal':
-            trans = blend_xy_sep_transform(self.ax.transData, self.ax.transAxes)
+        self.new_axes(ax)
+
+
+    def new_axes(self,ax):
+        self.ax = ax
+        if self.canvas is not ax.figure.canvas:
+            for cid in self.cids:
+                self.canvas.mpl_disconnect(cid)
+
+            self.canvas = ax.figure.canvas
+
+            self.cids.append(self.canvas.mpl_connect('motion_notify_event', self.onmove))
+            self.cids.append(self.canvas.mpl_connect('button_press_event', self.press))
+	    self.cids.append(self.canvas.mpl_connect('button_release_event', self.release))
+	    self.cids.append(self.canvas.mpl_connect('draw_event', self.update_background))
+	if self.direction == 'horizontal':
+            trans = blended_transform_factory(self.ax.transData, self.ax.transAxes)
             w,h = 0,1
         else:
-            trans = blend_xy_sep_transform(self.ax.transAxes, self.ax.transData)
+            trans = blended_transform_factory(self.ax.transAxes, self.ax.transData)
             w,h = 1,0
         self.rect = Rectangle( (0,0), w, h,
                                transform=trans,
@@ -864,7 +879,6 @@ class SpanSelector:
                                )
 
         if not self.useblit: self.ax.add_patch(self.rect)
-        self.pressv = None
 
     def update_background(self, event):
         'force an update of the background'
@@ -934,10 +948,10 @@ class SpanSelector:
         minv, maxv = v, self.pressv
         if minv>maxv: minv, maxv = maxv, minv
         if self.direction == 'horizontal':
-            self.rect.xy[0] = minv
+            self.rect.set_x(minv)
             self.rect.set_width(maxv-minv)
         else:
-            self.rect.xy[1] = minv
+            self.rect.set_y(minv)
             self.rect.set_height(maxv-minv)
 
         if self.onmove_callback is not None:
@@ -1158,8 +1172,8 @@ class RectangleSelector:
             miny, maxy = self.eventpress.ydata, y # click-y and actual mouse-y
             if minx>maxx: minx, maxx = maxx, minx # get them in the right order
             if miny>maxy: miny, maxy = maxy, miny
-            self.to_draw.xy[0] = minx             # set lower left of box
-            self.to_draw.xy[1] = miny
+            self.to_draw.set_x(minx)             # set lower left of box
+            self.to_draw.set_y(miny)
             self.to_draw.set_width(maxx-minx)     # set width and height of box
             self.to_draw.set_height(maxy-miny)
             self.update()

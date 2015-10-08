@@ -2,10 +2,10 @@
 This module contains the instantiations of color mapping classes
 """
 
-import numpy as npy
+import numpy as np
+from numpy import ma
 import matplotlib as mpl
 import matplotlib.colors as colors
-import matplotlib.numerix.npyma as ma
 import matplotlib.cbook as cbook
 from matplotlib._cm import *
 
@@ -33,13 +33,15 @@ class ScalarMappable:
         cmap is a cm colormap instance
         """
 
+        self.callbacksSM = cbook.CallbackRegistry((
+                'changed',))
+
         if cmap is None: cmap = get_cmap()
         if norm is None: norm = colors.Normalize()
 
         self._A = None
         self.norm = norm
         self.cmap = cmap
-        self.observers = []
         self.colorbar = None
         self.update_dict = {'array':False}
 
@@ -56,18 +58,18 @@ class ScalarMappable:
         try:
             if x.ndim == 3:
                 if x.shape[2] == 3:
-                    if x.dtype == npy.uint8:
-                        alpha = npy.array(alpha*255, npy.uint8)
+                    if x.dtype == np.uint8:
+                        alpha = np.array(alpha*255, np.uint8)
                     m, n = x.shape[:2]
-                    xx = npy.empty(shape=(m,n,4), dtype = x.dtype)
+                    xx = np.empty(shape=(m,n,4), dtype = x.dtype)
                     xx[:,:,:3] = x
                     xx[:,:,3] = alpha
                 elif x.shape[2] == 4:
                     xx = x
                 else:
                     raise ValueError("third dimension must be 3 or 4")
-                if bytes and xx.dtype != npy.uint8:
-                    xx = (xx * 255).astype(npy.uint8)
+                if bytes and xx.dtype != np.uint8:
+                    xx = (xx * 255).astype(np.uint8)
                 return xx
         except AttributeError:
             pass
@@ -84,6 +86,10 @@ class ScalarMappable:
     def get_array(self):
         'Return the array'
         return self._A
+
+    def get_cmap(self):
+        'return the colormap'
+        return self.cmap
 
     def get_clim(self):
         'return the min, max of the color limits for image scaling'
@@ -159,39 +165,12 @@ class ScalarMappable:
             return True
         return False
 
-    def add_observer(self, mappable):
-        """
-        whenever the norm, clim or cmap is set, call the notify
-        instance of the mappable observer with self.
-
-        This is designed to allow one image to follow changes in the
-        cmap of another image
-        """
-        self.observers.append(mappable)
-        try:
-            self.add_callback(mappable.notify)
-        except AttributeError:
-            pass
-
-    def notify(self, mappable):
-        """
-        If this is called then we are pegged to another mappable.
-        Update our cmap, norm, alpha from the other mappable.
-        """
-        self.set_cmap(mappable.cmap)
-        self.set_norm(mappable.norm)
-        try:
-            self.set_alpha(mappable.get_alpha())
-        except AttributeError:
-            pass
-
     def changed(self):
         """
-        Call this whenever the mappable is changed so observers can
-        update state
+        Call this whenever the mappable is changed to notify all the
+        callbackSM listeners to the 'changed' signal
         """
-        for observer in self.observers:
-            observer.notify(self)
+        self.callbacksSM.process('changed', self)
+
         for key in self.update_dict:
             self.update_dict[key] = True
-

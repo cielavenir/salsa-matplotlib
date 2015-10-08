@@ -5,11 +5,7 @@ from the Python Cookbook -- hence the name cbook
 from __future__ import generators
 import re, os, errno, sys, StringIO, traceback, locale
 import time, datetime
-import numpy as npy
-
-try: set
-except NameError:
-    from sets import Set as set
+import numpy as np
 
 major, minor1, minor2, s, tmp = sys.version_info
 
@@ -175,31 +171,31 @@ class silent_list(list):
 
 def strip_math(s):
     'remove latex formatting from mathtext'
-    remove = (r'\rm', '\cal', '\tt', '\it', '\\', '{', '}')
+    remove = (r'\mathdefault', r'\rm', r'\cal', r'\tt', r'\it', '\\', '{', '}')
     s = s[1:-1]
     for r in remove:  s = s.replace(r,'')
     return s
 
 class Bunch:
-   """
-   Often we want to just collect a bunch of stuff together, naming each
-   item of the bunch; a dictionary's OK for that, but a small do- nothing
-   class is even handier, and prettier to use.  Whenever you want to
-   group a few variables:
+    """
+    Often we want to just collect a bunch of stuff together, naming each
+    item of the bunch; a dictionary's OK for that, but a small do- nothing
+    class is even handier, and prettier to use.  Whenever you want to
+    group a few variables:
 
-     >>> point = Bunch(datum=2, squared=4, coord=12)
-     >>> point.datum
+      >>> point = Bunch(datum=2, squared=4, coord=12)
+      >>> point.datum
 
-     By: Alex Martelli
-     From: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/52308
-   """
-   def __init__(self, **kwds):
-      self.__dict__.update(kwds)
+      By: Alex Martelli
+      From: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/52308
+    """
+    def __init__(self, **kwds):
+        self.__dict__.update(kwds)
 
 
 def unique(x):
-   'Return a list of unique elements of x'
-   return dict([ (val, 1) for val in x]).keys()
+    'Return a list of unique elements of x'
+    return dict([ (val, 1) for val in x]).keys()
 
 def iterable(obj):
     'return true if obj is iterable'
@@ -270,55 +266,55 @@ def flatten(seq, scalarp=is_scalar):
         if scalarp(item): yield item
         else:
             for subitem in flatten(item, scalarp):
-               yield subitem
+                yield subitem
 
 
 
 class Sorter:
-   """
+    """
 
-   Sort by attribute or item
+    Sort by attribute or item
 
-   Example usage:
-   sort = Sorter()
+    Example usage:
+    sort = Sorter()
 
-   list = [(1, 2), (4, 8), (0, 3)]
-   dict = [{'a': 3, 'b': 4}, {'a': 5, 'b': 2}, {'a': 0, 'b': 0},
-   {'a': 9, 'b': 9}]
+    list = [(1, 2), (4, 8), (0, 3)]
+    dict = [{'a': 3, 'b': 4}, {'a': 5, 'b': 2}, {'a': 0, 'b': 0},
+    {'a': 9, 'b': 9}]
 
 
-   sort(list)       # default sort
-   sort(list, 1)    # sort by index 1
-   sort(dict, 'a')  # sort a list of dicts by key 'a'
+    sort(list)       # default sort
+    sort(list, 1)    # sort by index 1
+    sort(dict, 'a')  # sort a list of dicts by key 'a'
 
-   """
+    """
 
-   def _helper(self, data, aux, inplace):
-      aux.sort()
-      result = [data[i] for junk, i in aux]
-      if inplace: data[:] = result
-      return result
+    def _helper(self, data, aux, inplace):
+        aux.sort()
+        result = [data[i] for junk, i in aux]
+        if inplace: data[:] = result
+        return result
 
-   def byItem(self, data, itemindex=None, inplace=1):
-      if itemindex is None:
-         if inplace:
-            data.sort()
-            result = data
-         else:
-            result = data[:]
-            result.sort()
-         return result
-      else:
-         aux = [(data[i][itemindex], i) for i in range(len(data))]
-         return self._helper(data, aux, inplace)
+    def byItem(self, data, itemindex=None, inplace=1):
+        if itemindex is None:
+            if inplace:
+                data.sort()
+                result = data
+            else:
+                result = data[:]
+                result.sort()
+            return result
+        else:
+            aux = [(data[i][itemindex], i) for i in range(len(data))]
+            return self._helper(data, aux, inplace)
 
-   def byAttribute(self, data, attributename, inplace=1):
-      aux = [(getattr(data[i],attributename),i) for i in range(len(data))]
-      return self._helper(data, aux, inplace)
+    def byAttribute(self, data, attributename, inplace=1):
+        aux = [(getattr(data[i],attributename),i) for i in range(len(data))]
+        return self._helper(data, aux, inplace)
 
-   # a couple of handy synonyms
-   sort = byItem
-   __call__ = byItem
+    # a couple of handy synonyms
+    sort = byItem
+    __call__ = byItem
 
 
 
@@ -402,11 +398,11 @@ class Null:
 
 
 def mkdirs(newdir, mode=0777):
-   try: os.makedirs(newdir, mode)
-   except OSError, err:
-      # Reraise the error unless it's about an already existing directory
-      if err.errno != errno.EEXIST or not os.path.isdir(newdir):
-         raise
+    try: os.makedirs(newdir, mode)
+    except OSError, err:
+        # Reraise the error unless it's about an already existing directory
+        if err.errno != errno.EEXIST or not os.path.isdir(newdir):
+            raise
 
 
 class GetRealpathAndStat:
@@ -463,61 +459,21 @@ class RingBuffer:
         return self.data
 
     def __get_item__(self, i):
-       return self.data[i % len(self.data)]
+        return self.data[i % len(self.data)]
 
-
-# use enumerate builtin if available, else use python version
-try:
-    import __builtin__
-    enumerate = __builtin__.enumerate
-except:
-    def enumerate(seq):
-        """Python equivalent to the enumerate builtin function
-        enumerate() is new in Python 2.3
-        """
-        for i in range(len(seq)):
-            yield i, seq[i]
-
-
-# use reversed builtin if available, else use python version
-try:
-    import __builtin__
-    reversed = __builtin__.reversed
-except:
-    def reversed(seq):
-        """Python equivalent to the enumerate builtin function
-        enumerate() is new in Python 2.3
-        """
-        for i in range(len(seq)-1,-1,-1):
-            yield seq[i]
-
-
-# use itertools.izip if available, else use python version
-try:
-    import itertools
-    izip = itertools.izip
-except:
-    def izip(*iterables):
-        """Python equivalent to itertools.izip
-        itertools module - new in Python 2.3
-        """
-        iterables = map(iter, iterables)
-        while iterables:
-            result = [i.next() for i in iterables]
-            yield tuple(result)
 
 
 def get_split_ind(seq, N):
-   """seq is a list of words.  Return the index into seq such that
-   len(' '.join(seq[:ind])<=N
-   """
+    """seq is a list of words.  Return the index into seq such that
+    len(' '.join(seq[:ind])<=N
+    """
 
-   sLen = 0
-   # todo: use Alex's xrange pattern from the cbook for efficiency
-   for (word, ind) in zip(seq, range(len(seq))):
-      sLen += len(word) + 1  # +1 to account for the len(' ')
-      if sLen>=N: return ind
-   return len(seq)
+    sLen = 0
+    # todo: use Alex's xrange pattern from the cbook for efficiency
+    for (word, ind) in zip(seq, range(len(seq))):
+        sLen += len(word) + 1  # +1 to account for the len(' ')
+        if sLen>=N: return ind
+    return len(seq)
 
 
 def wrap(prefix, text, cols):
@@ -637,20 +593,20 @@ def get_recursive_filelist(args):
 
 
 def pieces(seq, num=2):
-   "Break up the seq into num tuples"
-   start = 0
-   while 1:
-      item = seq[start:start+num]
-      if not len(item): break
-      yield item
-      start += num
+    "Break up the seq into num tuples"
+    start = 0
+    while 1:
+        item = seq[start:start+num]
+        if not len(item): break
+        yield item
+        start += num
 
 def exception_to_str(s = None):
 
-   sh = StringIO.StringIO()
-   if s is not None: print >>sh, s
-   traceback.print_exc(file=sh)
-   return sh.getvalue()
+    sh = StringIO.StringIO()
+    if s is not None: print >>sh, s
+    traceback.print_exc(file=sh)
+    return sh.getvalue()
 
 
 def allequal(seq):
@@ -863,7 +819,7 @@ def safezip(*args):
 class MemoryMonitor:
     def __init__(self, nmax=20000):
         self._nmax = nmax
-        self._mem = npy.zeros((self._nmax,), npy.int32)
+        self._mem = np.zeros((self._nmax,), np.int32)
         self.clear()
 
     def clear(self):
@@ -899,7 +855,7 @@ class MemoryMonitor:
             print "Warning: array size was too small for the number of calls."
 
     def xy(self, i0=0, isub=1):
-        x = npy.arange(i0, self._n, isub)
+        x = np.arange(i0, self._n, isub)
         return x, self._mem[i0:self._n:isub]
 
     def plot(self, i0=0, isub=1, fig=None):
@@ -974,9 +930,116 @@ def print_cycles(objects, outstream=sys.stdout, show_progress=False):
         outstream.write("Examining: %r\n" % (obj,))
         recurse(obj, obj, { }, [])
 
+class Grouper(object):
+    """
+    This class provides a lightweight way to group arbitrary objects
+    together into disjoint sets when a full-blown graph data structure
+    would be overkill.
+
+    Objects can be joined using .join(), tested for connectedness
+    using .joined(), and all disjoint sets can be retreived using
+    .get().
+
+    The objects being joined must be hashable.
+
+    For example:
+
+    >>> g = grouper.Grouper()
+    >>> g.join('a', 'b')
+    >>> g.join('b', 'c')
+    >>> g.join('d', 'e')
+    >>> list(g.get())
+    [['a', 'b', 'c'], ['d', 'e']]
+    >>> g.joined('a', 'b')
+    True
+    >>> g.joined('a', 'c')
+    True
+    >>> g.joined('a', 'd')
+    False
+    """
+    def __init__(self, init=[]):
+        mapping = self._mapping = {}
+        for x in init:
+            mapping[x] = [x]
+
+    def __contains__(self, item):
+        return item in self._mapping
+
+    def join(self, a, *args):
+        """
+        Join given arguments into the same set.
+        Accepts one or more arguments.
+        """
+        mapping = self._mapping
+        set_a = mapping.setdefault(a, [a])
+
+        for arg in args:
+            set_b = mapping.get(arg)
+            if set_b is None:
+                set_a.append(arg)
+                mapping[arg] = set_a
+            elif set_b is not set_a:
+                if len(set_b) > len(set_a):
+                    set_a, set_b = set_b, set_a
+                set_a.extend(set_b)
+                for elem in set_b:
+                    mapping[elem] = set_a
+
+    def joined(self, a, b):
+        """
+        Returns True if a and b are members of the same set.
+        """
+        mapping = self._mapping
+        try:
+            return mapping[a] is mapping[b]
+        except KeyError:
+            return False
+
+    def __iter__(self):
+        """
+        Returns an iterator yielding each of the disjoint sets as a list.
+        """
+        seen = set()
+        for elem, group in self._mapping.iteritems():
+            if elem not in seen:
+                yield group
+                seen.update(group)
+
+    def get_siblings(self, a):
+        """
+        Returns all of the items joined with the given item, including
+        itself.
+        """
+        return self._mapping.get(a, [a])
 
 
+def simple_linear_interpolation(a, steps):
+    steps = np.floor(steps)
+    new_length = ((len(a) - 1) * steps) + 1
+    new_shape = list(a.shape)
+    new_shape[0] = new_length
+    result = np.zeros(new_shape, a.dtype)
 
+    result[0] = a[0]
+    a0 = a[0:-1]
+    a1 = a[1:  ]
+    delta = ((a1 - a0) / steps)
+
+    for i in range(1, int(steps)):
+        result[i::steps] = delta * i + a0
+    result[steps::steps] = a1
+
+    return result
+
+
+# a dict to cross-map linestyle arguments
+_linestyles = [('-', 'solid'),
+    ('--', 'dashed'),
+    ('-.', 'dashdot'),
+    (':',  'dotted')]
+
+ls_mapper = dict(_linestyles)
+ls_mapper.update([(ls[1], ls[0]) for ls in _linestyles])
 
 if __name__=='__main__':
     assert( allequal([1,1,1]) )

@@ -3,22 +3,23 @@ An experimental module for reading dvi files output by TeX. Several
 limitations make this not (currently) useful as a general-purpose dvi
 preprocessor.
 
-Interface:
+Interface::
 
-    dvi = Dvi(filename, 72)
-    for page in dvi:          # iterate over pages
-        w, h, d = page.width, page.height, page.descent
-        for x,y,font,glyph,width in page.text:
-            fontname = font.texname
-            pointsize = font.size
-            ...
-        for x,y,height,width in page.boxes:
-            ...
+  dvi = Dvi(filename, 72)
+  for page in dvi:          # iterate over pages
+      w, h, d = page.width, page.height, page.descent
+      for x,y,font,glyph,width in page.text:
+          fontname = font.texname
+          pointsize = font.size
+          ...
+      for x,y,height,width in page.boxes:
+          ...
+
 """
 
 import matplotlib
 import matplotlib.cbook as mpl_cbook
-import numpy as npy
+import numpy as np
 import os
 import struct
 
@@ -76,8 +77,8 @@ class Dvi(object):
         Output the text and boxes belonging to the most recent page.
         page = dvi._output()
         """
-        minx, miny, maxx, maxy = npy.inf, npy.inf, -npy.inf, -npy.inf
-        maxy_pure = -npy.inf
+        minx, miny, maxx, maxy = np.inf, np.inf, -np.inf, -np.inf
+        maxy_pure = -np.inf
         for elt in self.text + self.boxes:
             if len(elt) == 4:   # box
                 x,y,h,w = elt
@@ -99,13 +100,13 @@ class Dvi(object):
                                    descent=maxy-maxy_pure)
 
         d = self.dpi / (72.27 * 2**16) # from TeX's "scaled points" to dpi units
-        text =  [ ((x-minx)*d, (maxy-y)*d, f, g, w*d) 
+        text =  [ ((x-minx)*d, (maxy-y)*d, f, g, w*d)
                   for (x,y,f,g,w) in self.text ]
         boxes = [ ((x-minx)*d, (maxy-y)*d, h*d, w*d) for (x,y,h,w) in self.boxes ]
 
-        return mpl_cbook.Bunch(text=text, boxes=boxes, 
-                               width=(maxx-minx)*d, 
-                               height=(maxy_pure-miny)*d, 
+        return mpl_cbook.Bunch(text=text, boxes=boxes,
+                               width=(maxx-minx)*d,
+                               height=(maxy_pure-miny)*d,
                                descent=(maxy-maxy_pure)*d)
 
     def _read(self):
@@ -118,8 +119,8 @@ class Dvi(object):
             self._dispatch(byte)
 #             if self.state == _dvistate.inpage:
 #                 matplotlib.verbose.report(
-#                     'Dvi._read: after %d at %f,%f' % 
-#                     (byte, self.h, self.v), 
+#                     'Dvi._read: after %d at %f,%f' %
+#                     (byte, self.h, self.v),
 #                     'debug-annoying')
             if byte == 140: # end of page
                 return True
@@ -248,10 +249,10 @@ class Dvi(object):
             raise ValueError, "misplaced put_char in dvi file"
         font = self.fonts[self.f]
         if font._vf is None:
-            self.text.append((self.h, self.v, font, char, 
+            self.text.append((self.h, self.v, font, char,
                               font._width_of(char)))
 #             matplotlib.verbose.report(
-#                 'Dvi._put_char: %d,%d %d' %(self.h, self.v, char), 
+#                 'Dvi._put_char: %d,%d %d' %(self.h, self.v, char),
 #                 'debug-annoying')
         else:
             scale = font._scale
@@ -350,7 +351,7 @@ class Dvi(object):
     def _xxx(self, special):
         matplotlib.verbose.report(
             'Dvi._xxx: encountered special: %s'
-            % ''.join([(32 <= ord(ch) < 127) and ch 
+            % ''.join([(32 <= ord(ch) < 127) and ch
                        or '<%02x>' % ord(ch)
                        for ch in special]),
             'debug')
@@ -419,12 +420,13 @@ class DviFont(object):
 
 class Vf(Dvi):
     """
-    A virtual font (*.vf file) containing subroutines for dvi files.
-    
-    Usage:
-    vf = Vf(filename)
-    glyph = vf[code]
-    glyph.text, glyph.boxes, glyph.width
+    A virtual font (\*.vf file) containing subroutines for dvi files.
+
+    Usage::
+
+      vf = Vf(filename)
+      glyph = vf[code]
+      glyph.text, glyph.boxes, glyph.width
     """
 
     def __init__(self, filename):
@@ -526,12 +528,16 @@ class Tfm(object):
     minimum needed by the Dvi class.
 
     Attributes:
+
       checksum: for verifying against dvi file
+
       design_size: design size of the font (in what units?)
-      width[i]: width of character #i, needs to be scaled 
+
+      width[i]: width of character \#i, needs to be scaled
         by the factor specified in the dvi file
         (this is a dict because indexing may not start from 0)
-      height[i], depth[i]: height and depth of character #i
+
+      height[i], depth[i]: height and depth of character \#i
     """
     __slots__ = ('checksum', 'design_size', 'width', 'height', 'depth')
 
@@ -559,7 +565,7 @@ class Tfm(object):
 
         self.width, self.height, self.depth = {}, {}, {}
         widths, heights, depths = \
-            [ struct.unpack('!%dI' % (len(x)/4), x) 
+            [ struct.unpack('!%dI' % (len(x)/4), x)
               for x in (widths, heights, depths) ]
         for i in range(ec-bc):
             self.width[bc+i] = _fix2comp(widths[ord(char_info[4*i])])
@@ -590,7 +596,7 @@ class PsfontsMap(object):
     But the user may have configured these files differently.
     """
     __slots__ = ('_font',)
-    
+
     def __init__(self, filename):
         self._font = {}
         file = open(filename, 'rt')
@@ -612,7 +618,7 @@ class PsfontsMap(object):
         """Parse each line into words."""
         for line in file:
             line = line.strip()
-            if line == '' or line.startswith('%'): 
+            if line == '' or line.startswith('%'):
                 continue
             words, pos = [], 0
             while pos < len(line):
@@ -660,18 +666,19 @@ class PsfontsMap(object):
                     assert filename is None
                     filename = word
         self._font[texname] = mpl_cbook.Bunch(
-            texname=texname, psname=psname, effects=effects, 
+            texname=texname, psname=psname, effects=effects,
             encoding=encoding, filename=filename)
 
 class Encoding(object):
     """
-    Parses a *.enc file referenced from a psfonts.map style file.
+    Parses a \*.enc file referenced from a psfonts.map style file.
     The format this class understands is a very limited subset of
     PostScript.
 
-    Usage (subject to change):
-    for name in Encoding(filename): 
-        whatever(name)
+    Usage (subject to change)::
+
+      for name in Encoding(filename):
+          whatever(name)
     """
     __slots__ = ('encoding',)
 
@@ -698,7 +705,7 @@ class Encoding(object):
 
             if state == 0:
                 # Expecting something like /FooEncoding [
-                if '[' in line: 
+                if '[' in line:
                     state = 1
                     line = line[line.index('[')+1:].strip()
 
@@ -766,10 +773,10 @@ def _fontfile(texname, class_, suffix, cache):
     cache[texname] = result
     return result
 
-def _tfmfile(texname): 
+def _tfmfile(texname):
     return _fontfile(texname, Tfm, '.tfm', _tfmcache)
 
-def _vffile(texname): 
+def _vffile(texname):
     return _fontfile(texname, Vf, '.vf', _vfcache)
 
 
@@ -792,5 +799,3 @@ if __name__ == '__main__':
             print x,y,c, 32 <= c < 128 and chr(c) or '.', w
         for x,y,w,h in page.boxes:
             print x,y,'BOX',w,h
-
-
