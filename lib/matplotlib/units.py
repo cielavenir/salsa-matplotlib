@@ -42,7 +42,11 @@ datetime objects::
     units.registry[datetime.date] = DateConverter()
 
 """
-from __future__ import print_function
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
+
+import six
+
 from matplotlib.cbook import iterable, is_numlike
 import numpy as np
 
@@ -145,7 +149,13 @@ class Registry(dict):
                     return converter
             except AttributeError:
                 # not a masked_array
-                converter = self.get_converter(xravel[0])
+                # Make sure we don't recurse forever -- it's possible for
+                # ndarray subclasses to continue to return subclasses and
+                # not ever return a non-subclass for a single element.
+                next_item = xravel[0]
+                if (not isinstance(next_item, np.ndarray) or
+                    next_item.shape != x.shape):
+                    converter = self.get_converter(next_item)
                 return converter
 
         if converter is None and iterable(x):

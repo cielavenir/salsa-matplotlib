@@ -64,6 +64,7 @@ mpl_packages = [
     setupext.Platform(),
     'Required dependencies and extensions',
     setupext.Numpy(),
+    setupext.Six(),
     setupext.Dateutil(),
     setupext.Tornado(),
     setupext.Pyparsing(),
@@ -72,22 +73,27 @@ mpl_packages = [
     setupext.FreeType(),
     setupext.FT2Font(),
     setupext.Png(),
+    setupext.Qhull(),
     setupext.Image(),
     setupext.TTConv(),
     setupext.Path(),
     setupext.Contour(),
     setupext.Delaunay(),
+    setupext.QhullWrap(),
     setupext.Tri(),
     'Optional subpackages',
     setupext.SampleData(),
     setupext.Toolkits(),
     setupext.Tests(),
+    setupext.Toolkits_Tests(),
     'Optional backend extensions',
     # These backends are listed in order of preference, the first
     # being the most preferred.  The first one that looks like it will
     # work will be selected as the default backend.
     setupext.BackendMacOSX(),
+    setupext.BackendQt5(),
     setupext.BackendQt4(),
+    setupext.BackendPySide(),
     setupext.BackendGtk3Agg(),
     setupext.BackendGtk3Cairo(),
     setupext.BackendGtkAgg(),
@@ -209,19 +215,12 @@ if __name__ == '__main__':
         for mod in ext_modules:
             mod.extra_compile_args.append('-DVERBOSE')
 
-
-    extra_args = {}
-    if sys.version_info[0] >= 3:
-        # Automatically 2to3 source on Python 3.x.  This isn't set on
-        # Python 2 because it's not needed, and some really old
-        # versions of distribute don't support it.
-        extra_args['use_2to3'] = True
-
     # Finalize the extension modules so they can get the Numpy include
     # dirs
     for mod in ext_modules:
         mod.finalize()
 
+    extra_args = {}
 
     # Avoid installing setup_requires dependencies if the user just
     # queries for information
@@ -230,40 +229,40 @@ if __name__ == '__main__':
         'clean' in sys.argv):
         setup_requires = []
 
-
     # Finally, pass this all along to distutils to do the heavy lifting.
-    distrib = setup(name="matplotlib",
-          version=__version__,
-          description="Python plotting package",
-          author="John D. Hunter, Michael Droettboom",
-          author_email="mdroe@stsci.edu",
-          url="http://matplotlib.org",
-          long_description="""
-          matplotlib strives to produce publication quality 2D graphics
-          for interactive graphing, scientific publishing, user interface
-          development and web application servers targeting multiple user
-          interfaces and hardcopy output formats.  There is a 'pylab' mode
-          which emulates matlab graphics.
-          """,
-          license="BSD",
-          packages=packages,
-          namespace_packages = namespace_packages,
-          platforms='any',
-          py_modules=py_modules,
-          ext_modules=ext_modules,
-          package_dir=package_dir,
-          package_data=package_data,
-          classifiers=classifiers,
-          download_url="https://downloads.sourceforge.net/project/matplotlib/matplotlib/matplotlib-{0}/matplotlib-{0}.tar.gz".format(__version__),
+    distrib = setup(
+        name="matplotlib",
+        version=__version__,
+        description="Python plotting package",
+        author="John D. Hunter, Michael Droettboom",
+        author_email="mdroe@stsci.edu",
+        url="http://matplotlib.org",
+        long_description="""
+        matplotlib strives to produce publication quality 2D graphics
+        for interactive graphing, scientific publishing, user interface
+        development and web application servers targeting multiple user
+        interfaces and hardcopy output formats.  There is a 'pylab' mode
+        which emulates matlab graphics.
+        """,
+        license="BSD",
+        packages=packages,
+        namespace_packages = namespace_packages,
+        platforms='any',
+        py_modules=py_modules,
+        ext_modules=ext_modules,
+        package_dir=package_dir,
+        package_data=package_data,
+        classifiers=classifiers,
+        download_url="https://downloads.sourceforge.net/project/matplotlib/matplotlib/matplotlib-{0}/matplotlib-{0}.tar.gz".format(__version__),
 
-          # List third-party Python packages that we require
-          install_requires=install_requires,
-          setup_requires=setup_requires,
+        # List third-party Python packages that we require
+        install_requires=install_requires,
+        setup_requires=setup_requires,
 
-          # matplotlib has C/C++ extensions, so it's not zip safe.
-          # Telling setuptools this prevents it from doing an automatic
-          # check for zip safety.
-          zip_safe=False,
+        # matplotlib has C/C++ extensions, so it's not zip safe.
+        # Telling setuptools this prevents it from doing an automatic
+        # check for zip safety.
+        zip_safe=False,
 
-          **extra_args
-         )
+        **extra_args
+    )

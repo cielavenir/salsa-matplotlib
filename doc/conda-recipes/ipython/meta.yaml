@@ -1,0 +1,34 @@
+package:
+  name: ipython
+  version: 1.0.0rc1
+
+source:
+  fn: ipython-1.0.0-rc1.tar.gz
+  url: http://archive.ipython.org/testing/1.0.0/ipython-1.0.0-rc1.tar.gz
+
+build:
+  entry_points:
+    - ipython3 = IPython.terminal.ipapp:launch_new_instance  [py3k]
+    - ipython = IPython.terminal.ipapp:launch_new_instance
+  osx_is_app: True           [py2k]
+
+requirements:
+  build:
+    - python
+    - setuptools             [win or py3k]
+    - pyreadline             [win]
+  run:
+    - python
+    - pyreadline             [win]
+    - python.app             [osx and py2k]
+
+test:
+  commands:
+    - ipython -h
+    - ipython3 -h            [py3k]
+  imports:
+    - IPython
+
+about:
+  home: http://ipython.org/
+  license: BSD

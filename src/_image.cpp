@@ -374,6 +374,12 @@ Image::resize(const Py::Tuple& args, const Py::Dict& kwargs)
     int numcols = Py::Int(args[0]);
     int numrows = Py::Int(args[1]);
 
+    if (numcols <= 0 || numrows <= 0)
+    {
+        throw Py::RuntimeError(
+        "Width and height must have positive values");
+    }
+
     colsOut = numcols;
     rowsOut = numrows;
 
@@ -991,7 +997,6 @@ _image_module::fromarray(const Py::Tuple& args)
     {
         throw Py::ValueError("Illegal array rank; must be rank; must 2 or 3");
     }
-    buffer -= NUMBYTES;
 
     return Py::asObject(imo);
 }
@@ -1099,7 +1104,6 @@ _image_module::fromarray2(const Py::Tuple& args)
     {
         throw Py::ValueError("Illegal array rank; must be rank; must 2 or 3");
     }
-    buffer -= NUMBYTES;
 
     return Py::asObject(imo);
 }
@@ -1260,7 +1264,7 @@ _image_module::frombuffer(const Py::Tuple& args)
 
     args.verify_length(4);
 
-    PyObject *bufin = new_reference_to(args[0]);
+    PyObject *bufin = args[0].ptr();
     size_t x = (long)Py::Int(args[1]);
     size_t y = (long)Py::Int(args[2]);
 
@@ -1681,7 +1685,6 @@ _image_module::pcolor(const Py::Tuple& args)
     unsigned char *inposition;
     size_t inrowsize(nx*4);
     size_t rowsize(cols*4);
-    rowstart = rowstarts;
     agg::int8u * position = buffer;
     agg::int8u * oldposition = NULL;
     start = reinterpret_cast<unsigned char*>(d->data);
