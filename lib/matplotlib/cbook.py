@@ -28,15 +28,18 @@ major, minor1, minor2, s, tmp = sys.version_info
 # On some systems, getpreferredencoding sets the locale, which has
 # side effects.  Passing False eliminates those side effects.
 
-try:
-    preferredencoding = locale.getpreferredencoding(
-        matplotlib.rcParams['axes.formatter.use_locale']).strip()
-    if not preferredencoding:
-        preferredencoding = None
-except (ValueError, ImportError, AttributeError):
-    preferredencoding = None
 
 def unicode_safe(s):
+    import matplotlib
+
+    try:
+        preferredencoding = locale.getpreferredencoding(
+            matplotlib.rcParams['axes.formatter.use_locale']).strip()
+        if not preferredencoding:
+            preferredencoding = None
+    except (ValueError, ImportError, AttributeError):
+        preferredencoding = None
+
     if preferredencoding is None: return unicode(s)
     else: return unicode(s, preferredencoding)
 
@@ -240,6 +243,9 @@ class CallbackRegistry:
             except KeyError:
                 continue
             else:
+                for key, value in self._func_cid_map.items():
+                    if value == cid:
+                        del self._func_cid_map[key]
                 return
 
     def process(self, s, *args, **kwargs):

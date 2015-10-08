@@ -448,7 +448,11 @@ class PdfFile(object):
                     'Parent': self.pagesObject,
                     'Resources': self.resourceObject,
                     'MediaBox': [ 0, 0, 72*width, 72*height ],
-                    'Contents': contentObject }
+                    'Contents': contentObject,
+                    'Group': {'Type': Name('Group'),
+                              'S': Name('Transparency'),
+                              'CS': Name('DeviceRGB')}
+                    }
         pageObject = self.reserveObject('page')
         self.writeObject(pageObject, thePage)
         self.pageList.append(pageObject)
@@ -1187,10 +1191,10 @@ end"""
 
             img.flipud_out()
 
-    def markerObject(self, path, trans, fillp, lw):
+    def markerObject(self, path, trans, fillp, lw, joinstyle, capstyle):
         """Return name of a marker XObject representing the given path."""
         pathops = self.pathOperations(path, trans, simplify=False)
-        key = (tuple(pathops), bool(fillp))
+        key = (tuple(pathops), bool(fillp), joinstyle, capstyle)
         result = self.markers.get(key)
         if result is None:
             name = Name('M%d' % len(self.markers))
@@ -1204,12 +1208,14 @@ end"""
         return name
 
     def writeMarkers(self):
-        for (pathops, fillp),(name, ob, bbox, lw) in self.markers.iteritems():
+        for (pathops, fillp, joinstyle, capstyle),(name, ob, bbox, lw) in self.markers.iteritems():
             bbox = bbox.padded(lw * 0.5)
             self.beginStream(
                 ob.id, None,
                 {'Type': Name('XObject'), 'Subtype': Name('Form'),
                  'BBox': list(bbox.extents) })
+            self.output(GraphicsContextPdf.joinstyles[joinstyle], Op.setlinejoin)
+            self.output(GraphicsContextPdf.capstyles[capstyle], Op.setlinecap)
             self.output(*pathops)
             if fillp:
                 self.output(Op.fill_stroke)
@@ -1227,6 +1233,8 @@ end"""
                 # This is allowed anywhere in the path
                 cmds.extend(points)
                 cmds.append(Op.moveto)
+            elif code == Path.CLOSEPOLY:
+                cmds.append(Op.closepath)
             elif last_points is None:
                 # The other operations require a previous point
                 raise ValueError, 'Path lacks initial MOVETO'
@@ -1240,8 +1248,6 @@ end"""
             elif code == Path.CURVE4:
                 cmds.extend(points)
                 cmds.append(Op.curveto)
-            elif code == Path.CLOSEPOLY:
-                cmds.append(Op.closepath)
             last_points = points
         return cmds
 
@@ -1402,7 +1408,7 @@ class RendererPdf(RendererBase):
             h = 72.0*h/self.image_dpi
         else:
             h = dy
-        
+
         imob = self.file.imageObject(im)
 
         if transform is None:
@@ -1416,7 +1422,7 @@ class RendererPdf(RendererBase):
                              tr1, tr2, tr3, tr4, tr5, tr6, Op.concat_matrix,
                              w, 0, 0, h, x, y, Op.concat_matrix,
                              imob, Op.use_xobject, Op.grestore)
-        
+
 
     def draw_path(self, gc, path, transform, rgbFace=None):
         self.check_gc(gc, rgbFace)
@@ -1438,7 +1444,8 @@ class RendererPdf(RendererBase):
 
         output = self.file.output
         marker = self.file.markerObject(
-            marker_path, marker_trans, fillp, self.gc._linewidth)
+            marker_path, marker_trans, fillp, self.gc._linewidth,
+            gc.get_joinstyle(), gc.get_capstyle())
 
         output(Op.gsave)
         lastx, lasty = 0, 0

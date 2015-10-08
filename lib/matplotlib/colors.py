@@ -127,7 +127,7 @@ cnames = {
     'lightcyan'            : '#E0FFFF',
     'lightgoldenrodyellow' : '#FAFAD2',
     'lightgreen'           : '#90EE90',
-    'lightgrey'            : '#D3D3D3',
+    'lightgray'            : '#D3D3D3',
     'lightpink'            : '#FFB6C1',
     'lightsalmon'          : '#FFA07A',
     'lightseagreen'        : '#20B2AA',
@@ -601,7 +601,7 @@ class Colormap:
             self._lut[self._i_over] = self._lut[self.N-1]
         self._lut[self._i_bad] = self._rgba_bad
 
-    def _init():
+    def _init(self):
         '''Generate the lookup table, self._lut'''
         raise NotImplementedError("Abstract class only")
 
