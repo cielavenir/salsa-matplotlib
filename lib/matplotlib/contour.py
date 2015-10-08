@@ -535,7 +535,7 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         self.levels = kwargs.get('levels', None)
         self.filled = kwargs.get('filled', False)
         self.linewidths = kwargs.get('linewidths', None)
-        self.linestyles = kwargs.get('linestyles', 'solid')
+        self.linestyles = kwargs.get('linestyles', None)
 
         self.alpha = kwargs.get('alpha', 1.0)
         self.origin = kwargs.get('origin', None)
@@ -613,9 +613,6 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
                                      linestyle = lstyle,
                                      alpha=self.alpha)
 
-                if level < 0.0 and self.monochrome:
-                    ls = mpl.rcParams['contour.negative_linestyle']
-                    col.set_linestyle(ls)
                 col.set_label('_nolegend_')
                 self.ax.add_collection(col, False)
                 self.collections.append(col)
@@ -632,8 +629,10 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
                                 self.to_rgba(self.cvalues, alpha=self.alpha)]
         self.tcolors = tcolors
         for color, collection in zip(tcolors, self.collections):
-            collection.set_alpha(self.alpha)
-            collection.set_color(color)
+            if self.filled:
+                collection.set_facecolor(color)
+            else:
+                collection.set_color(color)
         for label, cv in zip(self.labelTexts, self.labelCValues):
             label.set_alpha(self.alpha)
             label.set_color(self.labelMappable.to_rgba(cv))
@@ -857,11 +856,18 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         Nlev = len(self.levels)
         if linestyles is None:
             tlinestyles = ['solid'] * Nlev
+            if self.monochrome:
+                neg_ls = mpl.rcParams['contour.negative_linestyle']
+                for i, lev in enumerate(self.levels):
+                    if lev < 0.0:
+                        tlinestyles[i] = neg_ls
         else:
             if cbook.is_string_like(linestyles):
                 tlinestyles = [linestyles] * Nlev
-            elif cbook.iterable(linestyles) and len(linestyles) <= Nlev:
+            elif cbook.iterable(linestyles) and len(linestyles) < Nlev:
                 tlinestyles = list(linestyles) * int(np.ceil(Nlev/len(linestyles)))
+            elif cbook.iterable(linestyles): # len(linestyles) >= Nlev
+                tlinestyles = list(linestyles)[:Nlev]
         return tlinestyles
 
     def get_alpha(self):

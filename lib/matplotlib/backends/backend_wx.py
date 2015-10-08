@@ -92,7 +92,7 @@ Examples which work on this release:
  (3) - Clipping seems to be broken.
 """
 
-cvs_id = '$Id: backend_wx.py 6484 2008-12-03 18:38:03Z jdh2358 $'
+cvs_id = '$Id: backend_wx.py 6972 2009-03-11 19:36:22Z efiring $'
 
 
 import sys, os, os.path, math, StringIO, weakref, warnings
@@ -108,12 +108,23 @@ if _DEBUG < 5:
     import traceback, pdb
 _DEBUG_lvls = {1 : 'Low ', 2 : 'Med ', 3 : 'High', 4 : 'Error' }
 
+missingwx = "Matplotlib backend_wx and backend_wxagg require wxPython >=2.8"
+
+try:
+    import wxversion
+except ImportError:
+    raise ImportError(missingwx)
+
+try:
+    wxversion.ensureMinimal('2.8')
+except wxversion.AlreadyImportedError:
+    pass
 
 try:
     import wx
     backend_version = wx.VERSION_STRING
-except:
-    raise ImportError("Matplotlib backend_wx requires wxPython be installed")
+except ImportError:
+    raise ImportError(missingwx)
 
 #!!! this is the call that is causing the exception swallowing !!!
 #wx.InitAllImageHandlers()

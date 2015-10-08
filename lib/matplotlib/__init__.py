@@ -36,7 +36,7 @@ Modules include:
         defines the :class:`~matplotlib.lines.Line2D` class for
         drawing lines and markers
 
-    :mod`matplotlib.patches`
+    :mod:`matplotlib.patches`
         defines classes for drawing polygons
 
     :mod:`matplotlib.text`
@@ -89,9 +89,9 @@ host of others.
 """
 from __future__ import generators
 
-__version__  = '0.98.5.2'
-__revision__ = '$Revision: 6660 $'
-__date__     = '$Date: 2008-12-18 04:10:51 -0800 (Thu, 18 Dec 2008) $'
+__version__  = '0.98.5.3'
+__revision__ = '$Revision: 6890 $'
+__date__     = '$Date: 2009-02-08 14:29:42 -0600 (Sun, 08 Feb 2009) $'
 
 import os, re, shutil, subprocess, sys, warnings
 import distutils.sysconfig
@@ -582,6 +582,14 @@ _deprecated_map = {
     'tick.size' :       'tick.major.size',
     }
 
+_deprecated_ignore_map = {
+    'legend.pad' :       'legend.borderpad',
+    'legend.labelsep' :       'legend.labelspacing',
+    'legend.handlelen' :       'legend.handlelength',
+    'legend.handletextsep' :       'legend.handletextpad',
+    'legend.axespad' :       'legend.borderaxespad',
+    }
+
 
 class RcParams(dict):
 
@@ -602,6 +610,10 @@ class RcParams(dict):
                 warnings.warn('%s is deprecated in matplotlibrc. Use %s \
 instead.'% (key, alt))
                 key = alt
+            elif key in _deprecated_ignore_map:
+                alt = _deprecated_ignore_map[key]
+                warnings.warn('%s is deprecated. Use %s instead.'% (key, alt))
+                return
             cval = self.validate[key](val)
             dict.__setitem__(self, key, cval)
         except KeyError:
@@ -665,6 +677,9 @@ def rc_params(fail_on_error=False):
                 except Exception, msg:
                     warnings.warn('Bad val "%s" on line #%d\n\t"%s"\n\tin file \
 "%s"\n\t%s' % (val, cnt, line, fname, msg))
+        elif key in _deprecated_ignore_map:
+            warnings.warn('%s is deprecated. Update your matplotlibrc to use %s instead.'% (key, _deprecated_ignore_map[key]))
+
         else:
             print >> sys.stderr, """
 Bad key "%s" on line %d in
@@ -823,9 +838,12 @@ def use(arg, warn=True):
     else:
         be_parts = arg.split('.')
         name = validate_backend(be_parts[0])
+        if len(be_parts) > 1:
+            if name == 'cairo':
+                rcParams['cairo.format'] = validate_cairo_format(be_parts[1])
+            else:
+                raise ValueError('Only cairo backend has a format option')
     rcParams['backend'] = name
-    if name == 'cairo' and len(be_parts) > 1:
-        rcParams['cairo.format'] = validate_cairo_format(be_parts[1])
 
 def get_backend():
     "Returns the current backend"

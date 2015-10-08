@@ -1,6 +1,68 @@
+======================================================================
+2008-05-17 Release 0.98.5.3 at r7107
+
+2009-05-04 Fix bug that Text.Annotation is still drawn while set to
+           not visible.-JJL
+
+2009-04-06 The pdf backend now escapes newlines and linefeeds in strings.
+           Fixes sf bug #2708559; thanks to Tiago Pereira for the report.
+
+2009-04-06 texmanager.make_dvi now raises an error if LaTeX failed to
+           create an output file. Thanks to Joao Luis Silva for reporting
+           this. - JKS
+
+2009-04-05 _png.read_png() reads 12 bit PNGs (patch from
+           Tobias Wood) - ADS
+
+2009-03-17 Fix bugs in edge color handling by contourf, found
+           by Jae-Joon Lee. - EF
+
+2009-03-11 Ensure wx version >= 2.8; thanks to Sandro Tosi and
+           Chris Barker. - EF
+
+2009-02-26 Support image clipping in pdf backend. - JKS
+
+2009-02-16 Move plot_directive.py to the installed source tree.  Add
+           support for inline code content - MGD
+
+2009-02-16 Move mathmpl.py to the installed source tree so it is
+           available to other projects. - MGD
+
+2009-02-04 Fix bug in mathtext related to \dots and \ldots - MGD
+
+2009-01-29 Document 'resolution' kwarg for polar plots.  Support it
+           when using pyplot.polar, not just Figure.add_axes. - MGD
+
+2009-01-26 Make curves and NaNs play nice together - MGD
+
+2009-01-19 Fix bug in quiver argument handling. - EF
+
+2009-01-19 Fix bug in backend_gtk: don't delete nonexistent toolbar. - EF
+
+2009-01-16 Fix bug in is_string_like so it doesn't raise an
+           unnecessary exception. - EF
+
+2009-01-16 Bugfix of C typedef of MPL_Int64 that was failing on
+           Windows XP 64 bit, as reported by George Goussard on numpy
+           mailing list. - ADS
+
+2009-01-10 Fix bug in pan/zoom with log coordinates. - EF
+
+2009-01-06 Fix bug in setting of dashed negative contours. - EF
+
+2009-01-06 Be fault tolerant when len(linestyles)>NLev in contour. - MM
+
+2008-12-20 fix the dpi-dependent offset of Shadow. - JJL
+
+2008-12-20 fix the hatch bug in the pdf backend. minor update
+           in docs and  example - JJL
+
+2008-12-19 Update Axes.legend documnetation. /api/api_changes.rst is also
+           updated to describe chages in keyword parameters.
+           Issue a warning if old keyword parameters are used. - JJL
 
 =======================================================================
-Re-Released 0.98.5.2 at r6675
+Re-Released 0.98.5.2 at r6679
 
 Release 0.98.5.2 at r6667
 

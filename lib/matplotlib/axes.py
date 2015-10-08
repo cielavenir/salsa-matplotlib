@@ -439,6 +439,8 @@ class Axes(martist.Artist):
                  sharex=None, # use Axes instance's xaxis info
                  sharey=None, # use Axes instance's yaxis info
                  label='',
+                 xscale=None,
+                 yscale=None,
                  **kwargs
                  ):
         """
@@ -542,6 +544,11 @@ class Axes(martist.Artist):
         self._cachedRenderer = None
         self.set_navigate(True)
         self.set_navigate_mode(None)
+
+        if xscale:
+            self.set_xscale(xscale)
+        if yscale:
+            self.set_yscale(yscale)
 
         if len(kwargs): martist.setp(self, **kwargs)
 
@@ -1306,7 +1313,9 @@ class Axes(martist.Artist):
             collection.set_label('collection%d'%len(self.collections))
         self.collections.append(collection)
         self._set_artist_props(collection)
-        collection.set_clip_path(self.patch)
+
+        if collection.get_clip_path() is None:
+            collection.set_clip_path(self.patch)
         if autolim:
             if collection._paths and len(collection._paths):
                 self.update_datalim(collection.get_datalim(self.transData))
@@ -1319,7 +1328,8 @@ class Axes(martist.Artist):
         lines
         '''
         self._set_artist_props(line)
-        line.set_clip_path(self.patch)
+        if line.get_clip_path() is None:
+            line.set_clip_path(self.patch)
 
         self._update_line_limits(line)
         if not line.get_label():
@@ -1344,7 +1354,8 @@ class Axes(martist.Artist):
         """
 
         self._set_artist_props(p)
-        p.set_clip_path(self.patch)
+        if p.get_clip_path() is None:
+            p.set_clip_path(self.patch)
         self._update_patch_limits(p)
         self.patches.append(p)
         p._remove_method = lambda h: self.patches.remove(h)
@@ -2378,10 +2389,11 @@ class Axes(martist.Artist):
                     dy = dx
 
                 alpha = np.power(10.0, (dx, dy))
-                start = p.trans_inverse.transform_point((p.x, p.y))
-                lim_points = p.lim.get_points()
-                result = start + alpha * (lim_points - start)
-                result = mtransforms.Bbox(result)
+                start = np.array([p.x, p.y])
+                oldpoints = p.lim.transformed(p.trans)
+                newpoints = start + alpha * (oldpoints - start)
+                result = mtransforms.Bbox(newpoints) \
+                    .transformed(p.trans_inverse)
             except OverflowError:
                 warnings.warn('Overflow while panning')
                 return
@@ -2801,6 +2813,7 @@ class Axes(martist.Artist):
 
         # We need to strip away the units for comparison with
         # non-unitized bounds
+        self._process_unit_info( ydata=y, kwargs=kwargs )
         yy = self.convert_yunits( y )
         scaley = (yy<ymin) or (yy>ymax)
 
@@ -2860,6 +2873,7 @@ class Axes(martist.Artist):
 
         # We need to strip away the units for comparison with
         # non-unitized bounds
+        self._process_unit_info( xdata=x, kwargs=kwargs )
         xx = self.convert_xunits( x )
         scalex = (xx<xmin) or (xx>xmax)
 
@@ -2926,6 +2940,7 @@ class Axes(martist.Artist):
         p.set_transform(trans)
         p.x_isdata = False
         self.add_patch(p)
+        self.autoscale_view(scalex=False)
         return p
     axhspan.__doc__ = cbook.dedent(axhspan.__doc__) % martist.kwdocd
 
@@ -2981,6 +2996,7 @@ class Axes(martist.Artist):
         p.set_transform(trans)
         p.y_isdata = False
         self.add_patch(p)
+        self.autoscale_view(scaley=False)
         return p
     axvspan.__doc__ = cbook.dedent(axvspan.__doc__) % martist.kwdocd
 
@@ -3026,9 +3042,11 @@ class Axes(martist.Artist):
                                      'list of Line2D to draw; see API_CHANGES')
 
         # We do the conversion first since not all unitized data is uniform
+        # process the unit information
+        self._process_unit_info( [xmin, xmax], y, kwargs=kwargs )
         y = self.convert_yunits( y )
-        xmin = self.convert_xunits( xmin )
-        xmax = self.convert_xunits( xmax )
+        xmin = self.convert_xunits(xmin)
+        xmax = self.convert_xunits(xmax)
 
         if not iterable(y): y = [y]
         if not iterable(xmin): xmin = [xmin]
@@ -3102,7 +3120,7 @@ class Axes(martist.Artist):
                                      'collections.LineCollection and not a '
                                      'list of Line2D to draw; see API_CHANGES')
 
-        self._process_unit_info(xdata=x, ydata=ymin, kwargs=kwargs)
+        self._process_unit_info(xdata=x, ydata=[ymin, ymax], kwargs=kwargs)
 
         # We do the conversion first since not all unitized data is uniform
         x = self.convert_xunits( x )
@@ -3728,10 +3746,6 @@ class Axes(martist.Artist):
             A :class:`matplotlib.font_manager.FontProperties`
             instance, or *None* to use rc settings.
 
-          *pad*: [ None | scalar ]
-            The fractional whitespace inside the legend border, between 0 and 1.
-            If *None*, use rc settings.
-
           *markerscale*: [ None | scalar ]
             The relative size of legend markers vs. original. If *None*, use rc
             settings.
@@ -3739,20 +3753,20 @@ class Axes(martist.Artist):
           *shadow*: [ None | False | True ]
             If *True*, draw a shadow behind legend. If *None*, use rc settings.
 
-          *labelsep*: [ None | scalar ]
-            The vertical space between the legend entries. If *None*, use rc
-            settings.
+        Padding and spacing between various elements use following keywords
+        parameters. The dimensions of these values are given as a fraction
+        of the fontsize. Values from rcParams will be used if None.
 
-          *handlelen*: [ None | scalar ]
-            The length of the legend lines. If *None*, use rc settings.
-
-          *handletextsep*: [ None | scalar ]
-            The space between the legend line and legend text. If *None*, use rc
-            settings.
-
-          *axespad*: [ None | scalar ]
-            The border between the axes and legend edge. If *None*, use rc
-            settings.
+        ================   ==================================================================
+        Keyword            Description
+        ================   ==================================================================
+        borderpad          the fractional whitespace inside the legend border
+        labelspacing       the vertical space between the legend entries
+        handlelength       the length of the legend handles
+        handletextpad      the pad between the legend handle and text
+        borderaxespad      the pad between the axes and legend border
+        columnspacing      the spacing between columns
+        ================   ==================================================================
 
         **Example:**
 
@@ -5018,6 +5032,8 @@ class Axes(martist.Artist):
             }
 
         self._process_unit_info(xdata=x, ydata=y, kwargs=kwargs)
+        x = self.convert_xunits(x)
+        y = self.convert_yunits(y)
 
         x, y, s, c = cbook.delete_masked_points(x, y, s, c)
 
@@ -5734,7 +5750,7 @@ class Axes(martist.Artist):
             corner of the axes. If *None*, default to rc ``image.origin``.
 
           *extent*: [ None | scalars (left, right, bottom, top) ]
-            Eata values of the axes.  The default assigns zero-based row,
+            Data limits for the axes.  The default assigns zero-based row,
             column indices to the *x*, *y* centers of the pixels.
 
           *shape*: [ None | scalars (columns, rows) ]
