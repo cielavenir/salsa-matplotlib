@@ -16,23 +16,17 @@ if gtk.pygtk_version < pygtk_version_required:
                       % (gtk.pygtk_version + pygtk_version_required))
 del pygtk_version_required
 
+import numpy as npy
+
 import matplotlib
 from matplotlib._pylab_helpers import Gcf
 from matplotlib.backend_bases import RendererBase, GraphicsContextBase, \
      FigureManagerBase, FigureCanvasBase
 from matplotlib.cbook import is_string_like, enumerate
 from matplotlib.figure import Figure
-from matplotlib.mathtext import math_parse_s_ft2font
-import matplotlib.numerix as numerix
-from matplotlib.numerix import asarray, fromstring, UInt8, zeros, \
-     where, transpose, nonzero, indices, ones, nx
+from matplotlib.mathtext import MathTextParser
 
-if numerix.which[0] == "numarray":
-    from matplotlib.backends._na_backend_gdk import pixbuf_get_pixels_array
-elif numerix.which[0] == "numeric":
-    from matplotlib.backends._nc_backend_gdk import pixbuf_get_pixels_array
-else:
-    from matplotlib.backends._ns_backend_gdk import pixbuf_get_pixels_array
+from matplotlib.backends._backend_gdk import pixbuf_get_pixels_array
 
 
 backend_version = "%d.%d.%d" % gtk.pygtk_version
@@ -77,6 +71,7 @@ class RendererGDK(RendererBase):
         self.gtkDA = gtkDA
         self.dpi   = dpi
         self._cmap = gtkDA.get_colormap()
+        self.mathtext_parser = MathTextParser("Agg")
 
     def set_pixmap (self, pixmap):
         self.gdkDrawable = pixmap
@@ -110,7 +105,7 @@ class RendererGDK(RendererBase):
         im.flipud_out()
         rows, cols, image_str = im.as_rgba_str()
 
-        image_array = fromstring(image_str, UInt8)
+        image_array = npy.fromstring(image_str, npy.uint8)
         image_array.shape = rows, cols, 4
 
         pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB,
@@ -148,8 +143,8 @@ class RendererGDK(RendererBase):
 
     def draw_lines(self, gc, x, y, transform=None):
         if gc.gdkGC.line_width > 0:
-            x = x.astype(nx.Int16)
-            y = self.height - y.astype(nx.Int16)
+            x = x.astype(npy.int16)
+            y = self.height - y.astype(npy.int16)
             self.gdkDrawable.draw_lines(gc.gdkGC, zip(x,y))
 
 
@@ -204,29 +199,26 @@ class RendererGDK(RendererBase):
 
 
     def _draw_mathtext(self, gc, x, y, s, prop, angle):
-        size = prop.get_size_in_points()
-        width, height, fonts = math_parse_s_ft2font(
-            s, self.dpi.get(), size)
+        ox, oy, width, height, descent, font_image, used_characters = \
+            self.mathtext_parser.parse(s, self.dpi.get(), prop)
 
         if angle==90:
             width, height = height, width
             x -= width
         y -= height
 
-        imw, imh, image_str = fonts[0].image_as_str()
-        N = imw*imh
+        imw = font_image.get_width()
+        imh = font_image.get_height()
+        N = imw * imh
 
         # a numpixels by num fonts array
-        Xall = zeros((N,len(fonts)), typecode=UInt8)
-
-        for i, font in enumerate(fonts):
-            if angle == 90:
-                font.horiz_image_to_vert_image() # <-- Rotate
-            imw, imh, image_str = font.image_as_str()
-            Xall[:,i] = fromstring(image_str, UInt8)
+        Xall = npy.zeros((N,1), npy.uint8)
+        
+        image_str = font_image.as_str()
+        Xall[:,0] = npy.fromstring(image_str, npy.uint8)
 
         # get the max alpha at each pixel
-        Xs = numerix.mlab.max(Xall,1)
+        Xs = npy.amax(Xall,axis=1)
 
         # convert it to it's proper shape
         Xs.shape = imh, imw
@@ -346,15 +338,15 @@ class RendererGDK(RendererBase):
     def get_canvas_width_height(self):
         return self.width, self.height
 
-    def get_text_width_height(self, s, prop, ismath):
+    def get_text_width_height_descent(self, s, prop, ismath):
         if ismath:
-            width, height, fonts = math_parse_s_ft2font(
-                s, self.dpi.get(), prop.get_size_in_points())
-            return width, height
+            ox, oy, width, height, descent, font_image, used_characters = \
+                self.mathtext_parser.parse(s, self.dpi.get(), prop)
+            return width, height, descent
 
         layout, inkRect, logicalRect = self._get_pango_layout(s, prop)
         l, b, w, h = inkRect
-        return w, h+1
+        return w, h+1, h + 1
 
     def new_gc(self):
         return GraphicsContextGDK(renderer=self)
@@ -426,7 +418,7 @@ class GraphicsContextGDK(GraphicsContextBase):
         if dash_list == None:
             self.gdkGC.line_style = gdk.LINE_SOLID
         else:
-            pixels = self.renderer.points_to_pixels(asarray(dash_list))
+            pixels = self.renderer.points_to_pixels(npy.asarray(dash_list))
             dl = [max(1, int(round(val))) for val in pixels]
             self.gdkGC.set_dashes(dash_offset, dl)
             self.gdkGC.line_style = gdk.LINE_ON_OFF_DASH
@@ -484,55 +476,28 @@ class FigureCanvasGDK (FigureCanvasBase):
         self._renderer.set_width_height (width, height)
         self.figure.draw (self._renderer)
 
-    def print_figure(self, filename, dpi=150, facecolor='w', edgecolor='w',
-                     orientation='portrait', **kwargs):
-        root, ext = os.path.splitext(filename)
-        ext = ext[1:]
-        if ext == '':
-            ext      = IMAGE_FORMAT_DEFAULT
-            filename = filename + '.' + ext
+    filetypes = FigureCanvasBase.filetypes.copy()
+    filetypes['jpg'] = 'JPEG'
+    filetypes['jpeg'] = 'JPEG'
 
-        self.figure.dpi.set(dpi)
-        self.figure.set_facecolor(facecolor)
-        self.figure.set_edgecolor(edgecolor)
+    def print_jpeg(self, filename, *args, **kwargs):
+        return self._print_image(filename, 'jpeg')
+    print_jpg = print_jpeg
 
-        ext = ext.lower()
-        if ext in ('jpg', 'png'):          # native printing
-            width, height = self.get_width_height()
-            pixmap = gtk.gdk.Pixmap (None, width, height, depth=24)
-            self._render_figure(pixmap, width, height)
+    def print_png(self, filename, *args, **kwargs):
+        return self._print_image(filename, 'png')
+    
+    def _print_image(self, filename, format, *args, **kwargs):
+        width, height = self.get_width_height()
+        pixmap = gtk.gdk.Pixmap (None, width, height, depth=24)
+        self._render_figure(pixmap, width, height)
 
-            # jpg colors don't match the display very well, png colors match
-            # better
-            pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, 0, 8,
-                                    width, height)
-            pixbuf.get_from_drawable(pixmap, pixmap.get_colormap(),
-                                     0, 0, 0, 0, width, height)
+        # jpg colors don't match the display very well, png colors match
+        # better
+        pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, 0, 8,
+                                width, height)
+        pixbuf.get_from_drawable(pixmap, pixmap.get_colormap(),
+                                 0, 0, 0, 0, width, height)
 
-            # pixbuf.save() recognises 'jpeg' not 'jpg'
-            if ext == 'jpg': ext = 'jpeg'
-
-            pixbuf.save(filename, ext)
-
-        elif ext in ('eps', 'ps', 'svg',):
-            if ext == 'svg':
-                from backend_svg import FigureCanvasSVG as FigureCanvas
-            else:
-                from backend_ps  import FigureCanvasPS  as FigureCanvas
-
-
-            fc = self.switch_backends(FigureCanvas)
-            fc.print_figure(filename, dpi, facecolor, edgecolor, orientation,
-                            **kwargs)
-        elif ext in ('bmp', 'raw', 'rgb',):
-
-            from backend_agg import FigureCanvasAgg  as FigureCanvas
-            fc = self.switch_backends(FigureCanvas)
-            fc.print_figure(filename, dpi, facecolor, edgecolor, orientation,
-                            **kwargs)
-
-        else:
-            raise ValueError('Format "%s" is not supported.\nSupported formats are %s.' %
-                             (ext, ', '.join(IMAGE_FORMAT)))
-
-        self.figure.set_canvas(self)
+        pixbuf.save(filename, format)
+        

@@ -7,8 +7,8 @@ more information.
 from matplotlib import rcParams
 rcParams['text.usetex']=True
 rcParams['text.latex.unicode']=True
-from matplotlib.numerix import arange, cos, pi
-from pylab import figure, axes, plot, xlabel, ylabel, title, \
+from numpy import arange, cos, pi
+from matplotlib.pyplot import figure, axes, plot, xlabel, ylabel, title, \
      grid, savefig, show
 
 figure(1)
@@ -20,7 +20,7 @@ plot(t, s)
 xlabel(r'\textbf{time (s)}')
 s = unicode(r'\textit{Velocity (°/sec)}','latin-1')
 ylabel(unicode(r'\textit{Velocity (°/sec)}','latin-1'),fontsize=16)
-title(r"\TeX\ is Number $\displaystyle\sum_{n=1}^\infty\frac{-e^{i\pi}}{2^n}$!", 
+title(r"\TeX\ is Number $\displaystyle\sum_{n=1}^\infty\frac{-e^{i\pi}}{2^n}$!",
       fontsize=16, color='r')
 grid(True)
 savefig('tex_demo')

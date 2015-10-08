@@ -5,8 +5,8 @@ specifying the legend location
 
 The location codes are
 
-  'best'         : 0,
-  'upper right'  : 1,  (default)
+  'best'         : 0, (only implemented for axis legends)
+  'upper right'  : 1,
   'upper left'   : 2,
   'lower left'   : 3,
   'lower right'  : 4,
@@ -22,15 +22,15 @@ up the legend
 """
 from __future__ import division
 import sys, warnings
-from numerix import array, ones, Float
 
+import numpy as npy
 
 from matplotlib import verbose, rcParams
 from artist import Artist
 from cbook import enumerate, is_string_like, iterable, silent_list
 from font_manager import FontProperties
 from lines import Line2D
-from mlab import linspace, segments_intersect
+from mlab import segments_intersect
 from patches import Patch, Rectangle, RegularPolygon, Shadow, bbox_artist, draw_bbox
 from collections import LineCollection, RegularPolyCollection, PatchCollection
 from text import Text
@@ -75,8 +75,8 @@ class Legend(Artist):
 
     The location codes are
 
-      'best'         : 0,
-      'upper right'  : 1,  (default)
+      'best'         : 0, (only implemented for axis legends)
+      'upper right'  : 1,
       'upper left'   : 2,
       'lower left'   : 3,
       'lower right'  : 4,
@@ -92,8 +92,8 @@ class Legend(Artist):
     """
 
 
-    codes = {'best'         : 0,
-             'upper right'  : 1,  # default
+    codes = {'best'         : 0, # only implemented for axis legends
+             'upper right'  : 1,
              'upper left'   : 2,
              'lower left'   : 3,
              'lower right'  : 4,
@@ -108,26 +108,28 @@ class Legend(Artist):
 
 
     zorder = 5
-    def __init__(self, parent, handles, labels, loc,
-                 isaxes= None,
-                 numpoints = None,      # the number of points in the legend line
+    def __str__(self):
+        return "Legend"
+
+    def __init__(self, parent, handles, labels,
+                 loc = None,
+                 numpoints = None,     # the number of points in the legend line
                  prop = None,
-                 pad = None,          # the fractional whitespace inside the legend border
-                 markerscale = None,    # the relative size of legend markers vs. original
+                 pad = None,           # the fractional whitespace inside the legend border
+                 markerscale = None,   # the relative size of legend markers vs. original
                  # the following dimensions are in axes coords
-                 labelsep = None,     # the vertical space between the legend entries
+                 labelsep = None,      # the vertical space between the legend entries
                  handlelen = None,     # the length of the legend lines
                  handletextsep = None, # the space between the legend line and legend text
                  axespad = None,       # the border between the axes and legend edge
 
-                 shadow= None,
+                 shadow = None
                  ):
         """
   parent                # the artist that contains the legend
   handles               # a list of artists (lines, patches) to add to the legend
   labels                # a list of strings to label the legend
   loc                   # a location code
-  isaxes=True           # whether this is an axes legend
   numpoints = 4         # the number of points in the legend line
   prop = FontProperties(size='smaller')  # the font property
   pad = 0.2             # the fractional whitespace inside the legend border
@@ -140,13 +142,13 @@ The following dimensions are in axes coords
   handletextsep = 0.02 # the space between the legend line and legend text
   axespad = 0.02       # the border between the axes and legend edge
         """
-        Artist.__init__(self)
-        if is_string_like(loc) and not self.codes.has_key(loc):
-            warnings.warn('Unrecognized location %s. Falling back on upper right; valid locations are\n%s\t' %(loc, '\n\t'.join(self.codes.keys())))
-        if is_string_like(loc): loc = self.codes.get(loc, 1)
+        from axes import Axes     # local import only to avoid circularity
+        from figure import Figure # local import only to avoid circularity
 
-        proplist=[numpoints, pad, markerscale, labelsep, handlelen, handletextsep, axespad, shadow, isaxes]
-        propnames=['numpoints', 'pad', 'markerscale', 'labelsep', 'handlelen', 'handletextsep', 'axespad', 'shadow', 'isaxes']
+        Artist.__init__(self)
+
+        proplist=[numpoints, pad, markerscale, labelsep, handlelen, handletextsep, axespad, shadow]
+        propnames=['numpoints', 'pad', 'markerscale', 'labelsep', 'handlelen', 'handletextsep', 'axespad', 'shadow']
         for name, value in zip(propnames,proplist):
             if value is None:
                 value=rcParams["legend."+name]
@@ -157,22 +159,49 @@ The following dimensions are in axes coords
             self.prop=prop
         self.fontsize = self.prop.get_size_in_points()
 
-        if self.isaxes:  # parent is an Axes
+        if isinstance(parent,Axes):
+            self.isaxes = True
             self.set_figure(parent.figure)
-        else:        # parent is a Figure
+        elif isinstance(parent,Figure):
+            self.isaxes = False
             self.set_figure(parent)
-
+        else:
+            raise TypeError("Legend needs either Axes or Figure as parent")
         self.parent = parent
         self.set_transform( get_bbox_transform( unit_bbox(), parent.bbox) )
+
+        if loc is None:
+            loc = rcParams["legend.loc"]
+            if not self.isaxes and loc in [0,'best']:
+                loc = 'upper right'
+        if is_string_like(loc):
+            if not self.codes.has_key(loc):
+                if self.isaxes:
+                    warnings.warn('Unrecognized location "%s". Falling back on "best"; '
+                                  'valid locations are\n\t%s\n'
+                                  % (loc, '\n\t'.join(self.codes.keys())))
+                    loc = 0
+                else:
+                    warnings.warn('Unrecognized location "%s". Falling back on "upper right"; '
+                                  'valid locations are\n\t%s\n'
+                                   % (loc, '\n\t'.join(self.codes.keys())))
+                    loc = 1
+            else:
+                loc = self.codes[loc]
+        if not self.isaxes and loc == 0:
+            warnings.warn('Automatic legend placement (loc="best") not implemented for figure legend. '
+                          'Falling back on "upper right".')
+            loc = 1
+
         self._loc = loc
 
         # make a trial box in the middle of the axes.  relocate it
         # based on it's bbox
         left, top = 0.5, 0.5
         if self.numpoints == 1:
-            self._xdata = array([left + self.handlelen*0.5])
+            self._xdata = npy.array([left + self.handlelen*0.5])
         else:
-            self._xdata = linspace(left, left + self.handlelen, self.numpoints)
+            self._xdata = npy.linspace(left, left + self.handlelen, self.numpoints)
         textleft = left+ self.handlelen+self.handletextsep
         self.texts = self._get_texts(labels, textleft, top)
         self.legendHandles = self._get_handles(handles, self.texts)
@@ -251,7 +280,7 @@ The following dimensions are in axes coords
             x, y = label.get_position()
             x -= self.handlelen + self.handletextsep
             if isinstance(handle, Line2D):
-                ydata = (y-HEIGHT/2)*ones(self._xdata.shape, Float)
+                ydata = (y-HEIGHT/2)*npy.ones(self._xdata.shape, float)
                 legline = Line2D(self._xdata, ydata)
                 legline.update_from(handle)
                 self._set_artist_props(legline) # after update
@@ -269,7 +298,7 @@ The following dimensions are in axes coords
                 p.set_clip_box(None)
                 ret.append(p)
             elif isinstance(handle, LineCollection):
-                ydata = (y-HEIGHT/2)*ones(self._xdata.shape, Float)
+                ydata = (y-HEIGHT/2)*npy.ones(self._xdata.shape, float)
                 legline = Line2D(self._xdata, ydata)
                 self._set_artist_props(legline)
                 legline.set_clip_box(None)
@@ -310,49 +339,42 @@ The following dimensions are in axes coords
         the legend's handles.
         """
 
-        if not self.isaxes:
-            raise Exception, 'Auto legends not available for figure legends.'
-
-        def get_handles(ax):
-            handles = ax.lines[:]
-            handles.extend(ax.patches)
-            handles.extend([c for c in ax.collections if isinstance(c, LineCollection)])
-
-            return handles
+        assert self.isaxes # should always hold because function is only called internally
 
         ax = self.parent
-        handles = get_handles(ax)
         vertices = []
         bboxes = []
         lines = []
 
         inv = ax.transAxes.inverse_xy_tup
-        for handle in handles:
 
-            if isinstance(handle, Line2D):
+        for handle in ax.lines:
+            assert isinstance(handle, Line2D)
 
-                xdata = handle.get_xdata(orig=False)
-                ydata = handle.get_ydata(orig=False)
-                trans = handle.get_transform()
-                xt, yt = trans.numerix_x_y(xdata, ydata)
+            xdata = handle.get_xdata(orig=False)
+            ydata = handle.get_ydata(orig=False)
+            trans = handle.get_transform()
+            xt, yt = trans.numerix_x_y(xdata, ydata)
 
-                # XXX need a special method in transform to do a list of verts
-                averts = [inv(v) for v in zip(xt, yt)]
-                lines.append(averts)
+            # XXX need a special method in transform to do a list of verts
+            averts = [inv(v) for v in zip(xt, yt)]
+            lines.append(averts)
 
-            elif isinstance(handle, Patch):
+        for handle in ax.patches:
+            assert isinstance(handle, Patch)
 
-                verts = handle.get_verts()
-                trans = handle.get_transform()
-                tverts = trans.seq_xy_tups(verts)
+            verts = handle.get_verts()
+            trans = handle.get_transform()
+            tverts = trans.seq_xy_tups(verts)
 
-                averts = [inv(v) for v in tverts]
+            averts = [inv(v) for v in tverts]
 
-                bbox = unit_bbox()
-                bbox.update(averts, True)
-                bboxes.append(bbox)
+            bbox = unit_bbox()
+            bbox.update(averts, True)
+            bboxes.append(bbox)
 
-            elif isinstance(handle, LineCollection):
+        for handle in ax.collections:
+            if isinstance(handle, LineCollection):
                 hlines = handle.get_lines()
                 trans = handle.get_transform()
                 for line in hlines:
@@ -396,7 +418,7 @@ The following dimensions are in axes coords
                 text=l,
                 fontproperties=self.prop,
                 verticalalignment='top',
-                horizontalalignment='left',
+                horizontalalignment='left'
                 )
             self._set_artist_props(text)
             ret.append(text)
@@ -435,6 +457,8 @@ The following dimensions are in axes coords
         `consider` is a list of (x, y) pairs to consider as a potential
         lower-left corner of the legend. All are axes coords.
         """
+
+        assert self.isaxes # should always hold because function is only called internally
 
         verts, bboxes, lines = self._auto_legend_data()
 
@@ -477,40 +501,31 @@ The following dimensions are in axes coords
     def _loc_to_axes_coords(self, loc, width, height):
         """Convert a location code to axes coordinates.
 
-        - loc: a location code, which may be a pair of literal axes coords, or
-          in range(1, 11). This coresponds to the possible values for
-          self._loc, excluding "best".
+        - loc: a location code in range(1, 11).
+          This corresponds to the possible values for self._loc, excluding "best".
 
         - width, height: the final size of the legend, axes units.
         """
+        assert loc in range(1,11) # called only internally
+
         BEST, UR, UL, LL, LR, R, CL, CR, LC, UC, C = range(11)
 
-        left = self.axespad
-        right = 1.0 - (self.axespad + width)
-        upper = 1.0 - (self.axespad + height)
-        lower = self.axespad
-        centerx = 0.5 - (width/2.0)
-        centery = 0.5 - (height/2.0)
+        if loc in (UL, LL, CL):                # left
+            x = self.axespad
+        elif loc in (UR, LR, CR, R):           # right
+            x = 1.0 - (width + self.axespad)
+        elif loc in (LC, UC, C):               # center x
+            x = (0.5 - width/2.0)
 
-        if loc == UR:
-            return right, upper
-        if loc == UL:
-            return left, upper
-        if loc == LL:
-            return left, lower
-        if loc == LR:
-            return right, lower
-        if loc == CL:
-            return left, centery
-        if loc in (CR, R):
-            return right, centery
-        if loc == LC:
-            return centerx, lower
-        if loc == UC:
-            return centerx, upper
-        if loc == C:
-            return centerx, centery
-        raise TypeError, "%r isn't an understood type code." % (loc,)
+        if loc in (UR, UL, UC):                # upper
+            y = 1.0 - (height + self.axespad)
+        elif loc in (LL, LR, LC):              # lower
+            y = self.axespad
+        elif loc in (CL, CR, C, R):            # center y
+            y = (0.5 - height/2.0)
+
+        return x,y
+
 
     def _update_positions(self, renderer):
         # called from renderer to allow more precise estimates of
@@ -540,7 +555,7 @@ The following dimensions are in axes coords
         for handle, tup in zip(self.legendHandles, hpos):
             y,h = tup
             if isinstance(handle, Line2D):
-                ydata = y*ones(self._xdata.shape, Float)
+                ydata = y*npy.ones(self._xdata.shape, float)
                 handle.set_ydata(ydata+h/2)
             elif isinstance(handle, Rectangle):
                 handle.set_y(y+1/4*h)
@@ -553,33 +568,21 @@ The following dimensions are in axes coords
         l,b,w,h = bbox.get_bounds()
         self.legendPatch.set_bounds(l,b,w,h)
 
-        BEST, UR, UL, LL, LR, R, CL, CR, LC, UC, C = range(11)
         ox, oy = 0, 0                           # center
-
 
         if iterable(self._loc) and len(self._loc)==2:
             xo = self.legendPatch.get_x()
             yo = self.legendPatch.get_y()
             x, y = self._loc
-            ox = x-xo
-            oy = y-yo
-            self._offset(ox, oy)
+            ox, oy = x-xo, y-yo
+        elif self._loc == 0:  # "best"
+            ox, oy = self._find_best_position(w, h)
         else:
-            if self._loc in (BEST,):
-                ox, oy = self._find_best_position(w, h)
-            if self._loc in (UL, LL, CL):           # left
-                ox = self.axespad - l
-            if self._loc in (UR, LR, R, CR):  # right
-                ox = 1 - (l + w + self.axespad)
-            if self._loc in (UR, UL, UC):     # upper
-                oy = 1 - (b + h + self.axespad)
-            if self._loc in (LL, LR, LC):           # lower
-                oy = self.axespad - b
-            if self._loc in (LC, UC, C):            # center x
-                ox = (0.5-w/2)-l
-            if self._loc in (CL, CR, C):            # center y
-                oy = (0.5-h/2)-b
-            self._offset(ox, oy)
+            x, y = self._loc_to_axes_coords(self._loc, w, h)
+            ox, oy = x-l, y-b
+
+        self._offset(ox, oy)
+
 
 
 #artist.kwdocd['Legend'] = kwdoc(Legend)

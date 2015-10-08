@@ -29,15 +29,20 @@ def new_figure_manager(num, *args, **kwargs):
 
 
 class RendererGTKCairo (backend_cairo.RendererCairo):
-    def set_pixmap (self, pixmap):
-        if gtk.pygtk_version >= (2,7,0):
+    if gtk.pygtk_version >= (2,7,0):
+        def set_pixmap (self, pixmap):
             self.ctx = pixmap.cairo_create()
-        else:
+            self.ctx.save()  # restore, save  - when call new_gc()
+    else:
+        def set_pixmap (self, pixmap):
             self.ctx = cairo.gtk.gdk_cairo_create (pixmap)
-        self.ctx.save()  # restore, save  - when call new_gc()
+            self.ctx.save()  # restore, save  - when call new_gc()
 
 
-class FigureCanvasGTKCairo(FigureCanvasGTK):
+class FigureCanvasGTKCairo(backend_cairo.FigureCanvasCairo, FigureCanvasGTK):
+    filetypes = FigureCanvasGTK.filetypes.copy()
+    filetypes.update(backend_cairo.FigureCanvasCairo.filetypes)
+
     def _renderer_init(self):
         """Override to use cairo (rather than GDK) renderer"""
         if _debug: print '%s.%s()' % (self.__class__.__name__, _fn_name())

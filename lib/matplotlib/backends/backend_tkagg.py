@@ -17,7 +17,6 @@ from matplotlib.backend_bases import RendererBase, GraphicsContextBase, \
 
 from matplotlib.figure import Figure
 from matplotlib._pylab_helpers import Gcf
-from matplotlib.numerix import asarray
 
 import matplotlib.windowing as windowing
 from matplotlib.widgets import SubplotTool
@@ -33,7 +32,7 @@ backend_version = Tk.TkVersion
 PIXELS_PER_INCH = 75
 
 cursord = {
-    cursors.MOVE: "fleur",    
+    cursors.MOVE: "fleur",
     cursors.HAND: "hand2",
     cursors.POINTER: "arrow",
     cursors.SELECT_REGION: "tcross",
@@ -47,7 +46,7 @@ def raise_msg_to_str(msg):
     if not is_string_like(msg):
         msg = '\n'.join(map(str, msg))
     return msg
-    
+
 def error_msg_tkpaint(msg, parent=None):
     import tkMessageBox
     tkMessageBox.showerror("matplotlib", msg)
@@ -57,7 +56,7 @@ def draw_if_interactive():
         figManager =  Gcf.get_active()
         if figManager is not None:
             figManager.show()
-        
+
 
 def show():
     """
@@ -86,7 +85,7 @@ def new_figure_manager(num, *args, **kwargs):
     FigureClass = kwargs.pop('FigureClass', Figure)
     figure = FigureClass(*args, **kwargs)
     window = Tk.Tk()
-    canvas = FigureCanvasTkAgg(figure, master=window)    
+    canvas = FigureCanvasTkAgg(figure, master=window)
     figManager = FigureManagerTkAgg(canvas, num, window)
     if matplotlib.is_interactive():
         figManager.show()
@@ -104,6 +103,45 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
                65362 : 'up',
                65363 : 'right',
                65364 : 'down',
+               65307 : 'escape',
+               65470 : 'f1',
+               65471 : 'f2',
+               65472 : 'f3',
+               65473 : 'f4',
+               65474 : 'f5',
+               65475 : 'f6',
+               65476 : 'f7',
+               65477 : 'f8',
+               65478 : 'f9',
+               65479 : 'f10',
+               65480 : 'f11',
+               65481 : 'f12',
+               65300 : 'scroll_lock',
+               65299 : 'break',
+               65288 : 'backspace',
+               65293 : 'enter',
+               65379 : 'insert',
+               65535 : 'delete',
+               65360 : 'home',
+               65367 : 'end',
+               65365 : 'pageup',
+               65366 : 'pagedown',
+               65438 : '0',
+               65436 : '1',
+               65433 : '2',
+               65435 : '3',
+               65430 : '4',
+               65437 : '5',
+               65432 : '6',
+               65429 : '7',
+               65431 : '8',
+               65434 : '9',
+               65451 : '+',
+               65453 : '-',
+               65450 : '*',
+               65455 : '/',
+               65439 : 'dec',
+               65421 : 'enter',
                }
 
     def __init__(self, figure, master=None, resize_callback=None):
@@ -119,18 +157,18 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
         self._resize_callback = resize_callback
         self._tkcanvas.bind("<Configure>", self.resize)
         self._tkcanvas.bind("<Key>", self.key_press)
-        self._tkcanvas.bind("<Motion>", self.motion_notify_event)        
+        self._tkcanvas.bind("<Motion>", self.motion_notify_event)
         self._tkcanvas.bind("<KeyRelease>", self.key_release)
         for name in "<Button-1>", "<Button-2>", "<Button-3>":
             self._tkcanvas.bind(name, self.button_press_event)
 
         for name in "<ButtonRelease-1>", "<ButtonRelease-2>", "<ButtonRelease-3>":
             self._tkcanvas.bind(name, self.button_release_event)
-            
+
         self._master = master
         self._tkcanvas.focus_set()
 
-        
+
     def resize(self, event):
         width, height = event.width, event.height
         if self._resize_callback is not None:
@@ -143,7 +181,6 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
         self.figure.set_size_inches(winch, hinch)
 
 
-        self._tkphoto.configure(width=width, height=height)
         self._tkcanvas.delete(self._tkphoto)
         self._tkphoto = Tk.PhotoImage(
             master=self._tkcanvas, width=width, height=height)
@@ -177,21 +214,6 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
         is intended to hide that fact.
         """
         return self._tkcanvas
-
-    def print_figure(self, filename, dpi=None, facecolor='w', edgecolor='w',
-                     orientation='portrait', **kwargs):
-
-        if dpi is None: dpi = rcParams['savefig.dpi']
-        agg = self.switch_backends(FigureCanvasAgg)
-        try:
-            agg.print_figure(filename, dpi, facecolor, edgecolor, orientation,
-                             **kwargs)
-        except:
-            self.figure.set_canvas(self)
-            raise
-        else:
-            self.figure.set_canvas(self)
-            
 
     def motion_notify_event(self, event):
         x = event.x
@@ -238,17 +260,17 @@ class FigureCanvasTkAgg(FigureCanvasAgg):
             key = None
         return key
 
-        
+
     def key_press(self, event):
         key = self._get_key(event)
-        FigureCanvasBase.key_press_event(self, key, guiEvent=event)        
+        FigureCanvasBase.key_press_event(self, key, guiEvent=event)
 
     def key_release(self, event):
         key = self._get_key(event)
-        FigureCanvasBase.key_release_event(self, key, guiEvent=event)        
+        FigureCanvasBase.key_release_event(self, key, guiEvent=event)
 
 
-    
+
 class FigureManagerTkAgg(FigureManagerBase):
     """
     Public attributes
@@ -259,7 +281,7 @@ class FigureManagerTkAgg(FigureManagerBase):
     window      : The tk.Window
     """
     def __init__(self, canvas, num, window):
-        FigureManagerBase.__init__(self, canvas, num)        
+        FigureManagerBase.__init__(self, canvas, num)
         self.window = window
         self.window.withdraw()
         self.window.wm_title("Figure %d" % num)
@@ -280,11 +302,16 @@ class FigureManagerTkAgg(FigureManagerBase):
         self._shown = False
 
         def notify_axes_change(fig):
-            'this will be called whenever the current axes is changed'        
+            'this will be called whenever the current axes is changed'
             if self.toolbar != None: self.toolbar.update()
         self.canvas.figure.add_axobserver(notify_axes_change)
 
-        
+
+
+        # attach a show method to the figure for pylab ease of use
+        self.canvas.figure.show = lambda *args: self.show()
+
+
     def resize(self, event):
         width, height = event.width, event.height
         self.toolbar.configure(width=width) # , height=height)
@@ -299,14 +326,13 @@ class FigureManagerTkAgg(FigureManagerBase):
         def destroy(*args):
             self.window = None
             Gcf.destroy(self._num)
-            
-        if not self._shown: self.window.bind("<Destroy>", destroy)
 
+        if not self._shown: self.canvas._tkcanvas.bind("<Destroy>", destroy)
         _focus = windowing.FocusManager()
         if not self._shown:
             self.window.deiconify()
             # anim.py requires this
-            if sys.platform=='win32' : self.window.update()            
+            if sys.platform=='win32' : self.window.update()
         else:
             self.canvas.draw()
         self._shown = True
@@ -322,6 +348,9 @@ class FigureManagerTkAgg(FigureManagerBase):
 
             pass
         self.window = None
+
+    def set_window_title(self, title):
+        self.window.wm_title(title)
 
 class AxisMenu:
     def __init__(self, master, naxes):
@@ -401,11 +430,11 @@ class NavigationToolbar(Tk.Frame):
         b._ntimage = im
         b.pack(side=Tk.LEFT)
         return b
-            
+
     def __init__(self, canvas, window):
         self.canvas = canvas
         self.window = window
-        
+
         xmin, xmax = canvas.figure.bbox.intervalx().get_bounds()
         height, width = 50, xmax-xmin
         Tk.Frame.__init__(self, master=self.window,
@@ -425,7 +454,7 @@ class NavigationToolbar(Tk.Frame):
         self.bZoomInX = self._Button(
             text="ZoomInX",file="stock_zoom-in.ppm",
             command=lambda x=1: self.zoomx(x))
-        
+
         self.bZoomOutX = self._Button(
             text="ZoomOutX", file="stock_zoom-out.ppm",
             command=lambda x=-1: self.zoomx(x))
@@ -433,7 +462,7 @@ class NavigationToolbar(Tk.Frame):
         self.bUp = self._Button(
             text="Up", file="stock_up.ppm",
             command=lambda y=1: self.pany(y))
-        
+
         self.bDown = self._Button(
             text="Down", file="stock_down.ppm",
             command=lambda y=-1: self.pany(y))
@@ -445,14 +474,14 @@ class NavigationToolbar(Tk.Frame):
         self.bZoomOutY = self._Button(
             text="ZoomOutY",file="stock_zoom-out.ppm",
             command=lambda y=-1: self.zoomy(y))
-        
+
         self.bSave = self._Button(
             text="Save", file="stock_save_as.ppm",
             command=self.save_figure)
 
         self.pack(side=Tk.BOTTOM, fill=Tk.X)
-        
-        
+
+
     def set_active(self, ind):
         self._ind = ind
         self._active = [ self._axes[i] for i in self._ind ]
@@ -480,7 +509,7 @@ class NavigationToolbar(Tk.Frame):
     def zoomx(self, arg):
         try: arg.direction
         except AttributeError: direction = arg
-        else:            
+        else:
             if arg.direction == Tk.SCROLL_UP: direction=1
             else: direction=-1
 
@@ -506,15 +535,15 @@ class NavigationToolbar(Tk.Frame):
             self.lastDir
         except AttributeError:
             self.lastDir = os.curdir
-            
+
         fname = fs.go(dir_or_file=self.lastDir) # , pattern="*.png")
         if fname is None: # Cancel
             return
-        
+
         self.lastDir = os.path.dirname(fname)
         try:
             self.canvas.print_figure(fname)
-        except IOError, msg:                
+        except IOError, msg:
             err = '\n'.join(map(str, msg))
             msg = 'Failed to save %s: Error msg was\n\n%s' % (
                 fname, err)
@@ -543,7 +572,11 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
         self._idle = True
         #Tk.Frame.__init__(self, master=self.canvas._tkcanvas)
         NavigationToolbar2.__init__(self, canvas)
-        
+
+    def destroy(self, *args):
+        del self.message
+        Tk.Frame.destroy(self, *args)
+
     def set_message(self, s):
         self.message.set(s)
 
@@ -567,7 +600,7 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
 
     def set_cursor(self, cursor):
         self.window.configure(cursor=cursord[cursor])
-    
+
     def _Button(self, text, file, command):
         file = os.path.join(rcParams['datapath'], 'images', file)
         im = Tk.PhotoImage(master=self, file=file)
@@ -583,7 +616,7 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
         Tk.Frame.__init__(self, master=self.window,
                           width=width, height=height,
                           borderwidth=2)
-        
+
         self.update()  # Make axes menu
 
         self.bHome = self._Button( text="Home", file="home.ppm",
@@ -591,7 +624,7 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
 
         self.bBack = self._Button( text="Back", file="back.ppm",
                                    command = self.back)
-        
+
         self.bForward = self._Button(text="Forward", file="forward.ppm",
                                      command = self.forward)
 
@@ -616,7 +649,7 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
     def configure_subplots(self):
         toolfig = Figure(figsize=(6,3))
         window = Tk.Tk()
-        canvas = FigureCanvasTkAgg(toolfig, master=window)    
+        canvas = FigureCanvasTkAgg(toolfig, master=window)
         toolfig.subplots_adjust(top=0.9)
         tool =  SubplotTool(self.canvas.figure, toolfig)
         canvas.show()
@@ -624,51 +657,37 @@ class NavigationToolbar2TkAgg(NavigationToolbar2, Tk.Frame):
 
     def save_figure(self):
         from tkFileDialog import asksaveasfilename
+        from tkMessageBox import showerror
+        filetypes = self.canvas.get_supported_filetypes().copy()
+        default_filetype = self.canvas.get_default_filetype()
 
+        # Tk doesn't provide a way to choose a default filetype,
+        # so we just have to put it first
+        default_filetype_name = filetypes[default_filetype]
+        del filetypes[default_filetype]
+        
+        sorted_filetypes = filetypes.items()
+        sorted_filetypes.sort()
+        sorted_filetypes.insert(0, (default_filetype, default_filetype_name))
+        
+        tk_filetypes = [
+            (name, '*.%s' % ext) for (ext, name) in sorted_filetypes]
+        
         fname = asksaveasfilename(
             master=self.window,
             title='Save the figure',
-            filetypes=[
-            ('Portable Network Graphics','*.png'),
-            ('Encapsulated Postscript File','*.eps'),
-            ('Scalable Vector Graphics','*.svg'),
+            filetypes = tk_filetypes,
+            defaultextension = self.canvas.get_default_filetype()
+            )
 
-            ])
-
-        if fname == "" :
+        if fname == "" or fname == ():
             return
         else:
-            bname, fext = os.path.splitext(fname)
-            if fext == '': # No extension provided
-                fext = '.png' # Assume png
-                fname += fext
-            if (fext.lower()=='.png'):
-                self.canvas.print_figure(fname, dpi=300)
-            elif (fext.lower()=='.eps'):
+            try:
+                # This method will handle the delegation to the correct type
                 self.canvas.print_figure(fname)
-            elif (fext.lower()=='.svg'):
-                self.canvas.print_figure(fname)
-
-    def _save_figure(self):
-        fs = FileDialog.SaveFileDialog(master=self.window,
-                                       title='Save the figure')
-        try:
-            self.lastDir
-        except AttributeError:
-            self.lastDir = os.curdir
-            
-        fname = fs.go(dir_or_file=self.lastDir) # , pattern="*.png")
-        if fname is None: # Cancel
-            return
-        
-        self.lastDir = os.path.dirname(fname)
-        try:
-            self.canvas.print_figure(fname)
-        except IOError, msg:                
-            err = '\n'.join(map(str, msg))
-            msg = 'Failed to save %s: Error msg was\n\n%s' % (
-                fname, err)
-            error_msg_tkpaint(msg)
+            except Exception, e:
+                showerror("Error saving file", str(e))
 
     def set_active(self, ind):
         self._ind = ind

@@ -21,8 +21,8 @@ License   : matplotlib license
 """
 from __future__ import division
 import sys, warnings
+
 from matplotlib import verbose
-from numerix import ones, Float, add, asarray
 
 import artist
 from artist import Artist
@@ -47,6 +47,7 @@ class Cell(Rectangle):
                  fill=True,
                  text='',
                  loc=None,
+                 fontproperties=None
                  ):
 
         # Call base
@@ -58,7 +59,8 @@ class Cell(Rectangle):
         # Create text object
         if loc is None: loc = 'right'
         self._loc = loc
-        self._text = Text(x=xy[0], y=xy[1], text=text)
+        self._text = Text(x=xy[0], y=xy[1], text=text,
+                          fontproperties=fontproperties)
         self._text.set_clip_on(False)
 
 
@@ -202,6 +204,8 @@ class Table(Artist):
         self._autoColumns = []
         self._autoFontsize = True
 
+        self._cachedRenderer = None
+
     def add_cell(self, row, col, *args, **kwargs):
         """ Add a cell to the table. """
         xy = (0,0)
@@ -217,6 +221,13 @@ class Table(Artist):
         return self.FONTSIZE/72.0*self.figure.dpi.get()/self._axes.bbox.height() * 1.2
 
     def draw(self, renderer):
+        # Need a renderer to do hit tests on mouseevent; assume the last one will do
+        if renderer is None:
+            renderer = self._cachedRenderer
+        if renderer is None:
+            raise RuntimeError('No renderer defined')
+        self._cachedRenderer = renderer
+
         if not self.get_visible(): return
         renderer.open_group('table')
         self._update_positions(renderer)
@@ -240,9 +251,28 @@ class Table(Artist):
         bbox = bbox_all(boxes)
         return inverse_transform_bbox(self.get_transform(), bbox)
 
-    def get_child_artists(self):
-        'Return the Artists cintained by the table'
+    def contains(self,mouseevent):
+        """Test whether the mouse event occurred in the table.
+
+        Returns T/F, {}
+        """
+        if callable(self._contains): return self._contains(self,mouseevent)
+
+        # TODO: Return index of the cell containing the cursor so that the user
+        # doesn't have to bind to each one individually.
+        if self._cachedRenderer is not None:
+            boxes = [self._cells[pos].get_window_extent(self._cachedRenderer)
+                 for pos in self._cells.keys()
+                 if pos[0] >= 0 and pos[1] >= 0]
+            bbox = bbox_all(boxes)
+            return bbox.contains(mouseevent.x,mouseevent.y),{}
+        else:
+            return False,{}
+
+    def get_children(self):
+        'Return the Artists contained by the table'
         return self._cells.values()
+    get_child_artists = get_children  # backward compatibility
 
     def get_window_extent(self, renderer):
         'Return the bounding box of the table in window coords'

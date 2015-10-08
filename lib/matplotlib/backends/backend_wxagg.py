@@ -1,4 +1,4 @@
-from __future__ import division 
+from __future__ import division
 """
 
  backend_wxagg.py
@@ -7,10 +7,10 @@ from __future__ import division
  Jeremy O'Donoghue (jeremy@o-donoghue.com) and the Agg backend by John
  Hunter (jdhunter@ace.bsd.uchicago.edu)
 
- Copyright (C) 2003-5 Jeremy O'Donoghue, John Hunter, Illinois Institute of 
+ Copyright (C) 2003-5 Jeremy O'Donoghue, John Hunter, Illinois Institute of
  Technology
 
-  
+
  License: This work is licensed under the matplotlib license( PSF
  compatible). A copy should be included with this source code.
 
@@ -40,12 +40,12 @@ class FigureFrameWxAgg(FigureFrameWx):
             toolbar.set_status_bar(statbar)
         else:
             toolbar = None
-        return toolbar 
+        return toolbar
 
-class FigureCanvasWxAgg(FigureCanvasWx,FigureCanvasAgg):
+class FigureCanvasWxAgg(FigureCanvasAgg, FigureCanvasWx):
     """
     The FigureCanvas contains the figure and does event handling.
-    
+
     In the wxPython backend, it is derived from wxPanel, and (usually)
     lives inside a frame instantiated by a FigureManagerWx. The parent
     window probably implements a wxSizer to control the displayed
@@ -95,31 +95,12 @@ class FigureCanvasWxAgg(FigureCanvasWx,FigureCanvasAgg):
         srcDC.SelectObject(wx.NullBitmap)
         self.gui_repaint()
 
-    def print_figure(self, filename, dpi=None, facecolor='w', edgecolor='w',
-                     orientation='portrait', **kwargs):
-        """
-        Render the figure to hardcopy
-        """
-        if dpi is None: dpi = matplotlib.rcParams['savefig.dpi']
-        agg = self.switch_backends(FigureCanvasAgg)
-        try:
-            agg.print_figure(filename, dpi, facecolor, edgecolor, orientation,
-                             **kwargs)
-        except:
-            self.figure.set_canvas(self)
-            raise
-
-        self.figure.set_canvas(self)
-
-    def _get_imagesave_wildcards(self):
-        'return the wildcard string for the filesave dialog'
-        return "PS (*.ps)|*.ps|"     \
-               "EPS (*.eps)|*.eps|"  \
-               "SVG (*.svg)|*.svg|"  \
-               "BMP (*.bmp)|*.bmp|"  \
-               "PNG (*.png)|*.png"  \
-
-
+    filetypes = FigureCanvasAgg.filetypes
+        
+    def print_figure(self, filename, *args, **kwargs):
+        FigureCanvasAgg.print_figure(self, filename, *args, **kwargs)
+        self.draw()
+        
 class NavigationToolbar2WxAgg(NavigationToolbar2Wx):
     def get_canvas(self, frame, fig):
         return FigureCanvasWxAgg(frame, -1, fig)
@@ -132,20 +113,15 @@ def new_figure_manager(num, *args, **kwargs):
     # in order to expose the Figure constructor to the pylab
     # interface we need to create the figure here
     DEBUG_MSG("new_figure_manager()", 3, None)
+    backend_wx._create_wx_app()
 
-    if backend_wx.wxapp is None:
-        backend_wx.wxapp = wx.GetApp()
-        if backend_wx.wxapp is None:
-            backend_wx.wxapp = wx.PySimpleApp()
-            backend_wx.wxapp.SetExitOnFrameDelete(True)
-
-    FigureClass = kwargs.pop('FigureClass', Figure)    
+    FigureClass = kwargs.pop('FigureClass', Figure)
     fig = FigureClass(*args, **kwargs)
     frame = FigureFrameWxAgg(num, fig)
     figmgr = frame.get_figure_manager()
     if matplotlib.is_interactive():
         figmgr.canvas.realize()
-        figmgr.frame.Show() 
+        figmgr.frame.Show()
     return figmgr
 
 
@@ -203,7 +179,7 @@ def _clipped_image_as_bitmap(image, bbox):
     destBmp = wx.EmptyBitmap(int(width), int(height))
     destDC = wx.MemoryDC()
     destDC.SelectObject(destBmp)
- 
+
     destDC.BeginDrawing()
     x = int(l)
     y = int(image.GetHeight() - t)
@@ -271,7 +247,7 @@ def _WX28_clipped_agg_as_bitmap(agg, bbox):
     destBmp = wx.EmptyBitmap(int(width), int(height))
     destDC = wx.MemoryDC()
     destDC.SelectObject(destBmp)
- 
+
     destDC.BeginDrawing()
     x = int(l)
     y = int(int(agg.height) - t)

@@ -7,10 +7,11 @@ layout -- you have to figure out how wide and tall you want your Axes
 to be to accommodate your widget.
 """
 
-from mlab import linspace, dist
+import numpy as npy
+
+from mlab import dist
 from patches import Circle, Rectangle
 from lines import Line2D
-from numerix import array
 from transforms import blend_xy_sep_transform
 
 class LockDraw:
@@ -83,7 +84,7 @@ class Button(Widget):
         label is a string which is the button text
 
         image if not None, is an image to place in the button -- can
-          be any legal arg to imshow (array, matplotlib Image
+          be any legal arg to imshow (numpy array, matplotlib Image
           instance, or PIL image)
 
         color is the color of the button when not activated
@@ -304,7 +305,7 @@ class CheckButtons(Widget):
 
         if len(labels)>1:
             dy = 1./(len(labels)+1)
-            ys = linspace(1-dy, dy, len(labels))
+            ys = npy.linspace(1-dy, dy, len(labels))
         else:
             dy = 0.25
             ys = [0.5]
@@ -421,7 +422,7 @@ class RadioButtons(Widget):
         ax.set_yticks([])
         ax.set_navigate(False)
         dy = 1./(len(labels)+1)
-        ys = linspace(1-dy, dy, len(labels))
+        ys = npy.linspace(1-dy, dy, len(labels))
         cnt = 0
         axcolor = ax.get_axis_bgcolor()
 
@@ -457,9 +458,9 @@ class RadioButtons(Widget):
         if event.button !=1 : return
         if event.inaxes != self.ax: return
         xy = self.ax.transAxes.inverse_xy_tup((event.x, event.y))
-        pclicked = array([xy[0], xy[1]])
+        pclicked = npy.array([xy[0], xy[1]])
         def inside(p):
-            pcirc = array([p.center[0], p.center[1]])
+            pcirc = npy.array([p.center[0], p.center[1]])
             return dist(pclicked, pcirc) < p.radius
 
         for p,t in zip(self.circles, self.labels):
@@ -661,8 +662,8 @@ class Cursor:
         self.vertOn = True
         self.useblit = useblit
 
-        self.lineh = ax.axhline(0, visible=False, **lineprops)
-        self.linev = ax.axvline(0, visible=False, **lineprops)
+        self.lineh = ax.axhline(ax.get_ybound()[0], visible=False, **lineprops)
+        self.linev = ax.axvline(ax.get_xbound()[0], visible=False, **lineprops)
 
         self.background = None
         self.needclear = False
@@ -943,7 +944,7 @@ class SpanSelector:
 
             if vmin>vmax: vmin, vmax = vmax, vmin
             self.onmove_callback(vmin, vmax)
-            
+
         self.update()
         return False
 
@@ -954,24 +955,40 @@ class HorizontalSpanSelector(SpanSelector):
         warnings.warn('Use SpanSelector instead!', DeprecationWarning)
         SpanSelector.__init__(self, ax, onselect, 'horizontal', **kwargs)
 
+
 class RectangleSelector:
     """
     Select a min/max range of the x axes for a matplotlib Axes
 
     Example usage:
 
-      ax = subplot(111)
-      ax.plot(x,y)
+        from matplotlib.widgets import  RectangleSelector
+        from pylab import *
 
-      def onselect(eclick, erelease):
+        def onselect(eclick, erelease):
           'eclick and erelease are matplotlib events at press and release'
-          print 'startposition : (%f,%f)'%(eclick.xdata, eclick.ydata)
-          print 'endposition   : (%f,%f)'%(erelease.xdata, erelease.ydata)
-          print 'used button   : ', eclick.button
+          print ' startposition : (%f, %f)' % (eclick.xdata, eclick.ydata)
+          print ' endposition   : (%f, %f)' % (erelease.xdata, erelease.ydata)
+          print ' used button   : ', eclick.button
 
-      span = Selector(ax, onselect,drawtype='box')
-      show()
+        def toggle_selector(event):
+            print ' Key pressed.'
+            if event.key in ['Q', 'q'] and toggle_selector.RS.active:
+                print ' RectangleSelector deactivated.'
+                toggle_selector.RS.set_active(False)
+            if event.key in ['A', 'a'] and not toggle_selector.RS.active:
+                print ' RectangleSelector activated.'
+                toggle_selector.RS.set_active(True)
 
+        x = arange(100)/(99.0)
+        y = sin(x)
+        fig = figure
+        ax = subplot(111)
+        ax.plot(x,y)
+
+        toggle_selector.RS = RectangleSelector(ax, onselect, drawtype='line')
+        connect('key_press_event', toggle_selector)
+        show()
     """
     def __init__(self, ax, onselect, drawtype='box',
                  minspanx=None, minspany=None, useblit=False,
@@ -1000,8 +1017,6 @@ class RectangleSelector:
         Use type if you want the mouse to draw a line, a box or nothing
         between click and actual position ny setting
         drawtype = 'line', drawtype='box' or drawtype = 'none'.
-
-
         """
         self.ax = ax
         self.visible = True
@@ -1011,6 +1026,7 @@ class RectangleSelector:
         self.canvas.mpl_connect('button_release_event', self.release)
         self.canvas.mpl_connect('draw_event', self.update_background)
 
+        self.active = True                    # for activation / deactivation
         self.to_draw = None
         self.background = None
 
@@ -1051,6 +1067,14 @@ class RectangleSelector:
 
     def ignore(self, event):
         'return True if event should be ignored'
+        # If RectangleSelector is not active :
+        if not self.active:
+            return True
+
+        # If canvas was locked
+        if not self.canvas.widgetlock.available(self):
+            return True
+
         # If no button was pressed yet ignore the event if it was out
         # of the axes
         if self.eventpress == None:
@@ -1141,6 +1165,17 @@ class RectangleSelector:
             self.update()
             return False
 
+    def set_active(self, active):
+        """ Use this to activate / deactivate the RectangleSelector
+
+            from your program with an boolean variable 'active'.
+        """
+        self.active = active
+
+    def get_active(self):
+        """ to get status of active mode (boolean variable)"""
+        return self.active
+
 class Lasso(Widget):
     def __init__(self, ax, xy, callback=None, useblit=True):
         self.axes = ax
@@ -1168,11 +1203,11 @@ class Lasso(Widget):
         self.verts = None
         for cid in self.cids:
             self.canvas.mpl_disconnect(cid)
-        
+
     def onmove(self, event):
-        if self.verts is None: return 
+        if self.verts is None: return
         if event.inaxes != self.axes: return
-        if event.button!=1: return 
+        if event.button!=1: return
         self.verts.append((event.xdata, event.ydata))
 
         self.line.set_data(zip(*self.verts))

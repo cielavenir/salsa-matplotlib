@@ -8,36 +8,29 @@ they are meant to be fast for common use cases (eg a bunch of solid
 line segemnts)
 """
 import math, warnings
-from matplotlib import rcParams, verbose
-
-import artist
-from artist import Artist, kwdocd
-from backend_bases import GraphicsContextBase
-from cbook import is_string_like, iterable, dedent
-from colors import colorConverter
-from cm import ScalarMappable
-from numerix import arange, sin, cos, pi, asarray, sqrt, array, newaxis, ones
-from numerix import isnan, any, resize
-from transforms import identity_transform
-
+import numpy as npy
+import matplotlib as mpl
+import matplotlib.cbook as cbook
+import matplotlib.colors as _colors # avoid conflict with kwarg
+import matplotlib.cm as cm
+import matplotlib.transforms as transforms
+import matplotlib.artist as artist
+import matplotlib.backend_bases as backend_bases
 import matplotlib.nxutils as nxutils
 
-class Collection(Artist):
+
+class Collection(artist.Artist):
     """
-    All properties in a collection must be sequences.  The
+    All properties in a collection must be sequences or scalars;
+    if scalars, they will be converted to sequences.  The
     property of the ith element of the collection is the
 
       prop[i % len(props)].
 
-    This implies that the properties cycle if the len of props is less
-    than the number of elements of the collection.  A length 1
-    property is shared by all the elements of the collection
-
-    All color args to a collection are sequences of rgba tuples
     """
 
     def __init__(self):
-        Artist.__init__(self)
+        artist.Artist.__init__(self)
 
 
     def get_verts(self):
@@ -47,7 +40,7 @@ class Collection(Artist):
     def _get_value(self, val):
         try: return (float(val), )
         except TypeError:
-            if iterable(val) and len(val):
+            if cbook.iterable(val) and len(val):
                 try: float(val[0])
                 except TypeError: pass # raise below
                 else: return val
@@ -58,7 +51,7 @@ class Collection(Artist):
 # these are not available for the object inspector until after the
 # class is built so we define an initial set here for the init
 # function and they will be overridden after object defn
-kwdocd['PatchCollection'] = """\
+artist.kwdocd['PatchCollection'] = """\
     Valid PatchCollection kwargs are:
 
       edgecolors=None,
@@ -66,8 +59,8 @@ kwdocd['PatchCollection'] = """\
       linewidths=None,
       antialiaseds = None,
       offsets = None,
-      transOffset = identity_transform(),
-      norm = None,  # optional for ScalarMappable
+      transOffset = transforms.identity_transform(),
+      norm = None,  # optional for cm.ScalarMappable
       cmap = None,  # ditto
 
     offsets and transOffset are used to translate the patch after
@@ -78,7 +71,7 @@ kwdocd['PatchCollection'] = """\
     form.
 """
 
-class PatchCollection(Collection, ScalarMappable):
+class PatchCollection(Collection, cm.ScalarMappable):
     """
     Base class for filled regions such as PolyCollection etc.
     It must be subclassed to be usable.
@@ -90,8 +83,8 @@ class PatchCollection(Collection, ScalarMappable):
           linewidths=None,
           antialiaseds = None,
           offsets = None,
-          transOffset = identity_transform(),
-          norm = None,  # optional for ScalarMappable
+          transOffset = transforms.identity_transform(),
+          norm = None,  # optional for cm.ScalarMappable
           cmap = None,  # ditto
 
     offsets and transOffset are used to translate the patch after
@@ -123,41 +116,52 @@ class PatchCollection(Collection, ScalarMappable):
         %(PatchCollection)s
         """
         Collection.__init__(self)
-        ScalarMappable.__init__(self, norm, cmap)
+        cm.ScalarMappable.__init__(self, norm, cmap)
 
-        if facecolors is None: facecolors = rcParams['patch.facecolor']
-        if edgecolors is None: edgecolors = rcParams['patch.edgecolor']
-        if linewidths is None: linewidths = (rcParams['patch.linewidth'],)
-        if antialiaseds is None: antialiaseds = (rcParams['patch.antialiased'],)
+        if facecolors is None: facecolors = mpl.rcParams['patch.facecolor']
+        if edgecolors is None: edgecolors = mpl.rcParams['patch.edgecolor']
+        if linewidths is None: linewidths = (mpl.rcParams['patch.linewidth'],)
+        if antialiaseds is None: antialiaseds = (mpl.rcParams['patch.antialiased'],)
 
-        self._facecolors  = colorConverter.to_rgba_list(facecolors)
+        self._facecolors  = _colors.colorConverter.to_rgba_list(facecolors)
         if edgecolors == 'None':
             self._edgecolors = self._facecolors
             linewidths = (0,)
         else:
-            self._edgecolors = colorConverter.to_rgba_list(edgecolors)
-        self._linewidths  = linewidths
-        self._antialiaseds = antialiaseds
+            self._edgecolors = _colors.colorConverter.to_rgba_list(edgecolors)
+        self._linewidths  = self._get_value(linewidths)
+        self._antialiaseds = self._get_value(antialiaseds)
         #self._offsets = offsets
         self._offsets = offsets
         self._transOffset = transOffset
         self._verts = []
 
-    __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
+    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
-    def pick(self, mouseevent):
+    def contains(self, mouseevent):
         """
-        fire a pick event with the index into the data if the mouse
-        click is within the patch
+        Test whether the mouse event occurred in the collection.
+
+        Returns T/F, dict(ind=itemlist), where every item in itemlist contains the event.
         """
-        if not self.pickable(): return
+        if callable(self._contains): return self._contains(self,mouseevent)
+        # TODO: Consider doing the test in data coordinates
+        # Patch transforms the mouse into data coordinates and does the
+        # test for membership there.  This is more efficient though it
+        # may not match the visual appearance of the polygon on the
+        # screen.  Regardless, patch and patch collection should use
+        # the same algorithm.  Here's the code in patch:
+        #
+        #    x, y = self.get_transform().inverse_xy_tup((mouseevent.x, mouseevent.y))
+        #    xyverts = self.get_verts()
+        #    inside = nxutils.pnpoly(x, y, xyverts)
+        #
         ind = []
         x, y = mouseevent.x, mouseevent.y
         for i, thispoly in enumerate(self.get_transformed_patches()):
             inside = nxutils.pnpoly(x, y, thispoly)
             if inside: ind.append(i)
-        if len(ind):
-            self.figure.canvas.pick_event(mouseevent, self, ind=ind)
+        return len(ind)>0,dict(ind=ind)
 
 
     def get_transformed_patches(self):
@@ -186,7 +190,7 @@ class PatchCollection(Collection, ScalarMappable):
         for i in xrange(N):
             #print 'i%%Nverts=%d'%(i%Nverts)
             polyverts = verts[i % Nverts]
-            if any(isnan(polyverts)):
+            if npy.any(npy.isnan(polyverts)):
                 continue
             #print 'thisvert', i, polyverts
             tverts = transform.seq_xy_tups(polyverts)
@@ -200,7 +204,7 @@ class PatchCollection(Collection, ScalarMappable):
 
     def get_transoffset(self):
         if self._transOffset is None:
-            self._transOffset = identity_transform()
+            self._transOffset = transforms.identity_transform()
         return self._transOffset
 
 
@@ -213,6 +217,7 @@ class PatchCollection(Collection, ScalarMappable):
         ACCEPTS: float or sequence of floats
         """
         self._linewidths = self._get_value(lw)
+    set_linewidths = set_lw = set_linewidth
 
     def set_color(self, c):
         """
@@ -233,17 +238,26 @@ class PatchCollection(Collection, ScalarMappable):
 
         ACCEPTS: matplotlib color arg or sequence of rgba tuples
         """
-        self._facecolors = colorConverter.to_rgba_list(c)
+        self._facecolors = _colors.colorConverter.to_rgba_list(c, self._alpha)
+
+    def set_facecolors(self, c):
+        self.set_facecolor(c)
 
     def set_edgecolor(self, c):
         """
-        Set the facecolor(s) of the collection. c can be a matplotlib color
+        Set the edgecolor(s) of the collection. c can be a matplotlib color
         arg (all patches have same color), or a a sequence or rgba tuples; if
         it is a sequence the patches will cycle through the sequence
 
         ACCEPTS: matplotlib color arg or sequence of rgba tuples
         """
-        self._edgecolors = colorConverter.to_rgba_list(c)
+        if c == 'None':
+            self._linewidths = (0.0,)
+        else:
+            self._edgecolors = _colors.colorConverter.to_rgba_list(c)
+
+    def set_edgecolors(self, c):
+        self.set_edgecolor(c)
 
     def set_alpha(self, alpha):
         """
@@ -255,9 +269,9 @@ class PatchCollection(Collection, ScalarMappable):
         try: float(alpha)
         except TypeError: raise TypeError('alpha must be a float')
         else:
-            Artist.set_alpha(self, alpha)
+            artist.Artist.set_alpha(self, alpha)
             self._facecolors = [(r,g,b,alpha) for r,g,b,a in self._facecolors]
-            if is_string_like(self._edgecolors) and self._edgecolors != 'None':
+            if cbook.is_string_like(self._edgecolors) and self._edgecolors != 'None':
                 self._edgecolors = [(r,g,b,alpha) for r,g,b,a in self._edgecolors]
 
     def update_scalarmappable(self):
@@ -285,7 +299,7 @@ class QuadMesh(PatchCollection):
     thus (meshWidth * meshHeight) quadrilaterals in the mesh.
     The mesh need not be regular and the polygons need not be convex.
     A quadrilateral mesh is represented by a
-    (2 x ((meshWidth + 1) * (meshHeight + 1))) Numeric array
+    (2 x ((meshWidth + 1) * (meshHeight + 1))) numpy array
     'coordinates' where each row is the X and Y coordinates of one
     of the vertices.
     To define the function that maps from a data point to
@@ -308,15 +322,14 @@ class QuadMesh(PatchCollection):
         return self._coordinates;
 
     def draw(self, renderer):
-        # does not call update_scalarmappable, need to update it
-        # when creating/changing              ****** Why not?  speed?
         if not self.get_visible(): return
         transform = self.get_transform()
         transoffset = self.get_transoffset()
         transform.freeze()
         transoffset.freeze()
         #print 'QuadMesh draw'
-        self.update_scalarmappable()  #######################
+        if self.check_update('array'):
+            self.update_scalarmappable()
 
         renderer.draw_quad_mesh( self._meshWidth, self._meshHeight,
             self._facecolors, self._coordinates[:,0],
@@ -330,13 +343,13 @@ class PolyCollection(PatchCollection):
         """
         verts is a sequence of ( verts0, verts1, ...) where verts_i is
         a sequence of xy tuples of vertices, or an equivalent
-        numerix array of shape (nv,2).
+        numpy array of shape (nv,2).
 
         %(PatchCollection)s
         """
         PatchCollection.__init__(self,**kwargs)
         self._verts = verts
-    __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
+    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def set_verts(self, verts):
         '''This allows one to delay initialization of the vertices.'''
@@ -352,7 +365,7 @@ class PolyCollection(PatchCollection):
         transform.freeze()
         transoffset.freeze()
         self.update_scalarmappable()
-        if is_string_like(self._edgecolors) and self._edgecolors[:2] == 'No':
+        if cbook.is_string_like(self._edgecolors) and self._edgecolors[:2] == 'No':
             self._linewidths = (0,)
             #self._edgecolors = self._facecolors
         renderer.draw_poly_collection(
@@ -398,7 +411,7 @@ class BrokenBarHCollection(PolyCollection):
         ymax = ymin + ywidth
         verts = [ [(xmin, ymin), (xmin, ymax), (xmin+xwidth, ymax), (xmin+xwidth, ymin)] for xmin, xwidth in xranges]
         PolyCollection.__init__(self, verts, **kwargs)
-    __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
+    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
 class RegularPolyCollection(PatchCollection):
     def __init__(self,
@@ -424,8 +437,8 @@ class RegularPolyCollection(PatchCollection):
 
         Example: see examples/dynamic_collection.py for complete example
 
-        offsets = nx.mlab.rand(20,2)
-        facecolors = [cm.jet(x) for x in nx.mlab.rand(20)]
+        offsets = npy.random.rand(20,2)
+        facecolors = [cm.jet(x) for x in npy.random.rand(20)]
         black = (0,0,0,1)
 
         collection = RegularPolyCollection(
@@ -448,30 +461,30 @@ class RegularPolyCollection(PatchCollection):
         self.numsides = numsides
         self.rotation = rotation
         self._update_verts()
-    __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
+    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def get_transformed_patches(self):
         # Shouldn't need all these calls to asarray;
         # the variables should be converted when stored.
-        # Similar speedups with numerix should be attainable
+        # Similar speedups with numpy should be attainable
         # in many other places.
-        verts = asarray(self._verts)
-        offsets = asarray(self._offsets)
+        verts = npy.asarray(self._verts)
+        offsets = npy.asarray(self._offsets)
         Npoly = len(offsets)
-        scales = sqrt(asarray(self._sizes)*self._dpi.get()/72.0)
+        scales = npy.sqrt(npy.asarray(self._sizes)*self._dpi.get()/72.0)
         Nscales = len(scales)
         if Nscales >1:
-            scales = resize(scales, (Npoly, 1, 1))
+            scales = npy.resize(scales, (Npoly, 1, 1))
         transOffset = self.get_transoffset()
         xyo = transOffset.numerix_xy(offsets)
-        polys = scales * verts + xyo[:, newaxis, :]
+        polys = scales * verts + xyo[:, npy.newaxis, :]
         return polys
 
 
     def _update_verts(self):
         r = 1.0/math.sqrt(math.pi)  # unit area
-        theta = (2*math.pi/self.numsides)*arange(self.numsides) + self.rotation
-        self._verts = zip( r*sin(theta), r*cos(theta) )
+        theta = (2*math.pi/self.numsides)*npy.arange(self.numsides) + self.rotation
+        self._verts = zip( r*npy.sin(theta), r*npy.cos(theta) )
 
     def draw(self, renderer):
         if not self.get_visible(): return
@@ -483,7 +496,7 @@ class RegularPolyCollection(PatchCollection):
         transoffset.freeze()
         self.update_scalarmappable()
         self._update_verts()
-        scales = sqrt(asarray(self._sizes)*self._dpi.get()/72.0)
+        scales = npy.sqrt(npy.asarray(self._sizes)*self._dpi.get()/72.0)
 
 
         offsets = self._offsets
@@ -499,7 +512,7 @@ class RegularPolyCollection(PatchCollection):
         #print 'drawing offsets', offsets
         #print 'drawing verts', self._verts
         #print 'drawing scales', scales
-        if is_string_like(self._edgecolors) and self._edgecolors[:2] == 'No':
+        if cbook.is_string_like(self._edgecolors) and self._edgecolors[:2] == 'No':
             #self._edgecolors = self._facecolors
             self._linewidths = (0,)
         renderer.draw_regpoly_collection(
@@ -548,37 +561,73 @@ class StarPolygonCollection(RegularPolyCollection):
         """
 
         RegularPolyCollection.__init__(self, dpi, numsides, rotation, sizes, **kwargs)
-    __init__.__doc__ = dedent(__init__.__doc__) % kwdocd
+    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
 
     def _update_verts(self):
         scale = 1.0/math.sqrt(math.pi)
-        r = scale*ones(self.numsides*2)
+        ns2 = self.numsides*2
+        r = scale*npy.ones(ns2)
         r[1::2] *= 0.5
-        theta  = (2.*math.pi/(2*self.numsides))*arange(2*self.numsides) + self.rotation
-        self._verts = zip( r*sin(theta), r*cos(theta) )
+        theta  = (math.pi/self.numsides)*npy.arange(ns2) + self.rotation
+        self._verts = zip( r*npy.sin(theta), r*npy.cos(theta) )
 
-class LineCollection(Collection, ScalarMappable):
+class AsteriskPolygonCollection(RegularPolyCollection):
+    def __init__(self,
+                 dpi,
+                 numsides,
+                 rotation = 0 ,
+                 sizes = (1,),
+                 **kwargs):
+        """
+        Draw a regular asterisk Polygone with numsides spikes.
+
+        * dpi is the figure dpi instance, and is required to do the
+          area scaling.
+
+        * numsides: the number of spikes of the polygon
+
+        * sizes gives the area of the circle circumscribing the
+          regular polygon in points^2
+
+        * rotation is the rotation of the polygon in radians
+
+        %(PatchCollection)s
+        """
+
+        RegularPolyCollection.__init__(self, dpi, numsides, rotation, sizes, **kwargs)
+    __init__.__doc__ = cbook.dedent(__init__.__doc__) % artist.kwdocd
+
+    def _update_verts(self):
+        scale = 1.0/math.sqrt(math.pi)
+        r = scale*npy.ones(self.numsides*2)
+        r[1::2] = 0
+        theta  = (math.pi/self.numsides)*npy.arange(2*self.numsides) + self.rotation
+        self._verts = zip( r*npy.sin(theta), r*npy.cos(theta) )
+
+class LineCollection(Collection, cm.ScalarMappable):
     """
-    All parameters must be sequences.  The property of the ith line
+    All parameters must be sequences or scalars; if scalars, they will
+    be converted to sequences.  The property of the ith line
     segment is the prop[i % len(props)], ie the properties cycle if
     the len of props is less than the number of sements
     """
     zorder = 2
     def __init__(self, segments,     # Can be None.
                  linewidths    = None,
-                 colors        = None,
+                 colors       = None,
                  antialiaseds  = None,
                  linestyle = 'solid',
                  offsets = None,
-                 transOffset = None,#identity_transform(),
+                 transOffset = None,#transforms.identity_transform(),
                  norm = None,
                  cmap = None,
+                 pickradius = 5,
                  **kwargs
                  ):
         """
         segments is a sequence of ( line0, line1, line2), where
         linen = (x0, y0), (x1, y1), ... (xm, ym), or the
-        equivalent numerix array with two columns.
+        equivalent numpy array with two columns.
         Each line can be a different length.
 
         colors must be a tuple of RGBA tuples (eg arbitrary color
@@ -590,7 +639,7 @@ class LineCollection(Collection, ScalarMappable):
           solid|dashed|dashdot|dotted.  The dash tuple is (offset, onoffseq)
           where onoffseq is an even length tuple of on and off ink in points.
 
-        If linewidths, colors, or antialiaseds is None, they default to
+        If linewidths, colors_, or antialiaseds is None, they default to
         their rc params setting, in sequence form.
 
         If offsets and transOffset are not None, then
@@ -607,49 +656,81 @@ class LineCollection(Collection, ScalarMappable):
         norm = None,  # optional for ScalarMappable
         cmap = None,  # ditto
 
+        pickradius is the tolerance for mouse clicks picking a line.  The
+        default is 5 pt.
+
         The use of ScalarMappable is optional.  If the ScalarMappable
         matrix _A is not None (ie a call to set_array has been made), at
         draw time a call to scalar mappable will be made to set the colors.
         """
 
         Collection.__init__(self)
-        ScalarMappable.__init__(self, norm, cmap)
+        cm.ScalarMappable.__init__(self, norm, cmap)
 
         if linewidths is None   :
-            linewidths   = (rcParams['lines.linewidth'], )
+            linewidths   = (mpl.rcParams['lines.linewidth'], )
 
         if colors is None       :
-            colors       = (rcParams['lines.color'],)
+            colors       = (mpl.rcParams['lines.color'],)
         if antialiaseds is None :
-            antialiaseds = (rcParams['lines.antialiased'], )
+            antialiaseds = (mpl.rcParams['lines.antialiased'], )
 
-        self._colors = colorConverter.to_rgba_list(colors)
-        self._aa = antialiaseds
-        self._lw = linewidths
+        self._colors = _colors.colorConverter.to_rgba_list(colors)
+        self._aa = self._get_value(antialiaseds)
+        self._lw = self._get_value(linewidths)
         self.set_linestyle(linestyle)
         self._uniform_offsets = None
         if offsets is not None:
-            offsets = asarray(offsets)
+            offsets = npy.asarray(offsets)
             if len(offsets.shape) == 1:
-                offsets = offsets[newaxis,:]  # Make it Nx2.
+                offsets = offsets[npy.newaxis,:]  # Make it Nx2.
         if transOffset is None:
             if offsets is not None:
                 self._uniform_offsets = offsets
                 offsets = None
-            transOffset = identity_transform()
+            transOffset = transforms.identity_transform()
         self._offsets = offsets
         self._transOffset = transOffset
         self.set_segments(segments)
+        self.pickradius = pickradius
         self.update(kwargs)
+
+    def contains(self, mouseevent):
+        """
+        Test whether the mouse event occurred in the collection.
+
+        Returns T/F, dict(ind=itemlist), where every item in itemlist contains the event.
+        """
+        import matplotlib.lines as ML
+        if callable(self._contains): return self._contains(self,mouseevent)
+
+        # TODO: add offset processing; adjusting the mouse for each offset
+        # will be somewhat cheaper than adjusting the segments.
+        if self._offsets != None:
+            raise NotImplementedError, "LineCollection does not yet support picking with offsets"
+
+        mx,my = mouseevent.x,mouseevent.y
+        transform = self.get_transform()
+
+        ind = []
+        for this in xrange(len(self._segments)):
+            xy = transform.seq_xy_tups(self._segments[this])
+            this_ind = ML.segment_hits(mx,my,xy[:,0],xy[:,1],self.pickradius)
+            ind.extend([(this,k) for k in this_ind])
+        return len(ind)>0,dict(ind=ind)
+
+    def set_pickradius(self,pickradius): self.pickradius = 5
+
+    def get_pickradius(self): return self.pickradius
 
     def get_transoffset(self):
         if self._transOffset is None:
-            self._transOffset = identity_transform()
+            self._transOffset = transforms.identity_transform()
         return self._transOffset
 
     def set_segments(self, segments):
         if segments is None: return
-        self._segments = [asarray(seg) for seg in segments]
+        self._segments = [npy.asarray(seg) for seg in segments]
         if self._uniform_offsets is not None:
             self._add_offsets()
 
@@ -694,6 +775,7 @@ class LineCollection(Collection, ScalarMappable):
                 offsets = zip(xs, ys)
 
         self.update_scalarmappable()
+        #print 'calling renderer draw line collection'
         renderer.draw_line_collection(
             segments, transform, self.clipbox,
             self._colors, self._lw, self._ls, self._aa, offsets,
@@ -713,15 +795,16 @@ class LineCollection(Collection, ScalarMappable):
         """
 
         self._lw = self._get_value(lw)
+    set_linewidths = set_lw = set_linewidth
 
     def set_linestyle(self, ls):
         """
         Set the linestyles(s) for the collection.
         ACCEPTS: ['solid' | 'dashed', 'dashdot', 'dotted' |  (offset, on-off-dash-seq) ]
         """
-        if is_string_like(ls):
-            dashes = GraphicsContextBase.dashd[ls]
-        elif iterable(ls) and len(ls)==2:
+        if cbook.is_string_like(ls):
+            dashes = backend_bases.GraphicsContextBase.dashd[ls]
+        elif cbook.iterable(ls) and len(ls)==2:
             dashes = ls
         else: raise ValueError('Do not know how to convert %s to dashes'%ls)
 
@@ -737,7 +820,7 @@ class LineCollection(Collection, ScalarMappable):
 
         ACCEPTS: matplotlib color arg or sequence of rgba tuples
         """
-        self._colors = colorConverter.to_rgba_list(c)
+        self._colors = _colors.colorConverter.to_rgba_list(c)
 
     def color(self, c):
         """
@@ -763,7 +846,7 @@ class LineCollection(Collection, ScalarMappable):
         try: float(alpha)
         except TypeError: raise TypeError('alpha must be a float')
         else:
-            Artist.set_alpha(self, alpha)
+            artist.Artist.set_alpha(self, alpha)
             self._colors = [(r,g,b,alpha) for r,g,b,a in self._colors]
 
     def get_linewidth(self):
@@ -775,8 +858,9 @@ class LineCollection(Collection, ScalarMappable):
     def get_dashes(self):
         return self._ls
 
-    def get_colors(self):
+    def get_color(self):
         return self._colors
+    get_colors = get_color  # for compatibility with old versions
 
     def get_verts(self, dataTrans=None):
         '''Return vertices in data coordinates.

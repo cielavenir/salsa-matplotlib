@@ -1,6 +1,6 @@
 # module pyparsing.py
 #
-# Copyright (c) 2003,2004,2005  Paul T. McGuire
+# Copyright (c) 2003-2007  Paul T. McGuire
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -20,9 +20,6 @@
 # CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
-#  Todo:
-#  - add pprint() - pretty-print output of defined BNF
 #
 #from __future__ import generators
 
@@ -60,15 +57,19 @@ The pyparsing module handles some of the problems that are typically vexing when
  - quoted strings
  - embedded comments
 """
-__version__ = "1.3.4alpha1"
-__versionTime__ = "14 December 2005 05:48"
+
+__version__ = "1.4.8"
+__versionTime__ = "7 October 2007 00:25"
 __author__ = "Paul McGuire <ptmcg@users.sourceforge.net>"
 
 import string
+from weakref import ref as wkref
 import copy,sys
 import warnings
 import re
-#sys.stderr.write( "testing pyparsing module, version %s, %s\n" % (__version__,__versionTime__ ) )
+import sre_constants
+import xml.sax.saxutils
+#~ sys.stderr.write( "testing pyparsing module, version %s, %s\n" % (__version__,__versionTime__ ) )
 
 def _ustr(obj):
     """Drop-in replacement for str(obj) that tries to be Unicode friendly. It first tries
@@ -96,7 +97,11 @@ def _ustr(obj):
 
 def _str2dict(strg):
     return dict( [(c,0) for c in strg] )
+    #~ return set( [c for c in strg] )
 
+class _Constants(object):
+    pass
+    
 alphas     = string.lowercase + string.uppercase
 nums       = string.digits
 hexnums    = nums + "ABCDEFabcdef"
@@ -107,10 +112,14 @@ class ParseBaseException(Exception):
     __slots__ = ( "loc","msg","pstr","parserElement" )
     # Performance tuning: we construct a *lot* of these, so keep this
     # constructor as small and fast as possible        
-    def __init__( self, pstr, loc, msg, elem=None ):
+    def __init__( self, pstr, loc=0, msg=None, elem=None ):
         self.loc = loc
-        self.msg = msg
-        self.pstr = pstr
+        if msg is None:
+            self.msg = pstr
+            self.pstr = ""
+        else:
+            self.msg = msg
+            self.pstr = pstr
         self.parserElement = elem
 
     def __getattr__( self, aname ):
@@ -129,7 +138,8 @@ class ParseBaseException(Exception):
             raise AttributeError, aname
 
     def __str__( self ):
-        return "%s (at char %d), (line:%d, col:%d)" % ( self.msg, self.loc, self.lineno, self.column )
+        return "%s (at char %d), (line:%d, col:%d)" % \
+                ( self.msg, self.loc, self.lineno, self.column )
     def __repr__( self ):
         return _ustr(self)
     def markInputline( self, markerString = ">!<" ):
@@ -139,12 +149,13 @@ class ParseBaseException(Exception):
         line_str = self.line
         line_column = self.column - 1
         if markerString:
-            line_str = "".join( [line_str[:line_column], markerString, line_str[line_column:]])
+            line_str = "".join( [line_str[:line_column],
+                                markerString, line_str[line_column:]])
         return line_str.strip()
 
 class ParseException(ParseBaseException):
-    """exception thrown when parse expressions don't match class"""
-    """supported attributes by name are:
+    """exception thrown when parse expressions don't match class;
+       supported attributes by name are:
         - lineno - returns the line number of the exception text
         - col - returns the column number of the exception text
         - line - returns the line containing the exception text
@@ -155,7 +166,20 @@ class ParseFatalException(ParseBaseException):
     """user-throwable exception thrown when inconsistent parse content
        is found; stops all parsing immediately"""
     pass
-    
+
+#~ class ReparseException(ParseBaseException):
+    #~ """Experimental class - parse actions can raise this exception to cause
+       #~ pyparsing to reparse the input string:
+        #~ - with a modified input string, and/or
+        #~ - with a modified start location
+       #~ Set the values of the ReparseException in the constructor, and raise the
+       #~ exception in a parse action to cause pyparsing to use the new string/location.
+       #~ Setting the values as None causes no change to be made.
+       #~ """
+    #~ def __init_( self, newstring, restartLoc ):
+        #~ self.newParseText = newstring
+        #~ self.reparseLoc = restartLoc
+
 class RecursiveGrammarException(Exception):
     """exception thrown by validate() if the grammar could be improperly recursive"""
     def __init__( self, parseElementList ):
@@ -164,13 +188,21 @@ class RecursiveGrammarException(Exception):
     def __str__( self ):
         return "RecursiveGrammarException: %s" % self.parseElementTrace
 
+class _ParseResultsWithOffset(object):
+    def __init__(self,p1,p2):
+        self.tup = (p1,p2)
+    def __getitem__(self,i):
+        return self.tup[i]
+    def __repr__(self):
+        return repr(self.tup)
+
 class ParseResults(object):
     """Structured parse results, to provide multiple means of access to the parsed data:
        - as a list (len(results))
        - by list index (results[0], results[1], etc.)
        - by attribute (results.<resultsName>)
        """
-    __slots__ = ( "__toklist", "__tokdict", "__doinit", "__name", "__parent", "__modal" )
+    __slots__ = ( "__toklist", "__tokdict", "__doinit", "__name", "__parent", "__accumNames", "__weakref__" )
     def __new__(cls, toklist, name=None, asList=True, modal=True ):
         if isinstance(toklist, cls):
             return toklist
@@ -185,60 +217,71 @@ class ParseResults(object):
             self.__doinit = False
             self.__name = None
             self.__parent = None
-            self.__modal = modal
+            self.__accumNames = {}
             if isinstance(toklist, list):
                 self.__toklist = toklist[:]
             else:
                 self.__toklist = [toklist]
             self.__tokdict = dict()
 
+        # this line is related to debugging the asXML bug
+        #~ asList = False
+        
         if name:
-            if not self.__name:
-                self.__modal = self.__modal and modal
+            if not modal:
+                self.__accumNames[name] = 0
             if isinstance(name,int):
                 name = _ustr(name) # will always return a str, but use _ustr for consistency
             self.__name = name
-            if toklist:
-                if isinstance(toklist,basestring):
+            if not toklist in (None,'',[]):
+                if isinstance(toklist,basestring): 
                     toklist = [ toklist ]
                 if asList:
                     if isinstance(toklist,ParseResults):
-                        self[name] = (toklist.copy(),-1)
+                        self[name] = _ParseResultsWithOffset(toklist.copy(),-1)
                     else:
-                        self[name] = (ParseResults(toklist[0]),-1)
+                        self[name] = _ParseResultsWithOffset(ParseResults(toklist[0]),-1)
                     self[name].__name = name
                 else:
                     try:
                         self[name] = toklist[0]
-                    except TypeError:
+                    except (KeyError,TypeError):
                         self[name] = toklist
 
     def __getitem__( self, i ):
         if isinstance( i, (int,slice) ):
             return self.__toklist[i]
         else:
-            if self.__modal:
+            if i not in self.__accumNames:
                 return self.__tokdict[i][-1][0]
             else:
                 return ParseResults([ v[0] for v in self.__tokdict[i] ])
 
     def __setitem__( self, k, v ):
-        if isinstance(v,tuple):
+        if isinstance(v,_ParseResultsWithOffset):
             self.__tokdict[k] = self.__tokdict.get(k,list()) + [v]
             sub = v[0]
+        elif isinstance(k,int):
+            self.__toklist[k] = v
+            sub = v
         else:
             self.__tokdict[k] = self.__tokdict.get(k,list()) + [(v,0)]
             sub = v
         if isinstance(sub,ParseResults):
-            sub.__parent = self
+            sub.__parent = wkref(self)
         
     def __delitem__( self, i ):
-        del self.__toklist[i]
+        if isinstance(i,(int,slice)):
+            del self.__toklist[i]
+        else:
+            del self.__tokdict[i]
 
     def __contains__( self, k ):
         return self.__tokdict.has_key(k)
         
     def __len__( self ): return len( self.__toklist )
+    def __bool__(self): return len( self.__toklist ) > 0
+    def __nonzero__( self ): return self.__bool__()
     def __iter__( self ): return iter( self.__toklist )
     def keys( self ): 
         """Returns all named result keys."""
@@ -246,7 +289,7 @@ class ParseResults(object):
     
     def items( self ): 
         """Returns all named result keys and values as a list of tuples."""
-        return [(k,v[-1][0]) for k,v in self.__tokdict.items()]
+        return [(k,self[k]) for k in self.__tokdict.keys()]
     
     def values( self ): 
         """Returns all named result values."""
@@ -255,7 +298,7 @@ class ParseResults(object):
     def __getattr__( self, name ):
         if name not in self.__slots__:
             if self.__tokdict.has_key( name ):
-                if self.__modal:
+                if name not in self.__accumNames:
                     return self.__tokdict[name][-1][0]
                 else:
                     return ParseResults([ v[0] for v in self.__tokdict[name] ])
@@ -263,16 +306,24 @@ class ParseResults(object):
                 return ""
         return None
 
+    def __add__( self, other ):
+        ret = self.copy()
+        ret += other
+        return ret
+        
     def __iadd__( self, other ):
         if other.__tokdict:
             offset = len(self.__toklist)
             addoffset = ( lambda a: (a<0 and offset) or (a+offset) )
-            otherdictitems = [(k,(v[0],addoffset(v[1])) ) for (k,vlist) in other.__tokdict.items() for v in vlist]
+            otheritems = other.__tokdict.items()
+            otherdictitems = [(k, _ParseResultsWithOffset(v[0],addoffset(v[1])) )
+                                for (k,vlist) in otheritems for v in vlist]
             for k,v in otherdictitems:
                 self[k] = v
                 if isinstance(v[0],ParseResults):
-                    v[0].__parent = self
+                    v[0].__parent = wkref(self)
         self.__toklist += other.__toklist
+        self.__accumNames.update( other.__accumNames )
         del other
         return self
        
@@ -321,7 +372,7 @@ class ParseResults(object):
         ret = ParseResults( self.__toklist )
         ret.__tokdict = self.__tokdict.copy()
         ret.__parent = self.__parent
-        ret.__modal = self.__modal
+        ret.__accumNames.update( self.__accumNames )
         ret.__name = self.__name
         return ret
         
@@ -329,7 +380,8 @@ class ParseResults(object):
         """Returns the parse results as XML. Tags are created for tokens and lists that have defined results names."""
         nl = "\n"
         out = []
-        namedItems = dict( [ (v[1],k) for (k,vlist) in self.__tokdict.items() for v in vlist ] )
+        namedItems = dict( [ (v[1],k) for (k,vlist) in self.__tokdict.items()
+                                                            for v in vlist ] )
         nextLevelIndent = indent + "  "
         
         # collapse out indents if formatting is not desired
@@ -350,16 +402,22 @@ class ParseResults(object):
                 return ""
             else:
                 selfTag = "ITEM"
-                
+        
         out += [ nl, indent, "<", selfTag, ">" ]
         
         worklist = self.__toklist
         for i,res in enumerate(worklist):
             if isinstance(res,ParseResults):
                 if i in namedItems:
-                    out += [ res.asXML(namedItems[i], namedItemsOnly and doctag is None, nextLevelIndent,formatted)]
+                    out += [ res.asXML(namedItems[i],
+                                        namedItemsOnly and doctag is None,
+                                        nextLevelIndent,
+                                        formatted)]
                 else:
-                    out += [ res.asXML(None, namedItemsOnly and doctag is None, nextLevelIndent,formatted)]
+                    out += [ res.asXML(None,
+                                        namedItemsOnly and doctag is None,
+                                        nextLevelIndent,
+                                        formatted)]
             else:
                 # individual token, see if there is a name for it
                 resTag = None
@@ -370,11 +428,13 @@ class ParseResults(object):
                         continue
                     else:
                         resTag = "ITEM"
-                out += [ nl, nextLevelIndent, "<", resTag, ">", _ustr(res), "</", resTag, ">" ]
+                xmlBodyText = xml.sax.saxutils.escape(_ustr(res))
+                out += [ nl, nextLevelIndent, "<", resTag, ">",
+                                                xmlBodyText,
+                                                "</", resTag, ">" ]
         
         out += [ nl, indent, "</", selfTag, ">" ]
         return "".join(out)
-
 
     def __lookup(self,sub):
         for k,vlist in self.__tokdict.items():
@@ -388,7 +448,7 @@ class ParseResults(object):
         if self.__name:
             return self.__name
         elif self.__parent:
-            par = self.__parent
+            par = self.__parent()
             if par:
                 return par.__lookup(self)
             else:
@@ -399,22 +459,79 @@ class ParseResults(object):
             return self.__tokdict.keys()[0]
         else:
             return None
+            
+    def dump(self,indent='',depth=0):
+        """Diagnostic method for listing out the contents of a ParseResults.
+           Accepts an optional indent argument so that this string can be embedded
+           in a nested display of other data."""
+        out = []
+        out.append( indent+_ustr(self.asList()) )
+        keys = self.items()
+        keys.sort()
+        for k,v in keys:
+            if out:
+                out.append('\n')
+            out.append( "%s%s- %s: " % (indent,('  '*depth), k) )
+            if isinstance(v,ParseResults):
+                if v.keys():
+                    #~ out.append('\n')
+                    out.append( v.dump(indent,depth+1) )
+                    #~ out.append('\n')
+                else:
+                    out.append(_ustr(v))
+            else:
+                out.append(_ustr(v))
+        #~ out.append('\n')
+        return "".join(out)
+
+    # add support for pickle protocol
+    def __getstate__(self):
+        return ( self.__toklist,
+                 ( self.__tokdict.copy(),
+                   self.__parent is not None and self.__parent() or None,
+                   self.__accumNames,
+                   self.__name ) )
+    
+    def __setstate__(self,state):
+        self.__toklist = state[0]
+        self.__tokdict, \
+        par, \
+        inAccumNames, \
+        self.__name = state[1]
+        self.__accumNames = {}
+        self.__accumNames.update(inAccumNames)
+        if par is not None:
+            self.__parent = wkref(par)
+        else:
+            self.__parent = None
+
 
 def col (loc,strg):
-    """Returns current column within a string, counting newlines as line separators
+    """Returns current column within a string, counting newlines as line separators.
    The first column is number 1.
+
+   Note: the default parsing behavior is to expand tabs in the input string
+   before starting the parsing process.  See L{I{ParserElement.parseString}<ParserElement.parseString>} for more information
+   on parsing strings containing <TAB>s, and suggested methods to maintain a
+   consistent view of the parsed string, the parse location, and line and column
+   positions within the parsed string.
    """
-    return loc - strg.rfind("\n", 0, loc)
+    return (loc<len(strg) and strg[loc] == '\n') and 1 or loc - strg.rfind("\n", 0, loc)
 
 def lineno(loc,strg):
-    """Returns current line number within a string, counting newlines as line separators
+    """Returns current line number within a string, counting newlines as line separators.
    The first line is number 1.
+   
+   Note: the default parsing behavior is to expand tabs in the input string
+   before starting the parsing process.  See L{I{ParserElement.parseString}<ParserElement.parseString>} for more information
+   on parsing strings containing <TAB>s, and suggested methods to maintain a
+   consistent view of the parsed string, the parse location, and line and column
+   positions within the parsed string.
    """
     return strg.count("\n",0,loc) + 1
 
 def line( loc, strg ):
-    """Returns the line of text containing loc within a string, counting newlines as line separators
-       The first line is number 1.
+    """Returns the line of text containing loc within a string, counting newlines as line separators.
        """
     lastCR = strg.rfind("\n", 0, loc)
     nextCR = strg.find("\n", loc)
@@ -424,13 +541,13 @@ def line( loc, strg ):
         return strg[lastCR+1:]
 
 def _defaultStartDebugAction( instring, loc, expr ):
-    print "Match",expr,"at loc",loc,"(%d,%d)" % ( lineno(loc,instring), col(loc,instring) )
+    print "Match",_ustr(expr),"at loc",loc,"(%d,%d)" % ( lineno(loc,instring), col(loc,instring) )
 
 def _defaultSuccessDebugAction( instring, startloc, endloc, expr, toks ):
-    print "Matched",expr,"->",toks.asList()
+    print "Matched",_ustr(expr),"->",toks.asList()
     
 def _defaultExceptionDebugAction( instring, loc, expr, exc ):
-    print "Exception raised:", exc
+    print "Exception raised:", _ustr(exc)
 
 def nullDebugAction(*args):
     """'Do-nothing' debug action, to suppress debugging output during parsing."""
@@ -439,7 +556,7 @@ def nullDebugAction(*args):
 class ParserElement(object):
     """Abstract base level parser element class."""
     DEFAULT_WHITE_CHARS = " \n\t\r"
-
+    
     def setDefaultWhitespaceChars( chars ):
         """Overrides the default whitespace chars
         """
@@ -447,41 +564,50 @@ class ParserElement(object):
     setDefaultWhitespaceChars = staticmethod(setDefaultWhitespaceChars)
     
     def __init__( self, savelist=False ):
-        self.parseAction = None
+        self.parseAction = list()
+        self.failAction = None
         #~ self.name = "<unknown>"  # don't define self.name, let subclasses try/except upcall
         self.strRepr = None
         self.resultsName = None
         self.saveAsList = savelist
         self.skipWhitespace = True
         self.whiteChars = ParserElement.DEFAULT_WHITE_CHARS
-        self.mayReturnEmpty = False
+        self.copyDefaultWhiteChars = True
+        self.mayReturnEmpty = False # used when checking for left-recursion
         self.keepTabs = False
-        self.ignoreExprs = []
+        self.ignoreExprs = list()
         self.debug = False
         self.streamlined = False
-        self.mayIndexError = True
+        self.mayIndexError = True # used to optimize exception handling for subclasses that don't advance parse index
         self.errmsg = ""
-        self.modalResults = True
-        self.debugActions = ( None, None, None )
+        self.modalResults = True # used to mark results names as modal (report only last) or cumulative (list all)
+        self.debugActions = ( None, None, None ) #custom debug actions
         self.re = None
+        self.callPreparse = True # used to avoid redundant calls to preParse
+        self.callDuringTry = False
 
     def copy( self ):
-        """Make a copy of this ParseElement.  Useful for defining different parse actions
+        """Make a copy of this ParserElement.  Useful for defining different parse actions
            for the same parsing pattern, using copies of the original parse element."""
         cpy = copy.copy( self )
-        cpy.whiteChars = ParserElement.DEFAULT_WHITE_CHARS
+        cpy.parseAction = self.parseAction[:]
+        cpy.ignoreExprs = self.ignoreExprs[:]
+        if self.copyDefaultWhiteChars:
+            cpy.whiteChars = ParserElement.DEFAULT_WHITE_CHARS
         return cpy
 
     def setName( self, name ):
         """Define name for this expression, for use in debugging."""
         self.name = name
         self.errmsg = "Expected " + self.name
+        if hasattr(self,"exception"):
+            self.exception.msg = self.errmsg
         return self
 
     def setResultsName( self, name, listAllMatches=False ):
         """Define name for referencing matching tokens as a nested attribute 
            of the returned parse results.
-           NOTE: this returns a *copy* of the original ParseElement object;
+           NOTE: this returns a *copy* of the original ParserElement object;
            this is so that the client can define a basic element, such as an
            integer, and reference it in multiple places with different names.
         """
@@ -490,19 +616,129 @@ class ParserElement(object):
         newself.modalResults = not listAllMatches
         return newself
 
-    def setParseAction( self, fn ):
-        """Define action to perform when successfully matching parse element definition.
-           Parse action fn is a callable method with the arguments (s, loc, toks) where:
-            - s   = the original string being parsed
-            - loc = the location of the matching substring
-            - toks = a list of the matched tokens, packaged as a ParseResults object
-           If the function fn modifies the tokens, it can return them as the return
-           value from fn, and the modified list of tokens will replace the original.
-           Otherwise, fn does not need to return any value.
+    def setBreak(self,breakFlag = True):
+        """Method to invoke the Python pdb debugger when this element is
+           about to be parsed. Set breakFlag to True to enable, False to
+           disable.
         """
-        self.parseAction = fn
+        if breakFlag:
+            _parseMethod = self._parse
+            def breaker(instring, loc, doActions=True, callPreParse=True):
+                import pdb
+                pdb.set_trace()
+                _parseMethod( instring, loc, doActions, callPreParse )
+            breaker._originalParseMethod = _parseMethod
+            self._parse = breaker
+        else:
+            if hasattr(self._parse,"_originalParseMethod"):
+                self._parse = self._parse._originalParseMethod
         return self
 
+    def normalizeParseActionArgs( f ):
+        """Internal method used to decorate parse actions that take fewer than 3 arguments,
+           so that all parse actions can be called as f(s,l,t)."""
+        STAR_ARGS = 4
+
+        try:
+            restore = None
+            if isinstance(f,type):
+                restore = f
+                f = f.__init__
+            if f.func_code.co_flags & STAR_ARGS:
+                return f
+            numargs = f.func_code.co_argcount
+            if hasattr(f,"im_self"):
+                numargs -= 1
+            if restore:
+                f = restore
+        except AttributeError:
+            try:
+                # not a function, must be a callable object, get info from the
+                # im_func binding of its bound __call__ method
+                if f.__call__.im_func.func_code.co_flags & STAR_ARGS:
+                    return f
+                numargs = f.__call__.im_func.func_code.co_argcount
+                if hasattr(f.__call__,"im_self"):
+                    numargs -= 1
+            except AttributeError:
+                # not a bound method, get info directly from __call__ method
+                if f.__call__.func_code.co_flags & STAR_ARGS:
+                    return f
+                numargs = f.__call__.func_code.co_argcount
+                if hasattr(f.__call__,"im_self"):
+                    numargs -= 1
+
+        #~ print "adding function %s with %d args" % (f.func_name,numargs)
+        if numargs == 3:
+            return f
+        else:
+            if numargs == 2:
+                def tmp(s,l,t):
+                    return f(l,t)
+            elif numargs == 1:
+                def tmp(s,l,t):
+                    return f(t)
+            else: #~ numargs == 0:
+                def tmp(s,l,t):
+                    return f()
+            try:
+                tmp.__name__ = f.__name__
+            except AttributeError:
+                # no need for special handling if attribute doesnt exist
+                pass
+            try:
+                tmp.__doc__ = f.__doc__
+            except AttributeError:
+                # no need for special handling if attribute doesnt exist
+                pass
+            try:
+                tmp.__dict__.update(f.__dict__)
+            except AttributeError:
+                # no need for special handling if attribute doesnt exist
+                pass
+            return tmp
+    normalizeParseActionArgs = staticmethod(normalizeParseActionArgs)
+            
+    def setParseAction( self, *fns, **kwargs ):
+        """Define action to perform when successfully matching parse element definition.
+           Parse action fn is a callable method with 0-3 arguments, called as fn(s,loc,toks),
+           fn(loc,toks), fn(toks), or just fn(), where:
+            - s   = the original string being parsed (see note below)
+            - loc = the location of the matching substring
+            - toks = a list of the matched tokens, packaged as a ParseResults object
+           If the functions in fns modify the tokens, they can return them as the return
+           value from fn, and the modified list of tokens will replace the original.
+           Otherwise, fn does not need to return any value.
+           
+           Note: the default parsing behavior is to expand tabs in the input string
+           before starting the parsing process.  See L{I{parseString}<parseString>} for more information
+           on parsing strings containing <TAB>s, and suggested methods to maintain a
+           consistent view of the parsed string, the parse location, and line and column
+           positions within the parsed string.
+           """
+        self.parseAction = map(self.normalizeParseActionArgs, list(fns))
+        self.callDuringTry = ("callDuringTry" in kwargs and kwargs["callDuringTry"])
+        return self
+
+    def addParseAction( self, *fns, **kwargs ):
+        """Add parse action to expression's list of parse actions. See L{I{setParseAction}<setParseAction>}."""
+        self.parseAction += map(self.normalizeParseActionArgs, list(fns))
+        self.callDuringTry = self.callDuringTry or ("callDuringTry" in kwargs and kwargs["callDuringTry"])
+        return self
+
+    def setFailAction( self, fn ):
+        """Define action to perform if parsing fails at this expression. 
+           Fail acton fn is a callable function that takes the arguments 
+           fn(s,loc,expr,err) where:
+            - s = string being parsed
+            - loc = location where expression match was attempted and failed
+            - expr = the parse expression that failed
+            - err = the exception thrown
+           The function returns no value.  It may throw ParseFatalException
+           if it is desired to stop parsing immediately."""
+        self.failAction = fn
+        return self
+        
     def skipIgnorables( self, instring, loc ):
         exprsFound = True
         while exprsFound:
@@ -510,7 +746,7 @@ class ParserElement(object):
             for e in self.ignoreExprs:
                 try:
                     while 1:
-                        loc,dummy = e.parse( instring, loc )
+                        loc,dummy = e._parse( instring, loc )
                         exprsFound = True
                 except ParseException:
                     pass
@@ -535,66 +771,70 @@ class ParserElement(object):
         return tokenlist
 
     #~ @profile
-    def parse( self, instring, loc, doActions=True, callPreParse=True ):
+    def _parseNoCache( self, instring, loc, doActions=True, callPreParse=True ):
         debugging = ( self.debug ) #and doActions )
 
-        if debugging:
+        if debugging or self.failAction:
             #~ print "Match",self,"at loc",loc,"(%d,%d)" % ( lineno(loc,instring), col(loc,instring) )
             if (self.debugActions[0] ):
                 self.debugActions[0]( instring, loc, self )
-            if callPreParse:
-                loc = self.preParse( instring, loc )
+            if callPreParse and self.callPreparse:
+                preloc = self.preParse( instring, loc )
+            else:
+                preloc = loc
             tokensStart = loc
             try:
                 try:
-                    loc,tokens = self.parseImpl( instring, loc, doActions )
+                    loc,tokens = self.parseImpl( instring, preloc, doActions )
                 except IndexError:
-                    raise ParseException, ( instring, len(instring), self.errmsg, self )
+                    raise ParseException( instring, len(instring), self.errmsg, self )
             except ParseException, err:
                 #~ print "Exception raised:", err
-                if (self.debugActions[2] ):
+                if self.debugActions[2]:
                     self.debugActions[2]( instring, tokensStart, self, err )
+                if self.failAction:
+                    self.failAction( instring, tokensStart, self, err )
                 raise
         else:
-            if callPreParse:
-                loc = self.preParse( instring, loc )
+            if callPreParse and self.callPreparse:
+                preloc = self.preParse( instring, loc )
+            else:
+                preloc = loc
             tokensStart = loc
             if self.mayIndexError or loc >= len(instring):
                 try:
-                    loc,tokens = self.parseImpl( instring, loc, doActions )
+                    loc,tokens = self.parseImpl( instring, preloc, doActions )
                 except IndexError:
-                    raise ParseException, ( instring, len(instring), self.errmsg, self )
+                    raise ParseException( instring, len(instring), self.errmsg, self )
             else:
-                loc,tokens = self.parseImpl( instring, loc, doActions )
+                loc,tokens = self.parseImpl( instring, preloc, doActions )
         
         tokens = self.postParse( instring, loc, tokens )
 
         retTokens = ParseResults( tokens, self.resultsName, asList=self.saveAsList, modal=self.modalResults )
-        if self.parseAction and doActions:
+        if self.parseAction and (doActions or self.callDuringTry):
             if debugging:
                 try:
-                    tokens = self.parseAction( instring, tokensStart, retTokens )
-                    if tokens is not None:
-                        if isinstance(tokens,tuple):
-                            tokens = tokens[1]
-                        retTokens = ParseResults( tokens, 
-                                                  self.resultsName, 
-                                                  asList=self.saveAsList and isinstance(tokens,(ParseResults,list)), 
-                                                  modal=self.modalResults )
+                    for fn in self.parseAction:
+                        tokens = fn( instring, tokensStart, retTokens )
+                        if tokens is not None:
+                            retTokens = ParseResults( tokens, 
+                                                      self.resultsName, 
+                                                      asList=self.saveAsList and isinstance(tokens,(ParseResults,list)), 
+                                                      modal=self.modalResults )
                 except ParseException, err:
                     #~ print "Exception raised in user parse action:", err
                     if (self.debugActions[2] ):
                         self.debugActions[2]( instring, tokensStart, self, err )
                     raise
             else:
-                tokens = self.parseAction( instring, tokensStart, retTokens )
-                if tokens is not None:
-                    if isinstance(tokens,tuple):
-                        tokens = tokens[1]
-                    retTokens = ParseResults( tokens, 
-                                              self.resultsName, 
-                                              asList=self.saveAsList and isinstance(tokens,(ParseResults,list)), 
-                                              modal=self.modalResults )
+                for fn in self.parseAction:
+                    tokens = fn( instring, tokensStart, retTokens )
+                    if tokens is not None:
+                        retTokens = ParseResults( tokens, 
+                                                  self.resultsName, 
+                                                  asList=self.saveAsList and isinstance(tokens,(ParseResults,list)), 
+                                                  modal=self.modalResults )
 
         if debugging:
             #~ print "Matched",self,"->",retTokens.asList()
@@ -604,45 +844,118 @@ class ParserElement(object):
         return loc, retTokens
 
     def tryParse( self, instring, loc ):
-        return self.parse( instring, loc, doActions=False )[0]
+        return self._parse( instring, loc, doActions=False )[0]
+    
+    # this method gets repeatedly called during backtracking with the same arguments -
+    # we can cache these arguments and save ourselves the trouble of re-parsing the contained expression
+    def _parseCache( self, instring, loc, doActions=True, callPreParse=True ):
+        lookup = (self,instring,loc,callPreParse,doActions)
+        if lookup in ParserElement._exprArgCache:
+            value = ParserElement._exprArgCache[ lookup ]
+            if isinstance(value,Exception):
+                if isinstance(value,ParseBaseException):
+                    value.loc = loc
+                raise value
+            return (value[0],value[1].copy())
+        else:
+            try:
+                value = self._parseNoCache( instring, loc, doActions, callPreParse )
+                ParserElement._exprArgCache[ lookup ] = (value[0],value[1].copy())
+                return value
+            except ParseBaseException, pe:
+                ParserElement._exprArgCache[ lookup ] = pe
+                raise
+
+    _parse = _parseNoCache
+
+    # argument cache for optimizing repeated calls when backtracking through recursive expressions
+    _exprArgCache = {}
+    def resetCache():
+        ParserElement._exprArgCache.clear()
+    resetCache = staticmethod(resetCache)
+    
+    _packratEnabled = False
+    def enablePackrat():
+        """Enables "packrat" parsing, which adds memoizing to the parsing logic.
+           Repeated parse attempts at the same string location (which happens 
+           often in many complex grammars) can immediately return a cached value, 
+           instead of re-executing parsing/validating code.  Memoizing is done of
+           both valid results and parsing exceptions.
+            
+           This speedup may break existing programs that use parse actions that 
+           have side-effects.  For this reason, packrat parsing is disabled when
+           you first import pyparsing.  To activate the packrat feature, your
+           program must call the class method ParserElement.enablePackrat().  If
+           your program uses psyco to "compile as you go", you must call 
+           enablePackrat before calling psyco.full().  If you do not do this,
+           Python will crash.  For best results, call enablePackrat() immediately
+           after importing pyparsing.
+        """
+        if not ParserElement._packratEnabled:
+            ParserElement._packratEnabled = True
+            ParserElement._parse = ParserElement._parseCache
+    enablePackrat = staticmethod(enablePackrat)
 
     def parseString( self, instring ):
         """Execute the parse expression with the given string.
            This is the main interface to the client code, once the complete 
            expression has been built.
+           
+           Note: parseString implicitly calls expandtabs() on the input string,
+           in order to report proper column numbers in parse actions.  
+           If the input string contains tabs and
+           the grammar uses parse actions that use the loc argument to index into the 
+           string being parsed, you can ensure you have a consistent view of the input 
+           string by:
+            - calling parseWithTabs on your grammar before calling parseString
+              (see L{I{parseWithTabs}<parseWithTabs>})
+            - define your parse action using the full (s,loc,toks) signature, and 
+              reference the input string using the parse action's s argument
+            - explictly expand the tabs in your input string before calling 
+              parseString           
         """
+        ParserElement.resetCache()
         if not self.streamlined:
             self.streamline()
-            self.saveAsList = True
+            #~ self.saveAsList = True
         for e in self.ignoreExprs:
             e.streamline()
         if self.keepTabs:
-            loc, tokens = self.parse( instring, 0 )
+            loc, tokens = self._parse( instring, 0 )
         else:
-            loc, tokens = self.parse( instring.expandtabs(), 0 )
+            loc, tokens = self._parse( instring.expandtabs(), 0 )
         return tokens
 
-    def scanString( self, instring ):
-        """Scan the input string for expression matches.  Each match will return the matching tokens, start location, and end location."""
+    def scanString( self, instring, maxMatches=sys.maxint ):
+        """Scan the input string for expression matches.  Each match will return the 
+           matching tokens, start location, and end location.  May be called with optional
+           maxMatches argument, to clip scanning after 'n' matches are found.
+           
+           Note that the start and end locations are reported relative to the string
+           being parsed.  See L{I{parseString}<parseString>} for more information on parsing 
+           strings with embedded tabs."""
         if not self.streamlined:
             self.streamline()
         for e in self.ignoreExprs:
             e.streamline()
         
         if not self.keepTabs:
-            instring = instring.expandtabs()
+            instring = _ustr(instring).expandtabs()
         instrlen = len(instring)
         loc = 0
         preparseFn = self.preParse
-        parseFn = self.parse
-        while loc < instrlen:
+        parseFn = self._parse
+        ParserElement.resetCache()
+        matches = 0
+        while loc <= instrlen and matches < maxMatches:
             try:
-                loc = preparseFn( instring, loc )
-                nextLoc,tokens = parseFn( instring, loc, callPreParse=False )
+                preloc = preparseFn( instring, loc )
+                nextLoc,tokens = parseFn( instring, preloc, callPreParse=False )
             except ParseException:
-                loc += 1
+                loc = preloc+1
             else:
-                yield tokens, loc, nextLoc
+                matches += 1
+                yield tokens, preloc, nextLoc
                 loc = nextLoc
         
     def transformString( self, instring ):
@@ -668,62 +981,101 @@ class ParserElement(object):
                     out.append(t)
             lastE = e
         out.append(instring[lastE:])
-        return "".join(out)
+        return "".join(map(_ustr,out))
 
+    def searchString( self, instring, maxMatches=sys.maxint ):
+        """Another extension to scanString, simplifying the access to the tokens found
+           to match the given parse expression.  May be called with optional
+           maxMatches argument, to clip searching after 'n' matches are found.
+        """
+        return ParseResults([ t for t,s,e in self.scanString( instring, maxMatches ) ])
+            
     def __add__(self, other ):
         """Implementation of + operator - returns And"""
         if isinstance( other, basestring ):
             other = Literal( other )
+        if not isinstance( other, ParserElement ):
+            warnings.warn("Cannot add element of type %s to ParserElement" % type(other),
+                    SyntaxWarning, stacklevel=2)
         return And( [ self, other ] )
 
     def __radd__(self, other ):
         """Implementation of += operator"""
         if isinstance( other, basestring ):
             other = Literal( other )
+        if not isinstance( other, ParserElement ):
+            warnings.warn("Cannot add element of type %s to ParserElement" % type(other),
+                    SyntaxWarning, stacklevel=2)
         return other + self
 
     def __or__(self, other ):
         """Implementation of | operator - returns MatchFirst"""
         if isinstance( other, basestring ):
             other = Literal( other )
+        if not isinstance( other, ParserElement ):
+            warnings.warn("Cannot add element of type %s to ParserElement" % type(other),
+                    SyntaxWarning, stacklevel=2)
         return MatchFirst( [ self, other ] )
 
     def __ror__(self, other ):
         """Implementation of |= operator"""
         if isinstance( other, basestring ):
             other = Literal( other )
+        if not isinstance( other, ParserElement ):
+            warnings.warn("Cannot add element of type %s to ParserElement" % type(other),
+                    SyntaxWarning, stacklevel=2)
         return other | self
 
     def __xor__(self, other ):
         """Implementation of ^ operator - returns Or"""
         if isinstance( other, basestring ):
             other = Literal( other )
+        if not isinstance( other, ParserElement ):
+            warnings.warn("Cannot add element of type %s to ParserElement" % type(other),
+                    SyntaxWarning, stacklevel=2)
         return Or( [ self, other ] )
 
     def __rxor__(self, other ):
         """Implementation of ^= operator"""
         if isinstance( other, basestring ):
             other = Literal( other )
+        if not isinstance( other, ParserElement ):
+            warnings.warn("Cannot add element of type %s to ParserElement" % type(other),
+                    SyntaxWarning, stacklevel=2)
         return other ^ self
 
     def __and__(self, other ):
         """Implementation of & operator - returns Each"""
         if isinstance( other, basestring ):
             other = Literal( other )
+        if not isinstance( other, ParserElement ):
+            warnings.warn("Cannot add element of type %s to ParserElement" % type(other),
+                    SyntaxWarning, stacklevel=2)
         return Each( [ self, other ] )
 
     def __rand__(self, other ):
         """Implementation of right-& operator"""
         if isinstance( other, basestring ):
             other = Literal( other )
+        if not isinstance( other, ParserElement ):
+            warnings.warn("Cannot add element of type %s to ParserElement" % type(other),
+                    SyntaxWarning, stacklevel=2)
         return other & self
 
     def __invert__( self ):
         """Implementation of ~ operator - returns NotAny"""
         return NotAny( self )
 
+    def __call__(self, name):
+        """Shortcut for setResultsName, with listAllMatches=default::
+             userdata = Word(alphas).setResultsName("name") + Word(nums+"-").setResultsName("socsecno")
+           could be written as::
+             userdata = Word(alphas)("name") + Word(nums+"-")("socsecno")
+           """
+        return self.setResultsName(name)
+
     def suppress( self ):
-        """Suppresses the output of this ParseElement; useful to keep punctuation from
+        """Suppresses the output of this ParserElement; useful to keep punctuation from
            cluttering up returned output.
         """
         return Suppress( self )
@@ -741,6 +1093,8 @@ class ParserElement(object):
         """
         self.skipWhitespace = True
         self.whiteChars = chars
+        self.copyDefaultWhiteChars = False
+        return self
         
     def parseWithTabs( self ):
         """Overrides default behavior to expand <TAB>s to spaces before parsing the input string.
@@ -770,7 +1124,8 @@ class ParserElement(object):
         return self
 
     def setDebug( self, flag=True ):
-        """Enable display of debugging messages while doing pattern matching."""
+        """Enable display of debugging messages while doing pattern matching.
+           Set flag to True to enable, False to disable."""
         if flag:
             self.setDebugActions( _defaultStartDebugAction, _defaultSuccessDebugAction, _defaultExceptionDebugAction )
         else:
@@ -808,19 +1163,28 @@ class ParserElement(object):
             f.close()
         return self.parseString(file_contents)
 
+    def getException(self):
+        return ParseException("",0,self.errmsg,self)
+    
+    def __getattr__(self,aname):
+        if aname == "myException":
+            self.myException = ret = self.getException();
+            return ret;
+        else:
+            raise AttributeError, "no such attribute " + aname
 
 class Token(ParserElement):
     """Abstract ParserElement subclass, for defining atomic matching patterns."""
     def __init__( self ):
         super(Token,self).__init__( savelist=False )
-        self.myException = ParseException("",0,"",self)
+        #self.myException = ParseException("",0,"",self)
 
     def setName(self, name):
         s = super(Token,self).setName(name)
         self.errmsg = "Expected " + self.name
-        s.myException.msg = self.errmsg
+        #s.myException.msg = self.errmsg
         return s
-
+    
 
 class Empty(Token):
     """An empty token, will always match."""
@@ -839,7 +1203,7 @@ class NoMatch(Token):
         self.mayReturnEmpty = True
         self.mayIndexError = False
         self.errmsg = "Unmatchable token"
-        self.myException.msg = self.errmsg
+        #self.myException.msg = self.errmsg
         
     def parseImpl( self, instring, loc, doActions=True ):
         exc = self.myException
@@ -859,10 +1223,11 @@ class Literal(Token):
         except IndexError:
             warnings.warn("null string passed to Literal; use Empty() instead", 
                             SyntaxWarning, stacklevel=2)
-        self.name = '"%s"' % self.match
+            self.__class__ = Empty
+        self.name = '"%s"' % _ustr(self.match)
         self.errmsg = "Expected " + self.name
         self.mayReturnEmpty = False
-        self.myException.msg = self.errmsg
+        #self.myException.msg = self.errmsg
         self.mayIndexError = False
 
     # Performance tuning: this routine gets called a *lot*
@@ -873,7 +1238,7 @@ class Literal(Token):
         if (instring[loc] == self.firstMatchChar and
             (self.matchLen==1 or instring.startswith(self.match,loc)) ):
             return loc+self.matchLen, self.match
-        #~ raise ParseException, ( instring, loc, self.errmsg )
+        #~ raise ParseException( instring, loc, self.errmsg )
         exc = self.myException
         exc.loc = loc
         exc.pstr = instring
@@ -903,7 +1268,7 @@ class Keyword(Token):
         self.name = '"%s"' % self.match
         self.errmsg = "Expected " + self.name
         self.mayReturnEmpty = False
-        self.myException.msg = self.errmsg
+        #self.myException.msg = self.errmsg
         self.mayIndexError = False
         self.caseless = caseless
         if caseless:
@@ -914,14 +1279,16 @@ class Keyword(Token):
     def parseImpl( self, instring, loc, doActions=True ):
         if self.caseless:
             if ( (instring[ loc:loc+self.matchLen ].upper() == self.caselessmatch) and
-                 (loc >= len(instring)-self.matchLen or instring[loc+self.matchLen].upper() not in self.identChars) ):
+                 (loc >= len(instring)-self.matchLen or instring[loc+self.matchLen].upper() not in self.identChars) and
+                 (loc == 0 or instring[loc-1].upper() not in self.identChars) ):
                 return loc+self.matchLen, self.match
         else:
             if (instring[loc] == self.firstMatchChar and
                 (self.matchLen==1 or instring.startswith(self.match,loc)) and
-                (loc >= len(instring)-self.matchLen or instring[loc+self.matchLen] not in self.identChars) ):
+                (loc >= len(instring)-self.matchLen or instring[loc+self.matchLen] not in self.identChars) and
+                (loc == 0 or instring[loc-1] not in self.identChars) ):
                 return loc+self.matchLen, self.match
-        #~ raise ParseException, ( instring, loc, self.errmsg )
+        #~ raise ParseException( instring, loc, self.errmsg )
         exc = self.myException
         exc.loc = loc
         exc.pstr = instring
@@ -950,12 +1317,12 @@ class CaselessLiteral(Literal):
         self.returnString = matchString
         self.name = "'%s'" % self.returnString
         self.errmsg = "Expected " + self.name
-        self.myException.msg = self.errmsg
+        #self.myException.msg = self.errmsg
 
     def parseImpl( self, instring, loc, doActions=True ):
         if instring[ loc:loc+self.matchLen ].upper() == self.match:
             return loc+self.matchLen, self.returnString
-        #~ raise ParseException, ( instring, loc, self.errmsg )
+        #~ raise ParseException( instring, loc, self.errmsg )
         exc = self.myException
         exc.loc = loc
         exc.pstr = instring
@@ -963,13 +1330,13 @@ class CaselessLiteral(Literal):
 
 class CaselessKeyword(Keyword):
     def __init__( self, matchString, identChars=Keyword.DEFAULT_KEYWORD_CHARS ):
-        super(CaselessKeyword,self).__init__( matchString, identCars, caseless=True )
+        super(CaselessKeyword,self).__init__( matchString, identChars, caseless=True )
 
     def parseImpl( self, instring, loc, doActions=True ):
         if ( (instring[ loc:loc+self.matchLen ].upper() == self.caselessmatch) and
              (loc >= len(instring)-self.matchLen or instring[loc+self.matchLen].upper() not in self.identChars) ):
             return loc+self.matchLen, self.match
-        #~ raise ParseException, ( instring, loc, self.errmsg )
+        #~ raise ParseException( instring, loc, self.errmsg )
         exc = self.myException
         exc.loc = loc
         exc.pstr = instring
@@ -980,9 +1347,11 @@ class Word(Token):
        Defined with string containing all allowed initial characters,
        an optional string containing allowed body characters (if omitted,
        defaults to the initial character set), and an optional minimum,
-       maximum, and/or exact length.
+       maximum, and/or exact length.  The default value for min is 1 (a
+       minimum value < 1 is not valid); the default values for max and exact
+       are 0, meaning no maximum or exact length restriction.
     """
-    def __init__( self, initChars, bodyChars=None, min=1, max=0, exact=0 ):
+    def __init__( self, initChars, bodyChars=None, min=1, max=0, exact=0, asKeyword=False ):
         super(Word,self).__init__()
         self.initCharsOrig = initChars
         self.initChars = _str2dict(initChars)
@@ -994,6 +1363,9 @@ class Word(Token):
             self.bodyChars = _str2dict(initChars)
             
         self.maxSpecified = max > 0
+        
+        if min < 1:
+            raise ValueError, "cannot specify a minimum length < 1; use Optional(Word()) if zero-length word is permitted"
 
         self.minLen = min
 
@@ -1008,21 +1380,27 @@ class Word(Token):
 
         self.name = _ustr(self)
         self.errmsg = "Expected " + self.name
-        self.myException.msg = self.errmsg
+        #self.myException.msg = self.errmsg
         self.mayIndexError = False
+        self.asKeyword = asKeyword
         
         if ' ' not in self.initCharsOrig+self.bodyCharsOrig and (min==1 and max==0 and exact==0):
             if self.bodyCharsOrig == self.initCharsOrig:
                 self.reString = "[%s]+" % _escapeRegexRangeChars(self.initCharsOrig)
             elif len(self.bodyCharsOrig) == 1:
                 self.reString = "%s[%s]*" % \
-                                      (_escapeRegexChars(self.initCharsOrig),
+                                      (re.escape(self.initCharsOrig),
                                       _escapeRegexRangeChars(self.bodyCharsOrig),)
             else:
                 self.reString = "[%s][%s]*" % \
                                       (_escapeRegexRangeChars(self.initCharsOrig),
                                       _escapeRegexRangeChars(self.bodyCharsOrig),)
-            self.re = re.compile( self.reString )
+            if self.asKeyword:
+                self.reString = r"\b"+self.reString+r"\b"
+            try:
+                self.re = re.compile( self.reString )
+            except:
+                self.re = None
         
     def parseImpl( self, instring, loc, doActions=True ):
         if self.re:
@@ -1037,7 +1415,7 @@ class Word(Token):
             return loc,result.group()
         
         if not(instring[ loc ] in self.initChars):
-            #~ raise ParseException, ( instring, loc, self.errmsg )
+            #~ raise ParseException( instring, loc, self.errmsg )
             exc = self.myException
             exc.loc = loc
             exc.pstr = instring
@@ -1056,9 +1434,12 @@ class Word(Token):
             throwException = True
         if self.maxSpecified and loc < instrlen and instring[loc] in bodychars:
             throwException = True
+        if self.asKeyword:
+            if (start>0 and instring[start-1] in bodychars) or (loc<instrlen and instring[loc] in bodychars):
+                throwException = True
 
         if throwException:
-            #~ raise ParseException, ( instring, loc, self.errmsg )
+            #~ raise ParseException( instring, loc, self.errmsg )
             exc = self.myException
             exc.loc = loc
             exc.pstr = instring
@@ -1107,15 +1488,16 @@ class Regex(Token):
         try:
             self.re = re.compile(self.pattern, self.flags)
             self.reString = self.pattern
-        except Exception,e:
+        except sre_constants.error,e:
             warnings.warn("invalid pattern (%s) passed to Regex" % pattern, 
                 SyntaxWarning, stacklevel=2)
             raise
 
         self.name = _ustr(self)
         self.errmsg = "Expected " + self.name
-        self.myException.msg = self.errmsg
+        #self.myException.msg = self.errmsg
         self.mayIndexError = False
+        self.mayReturnEmpty = True
     
     def parseImpl( self, instring, loc, doActions=True ):
         result = self.re.match(instring,loc)
@@ -1145,16 +1527,137 @@ class Regex(Token):
         return self.strRepr
 
 
+class QuotedString(Token):
+    """Token for matching strings that are delimited by quoting characters.
+    """
+    def __init__( self, quoteChar, escChar=None, escQuote=None, multiline=False, unquoteResults=True, endQuoteChar=None):
+        """
+           Defined with the following parameters:
+           - quoteChar - string of one or more characters defining the quote delimiting string
+           - escChar - character to escape quotes, typically backslash (default=None)
+           - escQuote - special quote sequence to escape an embedded quote string (such as SQL's "" to escape an embedded ") (default=None)
+           - multiline - boolean indicating whether quotes can span multiple lines (default=False)
+           - unquoteResults - boolean indicating whether the matched text should be unquoted (default=True)
+           - endQuoteChar - string of one or more characters defining the end of the quote delimited string (default=None => same as quoteChar)
+        """
+        super(QuotedString,self).__init__()
+        
+        # remove white space from quote chars - wont work anyway
+        quoteChar = quoteChar.strip()
+        if len(quoteChar) == 0:
+            warnings.warn("quoteChar cannot be the empty string",SyntaxWarning,stacklevel=2)
+            raise SyntaxError()
+        
+        if endQuoteChar is None:
+            endQuoteChar = quoteChar
+        else:
+            endQuoteChar = endQuoteChar.strip()
+            if len(endQuoteChar) == 0:
+                warnings.warn("endQuoteChar cannot be the empty string",SyntaxWarning,stacklevel=2)
+                raise SyntaxError()
+        
+        self.quoteChar = quoteChar
+        self.quoteCharLen = len(quoteChar)
+        self.firstQuoteChar = quoteChar[0]
+        self.endQuoteChar = endQuoteChar
+        self.endQuoteCharLen = len(endQuoteChar)
+        self.escChar = escChar
+        self.escQuote = escQuote
+        self.unquoteResults = unquoteResults
+        
+        if multiline:
+            self.flags = re.MULTILINE | re.DOTALL
+            self.pattern = r'%s(?:[^%s%s]' % \
+                ( re.escape(self.quoteChar),
+                  _escapeRegexRangeChars(self.endQuoteChar[0]),
+                  (escChar is not None and _escapeRegexRangeChars(escChar) or '') )
+        else:
+            self.flags = 0
+            self.pattern = r'%s(?:[^%s\n\r%s]' % \
+                ( re.escape(self.quoteChar),
+                  _escapeRegexRangeChars(self.endQuoteChar[0]),
+                  (escChar is not None and _escapeRegexRangeChars(escChar) or '') )
+        if len(self.endQuoteChar) > 1:
+            self.pattern += (
+                '|(?:' + ')|(?:'.join(["%s[^%s]" % (re.escape(self.endQuoteChar[:i]),
+                                               _escapeRegexRangeChars(self.endQuoteChar[i])) 
+                                    for i in range(len(self.endQuoteChar)-1,0,-1)]) + ')'
+                )
+        if escQuote:
+            self.pattern += (r'|(?:%s)' % re.escape(escQuote))
+        if escChar:
+            self.pattern += (r'|(?:%s.)' % re.escape(escChar))
+            self.escCharReplacePattern = re.escape(self.escChar)+"(.)"
+        self.pattern += (r')*%s' % re.escape(self.endQuoteChar))
+        
+        try:
+            self.re = re.compile(self.pattern, self.flags)
+            self.reString = self.pattern
+        except sre_constants.error,e:
+            warnings.warn("invalid pattern (%s) passed to Regex" % self.pattern, 
+                SyntaxWarning, stacklevel=2)
+            raise
+
+        self.name = _ustr(self)
+        self.errmsg = "Expected " + self.name
+        #self.myException.msg = self.errmsg
+        self.mayIndexError = False
+        self.mayReturnEmpty = True
+    
+    def parseImpl( self, instring, loc, doActions=True ):
+        result = instring[loc] == self.firstQuoteChar and self.re.match(instring,loc) or None
+        if not result:
+            exc = self.myException
+            exc.loc = loc
+            exc.pstr = instring
+            raise exc
+        
+        loc = result.end()
+        ret = result.group()
+        
+        if self.unquoteResults:
+            
+            # strip off quotes
+            ret = ret[self.quoteCharLen:-self.endQuoteCharLen]
+                
+            if isinstance(ret,basestring):
+                # replace escaped characters
+                if self.escChar:
+                    ret = re.sub(self.escCharReplacePattern,"\g<1>",ret)
+
+                # replace escaped quotes
+                if self.escQuote:
+                    ret = ret.replace(self.escQuote, self.endQuoteChar)
+
+        return loc, ret
+    
+    def __str__( self ):
+        try:
+            return super(QuotedString,self).__str__()
+        except:
+            pass
+        
+        if self.strRepr is None:
+            self.strRepr = "quoted string, starting with %s ending with %s" % (self.quoteChar, self.endQuoteChar)
+        
+        return self.strRepr
+
+
 class CharsNotIn(Token):
     """Token for matching words composed of characters *not* in a given set.
        Defined with string containing all disallowed characters, and an optional 
-       minimum, maximum, and/or exact length.
+       minimum, maximum, and/or exact length.  The default value for min is 1 (a
+       minimum value < 1 is not valid); the default values for max and exact
+       are 0, meaning no maximum or exact length restriction.
     """
     def __init__( self, notChars, min=1, max=0, exact=0 ):
         super(CharsNotIn,self).__init__()
         self.skipWhitespace = False
         self.notChars = notChars
         
+        if min < 1:
+            raise ValueError, "cannot specify a minimum length < 1; use Optional(CharsNotIn()) if zero-length char group is permitted"
+
         self.minLen = min
 
         if max > 0:
@@ -1169,12 +1672,12 @@ class CharsNotIn(Token):
         self.name = _ustr(self)
         self.errmsg = "Expected " + self.name
         self.mayReturnEmpty = ( self.minLen == 0 )
-        self.myException.msg = self.errmsg
+        #self.myException.msg = self.errmsg
         self.mayIndexError = False
 
     def parseImpl( self, instring, loc, doActions=True ):
         if instring[loc] in self.notChars:
-            #~ raise ParseException, ( instring, loc, self.errmsg )
+            #~ raise ParseException( instring, loc, self.errmsg )
             exc = self.myException
             exc.loc = loc
             exc.pstr = instring
@@ -1189,7 +1692,7 @@ class CharsNotIn(Token):
             loc += 1
 
         if loc - start < self.minLen:
-            #~ raise ParseException, ( instring, loc, self.errmsg )
+            #~ raise ParseException( instring, loc, self.errmsg )
             exc = self.myException
             exc.loc = loc
             exc.pstr = instring
@@ -1227,12 +1730,12 @@ class White(Token):
     def __init__(self, ws=" \t\r\n", min=1, max=0, exact=0):
         super(White,self).__init__()
         self.matchWhite = ws
-        self.whiteChars = "".join([c for c in self.whiteChars if c not in self.matchWhite])
+        self.setWhitespaceChars( "".join([c for c in self.whiteChars if c not in self.matchWhite]) )
         #~ self.leaveWhitespace()
         self.name = ("".join([White.whiteStrs[c] for c in self.matchWhite]))
         self.mayReturnEmpty = True
         self.errmsg = "Expected " + self.name
-        self.myException.msg = self.errmsg
+        #self.myException.msg = self.errmsg
 
         self.minLen = min
 
@@ -1247,7 +1750,7 @@ class White(Token):
             
     def parseImpl( self, instring, loc, doActions=True ):
         if not(instring[ loc ] in self.matchWhite):
-            #~ raise ParseException, ( instring, loc, self.errmsg )
+            #~ raise ParseException( instring, loc, self.errmsg )
             exc = self.myException
             exc.loc = loc
             exc.pstr = instring
@@ -1260,7 +1763,7 @@ class White(Token):
             loc += 1
 
         if loc - start < self.minLen:
-            #~ raise ParseException, ( instring, loc, self.errmsg )
+            #~ raise ParseException( instring, loc, self.errmsg )
             exc = self.myException
             exc.loc = loc
             exc.pstr = instring
@@ -1269,13 +1772,14 @@ class White(Token):
         return loc, instring[start:loc]
 
 
-class PositionToken(Token):
+class _PositionToken(Token):
     def __init__( self ):
-        super(PositionToken,self).__init__()
+        super(_PositionToken,self).__init__()
         self.name=self.__class__.__name__
         self.mayReturnEmpty = True
+        self.mayIndexError = False
 
-class GoToColumn(PositionToken):
+class GoToColumn(_PositionToken):
     """Token to advance to a specific column of input text; useful for tabular report scraping."""
     def __init__( self, colno ):
         super(GoToColumn,self).__init__()
@@ -1293,88 +1797,103 @@ class GoToColumn(PositionToken):
     def parseImpl( self, instring, loc, doActions=True ):
         thiscol = col( loc, instring )
         if thiscol > self.col:
-            raise ParseException, ( instring, loc, "Text not in expected column", self )
+            raise ParseException( instring, loc, "Text not in expected column", self )
         newloc = loc + self.col - thiscol
         ret = instring[ loc: newloc ]
         return newloc, ret
 
-class LineStart(PositionToken):
+class LineStart(_PositionToken):
     """Matches if current position is at the beginning of a line within the parse string"""
     def __init__( self ):
         super(LineStart,self).__init__()
-        self.whiteChars = " \t"
+        self.setWhitespaceChars( " \t" )
         self.errmsg = "Expected start of line"
-        self.myException.msg = self.errmsg
+        #self.myException.msg = self.errmsg
 
     def preParse( self, instring, loc ):
-        loc = super(LineStart,self).preParse(instring,loc)
-        if instring[loc] == "\n":
+        preloc = super(LineStart,self).preParse(instring,loc)
+        if instring[preloc] == "\n":
             loc += 1
         return loc
 
     def parseImpl( self, instring, loc, doActions=True ):
-        if not( loc==0 or ( loc<len(instring) and instring[loc-1] == "\n" ) ): #col(loc, instring) != 1:
-            #~ raise ParseException, ( instring, loc, "Expected start of line" )
+        if not( loc==0 or
+            (loc == self.preParse( instring, 0 )) or
+            (instring[loc-1] == "\n") ): #col(loc, instring) != 1:
+            #~ raise ParseException( instring, loc, "Expected start of line" )
             exc = self.myException
             exc.loc = loc
             exc.pstr = instring
             raise exc
         return loc, []
 
-class LineEnd(PositionToken):
+class LineEnd(_PositionToken):
     """Matches if current position is at the end of a line within the parse string"""
     def __init__( self ):
         super(LineEnd,self).__init__()
-        self.whiteChars = " \t"
+        self.setWhitespaceChars( " \t" )
         self.errmsg = "Expected end of line"
-        self.myException.msg = self.errmsg
+        #self.myException.msg = self.errmsg
     
     def parseImpl( self, instring, loc, doActions=True ):
         if loc<len(instring):
             if instring[loc] == "\n":
                 return loc+1, "\n"
             else:
-                #~ raise ParseException, ( instring, loc, "Expected end of line" )
+                #~ raise ParseException( instring, loc, "Expected end of line" )
                 exc = self.myException
                 exc.loc = loc
                 exc.pstr = instring
                 raise exc
+        elif loc == len(instring):
+            return loc+1, []
         else:
-            return loc, []
+            exc = self.myException
+            exc.loc = loc
+            exc.pstr = instring
+            raise exc
 
-class StringStart(PositionToken):
+class StringStart(_PositionToken):
     """Matches if current position is at the beginning of the parse string"""
     def __init__( self ):
         super(StringStart,self).__init__()
         self.errmsg = "Expected start of text"
-        self.myException.msg = self.errmsg
+        #self.myException.msg = self.errmsg
     
     def parseImpl( self, instring, loc, doActions=True ):
         if loc != 0:
             # see if entire string up to here is just whitespace and ignoreables
             if loc != self.preParse( instring, 0 ):
-                #~ raise ParseException, ( instring, loc, "Expected start of text" )
+                #~ raise ParseException( instring, loc, "Expected start of text" )
                 exc = self.myException
                 exc.loc = loc
                 exc.pstr = instring
                 raise exc
         return loc, []
 
-class StringEnd(PositionToken):
+class StringEnd(_PositionToken):
     """Matches if current position is at the end of the parse string"""
     def __init__( self ):
         super(StringEnd,self).__init__()
         self.errmsg = "Expected end of text"
-        self.myException.msg = self.errmsg
+        #self.myException.msg = self.errmsg
     
     def parseImpl( self, instring, loc, doActions=True ):
         if loc < len(instring):
-            #~ raise ParseException, ( instring, loc, "Expected end of text" )
+            #~ raise ParseException( instring, loc, "Expected end of text" )
             exc = self.myException
             exc.loc = loc
             exc.pstr = instring
             raise exc
-        return loc, []
+        elif loc == len(instring):
+            return loc+1, []
+        elif loc > len(instring):
+            return loc, []
+        else:
+            exc = self.myException
+            exc.loc = loc
+            exc.pstr = instring
+            raise exc
 
 
 class ParseExpression(ParserElement):
@@ -1387,6 +1906,7 @@ class ParseExpression(ParserElement):
             self.exprs = [ Literal( exprs ) ]
         else:
             self.exprs = [ exprs ]
+        self.callPreparse = False
 
     def __getitem__( self, i ):
         return self.exprs[i]
@@ -1400,7 +1920,7 @@ class ParseExpression(ParserElement):
         """Extends leaveWhitespace defined in base class, and also invokes leaveWhitespace on
            all contained expressions."""
         self.skipWhitespace = False
-        self.exprs = [ copy.copy(e) for e in self.exprs ]
+        self.exprs = [ e.copy() for e in self.exprs ]
         for e in self.exprs:
             e.leaveWhitespace()
         return self
@@ -1439,25 +1959,28 @@ class ParseExpression(ParserElement):
         if ( len(self.exprs) == 2 ):
             other = self.exprs[0]
             if ( isinstance( other, self.__class__ ) and
-                  other.parseAction is None and
+                  not(other.parseAction) and
                   other.resultsName is None and
                   not other.debug ):
                 self.exprs = other.exprs[:] + [ self.exprs[1] ]
                 self.strRepr = None
+                self.mayReturnEmpty |= other.mayReturnEmpty
+                self.mayIndexError  |= other.mayIndexError
 
             other = self.exprs[-1]
             if ( isinstance( other, self.__class__ ) and
-                  other.parseAction is None and
+                  not(other.parseAction) and
                   other.resultsName is None and
                   not other.debug ):
                 self.exprs = self.exprs[:-1] + other.exprs[:]
                 self.strRepr = None
+                self.mayReturnEmpty |= other.mayReturnEmpty
+                self.mayIndexError  |= other.mayIndexError
 
         return self
 
     def setResultsName( self, name, listAllMatches=False ):
         ret = super(ParseExpression,self).setResultsName(name,listAllMatches)
-        #~ ret.saveAsList = True
         return ret
     
     def validate( self, validateTrace=[] ):
@@ -1465,7 +1988,6 @@ class ParseExpression(ParserElement):
         for e in self.exprs:
             e.validate(tmp)
         self.checkRecursion( [] )
-
 
 class And(ParseExpression):
     """Requires all given ParseExpressions to be found in the given order.
@@ -1475,17 +1997,20 @@ class And(ParseExpression):
     def __init__( self, exprs, savelist = True ):
         super(And,self).__init__(exprs, savelist)
         self.mayReturnEmpty = True
-        for e in exprs:
+        for e in self.exprs:
             if not e.mayReturnEmpty:
                 self.mayReturnEmpty = False
                 break
+        self.setWhitespaceChars( exprs[0].whiteChars )
         self.skipWhitespace = exprs[0].skipWhitespace
-        self.whiteChars = exprs[0].whiteChars
+        self.callPreparse = True
 
     def parseImpl( self, instring, loc, doActions=True ):
-        loc, resultlist = self.exprs[0].parse( instring, loc, doActions )
+        # pass False as last arg to _parse for first element, since we already
+        # pre-parsed the string as part of our And pre-parsing
+        loc, resultlist = self.exprs[0]._parse( instring, loc, doActions, callPreParse=False )
         for e in self.exprs[1:]:
-            loc, exprtokens = e.parse( instring, loc, doActions )
+            loc, exprtokens = e._parse( instring, loc, doActions )
             if exprtokens or exprtokens.keys():
                 resultlist += exprtokens
         return loc, resultlist
@@ -1520,7 +2045,7 @@ class Or(ParseExpression):
     def __init__( self, exprs, savelist = False ):
         super(Or,self).__init__(exprs, savelist)
         self.mayReturnEmpty = False
-        for e in exprs:
+        for e in self.exprs:
             if e.mayReturnEmpty:
                 self.mayReturnEmpty = True
                 break
@@ -1545,9 +2070,12 @@ class Or(ParseExpression):
                     maxMatchExp = e
         
         if maxMatchLoc < 0:
-            raise maxException
+            if self.exprs:
+                raise maxException
+            else:
+                raise ParseException(instring, loc, "no defined alternatives to match", self)
 
-        return maxMatchExp.parse( instring, loc, doActions )
+        return maxMatchExp._parse( instring, loc, doActions )
 
     def __ixor__(self, other ):
         if isinstance( other, basestring ):
@@ -1576,17 +2104,20 @@ class MatchFirst(ParseExpression):
     """
     def __init__( self, exprs, savelist = False ):
         super(MatchFirst,self).__init__(exprs, savelist)
-        self.mayReturnEmpty = False
-        for e in exprs:
-            if e.mayReturnEmpty:
-                self.mayReturnEmpty = True
-                break
+        if exprs:
+            self.mayReturnEmpty = False
+            for e in self.exprs:
+                if e.mayReturnEmpty:
+                    self.mayReturnEmpty = True
+                    break
+        else:
+            self.mayReturnEmpty = True
     
     def parseImpl( self, instring, loc, doActions=True ):
         maxExcLoc = -1
         for e in self.exprs:
             try:
-                ret = e.parse( instring, loc, doActions )
+                ret = e._parse( instring, loc, doActions )
                 return ret
             except ParseException, err:
                 if err.loc > maxExcLoc:
@@ -1599,7 +2130,10 @@ class MatchFirst(ParseExpression):
 
         # only got here if no expression matched, raise exception for match that made it the furthest
         else:
-            raise maxException
+            if self.exprs:
+                raise maxException
+            else:
+                raise ParseException(instring, loc, "no defined alternatives to match", self)
 
     def __ior__(self, other ):
         if isinstance( other, basestring ):
@@ -1620,6 +2154,7 @@ class MatchFirst(ParseExpression):
         for e in self.exprs:
             e.checkRecursion( subRecCheckList )
 
+
 class Each(ParseExpression):
     """Requires all given ParseExpressions to be found, but in any order.
        Expressions may be separated by whitespace.
@@ -1628,7 +2163,7 @@ class Each(ParseExpression):
     def __init__( self, exprs, savelist = True ):
         super(Each,self).__init__(exprs, savelist)
         self.mayReturnEmpty = True
-        for e in exprs:
+        for e in self.exprs:
             if not e.mayReturnEmpty:
                 self.mayReturnEmpty = False
                 break
@@ -1664,12 +2199,12 @@ class Each(ParseExpression):
                 keepMatching = False
         
         if tmpReqd:
-            missing = ", ".join( [ str(e) for e in tmpReqd ] )
+            missing = ", ".join( [ _ustr(e) for e in tmpReqd ] )
             raise ParseException(instring,loc,"Missing one or more required elements (%s)" % missing )
 
         resultlist = []
         for e in matchOrder:
-            loc,results = e.parse(instring,loc,doActions)
+            loc,results = e._parse(instring,loc,doActions)
             resultlist.append(results)
             
         finalResults = ParseResults([])
@@ -1710,18 +2245,21 @@ class ParseElementEnhance(ParserElement):
         self.strRepr = None
         if expr is not None:
             self.mayIndexError = expr.mayIndexError
+            self.mayReturnEmpty = expr.mayReturnEmpty
+            self.setWhitespaceChars( expr.whiteChars )
             self.skipWhitespace = expr.skipWhitespace
-            self.whiteChars = expr.whiteChars
+            self.saveAsList = expr.saveAsList
+            self.callPreparse = expr.callPreparse
 
     def parseImpl( self, instring, loc, doActions=True ):
         if self.expr is not None:
-            return self.expr.parse( instring, loc, doActions )
+            return self.expr._parse( instring, loc, doActions, callPreParse=False )
         else:
-            raise ParseException(instring,loc,"",self)
-
+            raise ParseException("",loc,self.errmsg,self)
+            
     def leaveWhitespace( self ):
         self.skipWhitespace = False
-        self.expr = copy.copy(self.expr)
+        self.expr = self.expr.copy()
         if self.expr is not None:
             self.expr.leaveWhitespace()
         return self
@@ -1793,8 +2331,8 @@ class NotAny(ParseElementEnhance):
         #~ self.leaveWhitespace()
         self.skipWhitespace = False  # do NOT use self.leaveWhitespace(), don't want to propagate to exprs
         self.mayReturnEmpty = True
-        self.errmsg = "Found unexpected token, "+_ustr(self.expr)
-        self.myException = ParseException("",0,self.errmsg,self)
+        self.errmsg = "Found unwanted token, "+_ustr(self.expr)
+        #self.myException = ParseException("",0,self.errmsg,self)
         
     def parseImpl( self, instring, loc, doActions=True ):
         try:
@@ -1802,7 +2340,7 @@ class NotAny(ParseElementEnhance):
         except (ParseException,IndexError):
             pass
         else:
-            #~ raise ParseException, (instring, loc, self.errmsg )
+            #~ raise ParseException(instring, loc, self.errmsg )
             exc = self.myException
             exc.loc = loc
             exc.pstr = instring
@@ -1828,12 +2366,14 @@ class ZeroOrMore(ParseElementEnhance):
     def parseImpl( self, instring, loc, doActions=True ):
         tokens = []
         try:
-            loc, tokens = self.expr.parse( instring, loc, doActions )
+            loc, tokens = self.expr._parse( instring, loc, doActions, callPreParse=False )
             hasIgnoreExprs = ( len(self.ignoreExprs) > 0 )
             while 1:
                 if hasIgnoreExprs:
-                    loc = self.skipIgnorables( instring, loc )
-                loc, tmptokens = self.expr.parse( instring, loc, doActions )
+                    preloc = self.skipIgnorables( instring, loc )
+                else:
+                    preloc = loc
+                loc, tmptokens = self.expr._parse( instring, preloc, doActions )
                 if tmptokens or tmptokens.keys():
                     tokens += tmptokens
         except (ParseException,IndexError):
@@ -1860,13 +2400,15 @@ class OneOrMore(ParseElementEnhance):
     """Repetition of one or more of the given expression."""
     def parseImpl( self, instring, loc, doActions=True ):
         # must be at least one
-        loc, tokens = self.expr.parse( instring, loc, doActions )
+        loc, tokens = self.expr._parse( instring, loc, doActions, callPreParse=False )
         try:
             hasIgnoreExprs = ( len(self.ignoreExprs) > 0 )
             while 1:
                 if hasIgnoreExprs:
-                    loc = self.skipIgnorables( instring, loc )
-                loc, tmptokens = self.expr.parse( instring, loc, doActions )
+                    preloc = self.skipIgnorables( instring, loc )
+                else:
+                    preloc = loc
+                loc, tmptokens = self.expr._parse( instring, preloc, doActions )
                 if tmptokens or tmptokens.keys():
                     tokens += tmptokens
         except (ParseException,IndexError):
@@ -1887,27 +2429,32 @@ class OneOrMore(ParseElementEnhance):
         ret = super(OneOrMore,self).setResultsName(name,listAllMatches)
         ret.saveAsList = True
         return ret
-    
 
+class _NullToken(object):
+    def __bool__(self):
+        return False
+    def __str__(self):
+        return ""
+
+_optionalNotMatched = _NullToken()
 class Optional(ParseElementEnhance):
     """Optional matching of the given expression.
        A default return string can also be specified, if the optional expression
        is not found.
     """
-    def __init__( self, exprs, default=None ):
+    def __init__( self, exprs, default=_optionalNotMatched ):
         super(Optional,self).__init__( exprs, savelist=False )
         self.defaultValue = default
         self.mayReturnEmpty = True
 
     def parseImpl( self, instring, loc, doActions=True ):
         try:
-            loc, tokens = self.expr.parse( instring, loc, doActions )
+            loc, tokens = self.expr._parse( instring, loc, doActions, callPreParse=False )
         except (ParseException,IndexError):
-            if self.defaultValue is not None:
+            if self.defaultValue is not _optionalNotMatched:
                 tokens = [ self.defaultValue ]
             else:
                 tokens = []
-
         return loc, tokens
 
     def __str__( self ):
@@ -1929,27 +2476,30 @@ class SkipTo(ParseElementEnhance):
     def __init__( self, other, include=False, ignore=None ):
         super( SkipTo, self ).__init__( other )
         if ignore is not None:
-            self.expr = copy.copy( self.expr )
+            self.expr = self.expr.copy()
             self.expr.ignore(ignore)
         self.mayReturnEmpty = True
         self.mayIndexError = False
         self.includeMatch = include
+        self.asList = False
         self.errmsg = "No match found for "+_ustr(self.expr)
-        self.myException = ParseException("",0,self.errmsg,self)
+        #self.myException = ParseException("",0,self.errmsg,self)
 
     def parseImpl( self, instring, loc, doActions=True ):
         startLoc = loc
         instrlen = len(instring)
         expr = self.expr
-        while loc < instrlen:
+        while loc <= instrlen:
             try:
                 loc = expr.skipIgnorables( instring, loc )
-                expr.parse( instring, loc, doActions=False, callPreParse=False )
+                expr._parse( instring, loc, doActions=False, callPreParse=False )
                 if self.includeMatch:
                     skipText = instring[startLoc:loc]
-                    loc,mat = expr.parse(instring,loc)
+                    loc,mat = expr._parse(instring,loc,doActions,callPreParse=False)
                     if mat:
-                        return loc, [ skipText, mat ]
+                        skipRes = ParseResults( skipText )
+                        skipRes += mat
+                        return loc, [ skipRes ]
                     else:
                         return loc, [ skipText ]
                 else:
@@ -1965,14 +2515,30 @@ class Forward(ParseElementEnhance):
     """Forward declaration of an expression to be defined later -
        used for recursive grammars, such as algebraic infix notation.
        When the expression is known, it is assigned to the Forward variable using the '<<' operator.
+       
+       Note: take care when assigning to Forward not to overlook precedence of operators.
+       Specifically, '|' has a lower precedence than '<<', so that::
+          fwdExpr << a | b | c
+       will actually be evaluated as::
+          (fwdExpr << a) | b | c
+       thereby leaving b and c out as parseable alternatives.  It is recommended that you
+       explicitly group the values inserted into the Forward::
+          fwdExpr << (a | b | c)
     """
     def __init__( self, other=None ):
         super(Forward,self).__init__( other, savelist=False )
 
     def __lshift__( self, other ):
+        if isinstance( other, basestring ):
+            other = Literal(other)
         self.expr = other
         self.mayReturnEmpty = other.mayReturnEmpty
         self.strRepr = None
+        self.mayIndexError = self.expr.mayIndexError
+        self.mayReturnEmpty = self.expr.mayReturnEmpty
+        self.setWhitespaceChars( self.expr.whiteChars )
+        self.skipWhitespace = self.expr.skipWhitespace
+        self.saveAsList = self.expr.saveAsList        
         return self
 
     def leaveWhitespace( self ):
@@ -1996,15 +2562,24 @@ class Forward(ParseElementEnhance):
     def __str__( self ):
         if hasattr(self,"name"):
             return self.name
-            
-        strmethod = self.__str__
+
         self.__class__ = _ForwardNoRecurse
-        if self.expr is not None: 
-            retString = _ustr(self.expr)
-        else:
-            retString = "None"
-        self.__class__ = Forward
+        try:
+            if self.expr is not None: 
+                retString = _ustr(self.expr)
+            else:
+                retString = "None"
+        finally:
+            self.__class__ = Forward
         return "Forward: "+retString
+        
+    def copy(self):
+        if self.expr is not None:
+            return super(Forward,self).copy()
+        else:
+            ret = Forward()
+            ret << self
+            return ret
 
 class _ForwardNoRecurse(Forward):
     def __str__( self ):
@@ -2014,7 +2589,7 @@ class TokenConverter(ParseElementEnhance):
     """Abstract subclass of ParseExpression, for converting parsed results."""
     def __init__( self, expr, savelist=False ):
         super(TokenConverter,self).__init__( expr )#, savelist )
-
+        self.saveAsList = False
 
 class Upcase(TokenConverter):
     """Converter to upper case all matching tokens."""
@@ -2078,18 +2653,22 @@ class Dict(TokenConverter):
 
     def postParse( self, instring, loc, tokenlist ):
         for i,tok in enumerate(tokenlist):
-            ikey = _ustr(tok[0]).strip()
+            if len(tok) == 0: 
+                continue
+            ikey = tok[0]
+            if isinstance(ikey,int):
+                ikey = _ustr(tok[0]).strip()
             if len(tok)==1:
-                tokenlist[ikey] = ("",i)
+                tokenlist[ikey] = _ParseResultsWithOffset("",i)
             elif len(tok)==2 and not isinstance(tok[1],ParseResults):
-                tokenlist[ikey] = (tok[1],i)
+                tokenlist[ikey] = _ParseResultsWithOffset(tok[1],i)
             else:
                 dictvalue = tok.copy() #ParseResults(i)
                 del dictvalue[0]
                 if len(dictvalue)!= 1 or (isinstance(dictvalue,ParseResults) and dictvalue.keys()):
-                    tokenlist[ikey] = (dictvalue,i)
+                    tokenlist[ikey] = _ParseResultsWithOffset(dictvalue,i)
                 else:
-                    tokenlist[ikey] = (dictvalue[0],i)
+                    tokenlist[ikey] = _ParseResultsWithOffset(dictvalue[0],i)
 
         if self.resultsName:
             return [ tokenlist ]
@@ -2105,6 +2684,43 @@ class Suppress(TokenConverter):
     def suppress( self ):
         return self
 
+
+class OnlyOnce(object):
+    """Wrapper for parse actions, to ensure they are only called once."""
+    def __init__(self, methodCall):
+        self.callable = ParserElement.normalizeParseActionArgs(methodCall)
+        self.called = False
+    def __call__(self,s,l,t):
+        if not self.called:
+            results = self.callable(s,l,t)
+            self.called = True
+            return results
+        raise ParseException(s,l,"")
+    def reset(self):
+        self.called = False
+
+def traceParseAction(f):
+    """Decorator for debugging parse actions."""
+    f = ParserElement.normalizeParseActionArgs(f)
+    def z(*paArgs):
+        thisFunc = f.func_name
+        s,l,t = paArgs[-3:]
+        if len(paArgs)>3:
+            thisFunc = paArgs[0].__class__.__name__ + '.' + thisFunc
+        sys.stderr.write( ">>entering %s(line: '%s', %d, %s)\n" % (thisFunc,line(l,s),l,t) )
+        try:
+            ret = f(*paArgs)
+        except Exception, exc:
+            sys.stderr.write( "<<leaving %s (exception: %s)\n" % (thisFunc,exc) )
+            raise
+        sys.stderr.write( "<<leaving %s (ret: %s)\n" % (thisFunc,ret) )
+        return ret
+    try:
+        z.__name__ = f.__name__
+    except AttributeError:
+        pass
+    return z
+        
 #
 # global helpers
 #
@@ -2116,18 +2732,82 @@ def delimitedList( expr, delim=",", combine=False ):
        string, with the delimiters included; otherwise, the matching tokens are returned
        as a list of tokens, with the delimiters suppressed.
     """
+    dlName = _ustr(expr)+" ["+_ustr(delim)+" "+_ustr(expr)+"]..."
     if combine:
-        return Combine( expr + ZeroOrMore( delim + expr ) ).setName(_ustr(expr)+_ustr(delim)+"...")
+        return Combine( expr + ZeroOrMore( delim + expr ) ).setName(dlName)
     else:
-        return ( expr + ZeroOrMore( Suppress( delim ) + expr ) ).setName(_ustr(expr)+_ustr(delim)+"...")
+        return ( expr + ZeroOrMore( Suppress( delim ) + expr ) ).setName(dlName)
 
-def _escapeRegexChars(s):
-    #~  escape these chars: [\^$.|?*+()
-    for c in r"\[^$.|?*+()":
-        s = s.replace(c,"\\"+c)
-    s = s.replace("\n",r"\n")
-    s = s.replace("\t",r"\t")
-    return _ustr(s)
+def countedArray( expr ):
+    """Helper to define a counted list of expressions.
+       This helper defines a pattern of the form::
+           integer expr expr expr...
+       where the leading integer tells how many expr expressions follow.
+       The matched tokens returns the array of expr tokens as a list - the leading count token is suppressed.
+    """
+    arrayExpr = Forward()
+    def countFieldParseAction(s,l,t):
+        n = int(t[0])
+        arrayExpr << (n and Group(And([expr]*n)) or Group(empty))
+        return []
+    return ( Word(nums).setName("arrayLen").setParseAction(countFieldParseAction, callDuringTry=True) + arrayExpr )
+
+def _flatten(L):
+    if type(L) is not list: return [L]
+    if L == []: return L
+    return _flatten(L[0]) + _flatten(L[1:])
+
+def matchPreviousLiteral(expr):
+    """Helper to define an expression that is indirectly defined from
+       the tokens matched in a previous expression, that is, it looks
+       for a 'repeat' of a previous expression.  For example::
+           first = Word(nums)
+           second = matchPreviousLiteral(first)
+           matchExpr = first + ":" + second
+       will match "1:1", but not "1:2".  Because this matches a 
+       previous literal, will also match the leading "1:1" in "1:10".  
+       If this is not desired, use matchPreviousExpr.
+       Do *not* use with packrat parsing enabled.
+    """
+    rep = Forward()
+    def copyTokenToRepeater(s,l,t):
+        if t:
+            if len(t) == 1:
+                rep << t[0]
+            else:
+                # flatten t tokens
+                tflat = _flatten(t.asList())
+                rep << And( [ Literal(tt) for tt in tflat ] )
+        else:
+            rep << Empty()
+    expr.addParseAction(copyTokenToRepeater, callDuringTry=True)
+    return rep
+    
+def matchPreviousExpr(expr):
+    """Helper to define an expression that is indirectly defined from
+       the tokens matched in a previous expression, that is, it looks
+       for a 'repeat' of a previous expression.  For example::
+           first = Word(nums)
+           second = matchPreviousExpr(first)
+           matchExpr = first + ":" + second
+       will match "1:1", but not "1:2".  Because this matches by
+       expressions, will *not* match the leading "1:1" in "1:10";
+       the expressions are evaluated first, and then compared, so
+       "1" is compared with "10".
+       Do *not* use with packrat parsing enabled.
+    """
+    rep = Forward()
+    e2 = expr.copy()
+    rep << e2
+    def copyTokenToRepeater(s,l,t):
+        matchTokens = _flatten(t.asList())
+        def mustMatchTheseTokens(s,l,t):
+            theseTokens = _flatten(t.asList())
+            if  theseTokens != matchTokens:
+                raise ParseException("",0,"")
+        rep.setParseAction( mustMatchTheseTokens, callDuringTry=True )
+    expr.addParseAction(copyTokenToRepeater, callDuringTry=True)
+    return rep
     
 def _escapeRegexRangeChars(s):
     #~  escape these chars: ^-]
@@ -2140,7 +2820,14 @@ def _escapeRegexRangeChars(s):
 def oneOf( strs, caseless=False, useRegex=True ):
     """Helper to quickly define a set of alternative Literals, and makes sure to do 
        longest-first testing when there is a conflict, regardless of the input order, 
-       but returns a MatchFirst for best performance.
+       but returns a MatchFirst for best performance.  
+       
+       Parameters:
+        - strs - a string of space-delimited literals, or a list of string literals
+        - caseless - (default=False) - treat all literals as caseless
+        - useRegex - (default=True) - as an optimization, will generate a Regex
+          object; otherwise, will generate a MatchFirst object (if caseless=True, or
+          if creating a Regex raises an exception)
     """
     if caseless:
         isequal = ( lambda a,b: a.upper() == b.upper() )
@@ -2151,30 +2838,43 @@ def oneOf( strs, caseless=False, useRegex=True ):
         masks = ( lambda a,b: b.startswith(a) )
         parseElementClass = Literal
     
-    symbols = strs.split()
+    if isinstance(strs,(list,tuple)):
+        symbols = strs[:]
+    elif isinstance(strs,basestring):
+        symbols = strs.split()
+    else:
+        warnings.warn("Invalid argument to oneOf, expected string or list",
+                SyntaxWarning, stacklevel=2)
+
+    try:
+        symbols.sort(reverse=True)
+    except TypeError:
+        symbols.sort()
+        symbols.reverse()
     i = 0
     while i < len(symbols)-1:
         cur = symbols[i]
-        for j,other in enumerate(symbols[i+1:]):
+        for j, other in enumerate(symbols[i+1:]):
             if ( isequal(other, cur) ):
                 del symbols[i+j+1]
+            else:
                 break
-            elif ( masks(cur, other) ):
-                del symbols[i+j+1]
-                symbols.insert(i,other)
-                cur = other
-                break
-        else:
-            i += 1
-
+        i += 1
+    
     if not caseless and useRegex:
         #~ print strs,"->", "|".join( [ _escapeRegexChars(sym) for sym in symbols] )
-        if len(symbols)==len("".join(symbols)):
-            return Regex( "[%s]" % "".join( [ _escapeRegexRangeChars(sym) for sym in symbols] ) )
-        else:
-            return Regex( "|".join( [ _escapeRegexChars(sym) for sym in symbols] ) )
-    else:
-        return MatchFirst( [ parseElementClass(sym) for sym in symbols ] )
+        try:
+            if len(symbols)==len("".join(symbols)):
+                return Regex( "[%s]" % "".join( [ _escapeRegexRangeChars(sym) for sym in symbols] ) )
+            else:
+                return Regex( "|".join( [ re.escape(sym) for sym in symbols] ) )
+        except:
+            warnings.warn("Exception creating Regex for oneOf, building MatchFirst",
+                    SyntaxWarning, stacklevel=2)
+
+
+    # last resort, just use MatchFirst
+    return MatchFirst( [ parseElementClass(sym) for sym in symbols ] )
 
 def dictOf( key, value ):
     """Helper to easily and clearly define a dictionary by specifying the respective patterns
@@ -2188,7 +2888,13 @@ def dictOf( key, value ):
 
 _bslash = "\\"
 printables = "".join( [ c for c in string.printable if c not in string.whitespace ] )
-empty      = Empty().setName("empty")
+
+# convenience constants for positional expressions
+empty       = Empty().setName("empty")
+lineStart   = LineStart().setName("lineStart")
+lineEnd     = LineEnd().setName("lineEnd")
+stringStart = StringStart().setName("stringStart")
+stringEnd   = StringEnd().setName("stringEnd")
 
 _escapedPunc = Word( _bslash, r"\[]-*.$+^?()~ ", exact=2 ).setParseAction(lambda s,l,t:t[0][1])
 _printables_less_backslash = "".join([ c for c in printables if c not in  r"\]" ])
@@ -2196,7 +2902,7 @@ _escapedHexChar = Combine( Suppress(_bslash + "0x") + Word(hexnums) ).setParseAc
 _escapedOctChar = Combine( Suppress(_bslash) + Word("0","01234567") ).setParseAction(lambda s,l,t:unichr(int(t[0],8)))
 _singleChar = _escapedPunc | _escapedHexChar | _escapedOctChar | Word(_printables_less_backslash,exact=1)
 _charRange = Group(_singleChar + Suppress("-") + _singleChar)
-_reBracketExpr = "[" + Optional("^").setResultsName("negate") + Group( OneOrMore( _charRange | _singleChar ) ).setResultsName("body") + "]"
+_reBracketExpr = Literal("[") + Optional("^").setResultsName("negate") + Group( OneOrMore( _charRange | _singleChar ) ).setResultsName("body") + "]"
 
 _expanded = lambda p: (isinstance(p,ParseResults) and ''.join([ unichr(c) for c in range(ord(p[0]),ord(p[1])+1) ]) or p)
         
@@ -2226,7 +2932,7 @@ def replaceWith(replStr):
        useful when used with transformString().
     """
     def _replFunc(*args):
-        return replStr
+        return [replStr]
     return _replFunc
 
 def removeQuotes(s,l,t):
@@ -2238,26 +2944,64 @@ def removeQuotes(s,l,t):
 
 def upcaseTokens(s,l,t):
     """Helper parse action to convert tokens to upper case."""
-    return map( str.upper, t )
+    return [ tt.upper() for tt in map(_ustr,t) ]
 
 def downcaseTokens(s,l,t):
     """Helper parse action to convert tokens to lower case."""
-    return map( str.lower, t )
+    return [ tt.lower() for tt in map(_ustr,t) ]
+
+def keepOriginalText(s,startLoc,t):
+    """Helper parse action to preserve original parsed text,
+       overriding any nested parse actions."""
+    try:
+        endloc = getTokensEndLoc()
+    except ParseException:
+        raise ParseFatalException, "incorrect usage of keepOriginalText - may only be called as a parse action"
+    del t[:]
+    t += ParseResults(s[startLoc:endloc])
+    return t
+
+def getTokensEndLoc():
+    """Method to be called from within a parse action to determine the end 
+       location of the parsed tokens."""
+    import inspect
+    fstack = inspect.stack()
+    try:
+        # search up the stack (through intervening argument normalizers) for correct calling routine
+        for f in fstack[2:]:
+            if f[3] == "_parseNoCache":
+                endloc = f[0].f_locals["loc"]
+                return endloc
+        else:
+            raise ParseFatalException, "incorrect usage of getTokensEndLoc - may only be called from within a parse action"
+    finally:
+        del fstack
 
 def _makeTags(tagStr, xml):
     """Internal helper to construct opening and closing tag expressions, given a tag name"""
-    tagAttrName = Word(alphanums)
+    if isinstance(tagStr,basestring):
+        resname = tagStr
+        tagStr = Keyword(tagStr, caseless=not xml)
+    else:
+        resname = tagStr.name
+        
+    tagAttrName = Word(alphas,alphanums+"_-:")
     if (xml):
         tagAttrValue = dblQuotedString.copy().setParseAction( removeQuotes )
-        openTag = "<" + Keyword(tagStr) + Dict(ZeroOrMore(Group( tagAttrName + Suppress("=") + tagAttrValue ))) + Optional("/",default="").setResultsName("empty") + ">"
+        openTag = Suppress("<") + tagStr + \
+                Dict(ZeroOrMore(Group( tagAttrName + Suppress("=") + tagAttrValue ))) + \
+                Optional("/",default=[False]).setResultsName("empty").setParseAction(lambda s,l,t:t[0]=='/') + Suppress(">")
     else:
         printablesLessRAbrack = "".join( [ c for c in printables if c not in ">" ] )
         tagAttrValue = quotedString.copy().setParseAction( removeQuotes ) | Word(printablesLessRAbrack)
-        openTag = "<" + Keyword(tagStr,caseless=True) + Dict(ZeroOrMore(Group( tagAttrName.setParseAction(downcaseTokens) + Suppress("=") + tagAttrValue ))) + Optional("/",default="").setResultsName("empty") + ">"
-    closeTag = "</" + Keyword(tagStr,caseless=not xml) + ">"
+        openTag = Suppress("<") + tagStr + \
+                Dict(ZeroOrMore(Group( tagAttrName.setParseAction(downcaseTokens) + \
+                Optional( Suppress("=") + tagAttrValue ) ))) + \
+                Optional("/",default=[False]).setResultsName("empty").setParseAction(lambda s,l,t:t[0]=='/') + Suppress(">")
+    closeTag = Combine("</" + tagStr + ">")
     
-    openTag = openTag.setResultsName("start"+tagStr.title()).setName("<%s>" % tagStr)
-    closeTag = closeTag.setResultsName("end"+tagStr.title()).setName("</%s>" % tagStr)
+    openTag = openTag.setResultsName("start"+"".join(resname.replace(":"," ").title().split())).setName("<%s>" % tagStr)
+    closeTag = closeTag.setResultsName("end"+"".join(resname.replace(":"," ").title().split())).setName("</%s>" % tagStr)
     
     return openTag, closeTag
 
@@ -2269,30 +3013,159 @@ def makeXMLTags(tagStr):
     """Helper to construct opening and closing tag expressions for XML, given a tag name"""
     return _makeTags( tagStr, True )
 
-alphas8bit = srange(r"[\0xc0-\0xd6\0xd8-\0xf6\0xf8-\0xfe]")
+def withAttribute(*args,**attrDict):
+    """Helper to create a validating parse action to be used with start tags created 
+       with makeXMLTags or makeHTMLTags. Use withAttribute to qualify a starting tag 
+       with a required attribute value, to avoid false matches on common tags such as 
+       <TD> or <DIV>.
 
-_escapables = "tnrfbacdeghijklmopqsuvwxyz " + _bslash + "'" + '"'
-_octDigits = "01234567"
-_escapedChar = ( Word( _bslash, _escapables, exact=2 ) |
-                 Word( _bslash, _octDigits, min=2, max=4 ) )
-_sglQuote = Literal("'")
-_dblQuote = Literal('"')
-dblQuotedString = Combine( _dblQuote + ZeroOrMore( CharsNotIn('\\"\n\r') | _escapedChar | '""' ) + _dblQuote ).streamline().setName("string enclosed in double quotes")
-sglQuotedString = Combine( _sglQuote + ZeroOrMore( CharsNotIn("\\'\n\r") | _escapedChar | "''" ) + _sglQuote ).streamline().setName("string enclosed in single quotes")
-quotedString = ( dblQuotedString | sglQuotedString ).setName("quotedString using single or double quotes")
+       Call withAttribute with a series of attribute names and values. Specify the list 
+       of filter attributes names and values as:
+        - keyword arguments, as in (class="Customer",align="right"), or
+        - a list of name-value tuples, as in ( ("ns1:class", "Customer"), ("ns2:align","right") )
+       For attribute names with a namespace prefix, you must use the second form.  Attribute
+       names are matched insensitive to upper/lower case.
+       """
+    if args:
+        attrs = args[:]
+    else:
+        attrs = attrDict.items()
+    attrs = [(k.lower(),v) for k,v in attrs]
+    def pa(s,l,tokens):
+        for attrName,attrValue in attrs:
+            if attrName not in tokens:
+                raise ParseException(s,l,"no matching attribute " + attrName)
+            if tokens[attrName] != attrValue:
+                raise ParseException(s,l,"attribute '%s' has value '%s', must be '%s'" % 
+                                            (attrName, tokens[attrName], attrValue))
+    return pa
 
+opAssoc = _Constants()
+opAssoc.LEFT = object()
+opAssoc.RIGHT = object()
+
+def _flattenOpPrecTokens(tokens):
+    if isinstance(tokens,ParseResults):
+        if len(tokens)==1:
+            if isinstance(tokens[0],ParseResults):
+                return _flattenOpPrecTokens(tokens[0])
+            else:
+                return tokens[0]
+        return map(_flattenOpPrecTokens,tokens)
+    return tokens
+    
+def operatorPrecedence( baseExpr, opList ):
+    """Helper method for constructing grammars of expressions made up of 
+       operators working in a precedence hierarchy.  Operators may be unary or
+       binary, left- or right-associative.  Parse actions can also be attached
+       to operator expressions.
+        
+       Parameters:
+        - baseExpr - expression representing the most basic element for the nested 
+        - opList - list of tuples, one for each operator precedence level in the 
+          expression grammar; each tuple is of the form
+          (opExpr, numTerms, rightLeftAssoc, parseAction), where:
+           - opExpr is the pyparsing expression for the operator;
+              may also be a string, which will be converted to a Literal
+           - numTerms is the number of terms for this operator (must
+              be 1 or 2)
+           - rightLeftAssoc is the indicator whether the operator is
+              right or left associative, using the pyparsing-defined
+              constants opAssoc.RIGHT and opAssoc.LEFT.
+           - parseAction is the parse action to be associated with 
+              expressions matching this operator expression (the
+              parse action tuple member may be omitted)
+    """
+    ret = Forward()
+    lastExpr = baseExpr | ( Suppress('(') + ret + Suppress(')') )
+    for i,operDef in enumerate(opList):
+        opExpr,arity,rightLeftAssoc,pa = (operDef + (None,))[:4]
+        thisExpr = Forward()#.setName("expr%d" % i)
+        if rightLeftAssoc == opAssoc.LEFT:
+            if arity == 1:
+                matchExpr = Group( lastExpr + ZeroOrMore( opExpr ) )
+            elif arity == 2:
+                matchExpr = Group( lastExpr + ZeroOrMore( opExpr + lastExpr ) )
+            else:
+                raise ValueError, "operator must be unary (1) or binary (2)"
+        elif rightLeftAssoc == opAssoc.RIGHT:
+            if arity == 1:
+                # try to avoid LR with this extra test
+                if not isinstance(opExpr, Optional):
+                    opExpr = Optional(opExpr)
+                matchExpr = FollowedBy(opExpr.expr + thisExpr) + Group( opExpr + thisExpr ) 
+                matchExpr |= lastExpr
+            elif arity == 2:
+                matchExpr = Group( lastExpr + ZeroOrMore( opExpr + thisExpr ) )
+            else:
+                raise ValueError, "operator must be unary (1) or binary (2)"
+        else:
+            raise ValueError, "operator must indicate right or left associativity"
+        if pa:
+            matchExpr.setParseAction( pa )
+        thisExpr << ( matchExpr )
+        lastExpr = thisExpr
+    ret << lastExpr
+    ret.setParseAction(_flattenOpPrecTokens)
+    return Group(ret)
+
+dblQuotedString = Regex(r'"(?:[^"\n\r\\]|(?:"")|(?:\\.))*"').setName("string enclosed in double quotes")
+sglQuotedString = Regex(r"'(?:[^'\n\r\\]|(?:'')|(?:\\.))*'").setName("string enclosed in single quotes")
+quotedString = Regex(r'''(?:"(?:[^"\n\r\\]|(?:"")|(?:\\.))*")|(?:'(?:[^'\n\r\\]|(?:'')|(?:\\.))*')''').setName("quotedString using single or double quotes")
+
+def nestedExpr(opener="(", closer=")", content=None, ignoreExpr=quotedString):
+    """Helper method for defining nested lists enclosed in opening and closing
+       delimiters ("(" and ")" are the default).
+       
+       Parameters:
+        - opener - opening character for a nested list (default="("); can also be a pyparsing expression
+        - closer - closing character for a nested list (default=")"); can also be a pyparsing expression
+        - content - expression for items within the nested lists (default=None)
+        - ignoreExpr - expression for ignoring opening and closing delimiters (default=quotedString)
+       
+       If an expression is not provided for the content argument, the nested
+       expression will capture all whitespace-delimited content between delimiters
+       as a list of separate values.
+       
+       Use the ignoreExpr argument to define expressions that may contain 
+       opening or closing characters that should not be treated as opening
+       or closing characters for nesting, such as quotedString or a comment
+       expression.  Specify multiple expressions using an Or or MatchFirst.
+       The default is quotedString, but if no expressions are to be ignored,
+       then pass None for this argument.
+    """
+    if opener == closer:
+        raise ValueError("opening and closing strings cannot be the same")
+    if content is None:
+        if isinstance(opener,basestring) and isinstance(closer,basestring):
+            content = (empty+CharsNotIn(opener+closer+ParserElement.DEFAULT_WHITE_CHARS).setParseAction(lambda t:t[0].strip()))
+        else:
+            raise ValueError("opening and closing arguments must be strings if no content expression is given")
+    ret = Forward()
+    if ignoreExpr is not None:
+        ret << ZeroOrMore( ignoreExpr | content | Group( Suppress(opener) + ret + Suppress(closer) ) )
+    else:
+        ret << ZeroOrMore( content | Group( Suppress(opener) + ret + Suppress(closer) ) )
+    return ret
+
+alphas8bit = srange(r"[\0xc0-\0xd6\0xd8-\0xf6\0xf8-\0xff]")
+punc8bit = srange(r"[\0xa1-\0xbf\0xd7\0xf7]")
+
+anyOpenTag,anyCloseTag = makeHTMLTags(Word(alphas,alphanums+"_:"))
+commonHTMLEntity = Combine("&" + oneOf("gt lt amp nbsp quot").setResultsName("entity") +";")
+_htmlEntityMap = dict(zip("gt lt amp nbsp quot".split(),"><& '"))
+replaceHTMLEntity = lambda t : t.entity in _htmlEntityMap and _htmlEntityMap[t.entity] or None
+    
 # it's easy to get these comment structures wrong - they're very common, so may as well make them available
-cStyleComment = Combine( Literal("/*") +
-                         ZeroOrMore( CharsNotIn("*") | ( "*" + ~Literal("/") ) ) +
-                         Literal("*/") ).streamline().setName("cStyleComment enclosed in /* ... */")
-htmlComment = Combine( Literal("<!--") + ZeroOrMore( CharsNotIn("-") | 
-                                                   (~Literal("-->") + Literal("-").leaveWhitespace() ) ) + 
-                        Literal("-->") ).streamline().setName("htmlComment enclosed in <!-- ... -->")
-restOfLine = Optional( CharsNotIn( "\n\r" ), default="" ).setName("rest of line up to \\n").leaveWhitespace()
-dblSlashComment = "//" + restOfLine
-cppStyleComment = FollowedBy("/") + ( dblSlashComment | cStyleComment )
+cStyleComment = Regex(r"/\*(?:[^*]*\*+)+?/").setName("C style comment")
+
+htmlComment = Regex(r"<!--[\s\S]*?-->")
+restOfLine = Regex(r".*").leaveWhitespace()
+dblSlashComment = Regex(r"\/\/(\\\n|.)*").setName("// comment")
+cppStyleComment = Regex(r"/(?:\*(?:[^*]*\*+)+?/|/[^\n]*(?:\n[^\n]*)*?(?:(?<!\\)|\Z))").setName("C++ style comment")
+
 javaStyleComment = cppStyleComment
-pythonStyleComment = "#" + restOfLine
+pythonStyleComment = Regex(r"#.*").setName("Python style comment")
 _noncomma = "".join( [ c for c in printables if c != "," ] )
 _commasepitem = Combine(OneOrMore(Word(_noncomma) + 
                                   Optional( Word(" \t") + 
@@ -2322,9 +3195,9 @@ if __name__ == "__main__":
     fromToken      = CaselessLiteral( "from" )
 
     ident          = Word( alphas, alphanums + "_$" )
-    columnName     = Upcase( delimitedList( ident, ".", combine=True ) )
+    columnName     = delimitedList( ident, ".", combine=True ).setParseAction( upcaseTokens )
     columnNameList = Group( delimitedList( columnName ) )#.setName("columns")
-    tableName      = Upcase( delimitedList( ident, ".", combine=True ) )
+    tableName      = delimitedList( ident, ".", combine=True ).setParseAction( upcaseTokens )
     tableNameList  = Group( delimitedList( tableName ) )#.setName("tables")
     simpleSQL      = ( selectToken + \
                      ( '*' | columnNameList ).setResultsName( "columns" ) + \

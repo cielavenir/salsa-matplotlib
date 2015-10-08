@@ -1,5 +1,5 @@
 from __future__ import division
-import sys
+import sys, re
 from cbook import iterable, flatten
 from transforms import identity_transform
 import matplotlib.units as units
@@ -42,11 +42,39 @@ class Artist:
         self._lod = False
         self._label = ''
         self._picker = None
+        self._contains = None
 
         self.eventson = False  # fire events only if eventson
         self._oid = 0  # an observer id
         self._propobservers = {} # a dict from oids to funcs
         self.axes = None
+        self._remove_method = None
+
+    def remove(self):
+        """
+        Remove the artist from the figure if possible.  The effect will not
+        be visible until the figure is redrawn, e.g., with ax.draw_idle().
+        Call ax.relim() to update the axes limits if desired.
+
+        Note: relim() will not see collections even if the collection
+        was added to axes with autolim=True.
+
+        Note: there is no support for removing the artist's legend entry.
+        """
+
+        # There is no method to set the callback.  Instead the parent should set
+        # the _remove_method attribute directly.  This would be a protected
+        # attribute if Python supported that sort of thing.  The callback
+        # has one parameter, which is the child to be removed.
+        if self._remove_method != None:
+            self._remove_method(self)
+        else:
+            raise NotImplementedError('cannot remove artist')
+        # TODO: the fix for the collections relim problem is to move the
+        # limits calculation into the artist itself, including the property
+        # of whether or not the artist should affect the limits.  Then there
+        # will be no distinction between axes.add_line, axes.add_patch, etc.
+        # TODO: add legend support
 
     def have_units(self):
         'return True if units are set on the x or y axes'
@@ -59,7 +87,7 @@ class Artist:
         """for artists in an axes, if the xaxis as units support,
         convert x using xaxis unit type
         """
-        ax = getattr(self, 'axes', None)        
+        ax = getattr(self, 'axes', None)
         if ax is None or ax.xaxis is None:
             #print 'artist.convert_xunits no conversion: ax=%s'%ax
             return x
@@ -69,7 +97,7 @@ class Artist:
         """for artists in an axes, if the yaxis as units support,
         convert y using yaxis unit type
         """
-        ax = getattr(self, 'axes', None)        
+        ax = getattr(self, 'axes', None)
         if ax is None or ax.yaxis is None: return y
         return ax.yaxis.convert_units(y)
 
@@ -120,6 +148,49 @@ class Artist:
             self._transform = identity_transform()
         return self._transform
 
+    def hitlist(self,event):
+        """List the children of the artist which contain the mouse event"""
+        import traceback
+        L = []
+        try:
+            hascursor,info = self.contains(event)
+            if hascursor:
+                L.append(self)
+        except:
+            traceback.print_exc()
+            print "while checking",self.__class__
+
+        if hasattr(self,'get_children'):
+            for a in self.get_children(): L.extend(a.hitlist(event))
+        return L
+
+    def contains(self,mouseevent):
+        """Test whether the artist contains the mouse event.
+
+        Returns the truth value and a dictionary of artist specific details of
+        selection, such as which points are contained in the pick radius.  See
+        individual artists for details.
+        """
+        if callable(self._contains): return self._contains(self,mouseevent)
+        #raise NotImplementedError,str(self.__class__)+" needs 'contains' method"
+        print str(self.__class__)+" needs 'contains' method"
+        return False,{}
+
+    def set_contains(self,picker):
+        """Replace the contains test used by this artist. The new picker should
+        be a callable function which determines whether the artist is hit by the
+        mouse event:
+
+            hit, props = picker(artist, mouseevent)
+
+        If the mouse event is over the artist, return hit=True and props
+        is a dictionary of properties you want returned with the contains test.
+        """
+        self._contains = picker
+
+    def get_contains(self):
+        'return the _contains test used by the artist, or None for default.'
+        return self._contains
 
     def pickable(self):
         'return True if self is pickable'
@@ -129,11 +200,24 @@ class Artist:
 
     def pick(self, mouseevent):
         """
-        the user picked location x,y; if this Artist is within picker
-        "pick epsilon" of x,y fire off a pick event
+        pick(mouseevent)
+
+        each child artist will fire a pick event if mouseevent is over
+        the artist and the artist has picker set
         """
-        # if mouseevent x, y are within picker call self.figure.canvas.pick_event(self, mouseevent)
-        pass
+        # Pick self
+        if self.pickable():
+            picker = self.get_picker()
+            if callable(picker):
+                inside,prop = picker(self,mouseevent)
+            else:
+                inside,prop = self.contains(mouseevent)
+            if inside:
+                self.figure.canvas.pick_event(mouseevent, self, **prop)
+
+        # Pick children
+        if hasattr(self,'get_children'):
+            for a in self.get_children(): a.pick(mouseevent)
 
     def set_picker(self, picker):
         """
@@ -367,7 +451,7 @@ class Artist:
 
 class ArtistInspector:
     """
-    A helper class to insect an Artist and return information about
+    A helper class to inspect an Artist and return information about
     it's settable properties and their current values
     """
     def __init__(self, o):
@@ -400,6 +484,7 @@ class ArtistInspector:
             aliases[fullname[4:]] = name[4:]
         return aliases
 
+    _get_valid_values_regex = re.compile(r"\n\s*ACCEPTS:\s*(.*)\n")
     def get_valid_values(self, attr):
         """
         get the legal arguments for the setter associated with attr
@@ -421,10 +506,10 @@ class ArtistInspector:
 
         if docstring.startswith('alias for '):
             return None
-        for line in docstring.split('\n'):
-            line = line.lstrip()
-            if not line.startswith('ACCEPTS:'): continue
-            return line[8:].strip()
+
+        match = self._get_valid_values_regex.search(docstring)
+        if match is not None:
+            return match.group(1)
         return 'unknown'
 
     def get_setters(self):
@@ -504,7 +589,7 @@ class ArtistInspector:
             if self.is_alias(func): continue
             try: val = func()
             except: continue
-            if hasattr(val, 'shape') and len(val)>6:
+            if getattr(val, 'shape', ()) != () and len(val)>6:
                 s = str(val[:6]) + '...'
             else:
                 s = str(val)
@@ -623,7 +708,7 @@ def setp(h, *args, **kwargs):
     return [x for x in flatten(ret)]
 
 def kwdoc(a):
-    return '\n'.join(ArtistInspector(a).pprint_setters(leadingspace=8))
+    return '\n'.join(ArtistInspector(a).pprint_setters(leadingspace=4))
 
 kwdocd = dict()
 kwdocd['Artist'] = kwdoc(Artist)

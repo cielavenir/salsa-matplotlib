@@ -1,12 +1,12 @@
-#!/usr/bin/env python
-'''$Id: tzinfo.py 540 2004-09-24 15:24:50Z jdh2358 $'''
-
-__rcs_id__  = '$Id: tzinfo.py 540 2004-09-24 15:24:50Z jdh2358 $'
-__version__ = '$Revision: 540 $'[11:-2]
+'''Base classes and helpers for building zone specific tzinfo classes'''
 
 from datetime import datetime, timedelta, tzinfo
 from bisect import bisect_right
 from sets import Set
+
+import pytz
+
+__all__ = []
 
 _timedelta_cache = {}
 def memorized_timedelta(seconds):
@@ -18,14 +18,17 @@ def memorized_timedelta(seconds):
         _timedelta_cache[seconds] = delta
         return delta
 
-_datetime_cache = {}
-def memorized_datetime(*args):
+_epoch = datetime.utcfromtimestamp(0)
+_datetime_cache = {0: _epoch}
+def memorized_datetime(seconds):
     '''Create only one instance of each distinct datetime'''
     try:
-        return _datetime_cache[args]
+        return _datetime_cache[seconds]
     except KeyError:
-        dt = datetime(*args)
-        _datetime_cache[args] = dt
+        # NB. We can't just do datetime.utcfromtimestamp(seconds) as this
+        # fails with negative values under Windows (Bug #90096)
+        dt = _epoch + timedelta(seconds=seconds)
+        _datetime_cache[seconds] = dt
         return dt
 
 _ttinfo_cache = {}
@@ -44,22 +47,26 @@ def memorized_ttinfo(*args):
 
 _notime = memorized_timedelta(0)
 
+def _to_seconds(td):
+    '''Convert a timedelta to seconds'''
+    return td.seconds + td.days * 24 * 60 * 60
+
+
 class BaseTzInfo(tzinfo):
     # Overridden in subclass
     _utcoffset = None
     _tzname = None
-    _zone = None
+    zone = None
 
     def __str__(self):
-        return self._zone
-    
+        return self.zone
+
 
 class StaticTzInfo(BaseTzInfo):
     '''A timezone that has a constant offset from UTC
 
     These timezones are rare, as most regions have changed their
     offset from UTC at some point in their history
-
     '''
     def fromutc(self, dt):
         '''See datetime.tzinfo.fromutc'''
@@ -90,7 +97,12 @@ class StaticTzInfo(BaseTzInfo):
         return dt.replace(tzinfo=self)
 
     def __repr__(self):
-        return '<StaticTzInfo %r>' % (self._zone,)
+        return '<StaticTzInfo %r>' % (self.zone,)
+
+    def __reduce__(self):
+        # Special pickle to zone remains a singleton and to cope with
+        # database changes. 
+        return pytz._p, (self.zone,)
 
 
 class DstTzInfo(BaseTzInfo):
@@ -105,7 +117,7 @@ class DstTzInfo(BaseTzInfo):
     _utc_transition_times = None # Sorted list of DST transition times in UTC
     _transition_info = None # [(utcoffset, dstoffset, tzname)] corresponding
                             # to _utc_transition_times entries
-    _zone = None
+    zone = None
 
     # Set in __init__
     _tzinfos = None
@@ -289,12 +301,23 @@ class DstTzInfo(BaseTzInfo):
             dst = 'STD'
         if self._utcoffset > _notime:
             return '<DstTzInfo %r %s+%s %s>' % (
-                    self._zone, self._tzname, self._utcoffset, dst
+                    self.zone, self._tzname, self._utcoffset, dst
                 )
         else:
             return '<DstTzInfo %r %s%s %s>' % (
-                    self._zone, self._tzname, self._utcoffset, dst
+                    self.zone, self._tzname, self._utcoffset, dst
                 )
+
+    def __reduce__(self):
+        # Special pickle to zone remains a singleton and to cope with
+        # database changes.
+        return pytz._p, (
+                self.zone,
+                _to_seconds(self._utcoffset),
+                _to_seconds(self._dst),
+                self._tzname
+                )
+
 
 class AmbiguousTimeError(Exception):
     '''Exception raised when attempting to create an ambiguous wallclock time.
@@ -304,7 +327,56 @@ class AmbiguousTimeError(Exception):
     possibilities may be correct, unless further information is supplied.
 
     See DstTzInfo.normalize() for more info
-
     '''
        
+
+def unpickler(zone, utcoffset=None, dstoffset=None, tzname=None):
+    """Factory function for unpickling pytz tzinfo instances.
+    
+    This is shared for both StaticTzInfo and DstTzInfo instances, because
+    database changes could cause a zones implementation to switch between
+    these two base classes and we can't break pickles on a pytz version
+    upgrade.
+    """
+    # Raises a KeyError if zone no longer exists, which should never happen
+    # and would be a bug.
+    tz = pytz.timezone(zone)
+
+    # A StaticTzInfo - just return it
+    if utcoffset is None:
+        return tz
+
+    # This pickle was created from a DstTzInfo. We need to
+    # determine which of the list of tzinfo instances for this zone
+    # to use in order to restore the state of any datetime instances using
+    # it correctly.
+    utcoffset = memorized_timedelta(utcoffset)
+    dstoffset = memorized_timedelta(dstoffset)
+    try:
+        return tz._tzinfos[(utcoffset, dstoffset, tzname)]
+    except KeyError:
+        # The particular state requested in this timezone no longer exists.
+        # This indicates a corrupt pickle, or the timezone database has been
+        # corrected violently enough to make this particular
+        # (utcoffset,dstoffset) no longer exist in the zone, or the
+        # abbreviation has been changed.
+        pass
+
+    # See if we can find an entry differing only by tzname. Abbreviations
+    # get changed from the initial guess by the database maintainers to
+    # match reality when this information is discovered.
+    for localized_tz in tz._tzinfos.values():
+        if (localized_tz._utcoffset == utcoffset
+                and localized_tz._dst == dstoffset):
+            return localized_tz
+
+    # This (utcoffset, dstoffset) information has been removed from the
+    # zone. Add it back. This might occur when the database maintainers have
+    # corrected incorrect information. datetime instances using this
+    # incorrect information will continue to do so, exactly as they were
+    # before being pickled. This is purely an overly paranoid safety net - I
+    # doubt this will ever been needed in real life.
+    inf = (utcoffset, dstoffset, tzname)
+    tz._tzinfos[inf] = tz.__class__(inf, tz._tzinfos)
+    return tz._tzinfos[inf]
 

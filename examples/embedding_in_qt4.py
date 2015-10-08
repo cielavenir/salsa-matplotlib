@@ -12,7 +12,7 @@
 import sys, os, random
 from PyQt4 import QtGui, QtCore
 
-from matplotlib.numerix import arange, sin, pi
+from numpy import arange, sin, pi
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -29,7 +29,7 @@ class MyMplCanvas(FigureCanvas):
         self.axes.hold(False)
 
         self.compute_initial_figure()
-        
+
         FigureCanvas.__init__(self, self.fig)
         self.setParent(parent)
 
@@ -80,7 +80,7 @@ class ApplicationWindow(QtGui.QMainWindow):
         self.setWindowTitle("application main window")
 
         self.file_menu = QtGui.QMenu('&File', self)
-        self.file_menu.addAction('&Quit', self.fileQuit, 
+        self.file_menu.addAction('&Quit', self.fileQuit,
                                  QtCore.Qt.CTRL + QtCore.Qt.Key_Q)
         self.menuBar().addMenu(self.file_menu)
 
@@ -122,17 +122,10 @@ modified versions may be distributed without limitation."""
 % {"prog": progname, "version": progversion})
 
 
-def main():
-    # Note: color-intensive applications may require a different color
-    # allocation strategy.
-    QtGui.QApplication.setColorSpec(QtGui.QApplication.NormalColor)
-    qApp = QtGui.QApplication(sys.argv)
-    
-    aw = ApplicationWindow()
-    aw.setWindowTitle("%s" % progname)
-    aw.show()
-#    sys.exit(qApp.exec_())
-    qApp.exec_()
+qApp = QtGui.QApplication(sys.argv)
 
-
-if __name__ == "__main__": main()
+aw = ApplicationWindow()
+aw.setWindowTitle("%s" % progname)
+aw.show()
+sys.exit(qApp.exec_())
+#qApp.exec_()

@@ -8,7 +8,6 @@ import os, sys
 import matplotlib.agg as agg
 
 from matplotlib import verbose
-from matplotlib.numerix import array, Float
 
 from matplotlib._pylab_helpers import Gcf
 from matplotlib.backend_bases import RendererBase,\
@@ -16,19 +15,11 @@ from matplotlib.backend_bases import RendererBase,\
 
 from matplotlib.cbook import enumerate, is_string_like, exception_to_str
 from matplotlib.figure import Figure
-from matplotlib.font_manager import fontManager
 from matplotlib.ft2font import FT2Font
-from matplotlib.mathtext import math_parse_s_ft2font
+from matplotlib.mathtext import MathTextParser
 
 
-import matplotlib.numerix
-
-if matplotlib.numerix.which[0] == "numarray":
-    from _na_backend_agg import RendererAgg as _RendererAgg
-elif matplotlib.numerix.which[0] == "numeric":
-    from _nc_backend_agg import RendererAgg as _RendererAgg
-else:
-    from _ns_backend_agg import RendererAgg as _RendererAgg
+from _backend_agg import RendererAgg as _RendererAgg
 
 backend_version = 'v2.2'
 _fontd = {}     # a map from fname to font instances

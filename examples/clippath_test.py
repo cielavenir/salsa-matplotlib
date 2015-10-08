@@ -1,8 +1,9 @@
-from pylab import figure, show, nx
+from matplotlib.pyplot import figure, show
 import matplotlib.transforms as transforms
 from matplotlib.patches import RegularPolygon
 import matplotlib.agg as agg
-
+from numpy import arange, sin, pi
+from numpy.random import rand
 
 class ClipWindow:
     def __init__(self, ax, line):
@@ -18,19 +19,19 @@ class ClipWindow:
         ax.add_patch(self.poly)
         self.canvas.mpl_connect('button_press_event', self.onpress)
         self.canvas.mpl_connect('button_release_event', self.onrelease)
-        self.canvas.mpl_connect('motion_notify_event', self.onmove)        
+        self.canvas.mpl_connect('motion_notify_event', self.onmove)
         self.x, self.y = None, None
 
 
     def onpress(self, event):
         self.x, self.y = event.x, event.y
-        
+
     def onrelease(self, event):
         self.x, self.y = None, None
 
     def onmove(self, event):
 
-        if self.x is None: return 
+        if self.x is None: return
         dx = event.x - self.x
         dy = event.y - self.y
         self.x, self.y = event.x, event.y
@@ -54,13 +55,13 @@ class ClipWindow:
         path.close_polygon()
         self.line.set_clip_path(path)
         self.canvas.draw_idle()
-        
+
 
 fig = figure(figsize=(8,8))
 ax = fig.add_subplot(111)
-t = nx.arange(0.0, 4.0, 0.01)
-s = 2*nx.sin(2*nx.pi*8*t)
+t = arange(0.0, 4.0, 0.01)
+s = 2*sin(2*pi*8*t)
 
-line, = ax.plot(t, 2*(nx.mlab.rand(len(t))-0.5), 'b-')
+line, = ax.plot(t, 2*(rand(len(t))-0.5), 'b-')
 clipwin = ClipWindow(ax, line)
 show()
