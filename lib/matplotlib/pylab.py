@@ -51,6 +51,7 @@ _Plotting commands
   loglog   - a log log plot
   matshow  - display a matrix in a new figure preserving aspect
   pcolor   - make a pseudocolor plot
+  pcolormesh - make a pseudocolor plot using a quadrilateral mesh
   pie      - make a pie chart
   plot     - make a line plot
   plot_date - plot dates
@@ -190,15 +191,13 @@ John D. Hunter <jdhunter@ace.bsd.uhicago.edu>
 Most of the other commands are from Numeric, MLab and FFT, with the
 exception of those in mlab.py provided by matplotlib.
 """
-import warnings
+import sys, warnings
 import cm
 import _pylab_helpers
 import mlab  #so I can override hist, psd, etc...
 
 from axes import Axes, PolarAxes
 import backends
-from backends import new_figure_manager, draw_if_interactive, show
-
 from cbook import flatten, is_string_like, exception_to_str, popd, \
      silent_list, iterable, enumerate
 from colors import normalize
@@ -210,6 +209,13 @@ from backend_bases import FigureCanvasBase
 from artist import ArtistInspector, getp, get
 from artist import setp as _setp
 
+# a hack to keep old versions of ipython working with mpl after bug
+# fix #1209354
+if 'IPython.Shell' in  sys.modules:
+    from backends import new_figure_manager, draw_if_interactive, show
+else:
+    from backends import pylab_setup
+    new_figure_manager, draw_if_interactive, show = pylab_setup()
 
 
 
@@ -226,7 +232,7 @@ import numerix as nx
 # eg a bad pytz install.  I don't want to break all of matplotlib for
 # date support
 try:
-    from dates import date2num, num2date, drange, epoch2num, num2epoch, mx2num,\
+    from dates import date2num, num2date, datestr2num, drange, epoch2num, num2epoch, mx2num,\
             DateFormatter, IndexDateFormatter, DateLocator,\
             RRuleLocator, YearLocator, MonthLocator, WeekdayLocator,\
             DayLocator, HourLocator, MinuteLocator, SecondLocator,\
@@ -258,7 +264,11 @@ from numerix import Int8, UInt8, Int16, UInt16, Int32, UInt32, Float32, Float64,
 from matplotlib.numerix.fft import fft
 from matplotlib.numerix.linear_algebra import inverse, eigenvectors
 
-from matplotlib.numerix.mlab import rand,randn,eye,tri,diag,fliplr,flipud,rot90,tril,triu,ptp,mean,msort,median,std,cumsum,prod,cumprod,trapz,diff,cov,corrcoef,squeeze,kaiser,blackman,bartlett,hanning,hamming,sinc,eig,svd,angle,roots,amin,  amax
+#from matplotlib.numerix.mlab import rand,randn,eye,tri,diag,fliplr,flipud,rot90,tril,triu,ptp,mean,msort,median,std,cumsum,prod,cumprod,trapz,diff,cov,corrcoef,squeeze,kaiser,blackman,bartlett,hanning,hamming,sinc,eig,svd,angle,roots,amin,  amax
+
+pymin, pymax = min, max
+from matplotlib.numerix.mlab import *
+min, max = pymin, pymax
 
 from matplotlib.mlab import linspace, window_hanning, window_none, conv, detrend, detrend_mean, detrend_none, detrend_linear, corrcoef, polyfit, polyval, vander, entropy, normpdf, levypdf, find, trapz, prepca, fix, rem, norm, orth, rank, sqrtm, prctile, center_matrix, meshgrid, rk4, exp_safe, amap, sum_flat, mean_flat, rms_flat, l1norm, l2norm, norm, frange, diagonal_matrix, base_repr, binary_repr, log2, ispower2, bivariate_normal
 
@@ -301,25 +311,64 @@ def _shift_string(s):
     return ''.join(lines)
 
 
-def colorbar(tickfmt='%1.1f', cax=None, orientation='vertical'):
+def colorbar(mappable = None,
+             cax=None,
+             orientation='vertical',
+             tickfmt='%1.1f',
+             cspacing='proportional',
+             clabels=None,
+             drawedges=False,
+             edgewidth=0.5,
+             edgecolor='k'):
     """
-    Create a colorbar for current image
-    
+    Create a colorbar for mappable; if mappable is None,
+    use current image.
+
     tickfmt is a format string to format the colorbar ticks
 
     cax is a colorbar axes instance in which the colorbar will be
     placed.  If None, as default axesd will be created resizing the
     current aqxes to make room for it.  If not None, the supplied axes
     will be used and the other axes positions will be unchanged.
-    
+
     orientation is the colorbar orientation: one of 'vertical' | 'horizontal'
+
+    cspacing controls how colors are distributed on the colorbar.
+    if cspacing == 'linear', each color occupies an equal area
+    on the colorbar, regardless of the contour spacing.
+    if cspacing == 'proportional' (Default), the area each color
+    occupies on the the colorbar is proportional to the contour interval.
+    Only relevant for a Contour image.
+
+    clabels can be a sequence containing the
+    contour levels to be labelled on the colorbar, or None (Default).
+    If clabels is None, labels for all contour intervals are
+    displayed. Only relevant for a Contour image.
+
+    if drawedges == True, lines are drawn at the edges between
+    each color on the colorbar. Default False.
+
+    edgecolor is the line color delimiting the edges of the colors
+    on the colorbar (if drawedges == True). Default black ('k')
+
+    edgewidth is the width of the lines delimiting the edges of
+    the colors on the colorbar (if drawedges == True). Default 0.5
+
     return value is the colorbar axes instance
     """
-    mappable = gci()
-    ret = gcf().colorbar(mappable, tickfmt, cax, orientation)
+    if mappable is None:
+        mappable = gci()
+    ret = gcf().colorbar(mappable, cax = cax,
+                         orientation = orientation,
+                         tickfmt = tickfmt,
+                         cspacing=cspacing,
+                         clabels=clabels,
+                         drawedges=drawedges,
+                         edgewidth=edgewidth,
+                         edgecolor=edgecolor)
     draw_if_interactive()
     return ret
-    
+
 def colors():
     """
     This is a do nothing function to provide you with help on how
@@ -472,18 +521,18 @@ def get_current_fig_manager():
 def connect(s, func):
     return get_current_fig_manager().canvas.mpl_connect(s, func)
 if FigureCanvasBase.mpl_connect.__doc__ is not None:
-    connect.__doc__ = FigureCanvasBase.mpl_connect.__doc__
+    connect.__doc__ = _shift_string(FigureCanvasBase.mpl_connect.__doc__)
 
 def disconnect(cid):
     return get_current_fig_manager().canvas.mpl_disconnect(cid)
 if FigureCanvasBase.mpl_disconnect.__doc__ is not None:
-    disconnect.__doc__ = FigureCanvasBase.mpl_disconnect.__doc__
+    disconnect.__doc__ = _shift_string(FigureCanvasBase.mpl_disconnect.__doc__)
 
 def get_plot_commands(): return ( 'axes', 'axis', 'bar', 'boxplot', 'cla', 'clf',
     'close', 'colorbar', 'cohere', 'csd', 'draw', 'errorbar',
     'figlegend', 'figtext', 'figimage', 'figure', 'fill', 'gca',
     'gcf', 'gci', 'get', 'gray', 'barh', 'jet', 'hist', 'hold', 'imread',
-    'imshow', 'legend', 'loglog', 'quiver', 'rc', 'pcolor', 'plot', 'psd',
+    'imshow', 'legend', 'loglog', 'quiver', 'rc', 'pcolor', 'pcolormesh', 'plot', 'psd',
     'savefig', 'scatter', 'set', 'semilogx', 'semilogy', 'show',
     'specgram', 'stem', 'subplot', 'table', 'text', 'title', 'xlabel',
     'ylabel', 'pie', 'polar')
@@ -498,7 +547,6 @@ def raise_msg_to_str(msg):
 
 
 
-
 def axis(*v, **kwargs):
     """
     Set/Get the axis properties::
@@ -510,9 +558,22 @@ def axis(*v, **kwargs):
 
         axis('off') turns off the axis lines and labels
 
-        axis('equal') sets the xlim width and ylim height to be to be
-            identical.  The longer of the two intervals is chosen
+        axis('equal') changes limits of x or y axis such that equal
+          tick mark increments are equal in size. This makes a
+          circle look like a circle, for example. This is persistent.
+          For example, when axis limits are changed after this command,
+          the scale remains equal
 
+        axis('scaled') makes scale equal, changes lengths of axes while
+          keeping limits of x and y axes fixed. Keeps lower left hand corner
+          in original position. Fixes axis limits.
+
+        axis('tight') changes limits x and y axis such that all data is
+          shown. If all data is already shown, it will move it to the center
+          of the figure without modifying (xmax-xmin) or (ymax-ymin). Note
+          this is slightly different than in matlab. Fixes axis limits.
+
+        axis('normal') sets the axis to normal, i.e. turns equal scale off
 
        if len(*v)==0, you can pass in xmin, xmax, ymin, ymax as kwargs
        selectively to alter just those limits w/o changing the others.
@@ -521,47 +582,49 @@ def axis(*v, **kwargs):
        The xmin, xmax, ymin, ymax tuple is returned
 
     """
-
+    ax = gca()
     if len(v)==1 and is_string_like(v[0]):
         s = v[0]
-        if s.lower()=='on': gca().set_axis_on()
-        elif s.lower()=='off': gca().set_axis_off()
+        if s.lower()=='on': ax.set_axis_on()
+        elif s.lower()=='off': ax.set_axis_off()
         elif s.lower()=='equal':
-            ax = gca()
-            xmin, xmax = ax.get_xlim()
-            ymin, ymax = ax.get_ylim()
-
-            width = xmax-xmin
-            height = ymax-ymin
-            # TODO: handle decreasing lim
-
-            interval = max([width, height])
-            ax.set_xlim((xmin, xmin+interval))
-            ax.set_ylim((ymin, ymin+interval))
+            ax.set_aspect('equal')
             draw_if_interactive()
-
+        elif s.lower()=='tight':
+            ax.autoscale_view()
+            ax.set_autoscale_on(False)
+            draw_if_interactive()
+        elif s.lower()=='scaled':
+            ax.set_autoscale_on(False)
+            ax.set_aspect('scaled',True)
+            draw_if_interactive()
+        elif s.lower()=='normal':
+            ax.set_autoscale_on(True)
+            ax.set_aspect('normal')
         else:
             raise ValueError('Unrecognized string %s to axis; try on or off' % s)
-        ax  = gca()
-        xmin, xmax = ax.get_xlim() 
+        xmin, xmax = ax.get_xlim()
         ymin, ymax = ax.get_ylim()
         draw_if_interactive()
         return xmin, xmax, ymin, ymax
 
     try: v[0]
     except IndexError:
-        xmin, xmax = gca().set_xlim(**kwargs)
-        ymin, ymax = gca().set_ylim(**kwargs)
+        xmin, xmax = ax.set_xlim(**kwargs)
+        ymin, ymax = ax.set_ylim(**kwargs)
         draw_if_interactive()
         return [xmin, xmax, ymin, ymax]
 
     v = v[0]
     if len(v) != 4:
         raise ValueError('v must contain [xmin xmax ymin ymax]')
-    
-    
-    gca().set_xlim([v[0], v[1]])
-    gca().set_ylim([v[2], v[3]])
+
+
+    ax.set_xlim([v[0], v[1]])
+    ax.set_ylim([v[2], v[3]])
+    if ax.get_aspect() == 'equal':
+        ax.set_aspect( 'equal', True )
+
     draw_if_interactive()
     return v
 
@@ -584,6 +647,7 @@ def axes(*args, **kwargs):
       frameon=False  : don't display the frame
       sharex=otherax : the current axes shares xaxis attribute with otherax
       sharey=otherax : the current axes shares yaxis attribute with otherax
+      polar=True|False : use a polar axes or not
 
     Examples
 
@@ -714,7 +778,7 @@ def figtext(*args, **kwargs):
     draw_if_interactive()
     return ret
 if Figure.text.__doc__ is not None:
-    figtext.__doc__ = Figure.text.__doc__
+    figtext.__doc__ = _shift_string(Figure.text.__doc__)
 
 def figimage(*args, **kwargs):
     # allow callers to override the hold state by passing hold=True|False
@@ -723,7 +787,7 @@ def figimage(*args, **kwargs):
     gci._current = ret
     return ret
 if Figure.figimage.__doc__ is not None:
-    figimage.__doc__ = Figure.figimage.__doc__ + """
+    figimage.__doc__ = _shift_string(Figure.figimage.__doc__) + """
 Addition kwargs: hold = [True|False] overrides default hold state"""
 
 def figlegend(handles, labels, loc, **kwargs):
@@ -750,7 +814,7 @@ def savefig(*args, **kwargs):
     fig = gcf()
     return fig.savefig(*args, **kwargs)
 if Figure.savefig.__doc__ is not None:
-    savefig.__doc__ = Figure.savefig.__doc__
+    savefig.__doc__ = _shift_string(Figure.savefig.__doc__)
 
 
 def figure(num=None, # autoincrement if None, else integer from 1-N
@@ -803,7 +867,8 @@ def figure(num=None, # autoincrement if None, else integer from 1-N
         figManager = new_figure_manager(num, figsize, dpi, facecolor, edgecolor, frameon)
         _pylab_helpers.Gcf.set_active(figManager)
         figManager.canvas.figure.number = num
-        
+
+    draw_if_interactive()
     return figManager.canvas.figure
 
 def gca(**kwargs):
@@ -883,10 +948,10 @@ def isinteractive():
 def imread(*args, **kwargs):
     return _imread(*args, **kwargs)
 if _imread.__doc__ is not None:
-    imread.__doc__ = _imread.__doc__
+    imread.__doc__ = _shift_string(_imread.__doc__)
 
 
-def load(fname,comments='%',delimiter=None):
+def load(fname,comments='%',delimiter=None, converters=None,skiprows=0):
     """
     Load ASCII data from fname into an array and return the array.
 
@@ -915,13 +980,19 @@ def load(fname,comments='%',delimiter=None):
 
     comments is the character used to indicate the start of a comment
     in the file
-    
+
     delimiter is a string-like character used to seperate values in the
-    file. If delimiter is unspecified or none, any whitespace string is 
+    file. If delimiter is unspecified or none, any whitespace string is
     a separator.
 
+    converters, if not None, is a dictionary mapping column number to
+    a function that will convert that column to a float.  Eg, if
+    column 0 is a date string: converters={0:datestr2num}
+
+    skiprows is the number of rows from the top to skip
     """
 
+    if converters is None: converters = {}
     if is_string_like(fname):
         if fname.endswith('.gz'):
             import gzip
@@ -934,10 +1005,11 @@ def load(fname,comments='%',delimiter=None):
         raise ValueError('fname must be a string or file handle')
     X = []
     numCols = None
-    for line in fh:
+    for i,line in enumerate(fh):
+        if i<skiprows: continue
         line = line[:line.find(comments)].strip()
         if not len(line): continue
-        row = [float(val) for val in line.split(delimiter)]
+        row = [converters.get(i,float)(val) for i,val in enumerate(line.split(delimiter))]
         thisLen = len(row)
         if numCols is not None and thisLen != numCols:
             raise ValueError('All rows must have the same number of columns')
@@ -953,15 +1025,15 @@ def load(fname,comments='%',delimiter=None):
 def rc(*args, **kwargs):
     matplotlib.rc(*args, **kwargs)
 if matplotlib.rc.__doc__ is not None:
-    rc.__doc__ =   matplotlib.rc.__doc__
+    rc.__doc__ =  _shift_string(matplotlib.rc.__doc__)
 
 def rcdefaults():
     matplotlib.rcdefaults()
     draw_if_interactive()
 if matplotlib.rcdefaults.__doc__ is not None:
-    rcdefaults.__doc__ =   matplotlib.rcdefaults.__doc__
+    rcdefaults.__doc__ =   _shift_string(matplotlib.rcdefaults.__doc__)
 
-def save(fname, X, fmt='%.18e'):
+def save(fname, X, fmt='%.18e',delimiter=' '):
     """
     Save the data in X to file fname using fmt string to convert the
     data to strings
@@ -977,6 +1049,8 @@ def save(fname, X, fmt='%.18e'):
     save('test2.out', x)        # x is 1D
     save('test3.out', x, fmt='%1.4e')  # use exponential notation
 
+    delimiter is used to separate the fields, eg delimiter ',' for
+    comma-separated values
     """
 
     if is_string_like(fname):
@@ -997,7 +1071,7 @@ def save(fname, X, fmt='%.18e'):
         origShape = X.shape
         X.shape = len(X), 1
     for row in X:
-        fh.write(' '.join([fmt%val for val in row]) + '\n')
+        fh.write(delimiter.join([fmt%val for val in row]) + '\n')
 
     if origShape is not None:
         X.shape = origShape
@@ -1067,7 +1141,7 @@ def twinx(ax=None):
     ax2 = gcf().add_axes(ax.get_position(), sharex=ax, frameon=False)
     ax2.yaxis.tick_right()
     ax2.yaxis.set_label_position('right')
-
+    ax.yaxis.tick_left()
     draw_if_interactive()
     return ax2
 
@@ -1487,13 +1561,6 @@ def matshow(*args,**kw):
     else:
         return fig
 
-def set(*args, **kwargs):
-    message = 'set deprecated because it overrides python2.4 builtin set.  Use setp'
-    warnings.warn(message, DeprecationWarning, stacklevel=2)
-
-    return setp(*args, **kwargs)
-
-
 
 def setp(*args, **kwargs):
     ret = _setp(*args, **kwargs)
@@ -1515,14 +1582,14 @@ def subplots_adjust(*args, **kwargs):
       bottom = 0.1   # the bottom of the subplots of the figure
       top = 0.9      # the top of the subplots of the figure
       wspace = 0.2   # the amount of width reserved for blank space between subplots
-      hspace = 0.2   # the amount of height reserved for white space between subplots        
+      hspace = 0.2   # the amount of height reserved for white space between subplots
 
-    The actual defaults are controlled by the rc file    
+    The actual defaults are controlled by the rc file
     """
     fig = gcf()
     fig.subplots_adjust(*args, **kwargs)
     draw_if_interactive()
-    
+
 
 def subplot_tool(targetfig=None):
     """
@@ -1540,14 +1607,14 @@ def subplot_tool(targetfig=None):
         for manager in _pylab_helpers.Gcf._activeQue:
             if manager.canvas.figure==targetfig: break
         else: raise RuntimeError('Could not find manager for targetfig')
-    
+
     toolfig = figure(figsize=(6,3))
     toolfig.subplots_adjust(top=0.9)
     ret =  SubplotTool(targetfig, toolfig)
     rcParams['toolbar'] = tbar
     _pylab_helpers.Gcf.set_active(manager)  # restore the current figure
     return ret
-    
+
 ### The following functions were autogenerated by the boilerplate.py
 ### script.  They are simple wrappers around the Axes methods of the
 
@@ -1565,7 +1632,7 @@ def axhline(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.axhline.__doc__ is not None:
@@ -1586,7 +1653,7 @@ def axhspan(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.axhspan.__doc__ is not None:
@@ -1607,7 +1674,7 @@ def axvline(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.axvline.__doc__ is not None:
@@ -1628,7 +1695,7 @@ def axvspan(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.axvspan.__doc__ is not None:
@@ -1649,7 +1716,7 @@ def bar(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.bar.__doc__ is not None:
@@ -1670,7 +1737,7 @@ def barh(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.barh.__doc__ is not None:
@@ -1691,7 +1758,7 @@ def boxplot(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.boxplot.__doc__ is not None:
@@ -1712,7 +1779,7 @@ def cohere(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.cohere.__doc__ is not None:
@@ -1733,7 +1800,6 @@ def clabel(*args, **kwargs):
     except:
         hold(b)
         raise
-    if ret.mappable is not None: gci._current = ret.mappable
     hold(b)
     return ret
 if Axes.clabel.__doc__ is not None:
@@ -1754,7 +1820,7 @@ def contour(*args, **kwargs):
     except:
         hold(b)
         raise
-    if ret[1].mappable is not None: gci._current = ret[1].mappable
+    if ret._A is not None: gci._current = ret
     hold(b)
     return ret
 if Axes.contour.__doc__ is not None:
@@ -1775,7 +1841,7 @@ def contourf(*args, **kwargs):
     except:
         hold(b)
         raise
-    if ret[1].mappable is not None: gci._current = ret[1].mappable
+    if ret._A is not None: gci._current = ret
     hold(b)
     return ret
 if Axes.contourf.__doc__ is not None:
@@ -1796,7 +1862,7 @@ def csd(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.csd.__doc__ is not None:
@@ -1817,7 +1883,7 @@ def errorbar(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.errorbar.__doc__ is not None:
@@ -1838,7 +1904,7 @@ def fill(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.fill.__doc__ is not None:
@@ -1859,7 +1925,7 @@ def hist(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.hist.__doc__ is not None:
@@ -1880,7 +1946,7 @@ def hlines(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.hlines.__doc__ is not None:
@@ -1922,7 +1988,7 @@ def loglog(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.loglog.__doc__ is not None:
@@ -1952,6 +2018,27 @@ Addition kwargs: hold = [True|False] overrides default hold state"""
 
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
+def pcolormesh(*args, **kwargs):
+    # allow callers to override the hold state by passing hold=True|False
+    b = ishold()
+    h = popd(kwargs, 'hold', None)
+    if h is not None:
+        hold(h)
+    try:
+        ret =  gca().pcolormesh(*args, **kwargs)
+        draw_if_interactive()
+    except:
+        hold(b)
+        raise
+    gci._current = ret
+    hold(b)
+    return ret
+if Axes.pcolormesh.__doc__ is not None:
+    pcolormesh.__doc__ = _shift_string(Axes.pcolormesh.__doc__) + """
+Addition kwargs: hold = [True|False] overrides default hold state"""
+
+# This function was autogenerated by boilerplate.py.  Do not edit as
+# changes will be lost
 def pcolor_classic(*args, **kwargs):
     # allow callers to override the hold state by passing hold=True|False
     b = ishold()
@@ -1964,7 +2051,7 @@ def pcolor_classic(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.pcolor_classic.__doc__ is not None:
@@ -1985,7 +2072,7 @@ def pie(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.pie.__doc__ is not None:
@@ -2006,7 +2093,7 @@ def plot(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.plot.__doc__ is not None:
@@ -2027,7 +2114,7 @@ def plot_date(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.plot_date.__doc__ is not None:
@@ -2048,7 +2135,7 @@ def psd(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.psd.__doc__ is not None:
@@ -2090,7 +2177,7 @@ def scatter_classic(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.scatter_classic.__doc__ is not None:
@@ -2111,7 +2198,7 @@ def semilogx(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.semilogx.__doc__ is not None:
@@ -2132,7 +2219,7 @@ def semilogy(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.semilogy.__doc__ is not None:
@@ -2174,7 +2261,7 @@ def spy(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.spy.__doc__ is not None:
@@ -2216,7 +2303,7 @@ def stem(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.stem.__doc__ is not None:
@@ -2237,7 +2324,7 @@ def vlines(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.vlines.__doc__ is not None:
@@ -2258,7 +2345,7 @@ def quiver(*args, **kwargs):
     except:
         hold(b)
         raise
-    
+
     hold(b)
     return ret
 if Axes.quiver.__doc__ is not None:

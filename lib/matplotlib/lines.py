@@ -12,13 +12,12 @@ import agg
 from numerix import Float, alltrue, arange, array, logical_and,\
      nonzero, searchsorted, take, asarray, ones, where, less, ravel, \
      greater, logical_and, cos, sin, pi,\
-     compress, zeros, concatenate, cumsum
+     compress, zeros, concatenate, cumsum, typecode, NewAxis
 import numerix.ma as ma
 from matplotlib import verbose
 from artist import Artist, setp
 from cbook import iterable, is_string_like
 from colors import colorConverter
-from patches import bbox_artist
 
 from transforms import lbwh_to_bbox, LOG10
 from matplotlib import rcParams
@@ -51,14 +50,16 @@ def unmasked_index_ranges(mask, compressed = True):
     Example:
 
     y = ma.array(arange(5), mask = [0,0,1,0,0])
-    ii = unmasked_index_ranges(y.mask())
+    #ii = unmasked_index_ranges(y.mask())
+    ii = unmasked_index_ranges(ma.getmask(y))
         # returns [[0,2,] [2,4,]]
 
     y.compressed().filled()[ii[1,0]:ii[1,1]]
         # returns array [3,4,]
         # (The 'filled()' method converts the masked array to a numerix array.)
 
-    i0, i1 = unmasked_index_ranges(y.mask(), compressed=False)
+    #i0, i1 = unmasked_index_ranges(y.mask(), compressed=False)
+    i0, i1 = unmasked_index_ranges(ma.getmask(y), compressed=False)
         # returns [[0,3,] [2,5,]]
 
     y.filled()[ii[1,0]:ii[1,1]]
@@ -73,17 +74,14 @@ def unmasked_index_ranges(mask, compressed = True):
     assert len(i0) == len(i1)
     if not compressed:
         if len(i1):
-            return concatenate((i0[:, ma.NewAxis], i1[:, ma.NewAxis]), axis=1)
+            return concatenate((i0[:, NewAxis], i1[:, NewAxis]), axis=1)
         else:
             return zeros((0,0), 'i')
     seglengths = i1 - i0
     breakpoints = cumsum(seglengths)
-    try:
-        ic0 = concatenate(((0,), breakpoints[:-1]))
-        ic1 = breakpoints
-        return concatenate((ic0[:, ma.NewAxis], ic1[:, ma.NewAxis]), axis=1)
-    except:
-        return zeros((0,0), 'i')
+    ic0 = concatenate(((0,), breakpoints[:-1]))
+    ic1 = breakpoints
+    return concatenate((ic0[:, NewAxis], ic1[:, NewAxis]), axis=1)
 
 
 
@@ -131,18 +129,18 @@ class Line2D(Artist):
 
     def __init__(self, xdata, ydata,
                  linewidth       = None, # all Nones default to rc
-                 linestyle       = None, 
-                 color           = None, 
-                 marker          = None, 
-                 markersize      = None, 
-                 markeredgewidth = None, 
-                 markeredgecolor = None, 
-                 markerfacecolor = None, 
-                 antialiased     = None, 
+                 linestyle       = None,
+                 color           = None,
+                 marker          = None,
+                 markersize      = None,
+                 markeredgewidth = None,
+                 markeredgecolor = None,
+                 markerfacecolor = None,
+                 antialiased     = None,
                  dash_capstyle = None,
-                 solid_capstyle = None,                 
+                 solid_capstyle = None,
                  dash_joinstyle = None,
-                 solid_joinstyle = None,                 
+                 solid_joinstyle = None,
                  **kwargs
                  ):
         """
@@ -168,6 +166,7 @@ class Line2D(Artist):
             raise RuntimeError('ydata must be a sequence')
 
         if linewidth is None   : linewidth=rcParams['lines.linewidth']
+
         if linestyle is None   : linestyle=rcParams['lines.linestyle']
         if marker is None      : marker=rcParams['lines.marker']
         if color is None       : color=rcParams['lines.color']
@@ -202,9 +201,10 @@ class Line2D(Artist):
         self._markerfacecolor = markerfacecolor
         self._markeredgecolor = markeredgecolor
         self._markeredgewidth = markeredgewidth
+        self._point_size_reduction = 0.5
 
         self.verticalOffset = None
-        self._useDataClipping = rcParams['lines.data_clipping']
+
         self.set_data(xdata, ydata)
 
         if not self._lineStyles.has_key(linestyle):
@@ -217,14 +217,14 @@ class Line2D(Artist):
         self._logcache = None
 
         if len(kwargs): setp(self, **kwargs)
-        
+
     def get_window_extent(self, renderer):
         self._newstyle = hasattr(renderer, 'draw_markers')
         if self._newstyle:
             x = self._x
             y = self._y
         else:
-            x, y = self._get_numeric_clipped_data_in_range()
+            x, y = self._get_plottable()
 
 
         x, y = self._transform.numerix_x_y(x, y)
@@ -257,24 +257,25 @@ class Line2D(Artist):
         else:
             x, y = args
 
+        self._x_orig = x
+        self._y_orig = y
 
-        try: del self._xc, self._yc
-        except AttributeError: pass
+        x = ma.ravel(x)
+        y = ma.ravel(y)
+        if len(x)==1 and len(y)>1:
+            x = x * ones(y.shape, Float)
+        if len(y)==1 and len(x)>1:
+            y = y * ones(x.shape, Float)
 
-        self._masked_x = None
-        self._masked_y = None
+        if len(x) != len(y):
+            raise RuntimeError('xdata and ydata must be the same length')
+
         mx = ma.getmask(x)
         my = ma.getmask(y)
-        if mx is not None:
-            mx = ravel(mx)
-            self._masked_x = x
-        if my is not None:
-            my = ravel(my)
-            self._masked_y = y
         mask = ma.mask_or(mx, my)
-        if mask is not None:
-            x = ma.masked_array(ma.ravel(x), mask=mask).compressed()
-            y = ma.masked_array(ma.ravel(y), mask=mask).compressed()
+        if mask is not ma.nomask:
+            x = ma.masked_array(x, mask=mask).compressed()
+            y = ma.masked_array(y, mask=mask).compressed()
             self._segments = unmasked_index_ranges(mask)
         else:
             self._segments = None
@@ -282,30 +283,8 @@ class Line2D(Artist):
         self._x = asarray(x, Float)
         self._y = asarray(y, Float)
 
-        if len(self._x.shape)>1:
-            self._x = ravel(self._x)
-        if len(self._y.shape)>1:
-            self._y = ravel(self._y)
-
-        # What is the rationale for the following two lines?
-        # And why is there not a similar pair with _x and _y reversed?
-        if len(self._y)==1 and len(self._x)>1:
-            self._y = self._y*ones(self._x.shape, Float)
-
-        if len(self._x) != len(self._y):
-            raise RuntimeError('xdata and ydata must be the same length')
-
-        if self._useDataClipping: self._xsorted = self._is_sorted(self._x)
-
         self._logcache = None
 
-    def set_data_clipping(self, b):
-        """
-        b is a boolean that sets whether data clipping is on
-
-        ACCEPTS: [True | False]
-        """
-        self._useDataClipping = b
 
 
     def _is_sorted(self, x):
@@ -313,14 +292,10 @@ class Line2D(Artist):
         if len(x)<2: return 1
         return alltrue(x[1:]-x[0:-1]>=0)
 
-    def _get_numeric_clipped_data_in_range(self):
-        # if the x or y clip is set, only plot the points in the
-        # clipping region.  If log scale is set, only pos data will be
-        # returned
+    def _get_plottable(self):
+        # If log scale is set, only pos data will be returned
 
-        try: self._xc, self._yc
-        except AttributeError: x, y = self._x, self._y
-        else: x, y = self._xc, self._yc
+        x, y = self._x, self._y
 
         try: logx = self._transform.get_funcx().get_type()==LOG10
         except RuntimeError: logx = False  # non-separable
@@ -372,14 +347,14 @@ class Line2D(Artist):
             cap = self._solidcapstyle
             join = self._solidjoinstyle
         gc.set_joinstyle(join)
-        gc.set_capstyle(cap)        
+        gc.set_capstyle(cap)
 
         if self._newstyle:
             # transform in backend
             xt = self._x
             yt = self._y
         else:
-            x, y = self._get_numeric_clipped_data_in_range()
+            x, y = self._get_plottable()
             if len(x)==0: return
             xt, yt = self._transform.numerix_x_y(x, y)
 
@@ -405,7 +380,6 @@ class Line2D(Artist):
             markerFunc = getattr(self, funcname)
             markerFunc(renderer, gc, xt, yt)
 
-        #if 1: bbox_artist(self, renderer)
         #renderer.close_group('line2d')
 
     def get_antialiased(self): return self._antialiased
@@ -419,68 +393,15 @@ class Line2D(Artist):
     def get_markerfacecolor(self): return self._markerfacecolor
     def get_markersize(self): return self._markersize
     def get_xdata(self, valid_only = False):
-        if self._masked_x is None or valid_only:
+        if valid_only:
             return self._x
-        return self._masked_x
+        return self._x_orig
     def get_ydata(self, valid_only = False):
-        if self._masked_y is None or valid_only:
+        if valid_only:
             return self._y
-        return self._masked_y
+        return self._y_orig
 
 
-    def _set_clip(self):
-
-
-        if not self._useDataClipping: return
-        #self._logcache = None
-
-        try: self._xmin, self._xmax
-        except AttributeError: indx = arange(len(self._x))
-        else:
-            if not hasattr(self, '_xsorted'):
-                self._xsorted = self._is_sorted(self._x)
-            if len(self._x)==1:
-                indx = [0]
-            elif self._xsorted:
-                # for really long signals, if we know they are sorted
-                # on x we can save a lot of time using search sorted
-                # since the alternative approach requires 3 O(len(x) ) ops
-                indMin, indMax = searchsorted(
-                    self._x, array([self._xmin, self._xmax]))
-                indMin = max(0, indMin-1)
-                indMax = min(indMax+1, len(self._x))
-                skip = 0
-                if self._lod:
-                    # if level of detail is on, decimate the data
-                    # based on pixel width
-                    raise NotImplementedError('LOD deprecated')
-                    l, b, w, h = self.get_window_extent().get_bounds()
-                    skip = int((indMax-indMin)/w)
-                if skip>0:  indx = arange(indMin, indMax, skip)
-                else: indx = arange(indMin, indMax)
-            else:
-                indx = nonzero(
-                    logical_and( self._x>=self._xmin,
-                                 self._x<=self._xmax ))
-
-        self._xc = take(self._x, indx)
-        self._yc = take(self._y, indx)
-
-        # y data clipping for connected lines can introduce horizontal
-        # line artifacts near the clip region.  If you really need y
-        # clipping for efficiency, consider using plot(y,x) instead.
-        if ( self._yc.shape==self._xc.shape and
-             self._linestyle is None):
-            try: self._ymin, self._ymax
-            except AttributeError: indy = arange(len(self._yc))
-            else: indy = nonzero(
-                logical_and(self._yc>=self._ymin,
-                                  self._yc<=self._ymax ))
-        else:
-            indy = arange(len(self._yc))
-
-        self._xc = take(self._xc, indy)
-        self._yc = take(self._yc, indy)
 
     def set_antialiased(self, b):
         """
@@ -576,37 +497,6 @@ class Line2D(Artist):
 
         self.set_data(self.get_xdata(), y)
 
-    def set_xclip(self, *args):
-        """
-        Set the x clipping range for data clipping to xmin, xmax
-
-        ACCEPTS: (xmin, xmax)
-        """
-        if len(args)==1:
-            xmin, xmax = args[0]
-        else:
-            xmin, xmax = args
-
-        if xmax<xmin: xmax, xmin = xmin, xmax
-        self._xmin, self._xmax = xmin, xmax
-        self._set_clip()
-
-
-
-    def set_yclip(self, *args):
-        """
-        Set the y clipping range for data clipping to ymin, ymax
-
-        ACCEPTS: (ymin, ymax)
-        """
-        if len(args)==1:
-            ymin, ymax = args[0]
-        else:
-            ymin, ymax = args
-
-        if ymax<ymin: ymax, ymin = ymin, ymax
-        self._ymin, self._ymax = ymin, ymax
-        self._set_clip()
 
     def set_dashes(self, seq):
         """
@@ -626,9 +516,9 @@ class Line2D(Artist):
     def _draw_steps(self, renderer, gc, xt, yt):
         siz=len(xt)
         if siz<2: return
-        xt2=ones((2*siz,), xt.typecode())
+        xt2=ones((2*siz,), typecode(xt))
         xt2[0:-1:2], xt2[1:-1:2], xt2[-1]=xt, xt[1:], xt[-1]
-        yt2=ones((2*siz,), yt.typecode())
+        yt2=ones((2*siz,), typecode(yt))
         yt2[0:-1:2], yt2[1::2]=yt, yt
         gc.set_linestyle('solid')
 
@@ -676,17 +566,16 @@ class Line2D(Artist):
             renderer.draw_lines(gc, xt, yt)
 
     def _draw_point(self, renderer, gc, xt, yt):
-        if self._newstyle:
-            rgbFace = self._get_rgb_face()
-            path = agg.path_storage()
-            path.move_to(-0.5, -0.5)
-            path.line_to(-0.5, 0.5)
-            path.line_to(0.5, 0.5)
-            path.line_to(0.5, -0.5)
-            renderer.draw_markers(gc, path, rgbFace, xt, yt, self._transform)
+
+        r = 0.5 * renderer.points_to_pixels(self._markersize)
+        r *= self._point_size_reduction
+        gc.set_linewidth(0)
+        if r <= 0.5:
+            self._draw_pixel(renderer, gc, xt, yt)
+        elif r <= 2:
+            self._draw_hexagon1(renderer, gc, xt, yt, point=True)
         else:
-            for (x,y) in zip(xt, yt):
-                renderer.draw_arc(gc, None, x, y, 1, 1, 0.0, 360.0)
+            self._draw_circle(renderer, gc, xt, yt, point=True)
 
     def _draw_pixel(self, renderer, gc, xt, yt):
         if self._newstyle:
@@ -702,9 +591,12 @@ class Line2D(Artist):
                 renderer.draw_point(gc, x, y)
 
 
-    def _draw_circle(self, renderer, gc, xt, yt):
+    def _draw_circle(self, renderer, gc, xt, yt, point=False):
 
-        w = h = renderer.points_to_pixels(self._markersize)
+        w = renderer.points_to_pixels(self._markersize)
+        if point:
+            w *= self._point_size_reduction
+
 
         rgbFace = self._get_rgb_face()
 
@@ -725,7 +617,7 @@ class Line2D(Artist):
         else:
             for (x,y) in zip(xt, yt):
                 renderer.draw_arc(gc, rgbFace,
-                                  x, y, w, h, 0.0, 360.0)
+                                  x, y, w, w, 0.0, 360.0)
 
 
 
@@ -902,8 +794,10 @@ class Line2D(Artist):
                           (x+offsetX1, y+offsetY1))
                 renderer.draw_polygon(gc, rgbFace, verts)
 
-    def _draw_hexagon1(self, renderer, gc, xt, yt):
+    def _draw_hexagon1(self, renderer, gc, xt, yt, point=False):
         offset = 0.6*renderer.points_to_pixels(self._markersize)
+        if point:
+            offset *= self._point_size_reduction
         offsetX1 = offset*0.87
         offsetY1 = offset*0.5
         rgbFace = self._get_rgb_face()
@@ -1141,7 +1035,7 @@ class Line2D(Artist):
 
         self._linestyle = other._linestyle
         self._marker = other._marker
-        self._useDataClipping = other._useDataClipping
+
 
     def _get_rgb_face(self):
         if (self._markerfacecolor is None or
@@ -1230,7 +1124,7 @@ class Line2D(Artist):
     def set_dash_joinstyle(self, s):
         """
         Set the join style for dashed linestyles
-        ACCEPTS: ['miter' | 'round' | 'bevel']        
+        ACCEPTS: ['miter' | 'round' | 'bevel']
         """
         s = s.lower()
         if s not in self.validJoin:
@@ -1240,7 +1134,7 @@ class Line2D(Artist):
     def set_solid_joinstyle(self, s):
         """
         Set the join style for solid linestyles
-        ACCEPTS: ['miter' | 'round' | 'bevel']        
+        ACCEPTS: ['miter' | 'round' | 'bevel']
         """
         s = s.lower()
         if s not in self.validJoin:
@@ -1270,7 +1164,7 @@ class Line2D(Artist):
             raise ValueError('set_dash_capstyle passed "%s"; valid capstyles are %s'%(s, self.validJoin))
 
         self._dashcapstyle = s
-        
+
 
     def set_solid_capstyle(self, s):
         """

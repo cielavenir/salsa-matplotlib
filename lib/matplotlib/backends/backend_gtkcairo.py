@@ -1,14 +1,16 @@
 """
-GTK+ Matplotlib interface using Cairo (not GDK) drawing operations.
+GTK+ Matplotlib interface using cairo (not GDK) drawing operations.
 Author: Steve Chaplin
 """
-from backend_gtk import *
-from backend_cairo import RendererCairo
+import gtk
+if gtk.pygtk_version < (2,7,0):
+    import cairo.gtk
 
-import cairo
-import cairo.gtk
+import matplotlib.backends.backend_cairo as be_cairo
+from   matplotlib.backends.backend_gtk import *
 
-backend_version = 'PyGTK(%d.%d.%d),Pycairo(%d.%d.%d)' % (gtk.pygtk_version + cairo.version_info)
+backend_version = 'PyGTK(%d.%d.%d) ' % gtk.pygtk_version + \
+                  'Pycairo(%s)' % be_cairo.backend_version
 
 
 _debug = False
@@ -25,20 +27,23 @@ def new_figure_manager(num, *args, **kwargs):
     return FigureManagerGTK(canvas, num)
 
 
+class RendererGTKCairo (be_cairo.RendererCairo):
+    def set_pixmap (self, pixmap):
+        if gtk.pygtk_version >= (2,7,0):
+            self.ctx = pixmap.cairo_create()
+        else:
+            self.ctx = cairo.gtk.gdk_cairo_create (pixmap)
+        self.ctx.save()  # restore, save  - when call new_gc()
 
 
 class FigureCanvasGTKCairo(FigureCanvasGTK):
     def _renderer_init(self):
-        """Override to use Cairo rather than GDK renderer"""
+        """Override to use cairo (rather than GDK) renderer"""
         if _debug: print '%s.%s()' % (self.__class__.__name__, _fn_name())
-        self._renderer = RendererCairo (self.figure.dpi)
+        self._renderer = RendererGTKCairo (self.figure.dpi)
 
-class NavigationToolbar2Cairo(NavigationToolbar2GTK):
-    def _get_canvas(self, fig):
-        return FigureCanvasGTKCairo(fig)
-    
 
-class FigureManagerGTKAgg(FigureManagerGTK):
+class FigureManagerGTKCairo(FigureManagerGTK):
     def _get_toolbar(self, canvas):
         # must be inited after the window, drawingArea and figure
         # attrs are set
@@ -50,3 +55,7 @@ class FigureManagerGTKAgg(FigureManagerGTK):
             toolbar = None
         return toolbar
 
+
+class NavigationToolbar2Cairo(NavigationToolbar2GTK):
+    def _get_canvas(self, fig):
+        return FigureCanvasGTKCairo(fig)

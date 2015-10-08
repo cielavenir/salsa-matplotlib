@@ -1,11 +1,17 @@
 from __future__ import division
 import math
 from matplotlib import rcParams
-from numerix import array, arange, sin, cos, pi, Float, sqrt, matrixmultiply
+from numerix import array, arange, sin, cos, pi, Float, sqrt, \
+     matrixmultiply, sqrt, nonzero, equal, asarray, dot
 from artist import Artist, setp
 from cbook import enumerate, popd
 from colors import colorConverter
+from lines import Line2D
 from transforms import bound_vertices
+
+from numerix.mlab import amin
+from mlab import dist_point_to_segment
+
 
 class Patch(Artist):
     """
@@ -17,10 +23,11 @@ class Patch(Artist):
     """
     zorder = 1
     def __init__(self,
-                 edgecolor=None,   
+                 edgecolor=None,
                  facecolor=None,
                  linewidth=None,
-                 antialiased = None, 
+                 antialiased = None,
+                 hatch = None,
                  fill=1,
                  **kwargs
                  ):
@@ -34,21 +41,23 @@ class Patch(Artist):
         self._edgecolor = edgecolor
         self._facecolor = facecolor
         self._linewidth = linewidth
-        self._antialiased = antialiased        
+        self._antialiased = antialiased
+        self._hatch = hatch
         self.fill = fill
 
-
         if len(kwargs): setp(self, **kwargs)
+
     def update_from(self, other):
         Artist.update_from(self, other)
         self.set_edgecolor(other.get_edgecolor())
         self.set_facecolor(other.get_facecolor())
         self.set_fill(other.get_fill())
+        self.set_hatch(other.get_hatch())
         self.set_linewidth(other.get_linewidth())
         self.set_transform(other.get_transform())
         self.set_figure(other.get_figure())
-        self.set_alpha(other.get_alpha())                
-        
+        self.set_alpha(other.get_alpha())
+
     def get_antialiased(self):
         return self._antialiased
 
@@ -57,58 +66,85 @@ class Patch(Artist):
 
     def get_facecolor(self):
         return self._facecolor
-        
+
     def get_linewidth(self):
         return self._linewidth
 
     def set_antialiased(self, aa):
         """
-Set whether to use antialiased rendering
+        Set whether to use antialiased rendering
 
-ACCEPTS: [True | False]
-"""
+        ACCEPTS: [True | False]
+        """
         self._antialiased = aa
 
     def set_edgecolor(self, color):
         """
-Set the patch edge color
+        Set the patch edge color
 
-ACCEPTS: any matplotlib color - see help(colors)
-"""
+        ACCEPTS: any matplotlib color - see help(colors)
+        """
         self._edgecolor = color
 
     def set_facecolor(self, color):
         """
-Set the patch face color
+        Set the patch face color
 
-ACCEPTS: any matplotlib color - see help(colors)
-"""
+        ACCEPTS: any matplotlib color - see help(colors)
+        """
         self._facecolor = color
 
     def set_linewidth(self, w):
         """
-Set the patch linewidth in points
+        Set the patch linewidth in points
 
-ACCEPTS: float
-"""
+        ACCEPTS: float
+        """
         self._linewidth = w
 
     def set_fill(self, b):
         """
-Set whether to fill the patch
+        Set whether to fill the patch
 
-ACCEPTS: [True | False]
-"""
+        ACCEPTS: [True | False]
+        """
         self.fill = b
 
     def get_fill(self):
         'return whether fill is set'
         return self.fill
 
-     
-        
+    def set_hatch(self, h):
+        """
+        Set the hatching pattern
+ 
+        hatch can be one of:
+        /   - diagonal hatching
+        \   - back diagonal
+        |   - vertical
+        -   - horizontal
+        #   - crossed
+        X   - crossed diagonal
+        letters can be combined, in which case all the specified
+        hatchings are done
+        if same letter repeats, it increases the density of hatching
+        in that direction
+
+        CURRENT LIMITATIONS:
+        1. Hatching is supported in the PostScript
+        backend only.
+
+        2. Hatching is done with solid black lines of width 0.
+        """
+        self._hatch = h
+ 
+    def get_hatch(self):
+        'return the current hatching pattern'
+        return self._hatch
+
+
     def draw(self, renderer):
-        if not self.get_visible(): return 
+        if not self.get_visible(): return
         #renderer.open_group('patch')
         gc = renderer.new_gc()
         gc.set_foreground(self._edgecolor)
@@ -122,13 +158,17 @@ ACCEPTS: [True | False]
         if not self.fill or self._facecolor is None: rgbFace = None
         else: rgbFace = colorConverter.to_rgb(self._facecolor)
 
-        verts = self.get_verts()        
+        if self._hatch:
+            gc.set_hatch(self._hatch )
+
+        verts = self.get_verts()
         tverts = self._transform.seq_xy_tups(verts)
+
         renderer.draw_polygon(gc, rgbFace, tverts)
 
- 
+
         #renderer.close_group('patch')
-        
+
     def get_verts(self):
         """
         Return the vertices of the patch
@@ -145,12 +185,12 @@ ACCEPTS: [True | False]
     def set_lw(self, val):
         'alias for set_linewidth'
         self.set_linewidth(val)
-    
+
 
     def set_ec(self, val):
         'alias for set_edgecolor'
         self.set_edgecolor(val)
-    
+
 
     def set_fc(self, val):
         'alias for set_facecolor'
@@ -160,17 +200,17 @@ ACCEPTS: [True | False]
     def get_aa(self):
         'alias for get_antialiased'
         return self.get_antialiased()
-    
+
 
     def get_lw(self):
         'alias for get_linewidth'
         return self.get_linewidth()
-    
+
 
     def get_ec(self):
         'alias for get_edgecolor'
         return self.get_edgecolor()
-    
+
 
     def get_fc(self):
         'alias for get_facecolor'
@@ -179,17 +219,17 @@ ACCEPTS: [True | False]
 class Shadow(Patch):
     def __init__(self, patch, ox, oy, props=None):
         """
-Create a shadow of the patch offset by ox, oy.  props, if not None is
-a patch property update dictionary.  If None, the shadow will have
-have the same color as the face, but darkened
-"""
+        Create a shadow of the patch offset by ox, oy.  props, if not None is
+        a patch property update dictionary.  If None, the shadow will have
+        have the same color as the face, but darkened
+        """
         Patch.__init__(self)
         self.ox, self.oy = ox, oy
         self.patch = patch
         self.props = props
         self._update()
 
-    def _update(self):        
+    def _update(self):
         self.update_from(self.patch)
         if self.props is not None:
             self.update(self.props)
@@ -202,7 +242,7 @@ have the same color as the face, but darkened
 
             self.set_facecolor((r,g,b))
             self.set_edgecolor((r,g,b))
-                   
+
     def get_verts(self):
         verts = self.patch.get_verts()
         xs = [x+self.ox for x,y in verts]
@@ -231,7 +271,7 @@ class Rectangle(Patch):
         fill is a boolean indicating whether to fill the rectangle
 
         """
-                     
+
         Patch.__init__(self, **kwargs)
 
         self.xy  = array(xy, Float)
@@ -245,7 +285,7 @@ class Rectangle(Patch):
         return ( (x, y), (x, y+self.height),
                  (x+self.width, y+self.height), (x+self.width, y),
                  )
-        
+
     def get_x(self):
         "Return the left coord of the rectangle"
         return self.xy[0]
@@ -264,42 +304,42 @@ class Rectangle(Patch):
 
     def set_x(self, x):
         """
-Set the left coord of the rectangle
+        Set the left coord of the rectangle
 
-ACCEPTS: float
-"""     
+        ACCEPTS: float
+        """
         self.xy[0] = x
 
     def set_y(self, y):
         """
-Set the bottom coord of the rectangle
+        Set the bottom coord of the rectangle
 
-ACCEPTS: float
-"""
+        ACCEPTS: float
+        """
         self.xy[1] = y
 
     def set_width(self, w):
         """
-Set the width rectangle
+        Set the width rectangle
 
-ACCEPTS: float
-"""
+        ACCEPTS: float
+        """
         self.width = w
 
     def set_height(self, h):
         """
-Set the width rectangle
+        Set the width rectangle
 
-ACCEPTS: float
-"""
+        ACCEPTS: float
+        """
         self.height = h
 
     def set_bounds(self, *args):
         """
-Set the bounds of the rectangle: l,b,w,h
+        Set the bounds of the rectangle: l,b,w,h
 
-ACCEPTS: (left, bottom, width, height)
-"""
+        ACCEPTS: (left, bottom, width, height)
+        """
         if len(args)==0:
             l,b,w,h = args[0]
         else:
@@ -308,7 +348,7 @@ ACCEPTS: (left, bottom, width, height)
         self.width = w
         self.height = h
 
-    
+
 class RegularPolygon(Patch):
     """
     A regular polygon patch.  xy is a length 2 tuple (the center)
@@ -333,7 +373,7 @@ class RegularPolygon(Patch):
         r = self.radius
         xs = self.xy[0] + r*cos(theta)
         ys = self.xy[1] + r*sin(theta)
-        
+
         self.verts = zip(xs, ys)
 
     def get_verts(self):
@@ -352,8 +392,8 @@ class Polygon(Patch):
     def get_verts(self):
         return self.xy
 
-        
-              
+
+
 
 class Wedge(Polygon):
     def __init__(self, center, r, theta1, theta2,
@@ -362,7 +402,7 @@ class Wedge(Polygon):
         Draw a wedge centered at x,y tuple center with radius r that
         sweeps theta1 to theta2 (angles)
 
-        
+
         kwargs are Polygon keyword args
 
         dtheta is the resolution in degrees
@@ -390,7 +430,7 @@ class Arrow(Polygon):
             [ 0.8, -0.1 ], [ 0.8, -0.3],
             [ 1.0,  0.0 ], [ 0.8,  0.3],
             [ 0.8,  0.1 ] ] )
-        L = sqrt(dx**2+dy**2)
+        L = sqrt(dx**2+dy**2) or 1 # account for div by zero
         arrow[:,0] *= L
         arrow[:,1] *= width
         cx = float(dx)/L
@@ -398,7 +438,7 @@ class Arrow(Polygon):
         M = array( [ [ cx, sx],[ -sx, cx ] ] )
         verts = matrixmultiply( arrow, M )+ [x,y]
         Polygon.__init__( self, [ tuple(t) for t in verts ], **kwargs )
-        
+
 
 class Circle(RegularPolygon):
     """
@@ -415,7 +455,121 @@ class Circle(RegularPolygon):
                                 radius,
                                 orientation=0,
                                 **kwargs)
+
+class PolygonInteractor:
+    """
+    An polygon editor.
+
+    Key-bindings
+
+      't' toggle vertex markers on and off.  When vertex markers are on,
+          you can move them, delete them
+
+      'd' delete the vertex under point      
+
+      'i' insert a vertex at point.  You must be within epsilon of the
+          line connecting two existing vertices
+          
+    """
+
+    showverts = True
+    epsilon = 5  # max pixel distance to count as a vertex hit
+
+    def __init__(self, poly):
+        if poly.figure is None:
+            raise RuntimeError('You must first add the polygon to a figure or canvas before defining the interactor')
+        canvas = poly.figure.canvas
+        self.poly = poly
+        self.poly.verts = list(self.poly.verts)
+        x, y = zip(*self.poly.verts)
+        self.line = Line2D(x,y,marker='o', markerfacecolor='r')
+        #self._update_line(poly)
         
+        cid = self.poly.add_callback(self.poly_changed)
+        self._ind = None # the active vert
+
+        canvas.mpl_connect('button_press_event', self.button_press_callback)
+        canvas.mpl_connect('key_press_event', self.key_press_callback)        
+        canvas.mpl_connect('button_release_event', self.button_release_callback)
+        canvas.mpl_connect('motion_notify_event', self.motion_notify_callback)                
+        self.canvas = canvas
+        
+
+    def poly_changed(self, poly):
+        'this method is called whenever the polygon object is called'
+        # only copy the artist props to the line (except visibility)
+        vis = self.line.get_visible()
+        Artist.update_from(self.line, poly)
+        self.line.set_visible(vis)  # don't use the poly visibility state
+        
+
+    def get_ind_under_point(self, event):
+        'get the index of the vertex under point if within epsilon tolerance'
+        x, y = zip(*self.poly.verts)
+        
+        # display coords        
+        xt, yt = self.poly.get_transform().numerix_x_y(x, y)
+        d = sqrt((xt-event.x)**2 + (yt-event.y)**2)
+        indseq = nonzero(equal(d, amin(d)))
+        ind = indseq[0]
+
+        if d[ind]>=self.epsilon:
+            ind = None
+
+        return ind
+        
+    def button_press_callback(self, event):
+        'whenever a mouse button is pressed'
+        if not self.showverts: return 
+        if event.inaxes==None: return
+        if event.button != 1: return
+        self._ind = self.get_ind_under_point(event)
+
+    def button_release_callback(self, event):
+        'whenever a mouse button is released'
+        if not self.showverts: return
+        if event.button != 1: return
+        self._ind = None
+
+    def key_press_callback(self, event):
+        'whenever a key is pressed'
+        if not event.inaxes: return
+        if event.key=='t':
+            self.showverts = not self.showverts
+            self.line.set_visible(self.showverts)
+            if not self.showverts: self._ind = None
+        elif event.key=='d':
+            ind = self.get_ind_under_point(event)
+            if ind is not None:
+                self.poly.verts = [tup for i,tup in enumerate(self.poly.verts) if i!=ind]
+                self.line.set_data(zip(*self.poly.verts))
+        elif event.key=='i':            
+            xys = self.poly.get_transform().seq_xy_tups(self.poly.verts)
+            p = event.x, event.y # display coords
+            for i in range(len(xys)-1):                
+                s0 = xys[i]
+                s1 = xys[i+1]
+                d = dist_point_to_segment(p, s0, s1)
+                if d<=self.epsilon:
+                    self.poly.verts.insert(i+1, (event.xdata, event.ydata))
+                    self.line.set_data(zip(*self.poly.verts))
+                    break
+                
+            
+        self.canvas.draw()
+
+    def motion_notify_callback(self, event):
+        'on mouse movement'
+        if not self.showverts: return 
+        if self._ind is None: return
+        if event.inaxes is None: return
+        if event.button != 1: return
+        x,y = event.xdata, event.ydata
+        self.poly.verts[self._ind] = x,y
+        self.line.set_data(zip(*self.poly.verts))
+        self.canvas.draw_idle()
+
+
 def bbox_artist(artist, renderer, props=None, fill=True):
     """
     This is a debug function to draw a rectangle around the bounding
@@ -443,7 +597,7 @@ def bbox_artist(artist, renderer, props=None, fill=True):
     r.set_clip_on( False )
     r.update(props)
     r.draw(renderer)
-    
+
 
 def draw_bbox(bbox, renderer, color='k', trans=None):
     """
@@ -453,8 +607,8 @@ def draw_bbox(bbox, renderer, color='k', trans=None):
     """
 
     l,b,w,h = bbox.get_bounds()
-    r = Rectangle(xy=(l,b), 
-                  width=w, 
+    r = Rectangle(xy=(l,b),
+                  width=w,
                   height=h,
                   edgecolor=color,
                   fill=False,

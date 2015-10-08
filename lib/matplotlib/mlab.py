@@ -60,17 +60,18 @@ from matplotlib import verbose
 import numerix
 import numerix.mlab 
 from numerix import linear_algebra
+import numerix as nx
 
 from numerix import array, asarray, arange, divide, exp, arctan2, \
      multiply, transpose, ravel, repeat, resize, reshape, floor, ceil,\
      absolute, matrixmultiply, power, take, where, Float, Int, asum,\
      dot, convolve, pi, Complex, ones, zeros, diagonal, Matrix, nonzero, \
      log, searchsorted, concatenate, sort, ArrayType, clip, size, indices,\
-     conjugate
+     conjugate, typecode, iscontiguous
 
 
 from numerix.mlab import hanning, cov, diff, svd, rand, std
-from numerix.fft import fft
+from numerix.fft import fft, inverse_fft
 
 from cbook import iterable
 
@@ -166,10 +167,10 @@ def psd(x, NFFT=256, Fs=2, detrend=detrend_none,
     
 
     # for real x, ignore the negative frequencies
-    if x.typecode()==Complex: numFreqs = NFFT
+    if typecode(x)==Complex: numFreqs = NFFT
     else: numFreqs = NFFT//2+1
         
-    windowVals = window(ones((NFFT,),x.typecode()))
+    windowVals = window(ones((NFFT,),typecode(x)))
     step = NFFT-noverlap
     ind = range(0,len(x)-NFFT+1,step)
     n = len(ind)
@@ -229,10 +230,10 @@ def csd(x, y, NFFT=256, Fs=2, detrend=detrend_none,
         y[n:] = 0
 
     # for real x, ignore the negative frequencies
-    if x.typecode()==Complex: numFreqs = NFFT
+    if typecode(x)==Complex: numFreqs = NFFT
     else: numFreqs = NFFT//2+1
         
-    windowVals = window(ones((NFFT,),x.typecode()))
+    windowVals = window(ones((NFFT,),typecode(x)))
     step = NFFT-noverlap
     ind = range(0,len(x)-NFFT+1,step)
     n = len(ind)
@@ -411,7 +412,7 @@ def vander(x,N=None):
 
     """
     if N is None: N=len(x)
-    X = ones( (len(x),N), x.typecode())
+    X = ones( (len(x),N), typecode(x))
     for i in range(N-1):
         X[:,i] = x**(N-i-1)
     return X
@@ -494,7 +495,7 @@ def cohere_pairs( X, ij, NFFT=256, Fs=2, detrend=detrend_none,
     # zero pad if X is too short
     if numRows < NFFT:
         tmp = X
-        X = zeros( (NFFT, numCols), X.typecode())
+        X = zeros( (NFFT, numCols), typecode(X))
         X[:numRows,:] = tmp
         del tmp
 
@@ -509,13 +510,13 @@ def cohere_pairs( X, ij, NFFT=256, Fs=2, detrend=detrend_none,
     del seen
     
     # for real X, ignore the negative frequencies
-    if X.typecode()==Complex: numFreqs = NFFT
+    if typecode(X)==Complex: numFreqs = NFFT
     else: numFreqs = NFFT//2+1
 
     # cache the FFT of every windowed, detrended NFFT length segement
     # of every channel.  If preferSpeedOverMemory, cache the conjugate
     # as well
-    windowVals = window(ones((NFFT,), X.typecode()))
+    windowVals = window(ones((NFFT,), typecode(X)))
     ind = range(0, numRows-NFFT+1, NFFT-noverlap)
     numSlices = len(ind)
     FFTSlices = {}
@@ -691,7 +692,7 @@ def longest_contiguous_ones(x):
     if len(ind)==0:  return arange(len(x))
     if len(ind)==len(x): return array([])
 
-    y = zeros( (len(x)+2,),  x.typecode())
+    y = zeros( (len(x)+2,),  typecode(x))
     y[1:-1] = x
     dif = diff(y)
     up = find(dif ==  1);
@@ -1103,7 +1104,7 @@ def specgram(x, NFFT=256, Fs=2, detrend=detrend_none,
     The returned times are the midpoints of the intervals over which
     the ffts are calculated
     """
-
+    x = asarray(x)
     assert(NFFT>noverlap)
     if log(NFFT)/log(2) != int(log(NFFT)/log(2)):
        raise ValueError, 'NFFT must be a power of 2'
@@ -1116,10 +1117,10 @@ def specgram(x, NFFT=256, Fs=2, detrend=detrend_none,
     
 
     # for real x, ignore the negative frequencies
-    if x.typecode()==Complex: numFreqs = NFFT
+    if typecode(x)==Complex: numFreqs=NFFT
     else: numFreqs = NFFT//2+1
         
-    windowVals = window(ones((NFFT,),x.typecode()))
+    windowVals = window(ones((NFFT,),typecode(x)))
     step = NFFT-noverlap
     ind = arange(0,len(x)-NFFT+1,step)
     n = len(ind)
@@ -1248,6 +1249,114 @@ def segments_intersect(s1, s2):
     return 0.0 <= u1 <= 1.0 and 0.0 <= u2 <= 1.0
 
 
+def fftsurr(x, detrend=detrend_none, window=window_none):
+    """
+    Compute an FFT phase randomized surrogate of x
+    """
+    x = window(detrend(x))
+    z = fft(x)
+    a = 2.*pi*1j
+    phase = a*rand(len(x))
+    z = z*exp(phase)
+    return inverse_fft(z).real
+
+
+def liaupunov(x, fprime):
+   """
+   x is a very long trajectory from a map, and derivs is the analytic
+   derivative of the map.  Return lambda = 1/n\sum ln|fprime(x_i)|.
+   See Sec 10.5 Strogatz (1994) "Nonlinear Dynamics and Chaos".   
+   """
+   return mean(log(fprime(x)))
+
+class FIFOBuffer:
+    """
+    A FIFO queue to hold incoming x, y data in a rotating buffer using
+    numerix arrrays under the hood.  It is assumed that you will call
+    asarrays much less frequently than you add data to the queue --
+    otherwise another data structure will be faster
+
+    This can be used to support plots where data is added from a real
+    time feed and the plot object wants grab data from the buffer and
+    plot it to screen less freqeuently than the incoming
+
+    If you set the dataLim attr to a matplotlib BBox (eg ax.dataLim),
+    the dataLim will be updated as new data come in
+
+    TODI: add a grow method that will extend nmax
+    """
+    def __init__(self, nmax):
+        'buffer up to nmax points'
+        self._xa = nx.zeros((nmax,), typecode=nx.Float)
+        self._ya = nx.zeros((nmax,), typecode=nx.Float)        
+        self._xs = nx.zeros((nmax,), typecode=nx.Float)
+        self._ys = nx.zeros((nmax,), typecode=nx.Float)        
+        self._ind = 0
+        self._nmax = nmax
+        self.dataLim = None
+        self.callbackd = {}
+        
+    def register(self, func, N):
+        'call func everytime N events are passed; func signature is func(fifo)'
+        self.callbackd.setdefault(N, []).append(func)
+        
+    def add(self, x, y):
+        'add scalar x and y to the queue'
+        if self.dataLim is not None:
+           xys = ((x,y),) 
+           self.dataLim.update(xys, -1) #-1 means use the default ignore setting
+        ind = self._ind % self._nmax
+        #print 'adding to fifo:', ind, x, y
+        self._xs[ind] = x
+        self._ys[ind] = y
+
+        for N,funcs in self.callbackd.items():
+           if (self._ind%N)==0:
+              for func in funcs:
+                 func(self)
+                 
+        self._ind += 1
+
+    def last(self):
+        'get the last x, y or None, None if no data set'
+        if self._ind==0: return None, None
+        ind = (self._ind-1) % self._nmax
+        return self._xs[ind], self._ys[ind]
+
+    def asarrays(self):
+        """
+        return x and y as arrays; their length will be the len of data
+        added or nmax
+        """
+        if self._ind<self._nmax:
+            return self._xs[:self._ind], self._ys[:self._ind]
+        ind = self._ind % self._nmax
+
+        self._xa[:self._nmax-ind] = self._xs[ind:]
+        self._xa[self._nmax-ind:] = self._xs[:ind]
+        self._ya[:self._nmax-ind] = self._ys[ind:]
+        self._ya[self._nmax-ind:] = self._ys[:ind]
+
+        return self._xa, self._ya
+
+    def update_datalim_to_current(self):
+        'update the datalim in the current data in the fifo'
+        if self.dataLim is None:
+            raise ValueError('You must first set the dataLim attr')
+        x, y = self.asarrays()
+        self.dataLim.update_numerix(x, y, True)
+
+def movavg(x,n):
+    'compute the len(n) moving average of x'
+    n = int(n)
+    N = len(x)
+    assert(N>n)
+    y = zeros(N-(n-1),Float)
+    for i in range(n):
+       y += x[i:N-(n-1)+i]
+    y /= float(n)
+    return y
+
 ### the following code was written and submitted by Fernando Perez
 ### from the ipython numutils package under a BSD license
 """
@@ -1323,14 +1432,14 @@ def amap(fn,*args):
 def zeros_like(a):
     """Return an array of zeros of the shape and typecode of a."""
 
-    return zeros(a.shape,a.typecode())
+    return zeros(a.shape,typecode(a))
 
 def sum_flat(a):
     """Return the sum of all the elements of a, flattened out.
 
     It uses a.flat, and if a is not contiguous, a call to ravel(a) is made."""
 
-    if a.iscontiguous():
+    if iscontiguous(a):
         return asum(a.flat)
     else:
         return asum(ravel(a))

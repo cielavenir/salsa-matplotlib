@@ -707,5 +707,36 @@ ZeroDivisionError: SeparableTransformation::eval_scalars yin interval is zero; c
 
 -- clipping off in date_demo_rrule (agg 0.5 offset bug?)
 
--- merge qt patch.
+-- DONE merge qt patch.
 
+-- properly handle sys.arv, so that it does not conflict with library
+   usage of mpl. mpl processes -Dagg, --verbose-helpful, etc, itself,
+   which can conflict with code that uses mpl as a library and process
+   options itself.
+
+-- DONE Darren's black band ps image problem.
+
+-- Martin's zoomhist bug
+
+-- Add shading for patches and patch collections.
+
+-- tex system call problem
+
+-- tex rendering looks fuzzy (dvipng version or flag problem)
+
+-- Martin's zoomhist bug
+
+-- restore robert leftwich's tutorial link to FAQ
+
+-- JPL and NIST screenshots...
+
+-- John Gill's patch!
+
+-- Fix latex texmanager caching bug that is preventing the cache from
+   recognizing a font change
+
+-- handle lineprops.glade install file
+
+-- support zoom to rect in x or y only
+
+-- add Ryan's patch

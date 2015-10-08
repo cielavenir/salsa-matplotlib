@@ -14,6 +14,9 @@ The GTKAgg and TkAgg will try to build if they detect pygtk or Tkinter
 respectively; set them to 0 if you do not want to build them
 """
 
+
+rc = dict({'backend':'PS', 'numerix':'Numeric'})
+
 # build the image support module - requires agg and Numeric or
 # numarray.  You can build the image module with either Numeric or
 # numarray or both.  By default, matplotlib will build support for
@@ -24,26 +27,25 @@ BUILD_IMAGE = 1
 # templates, so it probably requires a fairly recent compiler to build
 # it.  It makes very nice antialiased output and also supports alpha
 # blending
-BUILD_AGG = 1
-
-# Render Agg to the GTK canvas
-#BUILD_GTKAGG       = 0
+BUILD_AGG          = 1
 BUILD_GTKAGG       = 'auto'
-
 BUILD_GTK          = 'auto'
 
 # build TK GUI with Agg renderer ; requires Tkinter Python extension
 # and Tk includes
 # Use False or 0 if you don't want to build
-#BUILD_TKAGG        = 0
 BUILD_TKAGG        = 'auto'
+
+# build wxPython GUI with Agg renderer ; requires wxPython package
+BUILD_WXAGG        = 'auto'
+
 
 # build a small extension to manage the focus on win32 platforms.
 #BUILD_WINDOWING        = 0
 BUILD_WINDOWING        = 'auto'
 
 
-VERBOSE =  False # insert lots of diagnostic prints in extension code
+VERBOSE = False # insert lots of diagnostic prints in extension code
 
 
 
@@ -55,11 +57,19 @@ VERBOSE =  False # insert lots of diagnostic prints in extension code
 import os
 if os.path.exists('MANIFEST'): os.remove('MANIFEST')
 
-from distutils.core import setup
+try:
+    # check if we have a reasonably recent copy of setuptools
+    from setuptools.command import bdist_egg 
+    from setuptools import setup
+    has_setuptools = True
+except ImportError:
+    from distutils.core import setup
+    has_setuptools = False
+    
 import sys,os
 import glob
 from distutils.core import Extension
-from setupext import build_agg, build_gtkagg, build_tkagg, \
+from setupext import build_agg, build_gtkagg, build_tkagg, build_wxagg,\
      build_ft2font, build_image, build_windowing, build_transforms, \
      build_contour, build_enthought, build_swigagg, build_gdk
 import distutils.sysconfig
@@ -68,45 +78,73 @@ major, minor1, minor2, s, tmp = sys.version_info
 
 if major==2 and minor1==2:
     print >> sys.stderr, "***\n\nWARNING, see build info for python2.2 in the header of setup.py\n\n***"
-    
+
 for line in file('lib/matplotlib/__init__.py').readlines():
     if line[:11] == '__version__':
         exec(line)
         break
+    
+# Find the plat-lib dir where mpl will be installed.
+# This is where the mpl-data will be installed.
+from distutils.command.install import INSTALL_SCHEMES
 
+if has_setuptools: # EGG's make it simple
+    datapath = os.path.curdir
+# logic from distutils.command.install.finalize_options
+elif os.name == 'posix':
+    py_version_short = sys.version[0:3]
+    datapath = INSTALL_SCHEMES['unix_prefix']['platlib']
+    datapath = datapath.replace('$platbase/', '').replace('$py_version_short', py_version_short)
+else:
+    datapath = INSTALL_SCHEMES[os.name]['platlib'].replace('$base/', '')
+
+datapath = os.sep.join([datapath, 'matplotlib', 'mpl-data']) # This is where mpl data will be installed
+
+print 'installing data to', datapath
+
+# Specify all the required mpl data
 data = []
-
+data.extend(glob.glob('gui/*.glade'))
 data.extend(glob.glob('fonts/afm/*.afm'))
 data.extend(glob.glob('fonts/ttf/*.ttf'))
 data.extend(glob.glob('images/*.xpm'))
 data.extend(glob.glob('images/*.svg'))
 data.extend(glob.glob('images/*.png'))
 data.extend(glob.glob('images/*.ppm'))
-data.append('.matplotlibrc')
+data.append('matplotlibrc')
 
-data_files=[('share/matplotlib', data),]
+data_files=[(datapath, data),]
+
+# Needed for CocoaAgg
+data_files.append((os.sep.join([datapath, 'Matplotlib.nib']),
+		   glob.glob('lib/matplotlib/backends/Matplotlib.nib/*.nib')))
 
 # Figure out which array packages to provide binary support for
-# and define the NUMERIX value: Numeric, numarray, or both.
+# and append to the NUMERIX list.
+NUMERIX = []
+
 try:
     import Numeric
-    HAVE_NUMERIC=1
+    NUMERIX.append('Numeric')
+
 except ImportError:
-    HAVE_NUMERIC=0
+    pass
 try:
     import numarray
-    HAVE_NUMARRAY=1
+    NUMERIX.append('numarray')
 except ImportError:
-    HAVE_NUMARRAY=0
-    
-NUMERIX=["neither", "Numeric","numarray","both"][HAVE_NUMARRAY*2+HAVE_NUMERIC]
+    pass
+try:
+     import numpy
+     NUMERIX.append('numpy')
+except ImportError:
+     pass
+
+if not NUMERIX:
+    raise RuntimeError("You must install one or more of numpy, Numeric, and numarray to build matplotlib")
 
 
-if NUMERIX == "neither":
-    raise RuntimeError("You must install Numeric, numarray, or both to build matplotlib")
-
-# This print interers with --version, which license depends on
-#print "Compiling matplotlib for:", NUMERIX
+rc['numerix'] = NUMERIX[-1]
 
 ext_modules = []
 
@@ -114,15 +152,17 @@ ext_modules = []
 BUILD_FT2FONT = 1
 BUILD_CONTOUR = 1
 
+# jdh
 packages = [
     'matplotlib',
-    'matplotlib/backends',
-    'matplotlib/numerix',
-    'matplotlib/numerix/mlab',
-    'matplotlib/numerix/ma',
-    'matplotlib/numerix/linear_algebra',
-    'matplotlib/numerix/random_array',
-    'matplotlib/numerix/fft',                    
+    'matplotlib.backends',
+    'matplotlib.toolkits',
+    'matplotlib.numerix',
+    'matplotlib.numerix.mlab',
+    'matplotlib.numerix.ma',
+    'matplotlib.numerix.linear_algebra',
+    'matplotlib.numerix.random_array',
+    'matplotlib.numerix.fft',
     ]
 
 
@@ -169,11 +209,32 @@ if BUILD_GTK:
         BUILD_GTK=0
     except RuntimeError:
         print 'pygtk present but import failed'
-    
 
 if BUILD_GTK:
-    build_gdk(ext_modules, packages, NUMERIX)
-    
+        build_gdk(ext_modules, packages, NUMERIX)
+        rc['backend'] = 'GTK'
+
+if BUILD_TKAGG:
+    try: import Tkinter
+    except ImportError: print 'TKAgg requires TkInter'
+    else:
+        BUILD_AGG = 1
+        build_tkagg(ext_modules, packages, NUMERIX)
+        rc['backend'] = 'TkAgg'
+        
+if BUILD_WXAGG:
+    try: import wxPython
+    except ImportError:
+        if BUILD_WXAGG != 'auto':
+            print 'WXAgg\'s accelerator requires wxPython'
+        BUILD_WXAGG = 0
+    else:
+        BUILD_AGG = 1
+        build_wxagg(ext_modules, packages, NUMERIX,
+            not (isinstance(BUILD_WXAGG, str) # don't about if BUILD_WXAGG
+                 and BUILD_WXAGG.lower() == 'auto')) # is "auto"
+        rc['backend'] = 'WXAgg'
+
 if BUILD_GTKAGG:
     try:
         import gtk
@@ -182,20 +243,17 @@ if BUILD_GTKAGG:
         BUILD_GTKAGG=0
     except RuntimeError:
         print 'pygtk present but import failed'
+
 if BUILD_GTKAGG:
     BUILD_AGG = 1
     build_gtkagg(ext_modules, packages, NUMERIX)
-
-if BUILD_TKAGG:
-    try: import Tkinter
-    except ImportError: print 'TKAgg requires TkInter'
-    else:
-        BUILD_AGG = 1
-        build_tkagg(ext_modules, packages, NUMERIX)
-
+    rc['backend'] = 'GTKAgg'
 
 if BUILD_AGG:
     build_agg(ext_modules, packages, NUMERIX)
+    if rc['backend'] == 'PS': rc['backend'] = 'Agg'
+
+
 
 if BUILD_FT2FONT:
     build_ft2font(ext_modules, packages)
@@ -205,15 +263,30 @@ if BUILD_WINDOWING and sys.platform=='win32':
 
 if BUILD_IMAGE:
     build_image(ext_modules, packages, NUMERIX)
-    
+
 if 1:  # I don't think we need to make these optional
     build_contour(ext_modules, packages, NUMERIX)
-    
+
 for mod in ext_modules:
     if VERBOSE:
         mod.extra_compile_args.append('-DVERBOSE')
-    
-setup(name="matplotlib",
+
+
+
+# packagers: set rc['numerix'] and rc['backend'] here to override the auto
+# defaults, eg
+#rc['numerix'] = numpy
+#rc['backend'] = GTKAgg
+if sys.platform=='win32':
+    rc = dict(backend='TkAgg', numerix='Numeric')
+template = file('matplotlibrc.template').read()
+file('matplotlibrc', 'w').write(template%rc)
+
+additional_params = {}
+if has_setuptools:
+    additional_params['namespace_packages'] = ['matplotlib.toolkits']
+
+distrib = setup(name="matplotlib",
       version= __version__,
       description = "Matlab(TM) style python plotting package",
       author = "John D. Hunter",
@@ -228,7 +301,9 @@ setup(name="matplotlib",
       packages = packages,
       platforms='any',
       py_modules = ['pylab'],
-      ext_modules = ext_modules, 
+      ext_modules = ext_modules,
       data_files = data_files,
       package_dir = {'': 'lib'},
+      **additional_params
       )
+

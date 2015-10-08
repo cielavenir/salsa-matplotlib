@@ -7,10 +7,13 @@ layout -- you have to figure out how wide and tall you want your Axes
 to be to accommodate your widget.
 """
 
-from matplotlib.mlab import linspace, dist
-from matplotlib.patches import Circle, Rectangle
-from matplotlib.lines import Line2D
-from matplotlib.numerix import array
+from mlab import linspace, dist
+from patches import Circle, Rectangle
+from lines import Line2D
+from numerix import array
+from transforms import blend_xy_sep_transform
+
+import thread
 
 class Widget:
     """
@@ -126,22 +129,25 @@ class Slider(Widget):
       closedmax : whether the slider is closed on the maximum
       slidermin : another slider - if not None, this slider must be > slidermin
       slidermax : another slider - if not None, this slider must be < slidermax
-
+      dragging : allow for mouse dragging on slider
       
     Call on_changed to connect to the slider event
     """
     def __init__(self, ax, label, valmin, valmax, valinit=0.5, valfmt='%1.2f',
-                 closedmin=True, closedmax=True, slidermin=None, slidermax=None):
+                 closedmin=True, closedmax=True, slidermin=None, slidermax=None,
+                 dragging=True):
         """
         Create a slider from valmin to valmax in axes ax;
 
-        label is the slider label valinit is the slider initial position
+        valinit -  the slider initial position
 
-        valfmt is used to format the slider value
+        label - the slider label 
 
-        closedmin and closedmax indicated whether the slider interval is closed
+        valfmt - used to format the slider value
 
-        slidermin and slidermax can be used to contrain the value of
+        closedmin and closedmax - indicate whether the slider interval is closed
+
+        slidermin and slidermax - be used to contrain the value of
           this slider to the values of other sliders.
           """
         self.ax = ax
@@ -162,6 +168,8 @@ class Slider(Widget):
         ax.set_navigate(False)
         
         ax.figure.canvas.mpl_connect('button_press_event', self._update)
+        if dragging:
+            ax.figure.canvas.mpl_connect('motion_notify_event', self._update)
         self.label = ax.text(-0.02, 0.5, label, transform=ax.transAxes,
                              verticalalignment='center',
                              horizontalalignment='right')
@@ -179,7 +187,6 @@ class Slider(Widget):
         self.slidermin = slidermin
         self.slidermax = slidermax
 
-
     def _update(self, event):
         'update the slider position'
         if event.button !=1: return
@@ -187,16 +194,16 @@ class Slider(Widget):
         val = event.xdata
         if not self.closedmin and val<=self.valmin: return
         if not self.closedmax and val>=self.valmax: return        
-
+        
         if self.slidermin is not None:
             if val<=self.slidermin.val: return
 
         if self.slidermax is not None:
             if val>=self.slidermax.val: return
+            
+        self.set_val(val)
 
-        self._set_val(val)
-        
-    def _set_val(self, val):
+    def set_val(self, val):
         self.poly.xy[-1] = val, 0
         self.poly.xy[-2] = val, 1        
         self.valtext.set_text(self.valfmt%val)
@@ -205,8 +212,6 @@ class Slider(Widget):
         if not self.eventson: return
         for cid, func in self.observers.items():
             func(val)
-
-
         
     def on_changed(self, func):
         """
@@ -226,8 +231,9 @@ class Slider(Widget):
         except KeyError: pass
 
     def reset(self):
-        "reset the slider to the initial value"
-        self._set_val(self.valinit)        
+        "reset the slider to the initial value if needed"
+        if (self.val != self.valinit):
+            self.set_val(self.valinit)     
 
 
 
@@ -260,8 +266,14 @@ class CheckButtons(Widget):
         ax.set_xticks([])
         ax.set_yticks([])
         ax.set_navigate(False)        
-        dy = 1./(len(labels)+1)
-        ys = linspace(1-dy, dy, len(labels))
+
+        if len(labels)>1:
+            dy = 1./(len(labels)+1)
+            ys = linspace(1-dy, dy, len(labels))
+        else:
+            dy = 0.25
+            ys = [0.5]
+            
         cnt = 0
         axcolor = ax.get_axis_bgcolor()
 
@@ -583,3 +595,428 @@ class SubplotTool(Widget):
     def funchspace(self, val):
         self.targetfig.subplots_adjust(hspace=val)
         if self.drawon: self.targetfig.canvas.draw()
+
+
+class Cursor:
+    """
+    A horizontal and vertical line span the axes that and move with
+    the pointer.  You can turn off the hline or vline spectively with
+    the attributes
+
+      horizOn =True|False: controls visibility of the horizontal line
+      vertOn =True|False: controls visibility of the horizontal line      
+
+    And the visibility of the cursor itself with visible attribute
+    """
+    def __init__(self, ax, useblit=False, **lineprops):
+        """
+        Add a cursor to ax.  If useblit=True, use the backend
+        dependent blitting features for faster updates (GTKAgg only
+        now).  lineprops is a dictionary of line properties.  See
+        examples/widgets/cursor.py.
+        """
+        self.ax = ax
+        self.canvas = ax.figure.canvas
+
+        self.canvas.mpl_connect('motion_notify_event', self.onmove)
+        self.canvas.mpl_connect('draw_event', self.clear)
+
+        self.visible = True
+        self.horizOn = True
+        self.vertOn = True
+        self.useblit = useblit
+
+        self.lineh = ax.axhline(0, visible=False, **lineprops)
+        self.linev = ax.axvline(0, visible=False, **lineprops)
+
+        self.background = None
+        self.needclear = False
+        
+        
+    def clear(self, event):
+        'clear the cursor'
+        if self.useblit:
+            self.background = self.canvas.copy_from_bbox(self.ax.bbox)
+        self.linev.set_visible(False)
+        self.lineh.set_visible(False)        
+
+    def onmove(self, event):
+        'on mouse motion draw the cursor if visible'
+        if event.inaxes != self.ax:
+            self.linev.set_visible(False)
+            self.lineh.set_visible(False)        
+
+            if self.needclear:            
+                self.canvas.draw()
+                self.needclear = False
+            return 
+        self.needclear = True
+        if not self.visible: return 
+        self.linev.set_xdata((event.xdata, event.xdata))
+
+        self.lineh.set_ydata((event.ydata, event.ydata))
+        self.linev.set_visible(self.visible and self.vertOn)
+        self.lineh.set_visible(self.visible and self.horizOn)        
+
+        self._update()
+        
+
+    def _update(self):
+        
+        if self.useblit:
+            if self.background is not None:
+                self.canvas.restore_region(self.background)
+            self.ax.draw_artist(self.linev)
+            self.ax.draw_artist(self.lineh)            
+            self.canvas.blit(self.ax.bbox)
+        else:
+
+            self.canvas.draw_idle()
+
+        return False
+
+class SpanSelector:
+    """
+    Select a min/max range of the x or y axes for a matplotlib Axes
+
+    Example usage:
+
+      ax = subplot(111)
+      ax.plot(x,y)
+
+      def onselect(vmin, vmax):
+          print vmin, vmax
+      span = SpanSelector(ax, onselect, 'horizontal')
+
+    """
+    def __init__(self, ax, onselect, direction, minspan=None, useblit=False, rectprops=None):
+        """
+        Create a span selector in ax.  When a selection is made, clear
+        the span and call onselect with
+
+          onselect(vmin, vmax)
+
+        and clear the span.
+        
+        direction must be 'horizontal' or 'vertical'
+
+        If minspan is not None, ignore events smaller than minspan
+
+        The span rect is drawn with rectprops; default
+          rectprops = dict(facecolor='red', alpha=0.5)
+
+        set the visible attribute to False if you want to turn off
+        the functionality of the span selector
+
+
+        """
+        if rectprops is None:
+            rectprops = dict(facecolor='red', alpha=0.5)
+            
+        assert direction in ['horizontal', 'vertical'], 'Must choose horizontal or vertical for direction'
+        self.direction = direction
+            
+        self.ax = ax
+        self.visible = True
+        self.canvas = ax.figure.canvas
+        self.canvas.mpl_connect('motion_notify_event', self.onmove)
+        self.canvas.mpl_connect('button_press_event', self.press)
+        self.canvas.mpl_connect('button_release_event', self.release)
+        self.canvas.mpl_connect('draw_event', self.update_background)
+
+        self.rect = None
+        self.background = None
+
+        self.rectprops = rectprops
+        self.onselect = onselect
+        self.useblit = useblit
+        self.minspan = minspan
+
+        # Needed when dragging out of axes
+        self.buttonDown = False
+        self.prev = (0, 0)
+
+        if self.direction == 'horizontal':
+            trans = blend_xy_sep_transform(self.ax.transData, self.ax.transAxes)
+            w,h = 0,1
+        else:
+            trans = blend_xy_sep_transform(self.ax.transAxes, self.ax.transData)
+            w,h = 1,0
+        self.rect = Rectangle( (0,0), w, h,
+                               transform=trans,
+                               visible=False,
+                               **self.rectprops
+                               )
+        
+        if not self.useblit: self.ax.add_patch(self.rect)
+        self.pressv = None
+        
+    def update_background(self, event):
+        'force an update of the background'
+        if self.useblit:
+            self.background = self.canvas.copy_from_bbox(self.ax.bbox)
+
+        
+    def ignore(self, event):
+        'return True if event should be ignored'
+        return  event.inaxes!=self.ax or not self.visible or event.button !=1 
+
+    def press(self, event):
+        'on button press event'
+        if self.ignore(event): return
+        self.buttonDown = True
+        
+        self.rect.set_visible(self.visible)
+        if self.direction == 'horizontal':
+            self.pressv = event.xdata
+        else:
+            self.pressv = event.ydata
+        return False
+
+
+    def release(self, event):
+        'on button release event'
+        if self.pressv is None or (self.ignore(event) and not self.buttonDown): return
+        self.buttonDown = False
+
+        self.rect.set_visible(False)
+        self.canvas.draw()
+        vmin = self.pressv
+        if self.direction == 'horizontal':
+            vmax = event.xdata or self.prev[0]
+        else:
+            vmax = event.ydata or self.prev[1]
+
+        if vmin>vmax: vmin, vmax = vmax, vmin
+        span = vmax - vmin
+        if self.minspan is not None and span<self.minspan: return
+        self.onselect(vmin, vmax)
+        self.pressv = None
+        return False
+
+    def update(self):
+        'draw using newfangled blit or oldfangled draw depending on useblit'
+        if self.useblit:
+            if self.background is not None:
+                self.canvas.restore_region(self.background)
+            self.ax.draw_artist(self.rect)
+            self.canvas.blit(self.ax.bbox)
+        else:
+            self.canvas.draw_idle()
+
+        return False
+
+    def onmove(self, event):
+        'on motion notify event'
+        if self.pressv is None or self.ignore(event): return
+        x, y = event.xdata, event.ydata
+        self.prev = x, y
+        if self.direction == 'horizontal':
+            v = x
+        else:
+            v = y
+
+        minv, maxv = v, self.pressv
+        if minv>maxv: minv, maxv = maxv, minv
+        if self.direction == 'horizontal':
+            self.rect.xy[0] = minv
+            self.rect.set_width(maxv-minv)
+        else:
+            self.rect.xy[1] = minv
+            self.rect.set_height(maxv-minv)
+        self.update()
+        return False
+
+# For backwards compatibility only!
+class HorizontalSpanSelector(SpanSelector):
+    def __init__(self, ax, onselect, **kwargs):
+        import warnings
+        warnings.warn(DeprecationWarning('Use SpanSelector instead!'))
+        SpanSelector.__init__(self, ax, onselect, 'horizontal', **kwargs)
+
+class RectangleSelector:
+    """
+    Select a min/max range of the x axes for a matplotlib Axes
+
+    Example usage:
+
+      ax = subplot(111)
+      ax.plot(x,y)
+
+      def onselect(eclick, erelease):
+          'eclick and erelease are matplotlib events at press and release'
+          print 'startposition : (%f,%f)'%(eclick.xdata, eclick.ydata)
+          print 'endposition   : (%f,%f)'%(erelease.xdata, erelease.ydata)
+          print 'used button   : ', eclick.button
+
+      span = Selector(ax, onselect,drawtype='box')
+      show()
+
+    """
+    def __init__(self, ax, onselect, drawtype='box', 
+                 minspanx=None, minspany=None, useblit=False,
+                 lineprops=None, rectprops=None):
+
+        """
+        Create a selector in ax.  When a selection is made, clear
+        the span and call onselect with
+
+          onselect(pos_1, pos_2)
+
+        and clear the drawn box/line. There pos_i are arrays of length 2
+        containing the x- and y-coordinate.
+
+        If minspanx is not None then events smaller than minspanx
+        in x direction are ignored(it's the same for y).
+
+        The rect is drawn with rectprops; default
+          rectprops = dict(facecolor='red', edgecolor = 'black',
+                           alpha=0.5, fill=False)
+
+        The line is drawn with lineprops; default
+          lineprops = dict(color='black', linestyle='-',
+                           linewidth = 2, alpha=0.5)
+
+        Use type if you want the mouse to draw a line, a box or nothing
+        between click and actual position ny setting
+        drawtype = 'line', drawtype='box' or drawtype = 'none'.
+
+
+        """
+        self.ax = ax
+        self.visible = True
+        self.canvas = ax.figure.canvas
+        self.canvas.mpl_connect('motion_notify_event', self.onmove)
+        self.canvas.mpl_connect('button_press_event', self.press)
+        self.canvas.mpl_connect('button_release_event', self.release)
+        self.canvas.mpl_connect('draw_event', self.update_background)
+
+        self.to_draw = None
+        self.background = None
+
+        if drawtype == 'none':
+            drawtype = 'line'                        # draw a line but make it 
+            self.visible = False                     # invisible
+
+        if drawtype == 'box':
+            if rectprops is None:
+                rectprops = dict(facecolor='white', edgecolor = 'black',
+                                 alpha=0.5, fill=False)
+            self.rectprops = rectprops
+            self.to_draw = Rectangle((0,0), 0, 1,visible=False,**self.rectprops)
+            self.ax.add_patch(self.to_draw)
+        if drawtype == 'line':
+            if lineprops is None:
+                lineprops = dict(color='black', linestyle='-',
+                                 linewidth = 2, alpha=0.5)
+            self.lineprops = lineprops
+            self.to_draw = Line2D([0,0],[0,0],visible=False,**self.lineprops)
+            self.ax.add_line(self.to_draw)
+
+        self.onselect = onselect
+        self.useblit = useblit
+        self.minspanx = minspanx
+        self.minspany = minspany
+        self.drawtype = drawtype
+        # will save the data (position at mouseclick)
+        self.eventpress = None            
+        # will save the data (pos. at mouserelease)
+        self.eventrelease = None          
+
+    def update_background(self, event):
+        'force an update of the background'
+        if self.useblit:
+            self.background = self.canvas.copy_from_bbox(self.ax.bbox)
+
+        
+    def ignore(self, event):
+        'return True if event should be ignored'
+        # If no button was pressed yet ignore the event if it was out
+        # of the axes
+        if self.eventpress == None:
+            return event.inaxes!= self.ax       
+
+        # If a button was pressed, check if the release-button is the
+        # same.
+        return  (event.inaxes!=self.ax or
+                 event.button != self.eventpress.button)
+      
+    def press(self, event):
+        'on button press event'
+        # Is the correct button pressed within the correct axes?
+        if self.ignore(event): return         
+
+
+        # make the drawed box/line visible get the click-coordinates,
+        # button, ...
+        self.to_draw.set_visible(self.visible)
+        self.eventpress = event               
+        return False
+
+
+    def release(self, event):
+        'on button release event'
+        if self.eventpress is None or self.ignore(event): return
+        # make the box/line invisible again
+        self.to_draw.set_visible(False)       
+        self.canvas.draw()
+        # release coordinates, button, ...
+        self.eventrelease = event             
+        xmin, ymin = self.eventpress.xdata, self.eventpress.ydata
+        xmax, ymax = self.eventrelease.xdata, self.eventrelease.ydata
+        # calculate dimensions of box or line get values in the right
+        # order
+        if xmin>xmax: xmin, xmax = xmax, xmin        
+        if ymin>ymax: ymin, ymax = ymax, ymin
+
+
+
+        spanx = xmax - xmin                  
+        spany = ymax - ymin
+        xproblems = self.minspanx is not None and spanx<self.minspanx
+        yproblems = self.minspany is not None and spany<self.minspany
+        if (self.drawtype=='box')  and (xproblems or  yproblems):
+            """Box to small"""     # check if drawed distance (if it exists) is
+            return                 # not to small in neither x nor y-direction
+        if (self.drawtype=='line') and (xproblems and yproblems):
+            """Line to small"""    # check if drawed distance (if it exists) is
+            return                 # not to small in neither x nor y-direction
+        self.onselect(self.eventpress, self.eventrelease)
+                                              # call desired function
+        self.eventpress = None                # reset the variables to their
+        self.eventrelease = None              #   inital values
+        return False
+
+    def update(self):
+        'draw using newfangled blit or oldfangled draw depending on useblit'
+        if self.useblit:
+            if self.background is not None:
+                self.canvas.restore_region(self.background)
+            self.ax.draw_artist(self.to_draw)
+            self.canvas.blit(self.ax.bbox)
+        else:
+            self.canvas.draw_idle()
+        return False
+
+
+    def onmove(self, event):
+        'on motion notify event if box/line is wanted'
+        if self.eventpress is None or self.ignore(event): return
+        x,y = event.xdata, event.ydata            # actual position (with
+                                                  #   (button still pressed)
+        if self.drawtype == 'box':
+            minx, maxx = self.eventpress.xdata, x # click-x and actual mouse-x
+            miny, maxy = self.eventpress.ydata, y # click-y and actual mouse-y
+            if minx>maxx: minx, maxx = maxx, minx # get them in the right order
+            if miny>maxy: miny, maxy = maxy, miny
+            self.to_draw.xy[0] = minx             # set lower left of box
+            self.to_draw.xy[1] = miny
+            self.to_draw.set_width(maxx-minx)     # set width and height of box
+            self.to_draw.set_height(maxy-miny)
+            self.update()
+            return False
+        if self.drawtype == 'line':
+            self.to_draw.set_data([self.eventpress.xdata, x],
+                                  [self.eventpress.ydata, y])
+            self.update()
+            return False

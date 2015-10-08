@@ -1,14 +1,16 @@
-"""numerix  imports either Numeric or numarray based on various selectors.
+"""
+numerix  imports either Numeric or numarray based on various selectors.
 
-0.  If the value "--numarray" or "--Numeric" is specified on the
-command line, then numerix imports the specified array package.
+0.  If the value "--numpy","--numarray" or "--Numeric" is specified on the
+    command line, then numerix imports the specified
+    array package.
 
-1. The value of numerix in ~/.matplotlibrc: either Numeric or numarray
+1. The value of numerix in matplotlibrc: either Numeric or numarray
 
 2. If none of the above is done, the default array package is Numeric.
-Because the .matplotlibrc always provides *some* value for numerix (it
-has it's own system of default values), this default is most likely
-never used.
+   Because the matplotlibrc always provides *some* value for numerix
+   (it has it's own system of default values), this default is most
+   likely never used.
 
 To summarize: the  commandline is examined first, the  rc file second,
 and the default array package is Numeric.  
@@ -24,7 +26,9 @@ which = None, None
 
 for a in sys.argv:
     if a in ["--Numeric", "--numeric", "--NUMERIC",
-             "--Numarray", "--numarray", "--NUMARRAY"]:
+             "--Numarray", "--numarray", "--NUMARRAY",
+             "--NumPy", "--numpy", "--NUMPY", "--Numpy",
+             ]:
         which = a[2:], "command line"
         break
     del a
@@ -40,8 +44,8 @@ if which[0] is None:
     which = "numeric", "defaulted"
 
 which = which[0].strip().lower(), which[1]
-if which[0] not in ["numeric", "numarray"]:
-    raise ValueError("numerix selector must be either 'Numeric' or 'numarray' but the value obtained from the %s was '%s'." % (which[1], which[0]))
+if which[0] not in ["numeric", "numarray", "numpy"]:
+    raise ValueError("numerix selector must be either 'Numeric', 'numarray', or 'numpy' but the value obtained from the %s was '%s'." % (which[1], which[0]))
 
 if which[0] == "numarray":
     #from na_imports import *
@@ -50,9 +54,7 @@ if which[0] == "numarray":
     from numarray.numeric import nonzero
     from numarray.convolve import cross_correlate, convolve
     import numarray
-    
     version = 'numarray %s'%numarray.__version__
-
 elif which[0] == "numeric":
     #from nc_imports import *
     from Numeric import *
@@ -60,8 +62,56 @@ elif which[0] == "numeric":
     from Matrix import Matrix
     import Numeric
     version = 'Numeric %s'%Numeric.__version__
+elif which[0] == "numpy":
+    import numpy
+    from numpy import *
+    from _sp_imports import nx, infinity
+    from _sp_imports import UInt8, UInt16, UInt32
+    Matrix = matrix
+    version = 'numpy %s' % numpy.__version__
 else:
     raise RuntimeError("invalid numerix selector")
+
+# Some changes are only applicable to the new numpy:
+if (which[0] == 'numarray' or
+    which[0] == 'numeric'):
+    def typecode(a):
+        return a.typecode()
+    def iscontiguous(a):
+        return a.iscontiguous()
+    def byteswapped(a):
+        return a.byteswapped()
+    def itemsize(a):
+        return a.itemsize()
+
+else:
+    # We've already checked for a valid numerix selector,
+    # so assume numpy.
+    def typecode(a):
+        return a.dtype.char
+    def iscontiguous(a):
+        return a.flags.contiguous
+    def byteswapped(a):
+        return a.byteswap()
+    def itemsize(a):
+        return a.itemsize
+    # resize function is already defined by numpy 
+    # Fix typecode->dtype
+    def fixkwargs(kwargs):
+        if 'typecode' in kwargs:
+            val = kwargs['typecode']
+            del kwargs['typecode']
+            kwargs['dtype'] = val
+    def array(*args, **kwargs):
+        fixkwargs(kwargs)
+        return numpy.array(*args, **kwargs)
+    def zeros(*args, **kwargs):
+        fixkwargs(kwargs)
+        return numpy.zeros(*args, **kwargs)
+    def ones(*args, **kwargs):
+        fixkwargs(kwargs)
+        return numpy.ones(*args, **kwargs)
+    
 
 verbose.report('numerix %s'%version)
 # a bug fix for blas numeric suggested by Fernando Perez
@@ -86,7 +136,6 @@ this module was turned off in setup.py.  If it appears that
 %(specific)s was not built, make sure you have a working copy of
 %(which)s and then re-install matplotlib. Otherwise, the following
 traceback gives more details:\n""" % _dict
-
 
 g = globals()
 l = locals()
