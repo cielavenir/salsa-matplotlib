@@ -87,7 +87,7 @@ class PsBackendHelper(object):
         except KeyError:
             pass
 
-        from subprocess import Popen, PIPE
+        from matplotlib.compat.subprocess import Popen, PIPE
         pipe = Popen(self.gs_exe + " --version",
                      shell=True, stdout=PIPE).stdout
         if sys.version_info[0] >= 3:
@@ -284,7 +284,7 @@ class RendererPS(RendererBase):
         if (fontname,fontsize) != (self.fontname,self.fontsize):
             out = ("/%s findfont\n"
                    "%1.3f scalefont\n"
-                   "setfont\n" % (fontname,fontsize))
+                   "setfont\n" % (fontname, fontsize))
 
             self._pswriter.write(out)
             if store: self.fontname = fontname
@@ -469,7 +469,7 @@ class RendererPS(RendererBase):
         im.flipud_out()
 
         h, w, bits, imagecmd = self._get_image_h_w_bits_command(im)
-        hexlines = '\n'.join(self._hex_lines(bits))
+        hexlines = b'\n'.join(self._hex_lines(bits)).decode('ascii')
 
         if dx is None:
             xscale = w / self.image_magnification
@@ -587,7 +587,7 @@ grestore
             if rgbFace[0]==rgbFace[1] and rgbFace[0]==rgbFace[2]:
                 ps_color = '%1.3f setgray' % rgbFace[0]
             else:
-                ps_color = '%1.3f %1.3f %1.3f setrgbcolor' % rgbFace
+                ps_color = '%1.3f %1.3f %1.3f setrgbcolor' % rgbFace[:3]
 
         # construct the generic marker command:
         ps_cmd = ['/o {', 'gsave', 'newpath', 'translate'] # dont want the translate to be global
@@ -649,7 +649,7 @@ grestore
 
         self._path_collection_id += 1
 
-    def draw_tex(self, gc, x, y, s, prop, angle, ismath='TeX!'):
+    def draw_tex(self, gc, x, y, s, prop, angle, ismath='TeX!', mtext=None):
         """
         draw a Text instance
         """
@@ -659,18 +659,18 @@ grestore
         color = '%1.3f,%1.3f,%1.3f'% gc.get_rgb()[:3]
         fontcmd = {'sans-serif' : r'{\sffamily %s}',
                'monospace'  : r'{\ttfamily %s}'}.get(
-                rcParams['font.family'], r'{\rmfamily %s}')
+                rcParams['font.family'][0], r'{\rmfamily %s}')
         s = fontcmd % s
         tex = r'\color[rgb]{%s} %s' % (color, s)
 
         corr = 0#w/2*(fontsize-10)/10
         if rcParams['text.latex.preview']:
             # use baseline alignment!
-            pos = _nums_to_str(x-corr, y+bl)
+            pos = _nums_to_str(x-corr, y)
             self.psfrag.append(r'\psfrag{%s}[Bl][Bl][1][%f]{\fontsize{%f}{%f}%s}'%(thetext, angle, fontsize, fontsize*1.25, tex))
         else:
             # stick to the bottom alignment, but this may give incorrect baseline some times.
-            pos = _nums_to_str(x-corr, y)
+            pos = _nums_to_str(x-corr, y-bl)
             self.psfrag.append(r'\psfrag{%s}[bl][bl][1][%f]{\fontsize{%f}{%f}%s}'%(thetext, angle, fontsize, fontsize*1.25, tex))
 
         ps = """\
@@ -684,7 +684,7 @@ grestore
         self._pswriter.write(ps)
         self.textcnt += 1
 
-    def draw_text(self, gc, x, y, s, prop, angle, ismath):
+    def draw_text(self, gc, x, y, s, prop, angle, ismath=False, mtext=None):
         """
         draw a Text instance
         """
@@ -748,14 +748,20 @@ grestore
             self.track_characters(font, s)
 
             self.set_color(*gc.get_rgb())
-            self.set_font(font.get_sfnt()[(1,0,0,6)], prop.get_size_in_points())
+            sfnt = font.get_sfnt()
+            try:
+                ps_name = sfnt[(1,0,0,6)]
+            except KeyError:
+                ps_name = sfnt[(3,1,0x0409,6)].decode(
+                    'utf-16be').encode('ascii','replace')
+            self.set_font(ps_name, prop.get_size_in_points())
 
             cmap = font.get_charmap()
             lastgind = None
             #print 'text', s
             lines = []
             thisx = 0
-            thisy = font.get_descent() / 64.0
+            thisy = 0
             for c in s:
                 ccode = ord(c)
                 gind = cmap.get(ccode)
@@ -824,14 +830,13 @@ grestore
         assert colors.shape[1] == 3
         assert colors.shape[2] == 4
 
-        points = trans.transform(points)
-
         shape = points.shape
         flat_points = points.reshape((shape[0] * shape[1], 2))
+        flat_points = trans.transform(flat_points)
         flat_colors = colors.reshape((shape[0] * shape[1], 4))
-        points_min = np.min(flat_points, axis=0) - (1 << 8)
-        points_max = np.max(flat_points, axis=0) + (1 << 8)
-        factor = float(0xffffffff) / (points_max - points_min)
+        points_min = np.min(flat_points, axis=0) - (1 << 12)
+        points_max = np.max(flat_points, axis=0) + (1 << 12)
+        factor = np.ceil(float(2 ** 32 - 1) / (points_max - points_min))
 
         xmin, ymin = points_min
         xmax, ymax = points_max
@@ -973,11 +978,6 @@ class FigureCanvasPS(FigureCanvasBase):
     def print_eps(self, outfile, *args, **kwargs):
         return self._print_ps(outfile, 'eps', *args, **kwargs)
 
-
-
-
-
-
     def _print_ps(self, outfile, format, *args, **kwargs):
         papertype = kwargs.pop("papertype", rcParams['ps.papersize'])
         papertype = papertype.lower()
@@ -1105,8 +1105,7 @@ class FigureCanvasPS(FigureCanvasBase):
         self.figure.set_facecolor(origfacecolor)
         self.figure.set_edgecolor(origedgecolor)
 
-        fd, tmpfile = mkstemp()
-        with io.open(fd, 'wb') as raw_fh:
+        def print_figure_impl():
             if sys.version_info[0] >= 3:
                 fh = io.TextIOWrapper(raw_fh, encoding="ascii")
             else:
@@ -1179,21 +1178,41 @@ class FigureCanvasPS(FigureCanvasBase):
             print("end", file=fh)
             print("showpage", file=fh)
             if not isEPSF: print("%%EOF", file=fh)
+            fh.flush()
 
-        if rcParams['ps.usedistiller'] == 'ghostscript':
-            gs_distill(tmpfile, isEPSF, ptype=papertype, bbox=bbox)
-        elif rcParams['ps.usedistiller'] == 'xpdf':
-            xpdf_distill(tmpfile, isEPSF, ptype=papertype, bbox=bbox)
+            if sys.version_info[0] >= 3:
+                fh.detach()
 
-        if passed_in_file_object:
-            with open(tmpfile, 'rb') as fh:
-                print(fh.read(), file=outfile)
+        if rcParams['ps.usedistiller']:
+            # We are going to use an external program to process the output.
+            # Write to a temporary file.
+            fd, tmpfile = mkstemp()
+            with io.open(fd, 'wb') as raw_fh:
+                print_figure_impl()
         else:
-            with open(outfile, 'w') as fh:
-                pass
-            mode = os.stat(outfile).st_mode
-            shutil.move(tmpfile, outfile)
-            os.chmod(outfile, mode)
+            # Write directly to outfile.
+            if passed_in_file_object:
+                raw_fh = outfile
+                print_figure_impl()
+            else:
+                with open(outfile, 'wb') as raw_fh:
+                    print_figure_impl()
+
+        if rcParams['ps.usedistiller']:
+            if rcParams['ps.usedistiller'] == 'ghostscript':
+                gs_distill(tmpfile, isEPSF, ptype=papertype, bbox=bbox)
+            elif rcParams['ps.usedistiller'] == 'xpdf':
+                xpdf_distill(tmpfile, isEPSF, ptype=papertype, bbox=bbox)
+
+            if passed_in_file_object:
+                with open(tmpfile, 'rb') as fh:
+                    outfile.write(fh.read())
+            else:
+                with open(outfile, 'w') as fh:
+                    pass
+                mode = os.stat(outfile).st_mode
+                shutil.move(tmpfile, outfile)
+                os.chmod(outfile, mode)
 
     def _print_figure_tex(self, outfile, format, dpi, facecolor, edgecolor,
                           orientation, isLandscape, papertype,
@@ -1293,6 +1312,7 @@ class FigureCanvasPS(FigureCanvasBase):
             #print >>fh, "grestore"
             print("end", file=fh)
             print("showpage", file=fh)
+            fh.flush()
 
         if isLandscape: # now we are ready to rotate
             isLandscape = True
@@ -1683,15 +1703,12 @@ def pstoeps(tmpfile, bbox=None, rotated=False):
             # eps file is not modified.
             line = tmph.readline()
             while line:
-                if line.startswith(b'%%Trailer'):
-                    write(b'%%Trailer\n')
+                if line.startswith(b'%%EOF'):
                     write(b'cleartomark\n')
                     write(b'countdictstack\n')
                     write(b'exch sub { end } repeat\n')
                     write(b'restore\n')
-                    if rcParams['ps.usedistiller'] == 'xpdf':
-                        # remove extraneous "end" operator:
-                        line = tmph.readline()
+                    write(b'%%EOF\n')
                 elif line.startswith(b'%%PageBoundingBox'):
                     pass
                 else:

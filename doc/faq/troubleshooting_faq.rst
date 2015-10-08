@@ -37,10 +37,10 @@ and printing the ``__file__`` attribute::
 :file:`.matplotlib` directory location
 ======================================
 
-Each user has a :file:`.matplotlib/` directory which may contain a
-:ref:`matplotlibrc <customizing-with-matplotlibrc-files>` file and various
-caches to improve matplotlib's performance. To locate your :file:`.matplotlib/`
-directory, use :func:`matplotlib.get_configdir`::
+Each user has a matplotlib configuration directory which may contain a
+:ref:`matplotlibrc <customizing-with-matplotlibrc-files>` file. To
+locate your :file:`.matplotlib/` directory, use
+:func:`matplotlib.get_configdir`::
 
     >>> import matplotlib as mpl
     >>> mpl.get_configdir()
@@ -68,13 +68,12 @@ Getting help
 There are a number of good resources for getting help with matplotlib.
 There is a good chance your question has already been asked:
 
-  - The `mailing list
-    <http://sourceforge.net/search/?group_id=80706&type_of_search=mlists>`_.
+  - The `mailing list archive <http://matplotlib.1069221.n5.nabble.com/>`_.
 
   - `Github issues <https://github.com/matplotlib/matplotlib/issues>`_.
 
   - Stackoverflow questions tagged `matplotlib
-<http://stackoverflow.com/questions/tagged/matplotlib>`_.
+    <http://stackoverflow.com/questions/tagged/matplotlib>`_.
 
 If you are unable to find an answer to your question through search,
 please provide the following information in your e-mail to the
@@ -87,7 +86,7 @@ please provide the following information in your e-mail to the
 
         python -c `import matplotlib; print matplotlib.__version__`
 
-  * where you obtained matplotlib (e.g. your Linux distribution's
+  * where you obtained matplotlib (e.g., your Linux distribution's
     packages or the matplotlib Sourceforge site, or the enthought
     python distribution `EPD
     <http://www.enthought.com/products/epd.php>`_).

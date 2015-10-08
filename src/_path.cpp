@@ -58,7 +58,7 @@ public:
         add_varargs_method("convert_path_to_polygons", &_path_module::convert_path_to_polygons,
                            "convert_path_to_polygons(path, trans, width, height)");
         add_varargs_method("cleanup_path", &_path_module::cleanup_path,
-                           "cleanup_path(path, trans, remove_nans, clip, snap, simplify, curves)");
+                           "cleanup_path(path, trans, remove_nans, clip, snap, simplify, curves, sketch_params)");
         add_varargs_method("convert_to_svg", &_path_module::convert_to_svg,
                            "convert_to_svg(path, trans, clip, simplify, precision)");
         initialize("Helper functions for paths");
@@ -128,6 +128,7 @@ point_in_path_impl(const void* const points_, const size_t s0,
                    npy_bool* const inside_flag)
 {
     int *yflag0;
+    int *subpath_flag;
     int yflag1;
     double vtx0, vty0, vtx1, vty1;
     double tx, ty;
@@ -138,6 +139,7 @@ point_in_path_impl(const void* const points_, const size_t s0,
     const char *const points = (const char * const)points_;
 
     yflag0 = (int *)malloc(n * sizeof(int));
+    subpath_flag = (int *)malloc(n * sizeof(int));
 
     path.rewind(0);
 
@@ -151,6 +153,10 @@ point_in_path_impl(const void* const points_, const size_t s0,
         if (code != agg::path_cmd_move_to)
         {
             code = path.vertex(&x, &y);
+            if (code == agg::path_cmd_stop ||
+                (code & agg::path_cmd_end_poly) == agg::path_cmd_end_poly) {
+                continue;
+            }
         }
 
         sx = vtx0 = vtx1 = x;
@@ -162,7 +168,7 @@ point_in_path_impl(const void* const points_, const size_t s0,
             // get test bit for above/below X axis
             yflag0[i] = (vty0 >= ty);
 
-            inside_flag[i] = 0;
+            subpath_flag[i] = 0;
         }
 
         do
@@ -208,7 +214,7 @@ point_in_path_impl(const void* const points_, const size_t s0,
                     // tests.
                     if (((vty1 - ty) * (vtx0 - vtx1) >=
                          (vtx1 - tx) * (vty0 - vty1)) == yflag1) {
-                        inside_flag[i] ^= 1;
+                        subpath_flag[i] ^= 1;
                     }
                 }
 
@@ -235,10 +241,10 @@ point_in_path_impl(const void* const points_, const size_t s0,
             if (yflag0[i] != yflag1) {
                 if (((vty1 - ty) * (vtx0 - vtx1) >=
                      (vtx1 - tx) * (vty0 - vty1)) == yflag1) {
-                    inside_flag[i] ^= 1;
+                    subpath_flag[i] ^= 1;
                 }
             }
-
+            inside_flag[i] |= subpath_flag[i];
             if (inside_flag[i] == 0) {
                 all_done = 0;
             }
@@ -253,6 +259,7 @@ point_in_path_impl(const void* const points_, const size_t s0,
  exit:
 
     free(yflag0);
+    free(subpath_flag);
 }
 
 inline void
@@ -699,7 +706,7 @@ _path_module::get_path_collection_extents(const Py::Tuple& args)
 Py::Object
 _path_module::point_in_path_collection(const Py::Tuple& args)
 {
-    args.verify_length(9);
+    args.verify_length(10);
 
     //segments, trans, clipbox, colors, linewidths, antialiaseds
     double                  x                = Py::Float(args[0]);
@@ -711,6 +718,9 @@ _path_module::point_in_path_collection(const Py::Tuple& args)
     Py::SeqBase<Py::Object> offsets_obj      = args[6];
     agg::trans_affine       offset_trans     = py_to_agg_transformation_matrix(args[7].ptr());
     bool                    filled           = Py::Boolean(args[8]);
+    std::string             offset_position  = Py::String(args[9]);
+
+    bool data_offsets = (offset_position == "data");
 
     PyArrayObject* offsets = (PyArrayObject*)PyArray_FromObject(
         offsets_obj.ptr(), PyArray_DOUBLE, 0, 2);
@@ -761,7 +771,11 @@ _path_module::point_in_path_collection(const Py::Tuple& args)
             double xo = *(double*)PyArray_GETPTR2(offsets, i % Noffsets, 0);
             double yo = *(double*)PyArray_GETPTR2(offsets, i % Noffsets, 1);
             offset_trans.transform(&xo, &yo);
-            trans *= agg::trans_affine_translation(xo, yo);
+            if (data_offsets) {
+                trans = agg::trans_affine_translation(xo, yo) * trans;
+            } else {
+                trans *= agg::trans_affine_translation(xo, yo);
+            }
         }
 
         if (filled)
@@ -952,8 +966,9 @@ clip_to_rect_one_step(const Polygon& polygon, Polygon& result, const Filter& fil
     }
 }
 
+template<class Path>
 void
-clip_to_rect(PathIterator& path,
+clip_to_rect(Path& path,
              double x0, double y0, double x1, double y1,
              bool inside, std::vector<Polygon>& results)
 {
@@ -1048,8 +1063,10 @@ _path_module::clip_path_to_rect(const Py::Tuple &args)
     }
 
     std::vector<Polygon> results;
+    typedef agg::conv_curve<PathIterator> curve_t;
+    curve_t curve(path);
 
-    ::clip_to_rect(path, x0, y0, x1, y1, inside, results);
+    ::clip_to_rect(curve, x0, y0, x1, y1, inside, results);
 
     npy_intp dims[2];
     dims[1] = 2;
@@ -1064,7 +1081,7 @@ _path_module::clip_path_to_rect(const Py::Tuple &args)
         for (std::vector<Polygon>::const_iterator p = results.begin(); p != results.end(); ++p)
         {
             size_t size = p->size();
-            dims[0] = p->size();
+            dims[0] = (npy_intp)size + 1;
             PyArrayObject* pyarray = (PyArrayObject*)PyArray_SimpleNew(2, dims, PyArray_DOUBLE);
             if (pyarray == NULL)
             {
@@ -1075,7 +1092,10 @@ _path_module::clip_path_to_rect(const Py::Tuple &args)
                 ((double *)pyarray->data)[2*i]   = (*p)[i].x;
                 ((double *)pyarray->data)[2*i+1] = (*p)[i].y;
             }
-            if (PyList_SetItem(py_results, p - results.begin(), (PyObject *)pyarray) != -1)
+            ((double *)pyarray->data)[2*size]   = (*p)[0].x;
+            ((double *)pyarray->data)[2*size+1] = (*p)[0].y;
+
+            if (PyList_SetItem(py_results, p - results.begin(), (PyObject *)pyarray) == -1)
             {
                 throw Py::RuntimeError("Error creating results list");
             }
@@ -1159,14 +1179,24 @@ _path_module::affine_transform(const Py::Tuple& args)
             size_t stride1 = PyArray_STRIDE(vertices, 1);
             double x;
             double y;
+            volatile double t0;
+	    volatile double t1;
+	    volatile double t;
 
             for (size_t i = 0; i < n; ++i)
             {
                 x = *(double*)(vertex_in);
                 y = *(double*)(vertex_in + stride1);
 
-                *vertex_out++ = a * x + c * y + e;
-                *vertex_out++ = b * x + d * y + f;
+		t0 = a * x;
+		t1 = c * y;
+                t = t0 + t1 + e;
+                *(vertex_out++) = t;
+
+		t0 = b * x;
+		t1 = d * y;
+                t = t0 + t1 + f;
+                *(vertex_out++) = t;
 
                 vertex_in += stride0;
             }
@@ -1353,7 +1383,7 @@ _add_polygon(Py::List& polygons, const std::vector<double>& polygon)
     {
         return;
     }
-    npy_intp polygon_dims[] = { polygon.size() / 2, 2, 0 };
+    npy_intp polygon_dims[] = { static_cast<npy_intp>(polygon.size() / 2), 2, 0 };
     PyArrayObject* polygon_array = NULL;
     polygon_array = (PyArrayObject*)PyArray_SimpleNew
                     (2, polygon_dims, PyArray_DOUBLE);
@@ -1454,6 +1484,8 @@ _cleanup_path(PathIterator& path, const agg::trans_affine& trans,
               const agg::rect_base<double>& rect,
               e_snap_mode snap_mode, double stroke_width,
               bool do_simplify, bool return_curves,
+              double sketch_scale, double sketch_length,
+              double sketch_randomness,
               std::vector<double>& vertices,
               std::vector<npy_uint8>& codes)
 {
@@ -1463,6 +1495,7 @@ _cleanup_path(PathIterator& path, const agg::trans_affine& trans,
     typedef PathSnapper<clipped_t>             snapped_t;
     typedef PathSimplifier<snapped_t>          simplify_t;
     typedef agg::conv_curve<simplify_t>        curve_t;
+    typedef Sketch<curve_t>                    sketch_t;
 
     transformed_path_t tpath(path, trans);
     nan_removal_t      nan_removed(tpath, remove_nans, path.has_curves());
@@ -1473,21 +1506,22 @@ _cleanup_path(PathIterator& path, const agg::trans_affine& trans,
     vertices.reserve(path.total_vertices() * 2);
     codes.reserve(path.total_vertices());
 
-    if (return_curves)
+    if (return_curves && sketch_scale == 0.0)
     {
         __cleanup_path(simplified, vertices, codes);
     }
     else
     {
         curve_t curve(simplified);
-        __cleanup_path(curve, vertices, codes);
+        sketch_t sketch(curve, sketch_scale, sketch_length, sketch_randomness);
+        __cleanup_path(sketch, vertices, codes);
     }
 }
 
 Py::Object
 _path_module::cleanup_path(const Py::Tuple& args)
 {
-    args.verify_length(8);
+    args.verify_length(9);
 
     PathIterator path(args[0]);
     agg::trans_affine trans = py_to_agg_transformation_matrix(args[1].ptr(), false);
@@ -1542,11 +1576,23 @@ _path_module::cleanup_path(const Py::Tuple& args)
 
     bool return_curves = args[7].isTrue();
 
+    Py::Object sketch_params = args[8];
+    double sketch_scale = 0.0;
+    double sketch_length = 0.0;
+    double sketch_randomness = 0.0;
+    if (sketch_params.ptr() != Py_None) {
+        Py::Tuple sketch(sketch_params);
+        sketch_scale = Py::Float(sketch[0]);
+        sketch_length = Py::Float(sketch[1]);
+        sketch_randomness = Py::Float(sketch[2]);
+    }
+
     std::vector<double> vertices;
     std::vector<npy_uint8> codes;
 
     _cleanup_path(path, trans, remove_nans, do_clip, clip_rect, snap_mode,
-                  stroke_width, simplify, return_curves, vertices, codes);
+                  stroke_width, simplify, return_curves, sketch_scale,
+                  sketch_length, sketch_randomness, vertices, codes);
 
     npy_intp length = codes.size();
     npy_intp dims[] = { length, 2, 0 };
