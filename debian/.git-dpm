@@ -6,3 +6,6 @@ bcd8e8642ebbe6e840d28afbd5bbc08ff5013244
 matplotlib_1.5.0~rc2.orig.tar.gz
 718c58f62e82959449e10a455274339882674042
 53304206
+debianTag="debian/%e%v"
+patchedTag="patched/%e%v"
+upstreamTag="upstream/%e%u"
