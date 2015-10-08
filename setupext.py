@@ -1395,13 +1395,16 @@ class BackendTkAgg(OptionalBackendPackage):
         except ImportError:
             return None
 
+        from distutils import sysconfig
         tcl_poss = [tcl_lib_dir,
                     os.path.normpath(os.path.join(tcl_lib_dir, '..')),
                     "/usr/lib/tcl" + str(Tkinter.TclVersion),
+                    "/usr/lib/%s/tcl%s" % (sysconfig.get_config_var('MULTIARCH'), Tkinter.TclVersion),
                     "/usr/lib"]
         tk_poss = [tk_lib_dir,
                     os.path.normpath(os.path.join(tk_lib_dir, '..')),
                    "/usr/lib/tk" + str(Tkinter.TkVersion),
+                   "/usr/lib/%s/tk%s" % (sysconfig.get_config_var('MULTIARCH'), Tkinter.TkVersion),
                    "/usr/lib"]
         for ptcl, ptk in zip(tcl_poss, tk_poss):
             tcl_config = os.path.join(ptcl, "tclConfig.sh")
