@@ -41,6 +41,7 @@ latex_to_bakoma = {
     r'\rangle'              : ('cmex10',  64),
     r'\widehat'             : ('cmex10',  15),
     r'\widetilde'           : ('cmex10',  52),
+    r'\widebar'             : ('cmr10',  131),
 
     r'\omega'               : ('cmmi10',  29),
     r'\varepsilon'          : ('cmmi10',  20),
@@ -118,6 +119,7 @@ latex_to_bakoma = {
     r'%'                    : ('cmr10',   48),
     r'\$'                   : ('cmr10',   99),
     r'@'                    : ('cmr10',  111),
+    r'\#'                   : ('cmr10',   39),
     r'\_'                   : ('cmtt10', 79),
     r'\Gamma'               : ('cmr10',  19),
     r'\Delta'               : ('cmr10',   6),
@@ -401,6 +403,7 @@ latex_to_standard = {
     r'\}'               : ('pncr8a', 125),
     r'\backslash'       : ('pncr8a',  92),
     r'\ast'             : ('pncr8a',  42),
+    r'\#'               : ('pncr8a',  35),
 
     r'\circumflexaccent'         : ('pncri8a',   124), # for \hat
     r'\combiningbreve'           : ('pncri8a',   81),  # for \breve
@@ -1760,6 +1763,7 @@ uni2type1 = dict([(v,k) for k,v in type12uni.items()])
 tex2uni = {
 'widehat': 0x0302,
 'widetilde': 0x0303,
+'widebar': 0x0305,
 'langle': 0x27e8,
 'rangle': 0x27e9,
 'perp': 0x27c2,
@@ -2288,6 +2292,7 @@ tex2uni = {
 '{': 123,
 '}': 125,
 '_': 95,
+'#': 35,
 'imath': 0x131,
 'circumflexaccent'         : 770,
 'combiningbreve'           : 774,

@@ -36,7 +36,7 @@ import sphinx
 sphinx_version = sphinx.__version__.split(".")
 # The split is necessary for sphinx beta versions where the string is
 # '6b1'
-sphinx_version = tuple([int(re.split('[a-z]', x)[0]) 
+sphinx_version = tuple([int(re.split('[a-z]', x)[0])
                         for x in sphinx_version[:2]])
 
 import matplotlib
@@ -81,7 +81,10 @@ else:
             i+=1
 
         rel_list = [os.pardir] * (len(base_list)-i) + target_list[i:]
-        return os.path.join(*rel_list)
+        if rel_list:
+            return os.path.join(*rel_list)
+        else:
+            return ""
 
 def write_char(s):
     sys.stdout.write(s)
@@ -93,7 +96,8 @@ options = {'alt': directives.unchanged,
            'scale': directives.nonnegative_int,
            'align': align,
            'class': directives.class_option,
-           'include-source': directives.flag }
+           'include-source': directives.flag,
+           'encoding': directives.encoding}
 
 template = """
 .. htmlonly::
@@ -260,11 +264,9 @@ def plot_directive(name, arguments, options, content, lineno,
     # the temporary directory, and then sphinx moves the file to
     # build/html/_images for us later.
     rstdir, rstfile = os.path.split(state_machine.document.attributes['source'])
-    reldir = rstdir[len(setup.confdir)+1:]
-    relparts = [p for p in os.path.split(reldir) if p.strip()]
-    nparts = len(relparts)
     outdir = os.path.join('plot_directive', basedir)
-    linkdir = ('../' * nparts) + outdir
+    reldir = relpath(setup.confdir, rstdir)
+    linkdir = os.path.join(reldir, outdir)
 
     # tmpdir is where we build all the output files.  This way the
     # plots won't have to be redone when generating latex after html.
@@ -274,8 +276,8 @@ def plot_directive(name, arguments, options, content, lineno,
     # treated as relative to the root of the documentation tree.  We need
     # to support both methods here.
     tmpdir = os.path.join('build', outdir)
+    tmpdir = os.path.abspath(tmpdir)
     if sphinx_version < (0, 6):
-        tmpdir = os.path.abspath(tmpdir)
         prefix = ''
     else:
         prefix = '/'
@@ -293,8 +295,15 @@ def plot_directive(name, arguments, options, content, lineno,
 
     if options.has_key('include-source'):
         if content is None:
-            content = open(reference, 'r').read()
-        lines = ['::', ''] + ['    %s'%row.rstrip() for row in content.split('\n')]
+            lines = [
+                '.. include:: %s' % os.path.join(setup.app.builder.srcdir, reference),
+                '    :literal:']
+            if options.has_key('encoding'):
+                lines.append('    :encoding: %s' % options['encoding'])
+                del options['encoding']
+        else:
+            lines = ['::', ''] + ['    %s'%row.rstrip() for row in content.split('\n')]
+        lines.append('')
         del options['include-source']
     else:
         lines = []
@@ -334,6 +343,36 @@ def plot_directive(name, arguments, options, content, lineno,
 
     return []
 
+def mark_plot_labels(app, document):
+    """
+    To make plots referenceable, we need to move the reference from
+    the "htmlonly" (or "latexonly") node to the actual figure node
+    itself.
+    """
+    for name, explicit in document.nametypes.iteritems():
+        if not explicit:
+            continue
+        labelid = document.nameids[name]
+        if labelid is None:
+            continue
+        node = document.ids[labelid]
+        if node.tagname in ('html_only', 'latex_only'):
+            for n in node:
+                if n.tagname == 'figure':
+                    sectname = name
+                    for c in n:
+                        if c.tagname == 'caption':
+                            sectname = c.astext()
+                            break
+
+                    node['ids'].remove(labelid)
+                    node['names'].remove(name)
+                    n['ids'].append(labelid)
+                    n['names'].append(name)
+                    document.settings.env.labels[name] = \
+                        document.settings.env.docname, labelid, sectname
+                    break
+
 def setup(app):
     setup.app = app
     setup.config = app.config
@@ -345,3 +384,4 @@ def setup(app):
         ['png', 'hires.png', 'pdf'],
         True)
 
+    app.connect('doctree-read', mark_plot_labels)

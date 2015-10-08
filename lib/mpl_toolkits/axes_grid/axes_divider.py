@@ -441,7 +441,7 @@ class AxesDivider(Divider):
                                  fraction_ref=self._xref)
 
         if pack_start:
-            self._horizontal.insert(0, pad)
+            self._horizontal.insert(0, size)
             self._xrefindex += 1
             locator = self.new_locator(nx=0, ny=0)
         else:
@@ -449,7 +449,6 @@ class AxesDivider(Divider):
             locator = self.new_locator(nx=len(self._horizontal)-1, ny=0)
 
         ax = self._get_new_axes(**kwargs)
-        locator = self.new_locator(nx=len(self._horizontal)-1, ny=0)
         ax.set_axes_locator(locator)
 
         return ax
@@ -489,7 +488,7 @@ class AxesDivider(Divider):
                                  fraction_ref=self._yref)
 
         if pack_start:
-            self._vertical.insert(0, pad)
+            self._vertical.insert(0, size)
             self._yrefindex += 1
             locator = self.new_locator(nx=0, ny=0)
         else:

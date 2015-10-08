@@ -275,8 +275,11 @@ class Text(Artist):
         baseline = None
         for i, line in enumerate(lines):
             clean_line, ismath = self.is_math_text(line)
-            w, h, d = renderer.get_text_width_height_descent(
-                clean_line, self._fontproperties, ismath=ismath)
+            if clean_line:
+                w, h, d = renderer.get_text_width_height_descent(
+                    clean_line, self._fontproperties, ismath=ismath)
+            else:
+                w, h, d = 0, 0, 0
             if baseline is None:
                 baseline = h - d
             whs[i] = w, h
@@ -664,7 +667,8 @@ class Text(Artist):
         x, y = self.get_position()
         return (x, y, self.get_text(), self._color,
                 self._verticalalignment, self._horizontalalignment,
-                hash(self._fontproperties), self._rotation,
+                hash(self._fontproperties),
+                self._rotation, self._rotation_mode,
                 self.figure.dpi, id(self._renderer),
                 )
 
@@ -1436,6 +1440,14 @@ class Annotation(Text):
           # 10 points to the right of the left border of the axes and
           # 5 points below the top border
           xy=(10,-5), xycoords='axes points'
+
+
+        The *annotation_clip* attribute contols the visibility of the
+        annotation when it goes outside the axes area. If True, the
+        annotation will only be drawn when the *xy* is inside the
+        axes. If False, the annotation will always be drawn regardless
+        of its position.  The default is *None*, which behave as True
+        only if *xycoords* is"data".
 
         Additional kwargs are Text properties:
 

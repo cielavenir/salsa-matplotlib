@@ -41,9 +41,9 @@ def allow_rasterization(draw):
             renderer.stop_rasterizing()
 
     # the axes class has a second argument inframe for its draw method.
-    def draw_wrapper(artist, renderer, *kl):
+    def draw_wrapper(artist, renderer, *args, **kwargs):
         before(artist, renderer)
-        draw(artist, renderer, *kl)
+        draw(artist, renderer, *args, **kwargs)
         after(artist, renderer)
 
     # "safe wrapping" to exactly replicate anything we haven't overridden above
@@ -477,12 +477,17 @@ class Artist(object):
                     path.get_path(),
                     path.get_transform())
                 success = True
+            elif isinstance(path, tuple):
+                path, transform = path
 
         if path is None:
             self._clippath = None
             success = True
         elif isinstance(path, Path):
             self._clippath = TransformedPath(path, transform)
+            success = True
+        elif isinstance(path, TransformedPath):
+            self._clippath = path
             success = True
 
         if not success:
