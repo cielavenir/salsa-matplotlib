@@ -24,7 +24,7 @@ plt.title("The default settings produce a diagram like this.")
 # This demonstrates:
 #   1. Setting one path longer than the others
 #   2. Placing a label in the middle of the diagram
-#   3. Using the the scale argument to normalize the flows
+#   3. Using the scale argument to normalize the flows
 #   4. Implicitly passing keyword arguments to PathPatch()
 #   5. Changing the angle of the arrow heads
 #   6. Changing the offset between the tips of the paths and their labels
@@ -37,13 +37,13 @@ ax = fig.add_subplot(1, 1, 1, xticks=[], yticks=[],
 sankey = Sankey(ax=ax, scale=0.01, offset=0.2, head_angle=180,
                 format='%.0f', unit='%')
 sankey.add(flows=[25, 0, 60, -10, -20, -5, -15, -10, -40],
-           labels = ['', '', '', 'First', 'Second', 'Third', 'Fourth',
-                     'Fifth', 'Hurray!'],
+           labels=['', '', '', 'First', 'Second', 'Third', 'Fourth',
+                   'Fifth', 'Hurray!'],
            orientations=[-1, 1, 0, 1, 1, 1, -1, -1, 0],
-           pathlengths = [0.25, 0.25, 0.25, 0.25, 0.25, 0.6, 0.25, 0.25,
-                          0.25],
+           pathlengths=[0.25, 0.25, 0.25, 0.25, 0.25, 0.6, 0.25, 0.25,
+                        0.25],
            patchlabel="Widget\nA",
-           alpha=0.2, lw=2.0) # Arguments to matplotlib.patches.PathPatch()
+           alpha=0.2, lw=2.0)  # Arguments to matplotlib.patches.PathPatch()
 diagrams = sankey.finish()
 diagrams[0].patch.set_facecolor('#37c959')
 diagrams[0].texts[-1].set_color('r')

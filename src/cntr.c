@@ -715,13 +715,14 @@ slit_cutter (Csite * site, int up, int pass2)
     double *ycp = pass2 ? site->ycp : 0;
     short *kcp = pass2 ? site->kcp : 0;
 
-    if (up)
+    if (up && pass2)
     {
         /* upward stroke of slit proceeds up left side of slit until
          * it hits a boundary or a point not between the contour levels
          * -- this never happens on the first pass */
         long p1 = site->edge;
         int z1;
+
         for (;;)
         {
             z1 = data[p1] & Z_VALUE;
@@ -1406,7 +1407,11 @@ int reorder(double *xpp, double *ypp, short *kpp,
 
     /* Find the subpaths as sets of connected segments. */
 
-    subp = (int *)malloc(nsegs * sizeof(int));
+    if (nsegs) {
+        subp = (int *)malloc(nsegs * sizeof(int));
+    } else {
+        subp = NULL;
+    }
     for (i=0; i<nsegs; i++) subp[i] = -1;
 
     nsp = 0;
@@ -1509,14 +1514,14 @@ build_cntr_list_v2(long *np, double *xp, double *yp, short *kp,
         dims[0] = np[i];
         dims[1] = 2;
         kdims[0] = np[i];
-        xyv = (PyArrayObject *) PyArray_SimpleNew(2, dims, PyArray_DOUBLE);
+        xyv = (PyArrayObject *) PyArray_SimpleNew(2, dims, NPY_DOUBLE);
         if (xyv == NULL)  goto error;
-        kv = (PyArrayObject *) PyArray_SimpleNew(1, kdims, PyArray_UBYTE);
+        kv = (PyArrayObject *) PyArray_SimpleNew(1, kdims, NPY_UBYTE);
         if (kv == NULL) goto error;
 
         n = reorder(xpp, ypp, kpp,
-                        (double *) xyv->data,
-                        (unsigned char *) kv->data,
+                        (double *) PyArray_DATA(xyv),
+                        (unsigned char *) PyArray_DATA(kv),
                         np[i]);
         if (n == -1) goto error;
         newshape.len = 2;
@@ -1569,9 +1574,9 @@ __build_cntr_list_v2(long *np, double *xp, double *yp, short *kp,
         dims[0] = np[i];
         dims[1] = 2;
         kdims[0] = np[i];
-        xyv = (PyArrayObject *) PyArray_SimpleNew(2, dims, PyArray_DOUBLE);
+        xyv = (PyArrayObject *) PyArray_SimpleNew(2, dims, NPY_DOUBLE);
         if (xyv == NULL)  goto error;
-        kv = (PyArrayObject *) PyArray_SimpleNew(1, kdims, PyArray_SHORT);
+        kv = (PyArrayObject *) PyArray_SimpleNew(1, kdims, NPY_SHORT);
         if (kv == NULL) goto error;
 
         for (j = 0; j < dims[0]; j++)
@@ -1809,14 +1814,14 @@ Cntr_init(Cntr *self, PyObject *args, PyObject *kwds)
     }
 
     xpa = (PyArrayObject *) PyArray_ContiguousFromObject(xarg,
-                                                      PyArray_DOUBLE, 2, 2);
+                                                      NPY_DOUBLE, 2, 2);
     ypa = (PyArrayObject *) PyArray_ContiguousFromObject(yarg,
-                                                      PyArray_DOUBLE, 2, 2);
+                                                      NPY_DOUBLE, 2, 2);
     zpa = (PyArrayObject *) PyArray_ContiguousFromObject(zarg,
-                                                      PyArray_DOUBLE, 2, 2);
+                                                      NPY_DOUBLE, 2, 2);
     if (marg)
         mpa = (PyArrayObject *) PyArray_ContiguousFromObject(marg,
-                                                      PyArray_BYTE, 2, 2);
+                                                      NPY_BYTE, 2, 2);
     else
         mpa = NULL;
 
@@ -1827,22 +1832,28 @@ Cntr_init(Cntr *self, PyObject *args, PyObject *kwds)
             "x, y, z must be castable to double.");
         goto error;
     }
-    iMax = zpa->dimensions[1];
-    jMax = zpa->dimensions[0];
-    if (xpa->dimensions[0] != jMax || xpa->dimensions[1] != iMax ||
-        ypa->dimensions[0] != jMax || ypa->dimensions[1] != iMax ||
-        (mpa && (mpa->dimensions[0] != jMax || mpa->dimensions[1] != iMax)))
+    iMax = PyArray_DIM(zpa, 1);
+    jMax = PyArray_DIM(zpa, 0);
+    if (PyArray_DIM(xpa, 0) != jMax || PyArray_DIM(xpa, 1) != iMax ||
+        PyArray_DIM(ypa, 0) != jMax || PyArray_DIM(ypa, 1) != iMax ||
+        (mpa && (PyArray_DIM(mpa, 0) != jMax || PyArray_DIM(mpa, 1) != iMax)))
     {
         PyErr_SetString(PyExc_ValueError,
             "Arguments x, y, z, mask (if present)"
              " must have the same dimensions.");
         goto error;
     }
-    if (mpa) mask = mpa->data;
-    else     mask = NULL;
-    if ( cntr_init(self->site, iMax, jMax, (double *)xpa->data,
-                            (double *)ypa->data,
-                            (double *)zpa->data, mask))
+    if (mpa)
+    {
+	mask = (char *) PyArray_DATA(mpa);
+    }
+    else
+    {
+	mask = NULL;
+    }
+    if ( cntr_init(self->site, iMax, jMax, (double *)PyArray_DATA(xpa),
+                            (double *)PyArray_DATA(ypa),
+                            (double *)PyArray_DATA(zpa), mask))
     {
         PyErr_SetString(PyExc_MemoryError,
             "Memory allocation failure in cntr_init");
@@ -1890,14 +1901,16 @@ Cntr_get_cdata(Cntr *self)
     npy_intp dims[2];
     int i, j;
     int ni, nj;
+    char *data;
 
     dims[0] = ni = self->site->imax;
     dims[1] = nj = self->site->jmax;
 
-    Cdata = (PyArrayObject *) PyArray_SimpleNew(2, dims, PyArray_SHORT);
+    Cdata = (PyArrayObject *) PyArray_SimpleNew(2, dims, NPY_SHORT);
+    data = (char *) PyArray_DATA(Cdata);
     for (j=0; j<nj; j++)
         for (i=0; i<ni; i++)
-            Cdata->data[j + i*nj] = self->site->data[i + j*ni];
+            data[j + i*nj] = self->site->data[i + j*ni];
             /* output is C-order, input is F-order */
     /* for now we are ignoring the last ni+1 values */
     return (PyObject *)Cdata;
@@ -2023,5 +2036,3 @@ init_cntr(void)
         return m;
     #endif
 }
-
-

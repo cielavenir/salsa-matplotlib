@@ -140,6 +140,21 @@ natgrid toolkit from the sourceforge `download
 page.
 
 
+.. _toolkit_matplotlibvenn:
+
+Matplotlib-Venn
+===============
+(*Not distributed with matplotlib*)
+
+`Matplotlib-Venn <https://github.com/konstantint/matplotlib-venn>`_ provides a set of functions for plotting 2- and 3-set area-weighted (or unweighted) Venn diagrams.
+
+mplstereonet
+===============
+(*Not distributed with matplotlib*)
+
+`mplstereonet <https://github.com/joferkington/mplstereonet>`_ provides stereonets for plotting and analyzing orientation data in Matplotlib.  
+
+
 .. _hl_plotting:
 
 High-Level Plotting
@@ -178,3 +193,14 @@ prettyplotlib
 `prettyplotlib <https://olgabot.github.io/prettyplotlib>`_ is an extension
 to matplotlib which changes many of the defaults to make plots some
 consider more attractive.
+
+
+iTerm2 terminal backend
+=======================
+(*Not distributed with matplotlib*)
+
+`matplotlib_iterm2 <https://github.com/oselivanov/matplotlib_iterm2>`_ is an
+external matplotlib backend uses iTerm2 nightly build inline image display
+feature.
+
+.. image:: /_static/matplotlib_iterm2_demo.png

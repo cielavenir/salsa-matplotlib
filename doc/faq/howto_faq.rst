@@ -478,6 +478,18 @@ though we have made significant progress towards supporting blocking events.
    able to create new figures and raise them in a subsequent call to
    ``show`` after closing the figures from a previous call to ``show``.
 
+.. _howto-boxplot_violinplot:
+
+Interpreting box plots and violin plots
+---------------------------------------
+
+Tukey's `box plots <http://matplotlib.org/examples/pylab_examples/boxplot_demo.html>`_ (Robert McGill, John W. Tukey and Wayne A. Larsen: "The American Statistician" Vol. 32, No. 1, Feb., 1978, pp. 12-16) are statistical plots that provide useful information about the data distribution such as skewness. However, bar plots with error bars are still the common standard in most scientific literature, and thus, the interpretation of box plots can be challenging for the unfamiliar reader. The figure below illustrates the different visual features of a box plot.
+
+.. figure:: ../_static/boxplot_explanation.png
+
+`Violin plots <http://matplotlib.org/examples/statistics/violinplot_demo.html>`_ are closely related to box plots but add useful information such as the distribution of the sample data (density trace).
+Violin plots were added in matplotlib 1.4.
+
 
 .. _howto-contribute:
 
@@ -491,7 +503,7 @@ Request a new feature
 
 Is there a feature you wish matplotlib had?  Then ask!  The best
 way to get started is to email the developer `mailing
-list <matplotlib-devel@lists.sourceforge.net>`_ for discussion.
+list <matplotlib-devel@python.org>`_ for discussion.
 This is an open source project developed primarily in the
 contributors free time, so there is no guarantee that your
 feature will be added.  The *best* way to get the feature
@@ -514,7 +526,7 @@ demonstrating what the bug is.  Including a clear, easy to test
 example makes it easy for the developers to evaluate the bug.  Expect
 that the bug reports will be a conversation.  If you do not want to
 register with github, please email bug reports to the `mailing list
-<matplotlib-devel@lists.sourceforge.net>`_.
+<matplotlib-devel@python.org>`_.
 
 
 The easiest way to submit patches to matplotlib is through pull

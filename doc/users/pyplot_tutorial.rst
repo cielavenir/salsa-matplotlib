@@ -11,7 +11,10 @@ some change to a figure: e.g., create a figure, create a plotting area
 in a figure, plot some lines in a plotting area, decorate the plot
 with labels, etc....  :mod:`matplotlib.pyplot` is stateful, in that it
 keeps track of the current figure and plotting area, and the plotting
-functions are directed to the current axes
+functions are directed to the current axes (please note that "axes" here
+and in most places in the documentation refers to the *axes*
+`part of a figure <http://matplotlib.org/faq/usage_faq.html#parts-of-a-figure>`__
+and not the strict mathematical term for more than one axis).
 
 .. plot:: pyplots/pyplot_simple.py
    :include-source:
@@ -164,7 +167,7 @@ scenes.  Below is a script to create two subplots.
 
 The :func:`~matplotlib.pyplot.figure` command here is optional because
 ``figure(1)`` will be created by default, just as a ``subplot(111)``
-will be created by default if you don't manually specify an axes.  The
+will be created by default if you don't manually specify any axes.  The
 :func:`~matplotlib.pyplot.subplot` command specifies ``numrows,
 numcols, fignum`` where ``fignum`` ranges from 1 to
 ``numrows*numcols``.  The commas in the ``subplot`` command are
@@ -280,3 +283,22 @@ variety of other coordinate systems one can choose -- see
 :ref:`annotations-tutorial` and :ref:`plotting-guide-annotation` for
 details.  More examples can be found in
 :ref:`pylab_examples-annotation_demo`.
+
+
+Logarithmic and other nonlinear axis
+====================================
+
+:mod:`matplotlib.pyplot` supports not only linear axis scales, but also
+logarithmic and logit scales. This is commonly used if data spans many orders
+of magnitude. Changing the scale of an axis is easy:
+
+    plt.xscale('log')
+
+An example of four plots with the same data and different scales for the y axis
+is shown below.
+
+.. plot:: pyplots/pyplot_scales.py
+   :include-source:
+
+It is also possible to add your own scale, see :ref:`adding-new-scales` for
+details.

@@ -13,6 +13,9 @@ import sys
 import warnings
 from textwrap import fill
 
+import versioneer
+
+
 PY3 = (sys.version_info[0] >= 3)
 
 
@@ -109,7 +112,7 @@ def extract_versions():
     """
     with open('lib/matplotlib/__init__.py') as fd:
         for line in fd.readlines():
-            if (line.startswith('__version__')):
+            if (line.startswith('__version__numpy__')):
                 exec(line.strip())
     return locals()
 
@@ -201,6 +204,8 @@ else:
 
 # Remove the -Wstrict-prototypesoption, is it's not valid for C++
 customize_compiler = sysconfig.customize_compiler
+
+
 def my_customize_compiler(compiler):
     retval = customize_compiler(compiler)
     try:
@@ -250,8 +255,13 @@ class PkgConfig(object):
         if sys.platform == 'win32':
             self.has_pkgconfig = False
         else:
+            try:
+                self.pkg_config = os.environ['PKG_CONFIG']
+            except KeyError:
+                self.pkg_config = 'pkg-config'
+
             self.set_pkgconfig_path()
-            status, output = getstatusoutput("pkg-config --help")
+            status, output = getstatusoutput(self.pkg_config + " --help")
             self.has_pkgconfig = (status == 0)
             if not self.has_pkgconfig:
                 print("IMPORTANT WARNING:")
@@ -284,7 +294,7 @@ class PkgConfig(object):
 
         executable = alt_exec
         if self.has_pkgconfig:
-            executable = 'pkg-config {0}'.format(package)
+            executable = (self.pkg_config + ' {0}').format(package)
 
         use_defaults = True
 
@@ -328,7 +338,7 @@ class PkgConfig(object):
             return None
 
         status, output = getstatusoutput(
-            "pkg-config %s --modversion" % (package))
+            self.pkg_config + " %s --modversion" % (package))
         if status == 0:
             return output
         return None
@@ -373,7 +383,6 @@ class SetupPackage(object):
         """
         return []
 
-
     def get_py_modules(self):
         """
         Get a list of top-level modules to add to the configuration.
@@ -414,6 +423,12 @@ class SetupPackage(object):
         """
         return []
 
+    def get_tests_require(self):
+        """
+        Get a list of Python packages that we require for executing tests.
+        """
+        return []
+
     def _check_for_pkg_config(self, package, include_file, min_version=None,
                               version=None):
         """
@@ -427,7 +442,9 @@ class SetupPackage(object):
         `min_version` is the minimum version required.
 
         `version` will override the found version if this package
-        requires an alternate method for that.
+        requires an alternate method for that. Set version='unknown'
+        if the version is not known but you still want to disabled
+        pkg_config version check.
         """
         if version is None:
             version = pkg_config.get_version(package)
@@ -441,7 +458,7 @@ class SetupPackage(object):
             raise CheckFailed(
                 "Requires patches that have not been merged upstream.")
 
-        if min_version:
+        if min_version and version != 'unknown':
             if (not is_min_version(version, min_version)):
                 raise CheckFailed(
                     "Requires %s %s or later.  Found %s." %
@@ -552,7 +569,7 @@ class Matplotlib(SetupPackage):
     name = "matplotlib"
 
     def check(self):
-        return extract_versions()['__version__']
+        return versioneer.get_version()
 
     def get_packages(self):
         return [
@@ -587,13 +604,14 @@ class Matplotlib(SetupPackage):
                 'mpl-data/images/*.xpm',
                 'mpl-data/images/*.svg',
                 'mpl-data/images/*.gif',
+                'mpl-data/images/*.pdf',
                 'mpl-data/images/*.png',
                 'mpl-data/images/*.ppm',
                 'mpl-data/example/*.npy',
                 'mpl-data/matplotlibrc',
                 'backends/web_backend/*.*',
-                'backends/web_backend/jquery/js/*',
-                'backends/web_backend/jquery/css/themes/base/*.*',
+                'backends/web_backend/jquery/js/*.min.js',
+                'backends/web_backend/jquery/css/themes/base/*.min.css',
                 'backends/web_backend/jquery/css/themes/base/images/*',
                 'backends/web_backend/css/*.*',
                 'backends/Matplotlib.nib/*',
@@ -642,9 +660,8 @@ class Tests(OptionalPackage):
 
         msgs = []
         msg_template = ('{package} is required to run the matplotlib test '
-                        'suite.  pip/easy_install may attempt to install it '
-                        'after matplotlib.')
-
+                        'suite. "setup.py test" will automatically download it.'
+                        ' Install {package} to run matplotlib.test()')
 
         bad_nose = msg_template.format(
             package='nose %s or later' % self.nose_min_version
@@ -657,7 +674,6 @@ class Tests(OptionalPackage):
                 msgs += [bad_nose]
         except ImportError:
             msgs += [bad_nose]
-
 
         if sys.version_info >= (3, 3):
             msgs += ['using unittest.mock']
@@ -673,6 +689,7 @@ class Tests(OptionalPackage):
     def get_packages(self):
         return [
             'matplotlib.tests',
+            'matplotlib.sphinxext.tests',
             ]
 
     def get_package_data(self):
@@ -685,14 +702,19 @@ class Tests(OptionalPackage):
             baseline_images +
             [
                 'tests/mpltest.ttf',
-                'tests/test_rcparams.rc'
+                'tests/test_rcparams.rc',
+                'tests/test_utf32_be_rcparams.rc',
+                'sphinxext/tests/tinypages/*.rst',
+                'sphinxext/tests/tinypages/*.py',
+                'sphinxext/tests/tinypages/_static/*',
             ]}
 
-    def get_install_requires(self):
-        requires = ['nose>=%s' % self.nose_min_version]
+    def get_tests_require(self):
+        requires = ['nose>=%s' % self.nose_min_version, 'sphinx']
         if not sys.version_info >= (3, 3):
             requires += ['mock']
         return requires
+
 
 class Toolkits_Tests(Tests):
     name = "toolkits_tests"
@@ -829,81 +851,14 @@ class Numpy(SetupPackage):
         ext.define_macros.append(('PY_ARRAY_UNIQUE_SYMBOL', array_api_name))
         ext.add_hook('include_dirs', self.include_dirs_hook)
 
+        ext.define_macros.append(('NPY_NO_DEPRECATED_API',
+                                  'NPY_1_7_API_VERSION'))
+
     def get_setup_requires(self):
         return ['numpy>=1.6']
 
     def get_install_requires(self):
         return ['numpy>=1.6']
-
-
-class CXX(SetupPackage):
-    name = 'pycxx'
-
-    def check(self):
-        if PY3:
-            # There is no version of PyCXX in the wild that will work
-            # with Python 3.x and matplotlib, since they lack support
-            # for the buffer object.
-            self.__class__.found_external = False
-            return ("Official versions of PyCXX are not compatible "
-                    "with matplotlib on Python 3.x, since they lack "
-                    "support for the buffer object.  Using local "
-                    "copy")
-
-        self.__class__.found_external = True
-        old_stdout = sys.stdout
-        if PY3:
-            sys.stdout = io.StringIO()
-        else:
-            sys.stdout = io.BytesIO()
-
-        try:
-            import CXX
-        except ImportError:
-            self.__class__.found_external = False
-            return "Couldn't import.  Using local copy."
-        finally:
-            sys.stdout = old_stdout
-
-        try:
-            return self._check_for_pkg_config(
-                'PyCXX', 'CXX/Extensions.hxx', min_version='6.2.4')
-        except CheckFailed as e:
-            # It's ok to just proceed here, since the `import CXX`
-            # worked above, and PyCXX (at least upstream) ensures that
-            # its header files are on the default distutils include
-            # path (either in a standard C place such as /usr/include,
-            # or in /usr/include/pythonX.Y.
-            return 'Using system CXX (version unknown, no pkg-config info)'
-
-    def add_flags(self, ext):
-        if self.found_external and not 'sdist' in sys.argv:
-            support_dir = os.path.normpath(
-                   os.path.join(
-                       sys.prefix,
-                       'share',
-                       'python%d.%d' % (
-                           sys.version_info[0], sys.version_info[1]),
-                       'CXX'))
-            if not os.path.exists(support_dir):
-                # On Fedora 17, these files are installed in /usr/share/CXX
-                support_dir = '/usr/src/CXX'
-            ext.sources.extend([
-                os.path.join(support_dir, x) for x in
-                ['cxxsupport.cxx', 'cxx_extensions.cxx',
-                 'IndirectPythonInterface.cxx',
-                 'cxxextensions.c']])
-            pkg_config.setup_extension(ext, 'PyCXX')
-        else:
-            ext.include_dirs.append('extern')
-            ext.sources.extend(glob.glob('extern/CXX/*.cxx'))
-            ext.sources.extend(glob.glob('extern/CXX/*.c'))
-        ext.define_macros.append(('PYCXX_ISO_CPP_LIB', '1'))
-        if PY3:
-            ext.define_macros.append(('PYCXX_PYTHON_2TO3', '1'))
-        if not (sys.platform == 'win32' and win32_compiler == 'msvc'):
-            ext.libraries.append('stdc++')
-            ext.libraries.append('m')
 
 
 class LibAgg(SetupPackage):
@@ -918,23 +873,24 @@ class LibAgg(SetupPackage):
             self.__class__.found_external = False
             return str(e) + ' Using local copy.'
 
-    def add_flags(self, ext):
+    def add_flags(self, ext, add_sources=True):
         if self.found_external:
             pkg_config.setup_extension(ext, 'libagg')
         else:
-            ext.include_dirs.append('extern/agg24/include')
-            agg_sources = [
-                'agg_bezier_arc.cpp',
-                'agg_curves.cpp',
-                'agg_image_filters.cpp',
-                'agg_trans_affine.cpp',
-                'agg_vcgen_contour.cpp',
-                'agg_vcgen_dash.cpp',
-                'agg_vcgen_stroke.cpp',
-                'agg_vpgen_segmentator.cpp'
-                ]
-            ext.sources.extend(
-                os.path.join('extern', 'agg24', 'src', x) for x in agg_sources)
+            ext.include_dirs.append('extern/agg24-svn/include')
+            if add_sources:
+                agg_sources = [
+                    'agg_bezier_arc.cpp',
+                    'agg_curves.cpp',
+                    'agg_image_filters.cpp',
+                    'agg_trans_affine.cpp',
+                    'agg_vcgen_contour.cpp',
+                    'agg_vcgen_dash.cpp',
+                    'agg_vcgen_stroke.cpp',
+                    'agg_vpgen_segmentator.cpp'
+                    ]
+                ext.sources.extend(
+                    os.path.join('extern', 'agg24-svn', 'src', x) for x in agg_sources)
 
 
 class FreeType(SetupPackage):
@@ -956,12 +912,15 @@ class FreeType(SetupPackage):
         if version is None or 'No such file or directory\ngrep:' in version:
             version = self.version_from_header()
 
+        # pkg_config returns the libtool version rather than the
+        # freetype version so we need to explicitly pass the version
+        # to _check_for_pkg_config
         return self._check_for_pkg_config(
             'freetype2', 'ft2build.h',
             min_version='2.3', version=version)
 
     def version_from_header(self):
-        version = 'Failed to identify version.'
+        version = 'unknown'
         ext = self.get_extension()
         if ext is None:
             return version
@@ -994,19 +953,18 @@ class FreeType(SetupPackage):
             default_libraries=['freetype', 'z'])
 
 
-
 class FT2Font(SetupPackage):
     name = 'ft2font'
 
     def get_extension(self):
         sources = [
             'src/ft2font.cpp',
+            'src/ft2font_wrapper.cpp',
             'src/mplutils.cpp'
             ]
         ext = make_extension('matplotlib.ft2font', sources)
         FreeType().add_flags(ext)
         Numpy().add_flags(ext)
-        CXX().add_flags(ext)
         return ext
 
 
@@ -1035,14 +993,14 @@ class Png(SetupPackage):
 
     def get_extension(self):
         sources = [
-            'src/_png.cpp', 'src/mplutils.cpp'
+            'src/_png.cpp',
+            'src/mplutils.cpp'
             ]
         ext = make_extension('matplotlib._png', sources)
         pkg_config.setup_extension(
             ext, 'libpng', default_libraries=['png', 'z'],
             alt_exec='libpng-config --ldflags')
         Numpy().add_flags(ext)
-        CXX().add_flags(ext)
         return ext
 
 
@@ -1088,7 +1046,6 @@ class TTConv(SetupPackage):
             ]
         ext = make_extension('matplotlib.ttconv', sources)
         Numpy().add_flags(ext)
-        CXX().add_flags(ext)
         ext.include_dirs.append('extern')
         return ext
 
@@ -1098,15 +1055,13 @@ class Path(SetupPackage):
 
     def get_extension(self):
         sources = [
-            'src/_path.cpp',
-            'src/path_cleanup.cpp',
-            'src/agg_py_transforms.cpp'
+            'src/py_converters.cpp',
+            'src/_path_wrapper.cpp'
             ]
 
         ext = make_extension('matplotlib._path', sources)
         Numpy().add_flags(ext)
         LibAgg().add_flags(ext)
-        CXX().add_flags(ext)
         return ext
 
 
@@ -1115,12 +1070,25 @@ class Image(SetupPackage):
 
     def get_extension(self):
         sources = [
-            'src/_image.cpp', 'src/mplutils.cpp'
+            'src/_image.cpp',
+            'src/mplutils.cpp',
+            'src/_image_wrapper.cpp'
             ]
         ext = make_extension('matplotlib._image', sources)
         Numpy().add_flags(ext)
         LibAgg().add_flags(ext)
-        CXX().add_flags(ext)
+        return ext
+
+
+class ContourLegacy(SetupPackage):
+    name = "contour_legacy"
+
+    def get_extension(self):
+        sources = [
+            "src/cntr.c"
+            ]
+        ext = make_extension('matplotlib._cntr', sources)
+        Numpy().add_flags(ext)
         return ext
 
 
@@ -1129,9 +1097,10 @@ class Contour(SetupPackage):
 
     def get_extension(self):
         sources = [
-            "src/cntr.c"
+            "src/_contour.cpp",
+            "src/_contour_wrapper.cpp",
             ]
-        ext = make_extension('matplotlib._cntr', sources)
+        ext = make_extension('matplotlib._contour', sources)
         Numpy().add_flags(ext)
         return ext
 
@@ -1169,39 +1138,19 @@ class Tri(SetupPackage):
     def get_extension(self):
         sources = [
             "lib/matplotlib/tri/_tri.cpp",
+            "lib/matplotlib/tri/_tri_wrapper.cpp",
             "src/mplutils.cpp"
             ]
         ext = make_extension('matplotlib._tri', sources)
         Numpy().add_flags(ext)
-        CXX().add_flags(ext)
         return ext
 
 
-class Six(SetupPackage):
-    name = "six"
-    min_version = "1.4"
+class Externals(SetupPackage):
+    name = "externals"
 
-    def check(self):
-        try:
-            import six
-        except ImportError:
-            return (
-                "six was not found."
-                "pip will attempt to install it "
-                "after matplotlib.")
-
-        if not is_min_version(six.__version__, self.min_version):
-            return ("The installed version of six is {inst_ver} but "
-                    "a the minimum required version is {min_ver}. "
-                    "pip/easy install will attempt to install a "
-                    "newer version."
-                    ).format(min_ver=self.min_version,
-                             inst_ver=six.__version__)
-
-        return "using six version %s" % six.__version__
-
-    def get_install_requires(self):
-        return ['six>={0}'.format(self.min_version)]
+    def get_packages(self):
+        return ['matplotlib.externals']
 
 
 class Pytz(SetupPackage):
@@ -1222,6 +1171,24 @@ class Pytz(SetupPackage):
         return ['pytz']
 
 
+class Cycler(SetupPackage):
+    name = "cycler"
+
+    def check(self):
+        try:
+            import cycler
+        except ImportError:
+            return (
+                "cycler was not found. "
+                "pip will attempt to install it "
+                "after matplotlib.")
+
+        return "using cycler version %s" % cycler.__version__
+
+    def get_install_requires(self):
+        return ['cycler']
+
+
 class Dateutil(SetupPackage):
     name = "dateutil"
 
@@ -1235,7 +1202,7 @@ class Dateutil(SetupPackage):
             # dateutil 2.1 has a file encoding bug that breaks installation on
             # python 3.3
             # https://github.com/matplotlib/matplotlib/issues/2373
-            # hack around the problem by installing the the (working) v2.0
+            # hack around the problem by installing the (working) v2.0
             major, minor1, _, _, _ = sys.version_info
             if self.version is None and (major, minor1) == (3, 3):
                 self.version = '!=2.1'
@@ -1318,14 +1285,14 @@ class BackendAgg(OptionalBackendPackage):
     def get_extension(self):
         sources = [
             "src/mplutils.cpp",
-            "src/agg_py_transforms.cpp",
-            "src/_backend_agg.cpp"
+            "src/py_converters.cpp",
+            "src/_backend_agg.cpp",
+            "src/_backend_agg_wrapper.cpp"
             ]
         ext = make_extension('matplotlib.backends._backend_agg', sources)
         Numpy().add_flags(ext)
         LibAgg().add_flags(ext)
         FreeType().add_flags(ext)
-        CXX().add_flags(ext)
         return ext
 
 
@@ -1356,7 +1323,7 @@ class BackendTkAgg(OptionalBackendPackage):
             tk_v = Tkinter.__version__.split()[-2]
         except (AttributeError, IndexError):
             # Tkinter.__version__ has been removed in python 3
-            tk_v = 'version not identified'
+            tk_v = 'not identified'
 
         BackendAgg.force = True
 
@@ -1364,15 +1331,14 @@ class BackendTkAgg(OptionalBackendPackage):
 
     def get_extension(self):
         sources = [
-            'src/agg_py_transforms.cpp',
+            'src/py_converters.cpp',
             'src/_tkagg.cpp'
             ]
 
         ext = make_extension('matplotlib.backends._tkagg', sources)
         self.add_flags(ext)
         Numpy().add_flags(ext)
-        LibAgg().add_flags(ext)
-        CXX().add_flags(ext)
+        LibAgg().add_flags(ext, add_sources=False)
         return ext
 
     def query_tcltk(self):
@@ -1741,14 +1707,13 @@ class BackendGtkAgg(BackendGtk):
 
     def get_extension(self):
         sources = [
-            'src/agg_py_transforms.cpp',
+            'src/py_converters.cpp',
             'src/_gtkagg.cpp',
             'src/mplutils.cpp'
             ]
         ext = make_extension('matplotlib.backends._gtkagg', sources)
         self.add_flags(ext)
         LibAgg().add_flags(ext)
-        CXX().add_flags(ext)
         Numpy().add_flags(ext)
         return ext
 
@@ -1897,20 +1862,22 @@ class BackendWxAgg(OptionalBackendPackage):
     name = "wxagg"
 
     def check_requirements(self):
+        wxversioninstalled = True
         try:
             import wxversion
         except ImportError:
-            raise CheckFailed("requires wxPython")
+            wxversioninstalled = False
 
-        try:
-            _wx_ensure_failed = wxversion.AlreadyImportedError
-        except AttributeError:
-            _wx_ensure_failed = wxversion.VersionError
+        if wxversioninstalled:
+            try:
+                _wx_ensure_failed = wxversion.AlreadyImportedError
+            except AttributeError:
+                _wx_ensure_failed = wxversion.VersionError
 
-        try:
-            wxversion.ensureMinimal('2.8')
-        except _wx_ensure_failed:
-            pass
+            try:
+                wxversion.ensureMinimal('2.8')
+            except _wx_ensure_failed:
+                pass
 
         try:
             import wx
@@ -1943,14 +1910,13 @@ class BackendMacOSX(OptionalBackendPackage):
     def get_extension(self):
         sources = [
             'src/_macosx.m',
-            'src/agg_py_transforms.cpp',
+            'src/py_converters.cpp',
             'src/path_cleanup.cpp'
             ]
 
         ext = make_extension('matplotlib.backends._macosx', sources)
         Numpy().add_flags(ext)
         LibAgg().add_flags(ext)
-        CXX().add_flags(ext)
         ext.extra_link_args.extend(['-framework', 'Cocoa'])
         return ext
 
@@ -2035,7 +2001,19 @@ class BackendQtBase(OptionalBackendPackage):
         return msg
 
 
-def backend_qt4_internal_check(self):
+def backend_pyside_internal_check(self):
+    try:
+        from PySide import __version__
+        from PySide import QtCore
+    except ImportError:
+        raise CheckFailed("PySide not found")
+    else:
+        BackendAgg.force = True
+        return ("Qt: %s, PySide: %s" %
+                (QtCore.__version__, __version__))
+
+
+def backend_pyqt4_internal_check(self):
     try:
         from PyQt4 import QtCore
     except ImportError:
@@ -2049,6 +2027,24 @@ def backend_qt4_internal_check(self):
     else:
         BackendAgg.force = True
         return ("Qt: %s, PyQt: %s" % (self.convert_qt_version(qt_version), pyqt_version_str))
+
+
+def backend_qt4_internal_check(self):
+    successes = []
+    failures = []
+    try:
+        successes.append(backend_pyside_internal_check(self))
+    except CheckFailed as e:
+        failures.append(str(e))
+
+    try:
+        successes.append(backend_pyqt4_internal_check(self))
+    except CheckFailed as e:
+        failures.append(str(e))
+
+    if len(successes) == 0:
+        raise CheckFailed('; '.join(failures))
+    return '; '.join(successes + failures)
 
 
 class BackendQt4(BackendQtBase):
@@ -2081,27 +2077,6 @@ class BackendQt5(BackendQtBase):
     def __init__(self, *args, **kwargs):
         BackendQtBase.__init__(self, *args, **kwargs)
         self.callback = backend_qt5_internal_check
-
-
-def backend_pyside_internal_check(self):
-    try:
-        from PySide import __version__
-        from PySide import QtCore
-    except ImportError:
-        raise CheckFailed("PySide not found")
-    else:
-        BackendAgg.force = True
-        return ("Qt: %s, PySide: %s" %
-                (QtCore.__version__, __version__))
-
-
-class BackendPySide(BackendQtBase):
-    name = "pyside"
-
-    def __init__(self, *args, **kwargs):
-        BackendQtBase.__init__(self, *args, **kwargs)
-        self.callback = backend_pyside_internal_check
-
 
 
 class BackendCairo(OptionalBackendPackage):

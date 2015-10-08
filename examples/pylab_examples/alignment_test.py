@@ -5,7 +5,7 @@ example shows you some of the alignment and rotation specifications to
 layout text
 """
 
-from pylab import *
+import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 
@@ -14,8 +14,8 @@ left, width = .25, .5
 bottom, height = .25, .5
 right = left + width
 top = bottom + height
-ax = gca()
-p = Rectangle((left, bottom), width, height,
+ax = plt.gca()
+p = plt.Rectangle((left, bottom), width, height,
               fill=False,
               )
 p.set_transform(ax.transAxes)
@@ -48,24 +48,24 @@ ax.text(right, bottom, 'center top',
         verticalalignment='top',
         transform=ax.transAxes)
 
-ax.text(left, 0.5*(bottom+top), 'right center',
+ax.text(left, 0.5*(bottom + top), 'right center',
         horizontalalignment='right',
         verticalalignment='center',
         rotation='vertical',
         transform=ax.transAxes)
 
-ax.text(left, 0.5*(bottom+top), 'left center',
+ax.text(left, 0.5*(bottom + top), 'left center',
         horizontalalignment='left',
         verticalalignment='center',
         rotation='vertical',
         transform=ax.transAxes)
 
-ax.text(0.5*(left+right), 0.5*(bottom+top), 'middle',
+ax.text(0.5*(left + right), 0.5*(bottom + top), 'middle',
         horizontalalignment='center',
         verticalalignment='center',
         transform=ax.transAxes)
 
-ax.text(right, 0.5*(bottom+top), 'centered',
+ax.text(right, 0.5*(bottom + top), 'centered',
         horizontalalignment='center',
         verticalalignment='center',
         rotation='vertical',
@@ -77,6 +77,6 @@ ax.text(left, top, 'rotated\nwith newlines',
         rotation=45,
         transform=ax.transAxes)
 
-axis('off')
+plt.axis('off')
 
-show()
+plt.show()

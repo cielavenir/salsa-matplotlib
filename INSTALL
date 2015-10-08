@@ -44,7 +44,7 @@ Mac OSX : using pip
 -------------------
 
 If you are on Mac OSX you can probably install matplotlib binaries using the
-standard Python installation program `pip <https://pypi.python.org/pip>`_.
+standard Python installation program `pip <https://pypi.python.org/pypi/pip>`_.
 See :ref:`install_osx_binaries`.
 
 
@@ -53,7 +53,7 @@ Windows
 
 If you don't already have Python installed, we recommend using
 one of the `scipy-stack compatible Python distributions
-<http://www.scipy.org/install.html>`_ such as Python(x,y),
+<http://www.scipy.org/install.html>`_ such as WinPython, Python(x,y),
 Enthought Canopy, or Continuum Anaconda, which have matplotlib and
 many of its dependencies, plus other useful packages, preinstalled.
 
@@ -63,13 +63,16 @@ you will also need to install compatible versions of
 `numpy <https://pypi.python.org/pypi/numpy/>`_,
 `python-dateutil <https://pypi.python.org/pypi/python-dateutil/>`_,
 `pytz <https://pypi.python.org/pypi/pytz>`_,
-`pyparsing <https://pypi.python.org/pypi/pyparsing/>`_ and
-`six <https://pypi.python.org/pypi/six>`_
+`pyparsing <https://pypi.python.org/pypi/pyparsing/>`_, and
+`cycler <https://pypi.python.org/pypi/Cycler>`_
 in addition to
 `matplotlib <http://matplotlib.org/downloads.html>`_.
 
-In case Python is not installed for all users (not the default), the
-Microsoft Visual C++ 2008 (
+For Python 3.5 the `Visual C++ Redistributable for Visual Studio 2015
+<http://www.microsoft.com/en-us/download/details.aspx?id=48145>`_
+needs to be installed.
+In case Python 2.6 to 3.4 are not installed for all users (not the default), 
+the Microsoft Visual C++ 2008 (
 `64 bit <http://www.microsoft.com/download/en/details.aspx?id=15336>`__
 or
 `32 bit <http://www.microsoft.com/download/en/details.aspx?id=29>`__
@@ -135,6 +138,14 @@ the latest *tar.gz* release file from `the download page
 to develop matplotlib or just need the latest bugfixed version, grab
 the latest git version :ref:`install-from-git`.
 
+The standard environment variables `CC`, `CXX`, `PKG_CONFIG` are respected.
+This means you can set them if your toolchain is prefixed. This may be used for
+cross compiling.
+
+  export CC=x86_64-pc-linux-gnu-gcc
+  export CXX=x86_64-pc-linux-gnu-g++
+  export PKG_CONFIG=x86_64-pc-linux-gnu-pkg-config
+
 Once you have satisfied the requirements detailed below (mainly
 python, numpy, libpng and freetype), you can build matplotlib::
 
@@ -170,10 +181,11 @@ package manager on Linux, you may need to install the development
 packages (look for a "-dev" postfix) in addition to the libraries
 themselves.
 
+
 Required Dependencies
 ^^^^^^^^^^^^^^^^^^^^^
 
-:term:`python` 2.6, 2.7, 3.3 or 3.4
+:term:`python` 2.6, 2.7, 3.3, 3.4, or 3.5
     `Download python <http://www.python.org/download/>`_.
 
 :term:`numpy` |minimum_numpy_version| (or later)
@@ -182,19 +194,12 @@ Required Dependencies
 :term:`dateutil` 1.1 or later
     Provides extensions to python datetime handling.  If using pip,
     easy_install or installing from source, the installer will attempt
-    to download and install `python_dateutil` from PyPI.  Note that
-    `python_dateutil` also depends on `six`.  `pip` and other package
-    managers should handle installing that secondary dependency
-    automatically.
+    to download and install `python_dateutil` from PyPI.
 
 `pyparsing`
     Required for matplotlib's mathtext math rendering support.  If
     using pip, easy_install or installing from source, the installer
     will attempt to download and install `pyparsing` from PyPI.
-
-six 1.4 or later
-    Python 2/3 compatibility library.  This is also a dependency of
-    :term:`dateutil`.
 
 libpng 1.2 (or later)
     library for loading and saving :term:`PNG` files (`download
@@ -206,6 +211,9 @@ libpng 1.2 (or later)
 
 :term:`freetype` 2.3 or later
     library for reading true type font files.
+
+``cycler`` 0.9 or later
+   Composable cycle class used for constructing style-cycles
 
 
 Optional GUI framework
@@ -242,9 +250,14 @@ ImageMagick
 Optional dependencies
 ^^^^^^^^^^^^^^^^^^^^^
 
-`Pillow <http://python-imaging.github.io/>`__
+`Pillow <http://python-pillow.github.io/>`__
     If Pillow is installed, matplotlib can read and write a larger
     selection of image file formats.
+
+pkg-config
+    A tool used to find required non-python libraries.  This is not strictly
+    required, but can make installation go more smoothly if the libraries and
+    headers are not in the expected locations.
 
 
 Required libraries that ship with matplotlib
@@ -254,15 +267,16 @@ Required libraries that ship with matplotlib
     agg template source statically, so it will not affect anything on
     your system outside of matplotlib.
 
-`PyCXX` 6.2.4
-    A library for writing Python extensions in C++.
-
 `qhull` 2012.1
-   A library for computing convex hulls.  Used for computing triangulation
-   and meshes.
+    A library for computing Delaunay triangulations.
 
 `ttconv`
    truetype font utility
+
+six 1.9.0
+    Python 2/3 compatibility library.  Do not use this in third-party
+    code.
+
 
 .. _build_linux:
 
@@ -298,7 +312,9 @@ the different OSX version (e.g., 10.4 and 10.5). We recommend that you build
 the way we do for the OSX release: get the source from the tarball or the
 git repository and follow the instruction in :file:`README.osx`.
 
+
 .. _build_windows:
+
 
 Building on Windows
 -------------------
