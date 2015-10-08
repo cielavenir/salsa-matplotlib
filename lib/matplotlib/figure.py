@@ -12,7 +12,6 @@ contains all the plot elements.  The following classes are defined
 
 """
 import numpy as np
-import time
 
 import artist
 from artist import Artist, allow_rasterization
@@ -299,7 +298,7 @@ class Figure(Artist):
 
         Example::
 
-          fig.subtitle('this is the figure title', fontsize=12)
+          fig.suptitle('this is the figure title', fontsize=12)
         """
         x = kwargs.pop('x', 0.5)
         y = kwargs.pop('y', 0.98)
@@ -851,7 +850,7 @@ class Figure(Artist):
 
           *fancybox*: [ None | False | True ]
             if True, draw a frame with a round fancybox.  If None, use rc
-            
+
           *shadow*: [ None | False | True ]
             If *True*, draw a shadow behind legend. If *None*, use rc settings.
 
@@ -1065,7 +1064,8 @@ class Figure(Artist):
 
     def subplots_adjust(self, *args, **kwargs):
         """
-        fig.subplots_adjust(left=None, bottom=None, right=None, wspace=None, hspace=None)
+        fig.subplots_adjust(left=None, bottom=None, right=None, top=None,
+            wspace=None, hspace=None)
 
         Update the :class:`SubplotParams` with *kwargs* (defaulting to rc where
         None) and update the subplot locations
@@ -1086,11 +1086,12 @@ class Figure(Artist):
                 ax.update_params()
                 ax.set_position(ax.figbox)
 
-    def ginput(self, n=1, timeout=30, show_clicks=True):
+    def ginput(self, n=1, timeout=30, show_clicks=True, mouse_add=1, mouse_pop=3, mouse_stop=2):
         """
         call signature::
 
-          ginput(self, n=1, timeout=30, show_clicks=True)
+          ginput(self, n=1, timeout=30, show_clicks=True,
+                 mouse_add=1, mouse_pop=3, mouse_stop=2)
 
         Blocking call to interact with the figure.
 
@@ -1104,6 +1105,12 @@ class Figure(Artist):
 
         Right clicking cancels last input.
 
+        The buttons used for the various actions (adding points, removing
+        points, terminating the inputs) can be overriden via the
+        arguments *mouse_add*, *mouse_pop* and *mouse_stop*, that give
+        the associated mouse button: 1 for left, 2 for middle, 3 for
+        right.
+
         The keyboard can also be used to select points in case your mouse
         does not have one or more of the buttons.  The delete and backspace
         keys act like right clicking (i.e., remove last point), the enter key
@@ -1111,7 +1118,9 @@ class Figure(Artist):
         manager) selects a point.
         """
 
-        blocking_mouse_input = BlockingMouseInput(self)
+        blocking_mouse_input = BlockingMouseInput(self, mouse_add =mouse_add,
+                                                        mouse_pop =mouse_pop,
+                                                        mouse_stop=mouse_stop)
         return blocking_mouse_input(n=n, timeout=timeout,
                                     show_clicks=show_clicks)
 

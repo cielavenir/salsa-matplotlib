@@ -459,7 +459,10 @@ class Line2D(Artist):
         self._y = self._xy[:, 1] # just a view
 
         self._subslice = False
-        if len(x) > 100 and self._is_sorted(x):
+        if (self.axes and len(x) > 100 and self._is_sorted(x) and
+            self.axes.name == 'rectilinear' and
+            self.axes.get_xscale() == 'linear' and
+            self.axes.get_yscale() == 'linear'):
             self._subslice = True
         if hasattr(self, '_path'):
             interpolation_steps = self._path._interpolation_steps
@@ -496,7 +499,7 @@ class Line2D(Artist):
     def draw(self, renderer):
         if self._invalid:
             self.recache()
-        if self._subslice:
+        if self._subslice and self.axes:
             # Need to handle monotonically decreasing case also...
             x0, x1 = self.axes.get_xbound()
             i0, = self._x.searchsorted([x0], 'left')
@@ -505,9 +508,10 @@ class Line2D(Artist):
             self._transform_path(subslice)
         if self._transformed_path is None:
             self._transform_path()
-        renderer.open_group('line2d', self.get_gid())
 
-        if not self._visible: return
+        if not self.get_visible(): return
+
+        renderer.open_group('line2d', self.get_gid())
         gc = renderer.new_gc()
         self._set_gc_clip(gc)
 
@@ -843,7 +847,6 @@ class Line2D(Artist):
 
         ACCEPTS: 1D array
         """
-        x = np.asarray(x)
         self.set_data(x, self._yorig)
 
     def set_ydata(self, y):
@@ -852,7 +855,6 @@ class Line2D(Artist):
 
         ACCEPTS: 1D array
         """
-        y = np.asarray(y)
         self.set_data(self._xorig, y)
 
     def set_dashes(self, seq):

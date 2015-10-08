@@ -50,8 +50,15 @@ basedir = {
     'linux2' : ['/usr/local', '/usr'],
     'linux'  : ['/usr/local', '/usr',],
     'cygwin' : ['/usr/local', '/usr',],
-    'darwin' : ['/sw/lib/freetype2', '/sw/lib/freetype219', '/usr/local',
+    '_darwin' : ['/sw/lib/freetype2', '/sw/lib/freetype219', '/usr/local',
                 '/usr', '/sw'],
+    # it appears builds with darwin are broken because of all the
+    # different flags the deps can be compile with, so I am pushing
+    # people to :
+    #   make -f make.osx fetch deps mpl_build mpl_install
+
+    'darwin' : [],
+
     'freebsd4' : ['/usr/local', '/usr'],
     'freebsd5' : ['/usr/local', '/usr'],
     'freebsd6' : ['/usr/local', '/usr'],
@@ -545,7 +552,7 @@ def add_ft2font_flags(module):
     else:
         add_base_flags(module)
         module.libraries.append('z')
-    
+
     # put this last for library link order
     module.libraries.extend(std_libs)
 
@@ -1037,6 +1044,7 @@ def add_tk_flags(module):
         try:
             tcl_lib_dir, tk_lib_dir, tk_ver = query_tcltk()
         except:
+            tk_ver = ''
             result = hardcoded_tcl_config()
         else:
             result = parse_tcl_config(tcl_lib_dir, tk_lib_dir)

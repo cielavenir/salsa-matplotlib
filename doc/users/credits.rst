@@ -16,9 +16,13 @@ Special thanks to those who have made valuable contributions
 Jeremy O'Donoghue
   wrote the wx backend
 
-Andrew Straw
-  provided much of the log scaling architecture, the fill command, PIL
-  support for imshow, and provided many examples
+Andrew Straw provided much of the log scaling architecture, the fill
+  command, PIL support for imshow, and provided many examples.  He
+  also wrote the support for dropped axis spines and the `buildbot
+  <http://mpl-buildbot.code.astraw.com/>`_ unit testing infrastructure
+  which triggers the JPL/James Evans platform specific builds and
+  regression test image comparisons from svn matplotlib across
+  platforms on svn commits.
 
 Charles Twardy
   provided the impetus code for the legend class and has made
@@ -27,7 +31,6 @@ Charles Twardy
 Gary Ruben
   made many enhancements to errorbar to support x and y
   errorbar plots, and added a number of new marker types to plot.
-
 
 John Gill
   wrote the table class and examples, helped with support for
@@ -117,11 +120,14 @@ Jeffrey Whitaker
   at `NOAA <http://www.boulder.noaa.gov>`_ wrote the
   :ref:`toolkit_basemap` tookit
 
-Sigve Tjoraand, Ted Drain
+Sigve Tjoraand, Ted Drain, James Evans 
   and colleagues at the `JPL <http://www.jpl.nasa.gov>`_ collaborated
   on the QtAgg backend and sponsored development of a number of
   features including custom unit types, datetime support, scale free
-  ellipses, broken bar plots and more.
+  ellipses, broken bar plots and more.  The JPL team wrote the unit
+  testing image comparison `infrastructure
+  <http://matplotlib.svn.sourceforge.net/viewvc/matplotlib/trunk/matplotlib/test>`_
+  for regression test image comparisons.
 
 James Amundson
   did the initial work porting the qt backend to qt4
@@ -133,7 +139,7 @@ Eric Firing
   most aspects of matplotlib.
 
 Daishi Harada
-  added support for "Dashed Text".  See ` dashpointlabel.py
+  added support for "Dashed Text".  See `dashpointlabel.py
   <examples/pylab_examples/dashpointlabel.py>`_ and
   :class:`~matplotlib.text.TextWithDash`.
 
@@ -147,11 +153,10 @@ The `brainvisa <http://brainvisa.info>`_ Orsay team and Fernando Perez
 
 
 Charlie Moad
-  contributed work to matplotlib's Cocoa support and does the binary
-  builds and releases.
+  contributed work to matplotlib's Cocoa support and has done a lot of work on the OSX and win32 binary releases.
 
-Jouni K. Seppaenen
-  wrote the PDF backend.
+Jouni K. Seppaenen wrote the PDF backend and contributed numerous
+  fixes to the code, to tex support and to the get_sample_data handler
 
 Paul Kienzle
   improved the picking infrastruture for interactive plots, and with
@@ -171,4 +176,7 @@ John Porter, Jonathon Taylor and Reinier Heeres
   matplotlib, and Jonathon Taylor and Reinier Heeres ported it to the
   refactored transform trunk.
 
-
+Jae-Joon Lee implemented fancy arrows and boxes, rewrote the legend
+  support to handle multiple columns and fancy text boxes, wrote the
+  axes grid toolkit, and has made numerous contributions to the code
+  and documentation
