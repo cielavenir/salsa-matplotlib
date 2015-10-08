@@ -1,4 +1,3 @@
 pylab
 mpl_toolkits
 matplotlib
-freetype2

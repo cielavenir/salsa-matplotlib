@@ -38,13 +38,31 @@ activity, but this can be problematic for the red/green colorblind. A new,
 colorblind-friendly colormap is now available at :class:`matplotlib.cm.Wistia`.
 This colormap maintains the red/green symbolism while achieving deuteranopic
 legibility through brightness variations. See
-`here <https://github.com/wistia/heatmap-palette>`
+`here <https://github.com/wistia/heatmap-palette>`_
 for more information.
 
-Documentation changes
----------------------
+The nbagg backend
+-----------------
+Phil Elson added a new backend, named "nbagg", which enables interactive
+figures in a live IPython notebook session. The backend makes use of the
+infrastructure developed for the webagg backend, which itself gives
+standalone server backed interactive figures in the browser, however nbagg
+does not require a dedicated matplotlib server as all communications are
+handled through the IPython Comm machinery.
 
-Phil Elson rewrote of the documentation and userguide for both Legend and PathEffects (links needed).
+As with other backends nbagg can be enabled inside the IPython notebook with::
+
+    import matplotlib
+    matplotlib.use('nbagg')
+
+Once figures are created and then subsequently shown, they will placed in an
+interactive widget inside the notebook allowing panning and zooming in the
+same way as any other matplotlib backend. Because figures require a connection
+to the IPython notebook server for their interactivity, once the notebook is
+saved, each figure will be rendered as a static image - thus allowing
+non-interactive viewing of figures on services such as
+`nbviewer <http://nbviewer.ipython.org/>`_.
+
 
 
 New plotting features
@@ -70,20 +88,20 @@ containing the positions for each element of the boxplots. Then
 a second method, :func:`~matplotlib.Axes.bxp` is called to draw the boxplots
 based on the stats.
 
-The :func:~matplotlib.pyplot.boxplot function can be used as before to
+The :func:`~matplotlib.pyplot.boxplot` function can be used as before to
 generate boxplots from data in one step. But now the user has the
 flexibility to generate the statistics independently, or to modify the
-output of :func:~matplotlib.cbook.boxplot_stats prior to plotting
-with :func:~matplotlib.Axes.bxp.
+output of :func:`~matplotlib.cbook.boxplot_stats` prior to plotting
+with :func:`~matplotlib.Axes.bxp`.
 
 Lastly, each artist (e.g., the box, outliers, cap, notches) can now be
 toggled on or off and their styles can be passed in through individual
 kwargs. See the examples:
-:ref:`~examples/statistics/boxplot_demo.py` and
-:ref:`~examples/statistics/bxp_demo.py`
+:ref:`statistics-boxplot_demo` and
+:ref:`statistics-bxp_demo`
 
-Added a bool kwarg, `manage_xticks`, which if False disables the management
-of the xtick and xlim by `boxplot`.
+Added a bool kwarg, :code:`manage_xticks`, which if False disables the management
+of the ticks and limits on the x-axis by :func:`~matplotlib.axes.Axes.bxp`.
 
 Support for datetime axes in 2d plots
 `````````````````````````````````````
@@ -269,6 +287,7 @@ Controls whether figures are saved with a transparent
 background by default.  Previously `savefig` always defaulted
 to a non-transparent background.
 
+
 ``axes.titleweight``
 ````````````````````
 Added rcParam to control the weight of the title
@@ -280,6 +299,12 @@ Controls the default value of `useOffset` in `ScalarFormatter`.  If
 an offset will be determined such that the tick labels are
 meaningful. If `False` then the full number will be formatted in all
 conditions.
+
+``nbagg.transparent`` added
+`````````````````````````````
+Controls whether nbagg figures have a transparent
+background. ``nbagg.transparent`` is ``True`` by default.
+
 
 XDG compliance
 ``````````````
@@ -316,6 +341,14 @@ Qt4 to look like Qt5, thus the Qt5 implementation is the primary implementation.
 Backwards compatibility for Qt4 is maintained by wrapping the Qt5 implementation.
 
 The Qt5Agg backend currently does not work with IPython's %matplotlib magic.
+
+The 1.4.0 release has a known bug where the toolbar is broken.  This can be
+fixed by: ::
+
+   cd path/to/installed/matplotlib
+   wget https://github.com/matplotlib/matplotlib/pull/3322.diff
+   # unix2dos 3322.diff (if on windows to fix line endings)
+   patch -p2 < 3322.diff
 
 Qt4 backend
 ```````````
@@ -378,6 +411,12 @@ Sphinx extension can now accept an optional ``reset`` setting, which will
 cause the context to be reset. This allows more than one distinct context to
 be present in documentation. To enable this option, use ``:context: reset``
 instead of ``:context:`` any time you want to reset the context.
+
+Legend and PathEffects documentation
+------------------------------------
+The :ref:`plotting-guide-legend` and :ref:`patheffects-guide` have both been
+updated to better reflect the full potential of each of these powerful
+features.
 
 Widgets
 -------
@@ -1076,7 +1115,7 @@ legends for complex plots such as :meth:`~matplotlib.pyplot.stem` plots
 will now display correctly. Second, the 'best' placement of a legend has
 been improved in the presence of NANs.
 
-See :ref:`legend-complex-plots` for more detailed explanation and
+See the :ref:`plotting-guide-legend` for more detailed explanation and
 examples.
 
 .. plot:: mpl_examples/pylab_examples/legend_demo4.py

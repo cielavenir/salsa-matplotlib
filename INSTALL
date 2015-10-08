@@ -66,17 +66,17 @@ you will also need to install compatible versions of
 `pyparsing <https://pypi.python.org/pypi/pyparsing/>`_ and
 `six <https://pypi.python.org/pypi/six>`_
 in addition to
-`matplotlib <https://pypi.python.org/pypi/matplotlib>`_.
+`matplotlib <http://matplotlib.org/downloads.html>`_.
 
 In case Python is not installed for all users (not the default), the
 Microsoft Visual C++ 2008 (
-`64 bit <http://www.microsoft.com/download/en/details.aspx?id=15336>`_
+`64 bit <http://www.microsoft.com/download/en/details.aspx?id=15336>`__
 or
-`32 bit <http://www.microsoft.com/download/en/details.aspx?id=29>`_
+`32 bit <http://www.microsoft.com/download/en/details.aspx?id=29>`__
 for Python 2.6 to 3.2) or Microsoft Visual C++ 2010 (
-`64 bit <http://www.microsoft.com/en-us/download/details.aspx?id=14632>`_
+`64 bit <http://www.microsoft.com/en-us/download/details.aspx?id=14632>`__
 or
-`32 bit <http://www.microsoft.com/en-us/download/details.aspx?id=5555>`_
+`32 bit <http://www.microsoft.com/en-us/download/details.aspx?id=5555>`__
 for Python 3.3 and 3.4) redistributable packages need to be installed.
 
 Matplotlib depends on `Pillow <https://pypi.python.org/pypi/Pillow>`_
@@ -106,14 +106,15 @@ standard Python shell or IPython. It is enabled as the default backend
 for the official binaries.  GTK3 is not supported on Windows.
 
 The Windows installers (:file:`*.exe`) and wheels (:file:`*.whl`) on
-the download page do not contain test data or example code.
+the `download page <http://matplotlib.org/downloads.html>`_ do not
+contain test data or example code.
 If you want to try the many demos that come in the matplotlib source
-distribution, download the zip file and look in the :file:`examples`
-subdirectory.
-To run the test suite, copy the lib\matplotlib\tests and
-lib\mpl_toolkits\tests directories from the source distribution to
-sys.prefix\Lib\site-packages\matplotlib and
-sys.prefix\Lib\site-packages\mpl_toolkits respectively, and install
+distribution, download the :file:`*.tar.gz` file and look in the
+:file:`examples` subdirectory.
+To run the test suite, copy the :file:`lib\matplotlib\tests` and
+:file:`lib\mpl_toolkits\tests` directories from the source distribution to
+:file:`sys.prefix\Lib\site-packages\matplotlib` and
+:file:`sys.prefix\Lib\site-packages\mpl_toolkits` respectively, and install
 `nose <https://pypi.python.org/pypi/nose>`_,
 `mock <https://pypi.python.org/pypi/mock>`_,
 Pillow, MiKTeX, GhostScript, ffmpeg, avconv, mencoder, ImageMagick, and
@@ -191,7 +192,7 @@ Required Dependencies
     using pip, easy_install or installing from source, the installer
     will attempt to download and install `pyparsing` from PyPI.
 
-six 1.3 or later
+six 1.4 or later
     Python 2/3 compatibility library.  This is also a dependency of
     :term:`dateutil`.
 
@@ -199,6 +200,11 @@ libpng 1.2 (or later)
     library for loading and saving :term:`PNG` files (`download
     <http://www.libpng.org/pub/png/libpng.html>`__). libpng requires
     zlib.
+
+`pytz`
+    Used to manipulate time-zone aware datetimes.
+
+
 
 Optional GUI framework
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -234,12 +240,12 @@ ImageMagick
 Optional dependencies
 ^^^^^^^^^^^^^^^^^^^^^
 
-`Pillow <http://python-imaging.github.io/>`_
+`Pillow <http://python-imaging.github.io/>`__
     If Pillow is installed, matplotlib can read and write a larger
     selection of image file formats.
 
 
-:term:`freetype` 1.4 (or later)
+:term:`freetype` 2.3 or later
     library for reading true type font files.
 
 
@@ -308,4 +314,4 @@ Framework with Visual Studio).  In addition to Visual Studio `CMake
 
 Since there is no canonical Windows package manager the build methods for
 freetype, zlib, libpng, tcl, & tk source code are documented as a build script
-at `matplotlib-winbuild <https://github.com/jbmohler/matplotlib-winbuild>`.
+at `matplotlib-winbuild <https://github.com/jbmohler/matplotlib-winbuild>`_.
