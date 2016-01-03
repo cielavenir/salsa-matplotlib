@@ -2,10 +2,10 @@
 13505e84eee9d9c3ca1037d4e565293ee80837ac
 13505e84eee9d9c3ca1037d4e565293ee80837ac
 bcd8e8642ebbe6e840d28afbd5bbc08ff5013244
-bcd8e8642ebbe6e840d28afbd5bbc08ff5013244
-matplotlib_1.5.0~rc2.orig.tar.gz
-718c58f62e82959449e10a455274339882674042
-53304206
+6d82424219d3a4cd0abb56028b7aefe94074d759
+matplotlib_1.5.1~rc1.orig.tar.gz
+0876ac5b477c2018ec808ff8b177b5fffa88bfff
+53376942
 debianTag="debian/%e%v"
 patchedTag="patched/%e%v"
 upstreamTag="upstream/%e%u"
