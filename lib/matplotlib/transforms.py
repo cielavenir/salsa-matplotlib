@@ -1534,6 +1534,10 @@ class TransformWrapper(Transform):
             msg = ("'child' must be an instance of"
                    " 'matplotlib.transform.Transform'")
             raise ValueError(msg)
+        self._init(child)
+        self.set_children(child)
+
+    def _init(self, child):
         Transform.__init__(self)
         self.input_dims = child.input_dims
         self.output_dims = child.output_dims
@@ -1548,13 +1552,26 @@ class TransformWrapper(Transform):
         def __str__(self):
             return str(self._child)
 
+    # NOTE: Transform.__[gs]etstate__ should be sufficient when using only
+    # Python 3.4+.
     def __getstate__(self):
-        # only store the child
-        return {'child': self._child}
+        # only store the child information and parents
+        return {
+            'child': self._child,
+            'input_dims': self.input_dims,
+            'output_dims': self.output_dims,
+            # turn the weakkey dictionary into a normal dictionary
+            'parents': dict(six.iteritems(self._parents))
+        }
 
     def __setstate__(self, state):
         # re-initialise the TransformWrapper with the state's child
-        self.__init__(state['child'])
+        self._init(state['child'])
+        # The child may not be unpickled yet, so restore its information.
+        self.input_dims = state['input_dims']
+        self.output_dims = state['output_dims']
+        # turn the normal dictionary back into a WeakValueDictionary
+        self._parents = WeakValueDictionary(state['parents'])
 
     def __repr__(self):
         return "TransformWrapper(%r)" % self._child
@@ -1565,7 +1582,6 @@ class TransformWrapper(Transform):
 
     def _set(self, child):
         self._child = child
-        self.set_children(child)
 
         self.transform = child.transform
         self.transform_affine = child.transform_affine
@@ -1594,6 +1610,7 @@ class TransformWrapper(Transform):
                    " output dimensions as the current child.")
             raise ValueError(msg)
 
+        self.set_children(child)
         self._set(child)
 
         self._invalid = 0

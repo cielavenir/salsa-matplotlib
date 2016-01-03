@@ -163,7 +163,10 @@ def get_include_dirs():
     """
     Returns a list of standard include directories on this platform.
     """
-    return [os.path.join(d, 'include') for d in get_base_dirs()]
+    include_dirs = [os.path.join(d, 'include') for d in get_base_dirs()]
+    include_dirs.extend(
+        os.environ.get('CPLUS_INCLUDE_PATH', '').split(os.pathsep))
+    return include_dirs
 
 
 def is_min_version(found, minversion):
@@ -423,12 +426,6 @@ class SetupPackage(object):
         """
         return []
 
-    def get_tests_require(self):
-        """
-        Get a list of Python packages that we require for executing tests.
-        """
-        return []
-
     def _check_for_pkg_config(self, package, include_file, min_version=None,
                               version=None):
         """
@@ -469,7 +466,8 @@ class SetupPackage(object):
             ext = make_extension('test', [])
             pkg_config.setup_extension(ext, package)
 
-        check_include_file(ext.include_dirs, include_file, package)
+        check_include_file(
+            ext.include_dirs + get_include_dirs(), include_file, package)
 
         return 'version %s' % version
 
@@ -660,8 +658,8 @@ class Tests(OptionalPackage):
 
         msgs = []
         msg_template = ('{package} is required to run the matplotlib test '
-                        'suite. "setup.py test" will automatically download it.'
-                        ' Install {package} to run matplotlib.test()')
+                        'suite. Please install it with pip or your preferred'
+                        ' tool to run the test suite')
 
         bad_nose = msg_template.format(
             package='nose %s or later' % self.nose_min_version
@@ -708,12 +706,6 @@ class Tests(OptionalPackage):
                 'sphinxext/tests/tinypages/*.py',
                 'sphinxext/tests/tinypages/_static/*',
             ]}
-
-    def get_tests_require(self):
-        requires = ['nose>=%s' % self.nose_min_version, 'sphinx']
-        if not sys.version_info >= (3, 3):
-            requires += ['mock']
-        return requires
 
 
 class Toolkits_Tests(Tests):
@@ -1238,7 +1230,7 @@ class Tornado(OptionalPackage):
 
 class Pyparsing(SetupPackage):
     name = "pyparsing"
-
+    # pyparsing 2.0.4 has broken python 3 support.
     def is_ok(self):
         # pyparsing 2.0.0 bug, but it may be patched in distributions
         try:
@@ -1274,9 +1266,9 @@ class Pyparsing(SetupPackage):
 
     def get_install_requires(self):
         if self.is_ok():
-            return ['pyparsing>=1.5.6']
+            return ['pyparsing>=1.5.6,!=2.0.4']
         else:
-            return ['pyparsing>=1.5.6,!=2.0.0']
+            return ['pyparsing>=1.5.6,!=2.0.0,!=2.0.4']
 
 
 class BackendAgg(OptionalBackendPackage):
@@ -2165,3 +2157,34 @@ class PdfToPs(SetupPackage):
             pass
 
         raise CheckFailed()
+
+
+class OptionalPackageData(OptionalPackage):
+    config_category = "package_data"
+
+
+class Dlls(OptionalPackageData):
+    """
+    On Windows, this packages any DLL files that can be found in the
+    lib/matplotlib/* directories.
+    """
+    name = "dlls"
+
+    def check_requirements(self):
+        if sys.platform != 'win32':
+            raise CheckFailed("Microsoft Windows only")
+
+    def get_package_data(self):
+        return {'': ['*.dll']}
+
+    @classmethod
+    def get_config(cls):
+        """
+        Look at `setup.cfg` and return one of ["auto", True, False] indicating
+        if the package is at default state ("auto"), forced by the user (True)
+        or opted-out (False).
+        """
+        try:
+            return config.getboolean(cls.config_category, cls.name)
+        except:
+            return False  # <-- default

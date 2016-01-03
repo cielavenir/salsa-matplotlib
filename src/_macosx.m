@@ -6049,7 +6049,9 @@ show(PyObject* self)
         [window orderFront:nil];
     }
     [pool release];
+    Py_BEGIN_ALLOW_THREADS
     [NSApp run];
+    Py_END_ALLOW_THREADS
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -6263,8 +6265,10 @@ static PyTypeObject TimerType = {
 static bool verify_framework(void)
 {
 #ifdef COMPILING_FOR_10_6
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     NSRunningApplication* app = [NSRunningApplication currentApplication];
     NSApplicationActivationPolicy activationPolicy = [app activationPolicy];
+    [pool release];
     switch (activationPolicy) {
         case NSApplicationActivationPolicyRegular:
         case NSApplicationActivationPolicyAccessory:
@@ -6283,7 +6287,9 @@ static bool verify_framework(void)
         "not be able to function correctly if Python is not installed as a "
         "framework. See the Python documentation for more information on "
         "installing Python as a framework on Mac OS X. Please either reinstall "
-        "Python as a framework, or try one of the other backends.");
+        "Python as a framework, or try one of the other backends. If you are "
+        "Working with Matplotlib in a virtual enviroment see 'Working with "
+        "Matplotlib in Virtual environments' in the Matplotlib FAQ");
     return false;
 }
 
@@ -6377,6 +6383,7 @@ void init_macosx(void)
 
     PyOS_InputHook = wait_for_stdin;
 
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     WindowServerConnectionManager* connectionManager = [WindowServerConnectionManager sharedManager];
     NSWorkspace* workspace = [NSWorkspace sharedWorkspace];
     NSNotificationCenter* notificationCenter = [workspace notificationCenter];
@@ -6384,6 +6391,7 @@ void init_macosx(void)
                            selector: @selector(launch:)
                                name: NSWorkspaceDidLaunchApplicationNotification
                              object: nil];
+    [pool release];
 #if PY3K
     return module;
 #endif

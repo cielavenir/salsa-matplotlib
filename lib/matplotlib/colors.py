@@ -659,6 +659,12 @@ class Colormap(object):
         return (np.alltrue(self._lut[:, 0] == self._lut[:, 1]) and
                 np.alltrue(self._lut[:, 0] == self._lut[:, 2]))
 
+    def _resample(self, lutsize):
+        """
+        Return a new color map with *lutsize* entries.
+        """
+        raise NotImplementedError()
+
 
 class LinearSegmentedColormap(Colormap):
     """Colormap objects based on lookup tables using linear segments.
@@ -772,6 +778,12 @@ class LinearSegmentedColormap(Colormap):
 
         return LinearSegmentedColormap(name, cdict, N, gamma)
 
+    def _resample(self, lutsize):
+        """
+        Return a new color map with *lutsize* entries.
+        """
+        return LinearSegmentedColormap(self.name, self._segmentdata, lutsize)
+
 
 class ListedColormap(Colormap):
     """Colormap object generated from a list of colors.
@@ -836,6 +848,12 @@ class ListedColormap(Colormap):
         self._isinit = True
         self._set_extremes()
 
+    def _resample(self, lutsize):
+        """
+        Return a new color map with *lutsize* entries.
+        """
+        return ListedColormap(self.name, self.colors, lutsize)
+
 
 class Normalize(object):
     """
@@ -886,8 +904,11 @@ class Normalize(object):
             is_scalar = False
             result = ma.asarray(value)
             if result.dtype.kind == 'f':
-                if isinstance(value, np.ndarray):
-                    result = result.copy()
+                # this is overkill for lists of floats, but required
+                # to support pd.Series as input until we can reliable
+                # determine if result and value share memory in all cases
+                # (list, tuple, deque, ndarray, Series, ...)
+                result = result.copy()
             elif result.dtype.itemsize > 2:
                 result = result.astype(np.float)
             else:
