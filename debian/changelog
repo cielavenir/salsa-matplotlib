@@ -1,9 +1,8 @@
-matplotlib (1.5.0~rc2-2) UNRELEASED; urgency=medium
+matplotlib (1.5.1~rc1-1) UNRELEASED; urgency=medium
 
-  * debian/patches/*
-    - fix qt4/5 tests errors
+  * New upstream release candidate
 
- -- Sandro Tosi <morph@debian.org>  Tue, 06 Oct 2015 22:09:41 +0100
+ -- Sandro Tosi <morph@debian.org>  Mon, 04 Jan 2016 00:21:32 +0000
 
 matplotlib (1.5.0~rc2-1) unstable; urgency=medium
 
