@@ -757,9 +757,9 @@ def matplotlib_fname():
 
     - `$PWD/matplotlibrc`
 
-    - environment variable `MATPLOTLIBRC`
+    - `$MATPLOTLIBRC/matplotlibrc`
 
-    - `$MPLCONFIGDIR/matplotlib`
+    - `$MPLCONFIGDIR/matplotlibrc`
 
     - On Linux,
 
@@ -1078,8 +1078,9 @@ def _rc_params_in_file(fname, fail_on_error=False):
 Bad key "%s" on line %d in
 %s.
 You probably need to get an updated matplotlibrc file from
-http://matplotlib.sf.net/_static/matplotlibrc or from the matplotlib source
-distribution""" % (key, cnt, fname), file=sys.stderr)
+http://github.com/matplotlib/matplotlib/blob/master/matplotlibrc.template
+or from the matplotlib source distribution""" % (key, cnt, fname),
+                  file=sys.stderr)
 
     return config
 
@@ -1441,6 +1442,7 @@ default_test_modules = [
     'matplotlib.tests.test_colorbar',
     'matplotlib.tests.test_colors',
     'matplotlib.tests.test_compare_images',
+    'matplotlib.tests.test_container',
     'matplotlib.tests.test_contour',
     'matplotlib.tests.test_dates',
     'matplotlib.tests.test_delaunay',
@@ -1485,6 +1487,9 @@ default_test_modules = [
 
 
 def verify_test_dependencies():
+    if not os.path.isdir(os.path.join(os.path.dirname(__file__), 'tests')):
+        raise ImportError("matplotlib test data is not installed")
+
     try:
         import nose
         try:

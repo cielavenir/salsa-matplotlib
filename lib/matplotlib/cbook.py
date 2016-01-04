@@ -12,6 +12,7 @@ from __future__ import (absolute_import, division, print_function,
 from matplotlib.externals import six
 from matplotlib.externals.six.moves import xrange, zip
 from itertools import repeat
+import collections
 
 import datetime
 import errno
@@ -1012,19 +1013,16 @@ def mkdirs(newdir, mode=0o777):
         > mkdir -p NEWDIR
         > chmod MODE NEWDIR
     """
-    try:
-        if not os.path.exists(newdir):
-            parts = os.path.split(newdir)
-            for i in range(1, len(parts) + 1):
-                thispart = os.path.join(*parts[:i])
-                if not os.path.exists(thispart):
-                    os.makedirs(thispart, mode)
-
-    except OSError as err:
-        # Reraise the error unless it's about an already existing directory
-        if err.errno != errno.EEXIST or not os.path.isdir(newdir):
-            raise
-
+    # this functionality is now in core python as of 3.2
+    # LPY DROP
+    if six.PY3:
+        os.makedirs(newdir, mode=mode, exist_ok=True)
+    else:
+        try:
+            os.makedirs(newdir, mode=mode)
+        except OSError as exception:
+            if exception.errno != errno.EEXIST:
+                raise
 
 class GetRealpathAndStat(object):
     def __init__(self):
@@ -1672,7 +1670,7 @@ class Grouper(object):
         False
 
     """
-    def __init__(self, init=[]):
+    def __init__(self, init=()):
         mapping = self._mapping = {}
         for x in init:
             mapping[ref(x)] = [ref(x)]
@@ -1723,6 +1721,14 @@ class Grouper(object):
             return mapping[ref(a)] is mapping[ref(b)]
         except KeyError:
             return False
+
+    def remove(self, a):
+        self.clean()
+
+        mapping = self._mapping
+        seta = mapping.pop(ref(a), None)
+        if seta is not None:
+            seta.remove(ref(a))
 
     def __iter__(self):
         """
@@ -2529,6 +2535,13 @@ def index_of(y):
     except AttributeError:
         y = np.atleast_1d(y)
         return np.arange(y.shape[0], dtype=float), y
+
+
+def safe_first_element(obj):
+    if isinstance(obj, collections.Iterator):
+        raise RuntimeError("matplotlib does not support generators "
+                           "as input")
+    return next(iter(obj))
 
 
 def get_label(y, default_name):

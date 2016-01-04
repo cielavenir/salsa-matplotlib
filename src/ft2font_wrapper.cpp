@@ -1032,6 +1032,8 @@ static PyObject *PyFT2Font_get_name_index(PyFT2Font *self, PyObject *args, PyObj
 
     CALL_CPP("get_name_index", name_index = self->x->get_name_index(glyphname));
 
+    PyMem_Free(glyphname);
+
     return PyLong_FromLong(name_index);
 }
 
@@ -1084,6 +1086,8 @@ static PyObject *PyFT2Font_get_sfnt_table(PyFT2Font *self, PyObject *args, PyObj
             break;
         }
     }
+
+    PyMem_Free(tagname);
 
     void *table = FT_Get_Sfnt_Table(self->x->get_face(), (FT_Sfnt_Tag)tag);
     if (!table) {
@@ -1640,15 +1644,18 @@ static PyTypeObject *PyFT2Font_init_type(PyObject *m, PyTypeObject *type)
 
 extern "C" {
 
-struct module_state
-{
-    int _dummy;
-};
-
 #if PY3K
-static struct PyModuleDef moduledef = { PyModuleDef_HEAD_INIT,       "ft2font", NULL,
-                                        sizeof(struct module_state), NULL,      NULL,
-                                        NULL,                        NULL,      NULL };
+static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT,
+    "ft2font",
+    NULL,
+    0,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL
+};
 
 #define INITERROR return NULL
 

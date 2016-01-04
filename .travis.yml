@@ -1,5 +1,10 @@
 sudo: false
 
+cache:
+  directories:
+    - $HOME/.ccache
+    - $HOME/.cache/pip
+
 addons:
   apt:
     packages:
@@ -55,18 +60,21 @@ before_install:
   # Install into our own pristine virtualenv
   - virtualenv --python=python venv
   - source venv/bin/activate
+  - export PATH=/usr/lib/ccache:$PATH
 
 install:
+  - ccache -s
   # Upgrade pip and setuptools. Mock has issues with the default version of
   # setuptools
   - |
     pip install --upgrade pip
+    pip install --upgrade wheel
     pip install --upgrade setuptools
   # Install only from travis wheelhouse
   - if [ -z "$PRE" ]; then
-        wheelhouse_pip_install python-dateutil $NUMPY $PANDAS pyparsing pillow sphinx!=1.3.0;
+        wheelhouse_pip_install python-dateutil $NUMPY $PANDAS pyparsing!=2.0.4 pillow sphinx!=1.3.0;
     else
-        pip install $PRE python-dateutil $NUMPY pyparsing pillow sphinx!=1.3.0;
+        pip install $PRE python-dateutil $NUMPY pyparsing!=2.0.4 pillow sphinx!=1.3.0;
     fi
   # Always install from pypi
   - pip install $PRE pep8 cycler
@@ -88,7 +96,7 @@ install:
   # Neihter is installed as a dependency of IPython since they are not used by the IPython console.
   - |
     if [[ $BUILD_DOCS == true ]]; then
-      pip install $PRE numpydoc ipython jsonschema mistune
+      pip install $PRE numpydoc ipython jsonschema mistune colorspacious
       pip install -q $PRE linkchecker
       wget https://github.com/google/fonts/blob/master/ofl/felipa/Felipa-Regular.ttf?raw=true -O Felipa-Regular.ttf
       wget http://mirrors.kernel.org/ubuntu/pool/universe/f/fonts-humor-sans/fonts-humor-sans_1.0-1_all.deb

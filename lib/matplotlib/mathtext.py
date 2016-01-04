@@ -13,9 +13,6 @@ The Bakoma distribution of the TeX Computer Modern fonts, and STIX
 fonts are supported.  There is experimental support for using
 arbitrary fonts, but results may vary without proper tweaking and
 metrics for those fonts.
-
-If you find TeX expressions that don't parse or render properly,
-please email mdroe@stsci.edu, but please check KNOWN ISSUES below first.
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
@@ -2806,10 +2803,12 @@ class Parser(object):
             new_children = nucleus.children
             if len(new_children):
                 # remove last kern
-                if isinstance(new_children[-1],Kern):
+                if (isinstance(new_children[-1],Kern) and
+                        hasattr(new_children[-2], '_metrics')):
                     new_children = new_children[:-1]
                 last_char = new_children[-1]
-                last_char.width = last_char._metrics.advance
+                if hasattr(last_char, '_metrics'):
+                    last_char.width = last_char._metrics.advance
             # create new Hlist without kerning
             nucleus = Hlist(new_children, do_kern=False)
         else:

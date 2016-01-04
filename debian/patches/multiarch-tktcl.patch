@@ -1,4 +1,4 @@
-From 7fd1d07d140fa60dfd40a0ef17a310ef989d1738 Mon Sep 17 00:00:00 2001
+From 53b06669981f333dd7ddd1278d3d1d8d64b42635 Mon Sep 17 00:00:00 2001
 From: Julian Taylor <jtaylor@ubuntu.com>
 Date: Thu, 8 Oct 2015 09:47:15 -0700
 Subject: adapt setup to find multiarched tk/tcl
@@ -12,10 +12,10 @@ Patch-Name: multiarch-tktcl.patch
  1 file changed, 3 insertions(+)
 
 diff --git a/setupext.py b/setupext.py
-index 0a9660b..43c61fb 100755
+index e68b8cd..f4dc33f 100755
 --- a/setupext.py
 +++ b/setupext.py
-@@ -1403,13 +1403,16 @@ class BackendTkAgg(OptionalBackendPackage):
+@@ -1395,13 +1395,16 @@ class BackendTkAgg(OptionalBackendPackage):
          except ImportError:
              return None
  

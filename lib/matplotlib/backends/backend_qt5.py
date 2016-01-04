@@ -137,7 +137,7 @@ def _create_qApp():
                 if display is None or not re.search(':\d', display):
                     raise RuntimeError('Invalid DISPLAY variable')
 
-            qApp = QtWidgets.QApplication([six.text_type(" ")])
+            qApp = QtWidgets.QApplication([str(" ")])
             qApp.lastWindowClosed.connect(qApp.quit)
         else:
             qApp = app
@@ -663,7 +663,7 @@ class NavigationToolbar2QT(NavigationToolbar2, QtWidgets.QToolBar):
     def set_message(self, s):
         self.message.emit(s)
         if self.coordinates:
-            self.locLabel.setText(s.replace(', ', '\n'))
+            self.locLabel.setText(s)
 
     def set_cursor(self, cursor):
         if DEBUG:

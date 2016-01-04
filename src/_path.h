@@ -27,6 +27,16 @@ struct XY
     XY(double x_, double y_) : x(x_), y(y_)
     {
     }
+
+    bool operator==(const XY& o)
+    {
+        return (x == o.x && y == o.y);
+    }
+
+    bool operator!=(const XY& o)
+    {
+        return (x != o.x || y != o.y);
+    }
 };
 
 //
@@ -358,7 +368,7 @@ void get_path_collection_extents(agg::trans_affine &master_transform,
                                  agg::trans_affine &offset_trans,
                                  extent_limits &extent)
 {
-    if (offsets.dim(0) != 0 && offsets.dim(1) != 2) {
+    if (offsets.size() != 0 && offsets.dim(1) != 2) {
         throw "Offsets array must be Nx2";
     }
 
@@ -416,7 +426,7 @@ void point_in_path_collection(double x,
         return;
     }
 
-    size_t Noffsets = offsets.dim(0);
+    size_t Noffsets = offsets.size();
     size_t N = std::max(Npaths, Noffsets);
     size_t Ntransforms = std::min(transforms.size(), N);
     size_t i;
@@ -692,11 +702,11 @@ clip_path_to_rect(PathIterator &path, agg::rect_d &rect, bool inside, std::vecto
 template <class VerticesArray, class ResultArray>
 void affine_transform_2d(VerticesArray &vertices, agg::trans_affine &trans, ResultArray &result)
 {
-    if (vertices.dim(0) != 0 && vertices.dim(1) != 2) {
+    if (vertices.size() != 0 && vertices.dim(1) != 2) {
         throw "Invalid vertices array.";
     }
 
-    size_t n = vertices.dim(0);
+    size_t n = vertices.size();
     double x;
     double y;
     double t0;
@@ -838,6 +848,25 @@ bool path_intersects_path(PathIterator1 &p1, PathIterator2 &p2)
     return false;
 }
 
+void _finalize_polygon(std::vector<Polygon> &result)
+{
+    Polygon &polygon = result.back();
+
+    if (result.size() == 0) {
+        return;
+    }
+
+    /* Clean up the last polygon in the result.  If less than a
+       triangle, remove it. */
+    if (polygon.size() < 3) {
+        result.pop_back();
+    } else {
+        if (polygon.front() != polygon.back()) {
+            polygon.push_back(polygon.front());
+        }
+    }
+}
+
 template <class PathIterator>
 void convert_path_to_polygons(PathIterator &path,
                               agg::trans_affine &trans,
@@ -867,14 +896,12 @@ void convert_path_to_polygons(PathIterator &path,
 
     while ((code = curve.vertex(&x, &y)) != agg::path_cmd_stop) {
         if ((code & agg::path_cmd_end_poly) == agg::path_cmd_end_poly) {
-            if (polygon->size() >= 1) {
-                polygon->push_back((*polygon)[0]);
-                result.push_back(Polygon());
-                polygon = &result.back();
-            }
+            _finalize_polygon(result);
+            result.push_back(Polygon());
+            polygon = &result.back();
         } else {
-            if (code == agg::path_cmd_move_to && polygon->size() >= 1) {
-                polygon->push_back((*polygon)[0]);
+            if (code == agg::path_cmd_move_to) {
+                _finalize_polygon(result);
                 result.push_back(Polygon());
                 polygon = &result.back();
             }
@@ -882,9 +909,7 @@ void convert_path_to_polygons(PathIterator &path,
         }
     }
 
-    if (polygon->size() == 0) {
-        result.pop_back();
-    }
+    _finalize_polygon(result);
 }
 
 template <class VertexSource>
@@ -1136,7 +1161,6 @@ int convert_to_string(PathIterator &path,
 
     *buffersize = path.total_vertices() * (precision + 5) * 4;
     if (*buffersize == 0) {
-        *buffer = NULL;
         return 0;
     }
 
@@ -1158,5 +1182,73 @@ int convert_to_string(PathIterator &path,
     }
 
 }
+
+template<class T>
+struct _is_sorted
+{
+    bool operator()(PyArrayObject *array)
+    {
+        npy_intp size;
+        npy_intp i;
+        T last_value;
+        T current_value;
+
+        size = PyArray_DIM(array, 0);
+
+        // std::isnan is only in C++11, which we don't yet require,
+        // so we use the the "self == self" trick
+        for (i = 0; i < size; ++i) {
+            last_value = *((T *)PyArray_GETPTR1(array, i));
+            if (last_value == last_value) {
+                break;
+            }
+        }
+
+        if (i == size) {
+            // The whole array is non-finite
+            return false;
+        }
+
+        for (; i < size; ++i) {
+            current_value = *((T *)PyArray_GETPTR1(array, i));
+            if (current_value == current_value) {
+                if (current_value < last_value) {
+                    return false;
+                }
+                last_value = current_value;
+            }
+        }
+
+        return true;
+    }
+};
+
+
+template<class T>
+struct _is_sorted_int
+{
+    bool operator()(PyArrayObject *array)
+    {
+        npy_intp size;
+        npy_intp i;
+        T last_value;
+        T current_value;
+
+        size = PyArray_DIM(array, 0);
+
+        last_value = *((T *)PyArray_GETPTR1(array, 0));
+
+        for (i = 1; i < size; ++i) {
+            current_value = *((T *)PyArray_GETPTR1(array, i));
+            if (current_value < last_value) {
+                return false;
+            }
+            last_value = current_value;
+        }
+
+        return true;
+    }
+};
+
 
 #endif

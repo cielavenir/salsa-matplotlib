@@ -270,6 +270,7 @@ def get_fontconfig_fonts(fontext='ttf'):
 
     fontfiles = {}
     try:
+        warnings.warn('Matplotlib is building the font cache using fc-list. This may take a moment.')
         pipe = subprocess.Popen(['fc-list', '--format=%{file}\\n'],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
@@ -587,7 +588,7 @@ def createFontList(fontfiles, fontext='ttf'):
                 continue
             try:
                 prop = ttfFontProperty(font)
-            except KeyError:
+            except (KeyError, RuntimeError):
                 continue
 
         fontlist.append(prop)

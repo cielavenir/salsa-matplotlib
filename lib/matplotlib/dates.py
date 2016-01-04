@@ -40,7 +40,7 @@ assumed.  If you want to use a custom time zone, pass a
 locators you create.  See `pytz <http://pythonhosted.org/pytz/>`_ for
 information on :mod:`pytz` and timezone handling.
 
-The `dateutil module <http://labix.org/python-dateutil>`_ provides
+The `dateutil module <https://dateutil.readthedocs.org>`_ provides
 additional code to handle date ticking, making it easy to place ticks
 on any kinds of dates.  See examples below.
 
@@ -88,7 +88,7 @@ Here are all the date tickers:
       :class:`matplotlib.dates.rrulewrapper`.  The
       :class:`rrulewrapper` is a simple wrapper around a
       :class:`dateutil.rrule` (`dateutil
-      <http://labix.org/python-dateutil>`_) which allow almost
+      <https://dateutil.readthedocs.org>`_) which allow almost
       arbitrary date tick specifications.  See `rrule example
       <../examples/pylab_examples/date_demo_rrule.html>`_.
 
@@ -281,7 +281,7 @@ def _from_ordinalf(x, tz=None):
     elif dt.microsecond > 999990:
         dt += datetime.timedelta(microseconds=1e6 - dt.microsecond)
 
-    return dt
+    return dt.astimezone(tz)
 
 
 # a version of _from_ordinalf that can operate on numpy arrays
@@ -707,7 +707,7 @@ class AutoDateFormatter(ticker.Formatter):
         elif six.callable(fmt):
             result = fmt(x, pos)
         else:
-            raise TypeError('Unexpected type passed to {!r}.'.formatter(self))
+            raise TypeError('Unexpected type passed to {0!r}.'.format(self))
 
         return result
 
@@ -1561,8 +1561,8 @@ class DateConverter(units.ConversionInterface):
             x = x.ravel()
 
         try:
-            x = x[0]
-        except (TypeError, IndexError):
+            x = cbook.safe_first_element(x)
+        except (TypeError, StopIteration):
             pass
 
         try:
