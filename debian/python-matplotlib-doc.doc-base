@@ -11,6 +11,3 @@ Section: Programming/Python
 Format: HTML
 Index: /usr/share/doc/python-matplotlib-doc/html/index.html
 Files: /usr/share/doc/python-matplotlib-doc/html/*
-
-Format: PDF
-Files: /usr/share/doc/python-matplotlib-doc/Matplotlib.pdf

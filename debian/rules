@@ -22,7 +22,7 @@ build-indep-stamp: $(DEFPY:%=build-%-stamp)
 
 	# build the doc
 	-( cd doc ; MPLCONFIGDIR=. MATPLOTLIBDATA=../lib/matplotlib/mpl-data/ \
-		PYTHONPATH=../build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py --small all )
+		PYTHONPATH=../build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py --small html )
 
 	touch $@
 
@@ -209,7 +209,7 @@ binary-indep: build-indep install-indep
 	dh_testdir -i
 	dh_testroot -i
 	dh_installchangelogs -i CHANGELOG
-	dh_installdocs -p$(pd) -i doc/build/html/ doc/build/latex/Matplotlib.pdf
+	dh_installdocs -p$(pd) -i doc/build/html/
 	# remove pyc file from doc
 	dh_installexamples -p$(pd) -i examples/*
 	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js -Xobjects.inv
