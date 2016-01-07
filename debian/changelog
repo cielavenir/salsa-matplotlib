@@ -6,9 +6,10 @@ matplotlib (1.5.1~rc1-1) UNRELEASED; urgency=medium
     - add/remove stanzas for new upstream code
   * debian/rules
     - run tests using tests.py, and disable those accessing the network
+    - increase verbosity of the tests
   * Build & install only the HTML version of the doc (no more PDF)
 
- -- Sandro Tosi <morph@debian.org>  Wed, 06 Jan 2016 07:03:32 +0000
+ -- Sandro Tosi <morph@debian.org>  Thu, 07 Jan 2016 22:13:52 +0000
 
 matplotlib (1.5.0~rc2-1) unstable; urgency=medium
 
