@@ -167,7 +167,7 @@ Description: Python based plotting system in a style similar to Matlab (Python 3
 
 Package: python-matplotlib-data
 Architecture: all
-Depends: fonts-lyx, ${misc:Depends}
+Depends: fonts-lyx, ${misc:Depends}, ttf-bitstream-vera
 Description: Python based plotting system (data package)
  Matplotlib is a pure Python plotting library designed to bring
  publication quality plotting to Python with a syntax familiar to
