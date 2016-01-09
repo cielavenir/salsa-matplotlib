@@ -11,8 +11,12 @@ matplotlib (1.5.1~rc1-1) UNRELEASED; urgency=medium
   * Build & install only the HTML version of the doc (no more PDF)
   * debian/control
     - add ttf-bitstream-vera to -data depends; Closes: #802776
+  * debian/patches/*bts800803*
+    - Disable the GitHub "Fork Me" ribbon, the access to the Raleway font
+      through the Google Fonts API, and the Google Analytics tracking code;
+      Closes: #800803
 
- -- Sandro Tosi <morph@debian.org>  Sat, 09 Jan 2016 00:40:17 +0000
+ -- Sandro Tosi <morph@debian.org>  Sat, 09 Jan 2016 16:51:50 +0000
 
 matplotlib (1.5.0~rc2-1) unstable; urgency=medium
 
