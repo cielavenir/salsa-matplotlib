@@ -1,6 +1,7 @@
 matplotlib (1.5.1~rc1-1) UNRELEASED; urgency=medium
 
   * New upstream release candidate
+    - initialize correctly the Qt4 backend; Closes: #802600
   * debian/copyright
     - extend packaging copyright years
     - add/remove stanzas for new upstream code
@@ -11,7 +12,7 @@ matplotlib (1.5.1~rc1-1) UNRELEASED; urgency=medium
   * debian/control
     - add ttf-bitstream-vera to -data depends; Closes: #802776
 
- -- Sandro Tosi <morph@debian.org>  Thu, 07 Jan 2016 22:54:40 +0000
+ -- Sandro Tosi <morph@debian.org>  Sat, 09 Jan 2016 00:40:17 +0000
 
 matplotlib (1.5.0~rc2-1) unstable; urgency=medium
 
