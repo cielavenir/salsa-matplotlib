@@ -2,6 +2,8 @@ matplotlib (1.5.1~rc1-1) UNRELEASED; urgency=medium
 
   * New upstream release candidate
     - initialize correctly the Qt4 backend; Closes: #802600
+    - install the baseline images, needed to import the 'testing' submodules;
+      Closes: #779847
   * debian/copyright
     - extend packaging copyright years
     - add/remove stanzas for new upstream code
@@ -16,7 +18,7 @@ matplotlib (1.5.1~rc1-1) UNRELEASED; urgency=medium
       through the Google Fonts API, and the Google Analytics tracking code;
       Closes: #800803
 
- -- Sandro Tosi <morph@debian.org>  Sat, 09 Jan 2016 16:51:50 +0000
+ -- Sandro Tosi <morph@debian.org>  Sat, 09 Jan 2016 16:56:53 +0000
 
 matplotlib (1.5.0~rc2-1) unstable; urgency=medium
 
