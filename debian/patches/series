@@ -2,3 +2,4 @@
 70_bts720549_try_StayPuft_for_xkcd.patch
 multiarch-tktcl.patch
 gtk3cairo_check_no-multiprocessing.patch
+0005-bts800803-disable-the-GitHub-Fork-Me-ribbon.patch
