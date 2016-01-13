@@ -3,5 +3,5 @@ set -efu
 
 pys="$(pyversions -r 2>/dev/null)"
 
-# todo check why debug fails
+# no dbg package in 3.0.2.0+dfsg-1
 BACKEND="WXAgg" pys=$pys DEBUG=no debian/tests/backend-base 2>&1
