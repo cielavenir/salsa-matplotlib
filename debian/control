@@ -94,6 +94,7 @@ Recommends: python-glade2,
             python-tk (>= 2.5.2-1.1)
 Enhances: ipython
 Suggests: dvipng,
+          ffmpeg,
           gir1.2-gtk-3.0,
           ghostscript,
           inkscape,
@@ -138,6 +139,7 @@ Recommends: python3-pil,
             python3-tk
 Enhances: ipython3
 Suggests: dvipng,
+          ffmpeg,
           gir1.2-gtk-3.0,
           ghostscript,
           inkscape,

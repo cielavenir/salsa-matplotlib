@@ -6,8 +6,11 @@ matplotlib (1.5.1-1) UNRELEASED; urgency=medium
 
   [ Sandro Tosi ]
   * New upstream release
+  * debian/control
+    - add ffmpeg to Suggests, Required for the animation module to be save out
+      put to movie formats
 
- -- Sandro Tosi <morph@debian.org>  Sun, 07 Feb 2016 16:48:39 +0000
+ -- Sandro Tosi <morph@debian.org>  Sun, 07 Feb 2016 17:03:42 +0000
 
 matplotlib (1.5.1~rc1-1) unstable; urgency=medium
 
