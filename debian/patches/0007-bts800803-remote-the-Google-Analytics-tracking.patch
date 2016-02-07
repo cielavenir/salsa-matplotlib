@@ -1,4 +1,4 @@
-From 6e26b84f9c1de9ac768f94070d36ae381af20bda Mon Sep 17 00:00:00 2001
+From cd9e4deee40f7ad808664b115c382b176b5b9036 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Sat, 9 Jan 2016 16:51:28 +0000
 Subject: bts800803 remote the Google Analytics tracking
@@ -8,10 +8,10 @@ Subject: bts800803 remote the Google Analytics tracking
  1 file changed, 10 deletions(-)
 
 diff --git a/doc/_templates/layout.html b/doc/_templates/layout.html
-index e17db11..d653f22 100644
+index 27ddde0..ee0d399 100644
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
-@@ -248,15 +248,5 @@ href="http://sphinx-doc.org/">Sphinx</a> {{ sphinx_version }}.{% endtrans %}
+@@ -231,16 +231,6 @@ href="http://sphinx-doc.org/">Sphinx</a> {{ sphinx_version }}.{% endtrans %}
      </div>
   {%- endblock %}
  
@@ -26,4 +26,5 @@ index e17db11..d653f22 100644
 -
 -</script>
  </body>
- </html>
+ <footer>
+   <!--Flipcause Integration v3.0// Flipcause Integration Instructions:
