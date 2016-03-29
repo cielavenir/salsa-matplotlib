@@ -74,7 +74,7 @@ XS-Python-Version: all
 X-Python3-Version: >= 3.2
 Standards-Version: 3.9.6
 Homepage: http://matplotlib.org/
-Vcs-Git: git://anonscm.debian.org/python-modules/packages/matplotlib.git
+Vcs-Git: https://anonscm.debian.org/git/python-modules/packages/matplotlib.git
 Vcs-Browser: https://anonscm.debian.org/cgit/python-modules/packages/matplotlib.git
 XS-Testsuite: autopkgtest
 

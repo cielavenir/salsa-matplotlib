@@ -1,3 +1,9 @@
+matplotlib (1.5.1-2) UNRELEASED; urgency=medium
+
+  * Fixed VCS URL (https)
+
+ -- Ondřej Nový <novy@ondrej.org>  Tue, 29 Mar 2016 21:43:08 +0200
+
 matplotlib (1.5.1-1) unstable; urgency=medium
 
   [ Julian Taylor ]
