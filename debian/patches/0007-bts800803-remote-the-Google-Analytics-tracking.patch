@@ -1,4 +1,4 @@
-From e8a807f92f7f810cae9e2aee35f49160a5f90f4d Mon Sep 17 00:00:00 2001
+From fdf3435ecbc25008fc3b3a80b12ea55245a50356 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Sat, 9 Jan 2016 16:51:28 +0000
 Subject: bts800803 remote the Google Analytics tracking
