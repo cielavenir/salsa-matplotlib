@@ -4,11 +4,12 @@ matplotlib (1.5.2~rc2-1) UNRELEASED; urgency=medium
   * New upstream release candidate
   * debian/copyright
     - update upstream licence text
+    - add copyright/license for src/_tkmini.h
 
   [ Ondřej Nový ]
   * Fixed VCS URL (https)
 
- -- Sandro Tosi <morph@debian.org>  Mon, 30 May 2016 17:50:07 +0100
+ -- Sandro Tosi <morph@debian.org>  Mon, 30 May 2016 18:06:10 +0100
 
 matplotlib (1.5.1-1) unstable; urgency=medium
 
