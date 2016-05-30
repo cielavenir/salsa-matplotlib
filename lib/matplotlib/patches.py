@@ -179,7 +179,6 @@ class Patch(artist.Artist):
         self.set_linewidth(other.get_linewidth())
         self.set_linestyle(other.get_linestyle())
         self.set_transform(other.get_data_transform())
-        self.set_figure(other.get_figure())
         self.set_alpha(other.get_alpha())
 
     def get_extents(self):
@@ -358,7 +357,7 @@ class Patch(artist.Artist):
         ===========================   =================
         ``'-'`` or ``'solid'``        solid line
         ``'--'`` or  ``'dashed'``     dashed line
-        ``'-.'`` or  ``'dash_dot'``   dash-dotted line
+        ``'-.'`` or  ``'dashdot'``    dash-dotted line
         ``':'`` or ``'dotted'``       dotted line
         ===========================   =================
 
@@ -1863,7 +1862,7 @@ class _Style(object):
 class BoxStyle(_Style):
     """
     :class:`BoxStyle` is a container class which defines several
-    boxstyle classes, which are used for :class:`FancyBoxPatch`.
+    boxstyle classes, which are used for :class:`FancyBboxPatch`.
 
     A style object can be created as::
 
@@ -2992,15 +2991,21 @@ class ConnectionStyle(_Style):
 
         def __init__(self, armA=0., armB=0., fraction=0.3, angle=None):
             """
-            *armA* : minimum length of armA
+            Parameters
+            ----------
+            armA : float
+                minimum length of armA
 
-            *armB* : minimum length of armB
+            armB : float
+                minimum length of armB
 
-            *fraction* : a fraction of the distance between two points that
-                         will be added to armA and armB.
+            fraction : float
+                a fraction of the distance between two points that
+                will be added to armA and armB.
 
-            *angle* : angle of the connecting line (if None, parallel to A
-                      and B)
+            angle : float or None
+                angle of the connecting line (if None, parallel
+                to A and B)
             """
             self.armA = armA
             self.armB = armB
@@ -4031,7 +4036,7 @@ class FancyArrowPatch(Patch):
     def set_dpi_cor(self, dpi_cor):
         """
         dpi_cor is currently used for linewidth-related things and
-        shink factor. Mutation scale is not affected by this.
+        shrink factor. Mutation scale is not affected by this.
         """
 
         self._dpi_cor = dpi_cor
@@ -4040,14 +4045,14 @@ class FancyArrowPatch(Patch):
     def get_dpi_cor(self):
         """
         dpi_cor is currently used for linewidth-related things and
-        shink factor. Mutation scale is not affected by this.
+        shrink factor. Mutation scale is not affected by this.
         """
 
         return self._dpi_cor
 
     def set_positions(self, posA, posB):
-        """ set the begin end end positions of the connecting
-        path. Use current vlaue if None.
+        """ set the begin and end positions of the connecting
+        path. Use current value if None.
         """
         if posA is not None:
             self._posA_posB[0] = posA

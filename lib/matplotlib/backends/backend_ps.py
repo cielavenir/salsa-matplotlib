@@ -165,15 +165,16 @@ def _num_to_str(val):
 def _nums_to_str(*args):
     return ' '.join(map(_num_to_str,args))
 
+
 def quote_ps_string(s):
     "Quote dangerous characters of S for use in a PostScript string constant."
-    s=s.replace("\\", "\\\\")
-    s=s.replace("(", "\\(")
-    s=s.replace(")", "\\)")
-    s=s.replace("'", "\\251")
-    s=s.replace("`", "\\301")
-    s=re.sub(r"[^ -~\n]", lambda x: r"\%03o"%ord(x.group()), s)
-    return s
+    s = s.replace(b"\\", b"\\\\")
+    s = s.replace(b"(", b"\\(")
+    s = s.replace(b")", b"\\)")
+    s = s.replace(b"'", b"\\251")
+    s = s.replace(b"`", b"\\301")
+    s = re.sub(br"[^ -~\n]", lambda x: br"\%03o" % ord(x.group()), s)
+    return s.decode('ascii')
 
 
 def seq_allequal(seq1, seq2):
@@ -1464,6 +1465,10 @@ def convert_psfrags(tmpfile, psfrags, font_preamble, custom_preamble,
     # multiple
     if sys.platform == 'win32': precmd = '%s &&'% os.path.splitdrive(tmpdir)[0]
     else: precmd = ''
+    #Replace \\ for / so latex does not think there is a function call
+    latexfile = latexfile.replace("\\", "/")
+    # Replace ~ so Latex does not think it is line break
+    latexfile = latexfile.replace("~", "\\string~")
     command = '%s cd "%s" && latex -interaction=nonstopmode "%s" > "%s"'\
                 %(precmd, tmpdir, latexfile, outfile)
     verbose.report(command, 'debug')

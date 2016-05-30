@@ -1,26 +1,22 @@
-From 94f8c63bbec08414c4cb2b957415af8b78835884 Mon Sep 17 00:00:00 2001
+From 790c8f5449a6921eeac063c262c9da83b69cd15a Mon Sep 17 00:00:00 2001
 From: SVN-Git Migration <python-modules-team@lists.alioth.debian.org>
 Date: Thu, 8 Oct 2015 09:47:16 -0700
 Subject: gtk3cairo_check_no-multiprocessing
 
 Patch-Name: gtk3cairo_check_no-multiprocessing.patch
 ---
- setupext.py | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ setupext.py | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/setupext.py b/setupext.py
-index f4dc33f..e18498e 100755
+index 9bb626d..0a26167 100755
 --- a/setupext.py
 +++ b/setupext.py
-@@ -1743,7 +1743,10 @@ class BackendGtk3Agg(OptionalBackendPackage):
+@@ -1639,7 +1639,6 @@ class BackendGtk3Agg(OptionalBackendPackage):
      def check_requirements(self):
          if 'TRAVIS' in os.environ:
              raise CheckFailed("Can't build with Travis")
 -
-+        # yoh: Builds of Debian packages often lead to a dead-lock here
-+        #      As a workaround forcing build manually without a check
-+        BackendAgg.force = True
-+        return "ok"
-         # This check needs to be performed out-of-process, because
-         # importing gi and then importing regular old pygtk afterward
-         # segfaults the interpreter.
+         # yoh: Builds of Debian packages often lead to a dead-lock here
+         #      As a workaround forcing build manually without a check
+         BackendAgg.force = True

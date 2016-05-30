@@ -16,7 +16,8 @@ from textwrap import fill
 import versioneer
 
 
-PY3 = (sys.version_info[0] >= 3)
+PY3min = (sys.version_info[0] >= 3)
+PY32min = (PY3min and sys.version_info[1] >= 2 or sys.version_info[0] > 3)
 
 
 try:
@@ -46,13 +47,13 @@ except ImportError:
 
 
 if sys.platform != 'win32':
-    if sys.version_info[0] < 3:
+    if not PY3min:
         from commands import getstatusoutput
     else:
         from subprocess import getstatusoutput
 
 
-if PY3:
+if PY3min:
     import configparser
 else:
     import ConfigParser as configparser
@@ -69,7 +70,10 @@ options = {
 
 setup_cfg = os.environ.get('MPLSETUPCFG', 'setup.cfg')
 if os.path.exists(setup_cfg):
-    config = configparser.SafeConfigParser()
+    if PY32min:
+        config = configparser.ConfigParser()
+    else:
+        config = configparser.SafeConfigParser()
     config.read(setup_cfg)
 
     try:
@@ -481,13 +485,17 @@ class OptionalPackage(SetupPackage):
     def get_config(cls):
         """
         Look at `setup.cfg` and return one of ["auto", True, False] indicating
-        if the package is at default state ("auto"), forced by the user (True)
-        or opted-out (False).
+        if the package is at default state ("auto"), forced by the user (case
+        insensitively defined as 1, true, yes, on for True) or opted-out (case
+        insensitively defined as 0, false, no, off for False).
         """
-        try:
-            return config.getboolean(cls.config_category, cls.name)
-        except:
-            return "auto"
+        conf = "auto"
+        if config is not None and config.has_option(cls.config_category, cls.name):
+            try:
+                conf = config.getboolean(cls.config_category, cls.name)
+            except ValueError:
+                conf = config.get(cls.config_category, cls.name)
+        return conf
 
     def check(self):
         """
@@ -1231,6 +1239,7 @@ class Tornado(OptionalPackage):
 class Pyparsing(SetupPackage):
     name = "pyparsing"
     # pyparsing 2.0.4 has broken python 3 support.
+    # pyparsing 2.1.2 is broken in python3.4/3.3.
     def is_ok(self):
         # pyparsing 2.0.0 bug, but it may be patched in distributions
         try:
@@ -1265,14 +1274,16 @@ class Pyparsing(SetupPackage):
         return "using pyparsing version %s" % pyparsing.__version__
 
     def get_install_requires(self):
+        versionstring = 'pyparsing>=1.5.6,!=2.0.4,!=2.1.2'
         if self.is_ok():
-            return ['pyparsing>=1.5.6,!=2.0.4']
+            return [versionstring]
         else:
-            return ['pyparsing>=1.5.6,!=2.0.0,!=2.0.4']
+            return [versionstring + ',!=2.0.0']
 
 
 class BackendAgg(OptionalBackendPackage):
     name = "agg"
+    force = True
 
     def get_extension(self):
         sources = [
@@ -1290,36 +1301,10 @@ class BackendAgg(OptionalBackendPackage):
 
 class BackendTkAgg(OptionalBackendPackage):
     name = "tkagg"
+    force = True
 
-    def __init__(self):
-        self.tcl_tk_cache = None
-
-    def check_requirements(self):
-        try:
-            if PY3:
-                import tkinter as Tkinter
-            else:
-                import Tkinter
-        except ImportError:
-            raise CheckFailed('TKAgg requires Tkinter.')
-        except RuntimeError:
-            raise CheckFailed('Tkinter present but import failed.')
-        else:
-            if Tkinter.TkVersion < 8.3:
-                raise CheckFailed("Tcl/Tk v8.3 or later required.")
-
-        ext = self.get_extension()
-        check_include_file(ext.include_dirs, "tk.h", "Tk")
-
-        try:
-            tk_v = Tkinter.__version__.split()[-2]
-        except (AttributeError, IndexError):
-            # Tkinter.__version__ has been removed in python 3
-            tk_v = 'not identified'
-
-        BackendAgg.force = True
-
-        return "version %s" % tk_v
+    def check(self):
+        return "installing; run-time loading from Python Tcl / Tk"
 
     def get_extension(self):
         sources = [
@@ -1490,97 +1475,10 @@ class BackendTkAgg(OptionalBackendPackage):
         return tcl_lib, tcl_inc, 'tcl', tk_lib, tk_inc, 'tk'
 
     def add_flags(self, ext):
+        ext.include_dirs.extend(['src'])
         if sys.platform == 'win32':
-            major, minor1, minor2, s, tmp = sys.version_info
-            if sys.version_info[0:2] < (3, 4):
-                ext.include_dirs.extend(['win32_static/include/tcl85'])
-                ext.libraries.extend(['tk85', 'tcl85'])
-            else:
-                ext.include_dirs.extend(['win32_static/include/tcl86'])
-                ext.libraries.extend(['tk86t', 'tcl86t'])
-            ext.library_dirs.extend([os.path.join(sys.prefix, 'dlls')])
-
-        elif sys.platform == 'darwin':
-            # this config section lifted directly from Imaging - thanks to
-            # the effbot!
-
-            # First test for a MacOSX/darwin framework install
-            from os.path import join, exists
-            framework_dirs = [
-                join(os.getenv('HOME'), '/Library/Frameworks'),
-                '/Library/Frameworks',
-                '/System/Library/Frameworks/',
-            ]
-
-            # Find the directory that contains the Tcl.framework and
-            # Tk.framework bundles.
-            tk_framework_found = 0
-            for F in framework_dirs:
-                # both Tcl.framework and Tk.framework should be present
-                for fw in 'Tcl', 'Tk':
-                    if not exists(join(F, fw + '.framework')):
-                        break
-                else:
-                    # ok, F is now directory with both frameworks. Continure
-                    # building
-                    tk_framework_found = 1
-                    break
-            if tk_framework_found:
-                # For 8.4a2, we must add -I options that point inside
-                # the Tcl and Tk frameworks. In later release we
-                # should hopefully be able to pass the -F option to
-                # gcc, which specifies a framework lookup path.
-
-                tk_include_dirs = [
-                    join(F, fw + '.framework', H)
-                    for fw in ('Tcl', 'Tk')
-                    for H in ('Headers', 'Versions/Current/PrivateHeaders')
-                ]
-
-                # For 8.4a2, the X11 headers are not included. Rather
-                # than include a complicated search, this is a
-                # hard-coded path. It could bail out if X11 libs are
-                # not found...
-
-                # tk_include_dirs.append('/usr/X11R6/include')
-                frameworks = ['-framework', 'Tcl', '-framework', 'Tk']
-                ext.include_dirs.extend(tk_include_dirs)
-                ext.extra_link_args.extend(frameworks)
-                ext.extra_compile_args.extend(frameworks)
-
-        # you're still here? ok we'll try it this way...
-        else:
-            # There are 3 methods to try, in decreasing order of "smartness"
-            #
-            #   1. Parse the tclConfig.sh and tkConfig.sh files that have
-            #      all the information we need
-            #
-            #   2. Guess the include and lib dirs based on the location of
-            #      Tkinter's 'tcl_library' and 'tk_library' variables.
-            #
-            #   3. Use some hardcoded locations that seem to work on a lot
-            #      of distros.
-
-            # Query Tcl/Tk system for library paths and version string
-            try:
-                tcl_lib_dir, tk_lib_dir, tk_ver = self.query_tcltk()
-            except:
-                tk_ver = ''
-                result = self.hardcoded_tcl_config()
-            else:
-                result = self.parse_tcl_config(tcl_lib_dir, tk_lib_dir)
-                if result is None:
-                    result = self.guess_tcl_config(
-                        tcl_lib_dir, tk_lib_dir, tk_ver)
-                    if result is None:
-                        result = self.hardcoded_tcl_config()
-
-            # Add final versions of directories and libraries to ext lists
-            (tcl_lib_dir, tcl_inc_dir, tcl_lib,
-             tk_lib_dir, tk_inc_dir, tk_lib) = result
-            ext.include_dirs.extend([tcl_inc_dir, tk_inc_dir])
-            ext.library_dirs.extend([tcl_lib_dir, tk_lib_dir])
-            ext.libraries.extend([tcl_lib, tk_lib])
+            # PSAPI library needed for finding Tcl / Tk at run time
+            ext.libraries.extend(['psapi'])
 
 
 class BackendGtk(OptionalBackendPackage):
@@ -1694,8 +1592,6 @@ class BackendGtkAgg(BackendGtk):
             return super(BackendGtkAgg, self).check()
         except:
             raise
-        else:
-            BackendAgg.force = True
 
     def get_package_data(self):
         return {'matplotlib': ['mpl-data/*.glade']}
@@ -1774,7 +1670,6 @@ class BackendGtk3Agg(OptionalBackendPackage):
             p.join()
 
         if success:
-            BackendAgg.force = True
             return msg
         else:
             raise CheckFailed(msg)
@@ -1847,7 +1742,6 @@ class BackendGtk3Cairo(OptionalBackendPackage):
             p.join()
 
         if success:
-            BackendAgg.force = True
             return msg
         else:
             raise CheckFailed(msg)
@@ -1891,8 +1785,6 @@ class BackendWxAgg(OptionalBackendPackage):
             raise CheckFailed(
                 "Requires wxPython 2.8, found %s" % backend_version)
 
-        BackendAgg.force = True
-
         return "version %s" % backend_version
 
 
@@ -1931,7 +1823,7 @@ class Windowing(OptionalBackendPackage):
         config = self.get_config()
         if config is False:
             raise CheckFailed("skipping due to configuration")
-        return "installing"
+        return ""
 
     def get_extension(self):
         sources = [
@@ -2006,7 +1898,6 @@ def backend_pyside_internal_check(self):
     except ImportError:
         raise CheckFailed("PySide not found")
     else:
-        BackendAgg.force = True
         return ("Qt: %s, PySide: %s" %
                 (QtCore.__version__, __version__))
 
@@ -2023,7 +1914,6 @@ def backend_pyqt4_internal_check(self):
     except AttributeError:
         raise CheckFailed('PyQt4 not correctly imported')
     else:
-        BackendAgg.force = True
         return ("Qt: %s, PyQt: %s" % (self.convert_qt_version(qt_version), pyqt_version_str))
 
 
@@ -2065,7 +1955,6 @@ def backend_qt5_internal_check(self):
     except AttributeError:
         raise CheckFailed('PyQt5 not correctly imported')
     else:
-        BackendAgg.force = True
         return ("Qt: %s, PyQt: %s" % (self.convert_qt_version(qt_version), pyqt_version_str))
 
 

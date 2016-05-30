@@ -314,6 +314,18 @@ class Line2D(Artist):
         if solid_joinstyle is None:
             solid_joinstyle = rcParams['lines.solid_joinstyle']
 
+        if is_string_like(linestyle):
+            ds, ls = self._split_drawstyle_linestyle(linestyle)
+            if ds is not None and drawstyle is not None and ds != drawstyle:
+                raise ValueError("Inconsistent drawstyle ({0!r}) and "
+                                 "linestyle ({1!r})".format(drawstyle,
+                                                            linestyle)
+                                 )
+            linestyle = ls
+
+            if ds is not None:
+                drawstyle = ds
+
         if drawstyle is None:
             drawstyle = 'default'
 
@@ -329,6 +341,9 @@ class Line2D(Artist):
         self._linestyles = None
         self._drawstyle = None
         self._linewidth = None
+
+        self._dashSeq = None
+
         self.set_linestyle(linestyle)
         self.set_drawstyle(drawstyle)
         self.set_linewidth(linewidth)
@@ -345,8 +360,6 @@ class Line2D(Artist):
         self.set_markevery(markevery)
         self.set_antialiased(antialiased)
         self.set_markersize(markersize)
-
-        self._dashSeq = None
 
         self._markeredgecolor = None
         self._markeredgewidth = None
@@ -758,7 +771,7 @@ class Line2D(Artist):
                 drawFunc(renderer, gc, tpath, affine.frozen())
                 gc.restore()
 
-        if self._marker:
+        if self._marker and self._markersize > 0:
             gc = renderer.new_gc()
             self._set_gc_clip(gc)
             rgbaFace = self._get_rgba_face()
@@ -978,6 +991,38 @@ class Line2D(Artist):
             self.stale = True
         self._linewidth = w
 
+    def _split_drawstyle_linestyle(self, ls):
+        '''Split drawstyle from linestyle string
+
+        If `ls` is only a drawstyle default to returning a linestyle
+        of '-'.
+
+        Parameters
+        ----------
+        ls : str
+            The linestyle to be processed
+
+        Returns
+        -------
+        ret_ds : str or None
+            If the linestyle string does not contain a drawstyle prefix
+            return None, otherwise return it.
+
+        ls : str
+            The linestyle with the drawstyle (if any) stripped.
+        '''
+        ret_ds = None
+        for ds in self.drawStyleKeys:  # long names are first in the list
+            if ls.startswith(ds):
+                ret_ds = ds
+                if len(ls) > len(ds):
+                    ls = ls[len(ds):]
+                else:
+                    ls = '-'
+                break
+
+        return ret_ds, ls
+
     def set_linestyle(self, ls):
         """
         Set the linestyle of the line (also accepts drawstyles,
@@ -989,7 +1034,7 @@ class Line2D(Artist):
         ===========================   =================
         ``'-'`` or ``'solid'``        solid line
         ``'--'`` or  ``'dashed'``     dashed line
-        ``'-.'`` or  ``'dash_dot'``   dash-dotted line
+        ``'-.'`` or  ``'dashdot'``    dash-dotted line
         ``':'`` or ``'dotted'``       dotted line
         ``'None'``                    draw nothing
         ``' '``                       draw nothing
@@ -1029,15 +1074,9 @@ class Line2D(Artist):
             self.set_dashes(ls[1])
             self._linestyle = "--"
             return
-
-        for ds in self.drawStyleKeys:  # long names are first in the list
-            if ls.startswith(ds):
-                self.set_drawstyle(ds)
-                if len(ls) > len(ds):
-                    ls = ls[len(ds):]
-                else:
-                    ls = '-'
-                break
+        ds, ls = self._split_drawstyle_linestyle(ls)
+        if ds is not None:
+            self.set_drawstyle(ds)
 
         if ls in [' ', '', 'none']:
             ls = 'None'
@@ -1047,7 +1086,7 @@ class Line2D(Artist):
                 ls = ls_mapper_r[ls]
             except KeyError:
                 raise ValueError(("You passed in an invalid linestyle, "
-                                  "`{}`.  See "
+                                  "`{0}`.  See "
                                   "docs of Line2D.set_linestyle for "
                                   "valid values.").format(ls))
 

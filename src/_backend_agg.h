@@ -488,7 +488,7 @@ RendererAgg::draw_path(GCAgg &gc, PathIterator &path, agg::trans_affine &trans, 
 
     transformed_path_t tpath(path, trans);
     nan_removed_t nan_removed(tpath, true, path.has_curves());
-    clipped_t clipped(nan_removed, clip, width, height);
+    clipped_t clipped(nan_removed, clip && !path.has_curves(), width, height);
     snapped_t snapped(clipped, gc.snap_mode, path.total_vertices(), snapping_linewidth);
     simplify_t simplified(snapped, simplify, path.simplify_threshold());
     curve_t curve(simplified);
@@ -961,13 +961,13 @@ inline void RendererAgg::_draw_path_collection_generic(GCAgg &gc,
         typename PathGenerator::path_iterator path = path_generator(i);
 
         if (Ntransforms) {
-            typename TransformArray::sub_t subtrans = transforms[i % Ntransforms];
-            trans = agg::trans_affine(subtrans(0, 0),
-                                      subtrans(1, 0),
-                                      subtrans(0, 1),
-                                      subtrans(1, 1),
-                                      subtrans(0, 2),
-                                      subtrans(1, 2));
+            int it = i % Ntransforms;
+            trans = agg::trans_affine(transforms(it, 0, 0),
+                                      transforms(it, 1, 0),
+                                      transforms(it, 0, 1),
+                                      transforms(it, 1, 1),
+                                      transforms(it, 0, 2),
+                                      transforms(it, 1, 2));
             trans *= master_transform;
         } else {
             trans = master_transform;
@@ -989,13 +989,13 @@ inline void RendererAgg::_draw_path_collection_generic(GCAgg &gc,
         trans *= agg::trans_affine_translation(0.0, (double)height);
 
         if (Nfacecolors) {
-            typename ColorArray::sub_t facecolor = facecolors[i % Nfacecolors];
-            face.second = agg::rgba(facecolor(0), facecolor(1), facecolor(2), facecolor(3));
+            int ic = i % Nfacecolors;
+            face.second = agg::rgba(facecolors(ic, 0), facecolors(ic, 1), facecolors(ic, 2), facecolors(ic, 3));
         }
 
         if (Nedgecolors) {
-            typename ColorArray::sub_t edgecolor = edgecolors[i % Nedgecolors];
-            gc.color = agg::rgba(edgecolor(0), edgecolor(1), edgecolor(2), edgecolor(3));
+            int ic = i % Nedgecolors;
+            gc.color = agg::rgba(edgecolors(ic, 0), edgecolors(ic, 1), edgecolors(ic, 2), edgecolors(ic, 3));
 
             if (Nlinewidths) {
                 gc.linewidth = linewidths(i % Nlinewidths);
@@ -1014,7 +1014,7 @@ inline void RendererAgg::_draw_path_collection_generic(GCAgg &gc,
 
             transformed_path_t tpath(path, trans);
             nan_removed_t nan_removed(tpath, true, has_curves);
-            clipped_t clipped(nan_removed, do_clip, width, height);
+            clipped_t clipped(nan_removed, do_clip && !has_curves, width, height);
             snapped_t snapped(
                 clipped, gc.snap_mode, path.total_vertices(), points_to_pixels(gc.linewidth));
             if (has_curves) {
@@ -1274,8 +1274,8 @@ inline void RendererAgg::draw_gouraud_triangles(GCAgg &gc,
     bool has_clippath = render_clippath(gc.clippath.path, gc.clippath.trans);
 
     for (int i = 0; i < points.dim(0); ++i) {
-        typename PointArray::sub_t point = points[i];
-        typename ColorArray::sub_t color = colors[i];
+        typename PointArray::sub_t point = points.subarray(i);
+        typename ColorArray::sub_t color = colors.subarray(i);
 
         _draw_gouraud_triangle(point, color, trans, has_clippath);
     }

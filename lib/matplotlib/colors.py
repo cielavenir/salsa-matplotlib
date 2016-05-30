@@ -821,7 +821,8 @@ class ListedColormap(Colormap):
         if N is None:
             N = len(self.colors)
         else:
-            if cbook.is_string_like(self.colors):
+            if (cbook.is_string_like(self.colors) and
+                    cbook.is_hashable(self.colors)):
                 self.colors = [self.colors] * N
                 self.monochrome = True
             elif cbook.iterable(self.colors):
@@ -852,7 +853,8 @@ class ListedColormap(Colormap):
         """
         Return a new color map with *lutsize* entries.
         """
-        return ListedColormap(self.name, self.colors, lutsize)
+        colors = self(np.linspace(0, 1, lutsize))
+        return ListedColormap(colors, name=self.name)
 
 
 class Normalize(object):

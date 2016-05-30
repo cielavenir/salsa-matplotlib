@@ -29,7 +29,8 @@ from .path import Path
 # python trick.  The answer is that I need to be able to manipulate
 # the docstring, and there is no clever way to do that in python 2.2,
 # as far as I can see - see
-# http://groups.google.com/groups?hl=en&lr=&threadm=mailman.5090.1098044946.5135.python-list%40python.org&rnum=1&prev=/groups%3Fq%3D__doc__%2Bauthor%253Ajdhunter%2540ace.bsd.uchicago.edu%26hl%3Den%26btnG%3DGoogle%2BSearch
+#
+# https://mail.python.org/pipermail/python-list/2004-October/242925.html
 
 
 def allow_rasterization(draw):
@@ -207,7 +208,8 @@ class Artist(object):
 
         ACCEPTS: an :class:`~matplotlib.axes.Axes` instance
         """
-        warnings.warn(_get_axes_msg, mplDeprecation, stacklevel=1)
+        warnings.warn(_get_axes_msg.format('set_axes'), mplDeprecation,
+                      stacklevel=1)
         self.axes = axes
 
     def get_axes(self):
@@ -218,7 +220,8 @@ class Artist(object):
         This has been deprecated in mpl 1.5, please use the
         axes property.  Will be removed in 1.7 or 2.0.
         """
-        warnings.warn(_get_axes_msg, mplDeprecation, stacklevel=1)
+        warnings.warn(_get_axes_msg.format('get_axes'), mplDeprecation,
+                      stacklevel=1)
         return self.axes
 
     @property
@@ -1480,5 +1483,5 @@ def kwdoc(a):
 
 docstring.interpd.update(Artist=kwdoc(Artist))
 
-_get_axes_msg = """This has been deprecated in mpl 1.5, please use the
+_get_axes_msg = """{0} has been deprecated in mpl 1.5, please use the
 axes property.  A removal date has not been set."""
