@@ -15,7 +15,8 @@ from matplotlib import unpack_labeled_data
 
 import matplotlib.cbook as cbook
 from matplotlib.cbook import (mplDeprecation, STEP_LOOKUP_MAP,
-                              iterable, is_string_like)
+                              iterable, is_string_like,
+                              safe_first_element)
 import matplotlib.collections as mcoll
 import matplotlib.colors as mcolors
 import matplotlib.contour as mcontour
@@ -43,6 +44,17 @@ from matplotlib.axes._base import _process_plot_format
 
 
 rcParams = matplotlib.rcParams
+
+_alias_map = {'color': ['c'],
+              'linewidth': ['lw'],
+              'linestyle': ['ls'],
+              'facecolor': ['fc'],
+              'edgecolor': ['ec'],
+              'markerfacecolor': ['mfc'],
+              'markeredgecolor': ['mec'],
+              'markeredgewidth': ['mew'],
+              'markersize': ['ms'],
+             }
 
 
 def _plot_args_replacer(args, data):
@@ -1415,11 +1427,7 @@ class Axes(_AxesBase):
             self.cla()
         lines = []
 
-        # Convert "c" alias to "color" immediately, to avoid
-        # confusion farther on.
-        c = kwargs.pop('c', None)
-        if c is not None:
-            kwargs['color'] = c
+        kwargs = cbook.normalize_kwargs(kwargs, _alias_map)
 
         for line in self._get_lines(*args, **kwargs):
             self.add_line(line)
@@ -1491,12 +1499,12 @@ class Axes(_AxesBase):
         if not self._hold:
             self.cla()
 
-        ret = self.plot(x, y, fmt, **kwargs)
-
         if xdate:
             self.xaxis_date(tz)
         if ydate:
             self.yaxis_date(tz)
+
+        ret = self.plot(x, y, fmt, **kwargs)
 
         self.autoscale_view()
 
@@ -2883,29 +2891,44 @@ class Axes(_AxesBase):
             if key in kwargs:
                 plot_kw[key] = kwargs[key]
 
-        if xerr is not None:
-            if (iterable(xerr) and len(xerr) == 2 and
-                    iterable(xerr[0]) and iterable(xerr[1])):
-                # using list comps rather than arrays to preserve units
-                left = [thisx - thiserr for (thisx, thiserr)
-                        in cbook.safezip(x, xerr[0])]
-                right = [thisx + thiserr for (thisx, thiserr)
-                         in cbook.safezip(x, xerr[1])]
-            else:
-                # Check if xerr is scalar or symmetric. Asymmetric is handled
-                # above. This prevents Nx2 arrays from accidentally
-                # being accepted, when the user meant the 2xN transpose.
-                # special case for empty lists
-                if len(xerr) > 1 and not ((len(xerr) == len(x) and not (
-                        iterable(xerr[0]) and len(xerr[0]) > 1))):
-                    raise ValueError("xerr must be a scalar, the same "
-                                     "dimensions as x, or 2xN.")
-                # using list comps rather than arrays to preserve units
-                left = [thisx - thiserr for (thisx, thiserr)
-                        in cbook.safezip(x, xerr)]
-                right = [thisx + thiserr for (thisx, thiserr)
-                         in cbook.safezip(x, xerr)]
+        def extract_err(err, data):
+            '''private function to compute error bars
 
+            Parameters
+            ----------
+            err : iterable
+                xerr or yerr from errorbar
+            data : iterable
+                x or y from errorbar
+            '''
+            if (iterable(err) and len(err) == 2):
+                a, b = err
+                if iterable(a) and iterable(b):
+                    # using list comps rather than arrays to preserve units
+                    low = [thisx - thiserr for (thisx, thiserr)
+                           in cbook.safezip(data, a)]
+                    high = [thisx + thiserr for (thisx, thiserr)
+                            in cbook.safezip(data, b)]
+                    return low, high
+            # Check if xerr is scalar or symmetric. Asymmetric is handled
+            # above. This prevents Nx2 arrays from accidentally
+            # being accepted, when the user meant the 2xN transpose.
+            # special case for empty lists
+            if len(err) > 1:
+                fe = safe_first_element(err)
+                if not ((len(err) == len(data) and not (iterable(fe) and
+                                                        len(fe) > 1))):
+                    raise ValueError("err must be a scalar, the same "
+                                     "dimensions as x, or 2xN.")
+            # using list comps rather than arrays to preserve units
+            low = [thisx - thiserr for (thisx, thiserr)
+                   in cbook.safezip(data, err)]
+            high = [thisx + thiserr for (thisx, thiserr)
+                    in cbook.safezip(data, err)]
+            return low, high
+
+        if xerr is not None:
+            left, right = extract_err(xerr, x)
             # select points without upper/lower limits in x and
             # draw normal errorbars for these points
             noxlims = ~(xlolims | xuplims)
@@ -2950,25 +2973,7 @@ class Axes(_AxesBase):
                     caplines.extend(self.plot(xup, yup, 'k|', **plot_kw))
 
         if yerr is not None:
-            if (iterable(yerr) and len(yerr) == 2 and
-                    iterable(yerr[0]) and iterable(yerr[1])):
-                # using list comps rather than arrays to preserve units
-                lower = [thisy - thiserr for (thisy, thiserr)
-                         in cbook.safezip(y, yerr[0])]
-                upper = [thisy + thiserr for (thisy, thiserr)
-                         in cbook.safezip(y, yerr[1])]
-            else:
-                # Check for scalar or symmetric, as in xerr.
-                if len(yerr) > 1 and not ((len(yerr) == len(y) and not (
-                        iterable(yerr[0]) and len(yerr[0]) > 1))):
-                    raise ValueError("yerr must be a scalar, the same "
-                                     "dimensions as y, or 2xN.")
-                # using list comps rather than arrays to preserve units
-                lower = [thisy - thiserr for (thisy, thiserr)
-                         in cbook.safezip(y, yerr)]
-                upper = [thisy + thiserr for (thisy, thiserr)
-                         in cbook.safezip(y, yerr)]
-
+            lower, upper = extract_err(yerr, y)
             # select points without upper/lower limits in y and
             # draw normal errorbars for these points
             noylims = ~(lolims | uplims)
@@ -3043,9 +3048,10 @@ class Axes(_AxesBase):
                 positions=None, widths=None, patch_artist=None,
                 bootstrap=None, usermedians=None, conf_intervals=None,
                 meanline=None, showmeans=None, showcaps=None,
-                showbox=None, showfliers=None, boxprops=None, labels=None,
-                flierprops=None, medianprops=None, meanprops=None,
-                capprops=None, whiskerprops=None, manage_xticks=True):
+                showbox=None, showfliers=None, boxprops=None,
+                labels=None, flierprops=None, medianprops=None,
+                meanprops=None, capprops=None, whiskerprops=None,
+                manage_xticks=True, autorange=False):
         """
         Make a box and whisker plot.
 
@@ -3055,12 +3061,13 @@ class Axes(_AxesBase):
                   positions=None, widths=None, patch_artist=False,
                   bootstrap=None, usermedians=None, conf_intervals=None,
                   meanline=False, showmeans=False, showcaps=True,
-                  showbox=True, showfliers=True, boxprops=None, labels=None,
-                  flierprops=None, medianprops=None, meanprops=None,
-                  capprops=None, whiskerprops=None, manage_xticks=True):
+                  showbox=True, showfliers=True, boxprops=None,
+                  labels=None, flierprops=None, medianprops=None,
+                  meanprops=None, capprops=None, whiskerprops=None,
+                  manage_xticks=True, autorange=False):
 
-        Make a box and whisker plot for each column of *x* or each
-        vector in sequence *x*.  The box extends from the lower to
+        Make a box and whisker plot for each column of ``x`` or each
+        vector in sequence ``x``.  The box extends from the lower to
         upper quartile values of the data, with a line at the median.
         The whiskers extend from the box to show the range of the
         data.  Flier points are those past the end of the whiskers.
@@ -3068,140 +3075,145 @@ class Axes(_AxesBase):
         Parameters
         ----------
         x : Array or a sequence of vectors.
-           The input data.
+            The input data.
 
-        notch : bool, default = False
-           If False, produces a rectangular box plot.
-           If True, will produce a notched box plot
+        notch : bool, optional (False)
+            If `True`, will produce a notched box plot. Otherwise, a
+            rectangular boxplot is produced.
 
-        sym : str or None, default = None
-           The default symbol for flier points.
-           Enter an empty string ('') if you don't want to show fliers.
-           If `None`, then the fliers default to 'b+'  If you want more
-           control use the flierprops kwarg.
+        sym : str, optional
+            The default symbol for flier points. Enter an empty string
+            ('') if you don't want to show fliers. If `None`, then the
+            fliers default to 'b+'  If you want more control use the
+            flierprops kwarg.
 
-        vert : bool, default = True
-           If True (default), makes the boxes vertical.
-           If False, makes horizontal boxes.
+        vert : bool, optional (True)
+            If `True` (default), makes the boxes vertical. If `False`,
+            everything is drawn horizontally.
 
-        whis : float, sequence (default = 1.5) or string
-           As a float, determines the reach of the whiskers past the first
-           and third quartiles (e.g., Q3 + whis*IQR, IQR = interquartile
-           range, Q3-Q1). Beyond the whiskers, data are considered outliers
-           and are plotted as individual points. Set this to an unreasonably
-           high value to force the whiskers to show the min and max values.
-           Alternatively, set this to an ascending sequence of percentile
-           (e.g., [5, 95]) to set the whiskers at specific percentiles of
-           the data. Finally, *whis* can be the string 'range' to force the
-           whiskers to the min and max of the data. In the edge case that
-           the 25th and 75th percentiles are equivalent, *whis* will be
-           automatically set to 'range'.
+        whis : float, sequence, or string (default = 1.5)
+            As a float, determines the reach of the whiskers past the
+            first and third quartiles (e.g., Q3 + whis*IQR,
+            IQR = interquartile range, Q3-Q1). Beyond the whiskers, data
+            are considered outliers and are plotted as individual
+            points. Set this to an unreasonably high value to force the
+            whiskers to show the min and max values. Alternatively, set
+            this to an ascending sequence of percentile (e.g., [5, 95])
+            to set the whiskers at specific percentiles of the data.
+            Finally, ``whis`` can be the string ``'range'`` to force the
+            whiskers to the min and max of the data.
 
-        bootstrap : None (default) or integer
-           Specifies whether to bootstrap the confidence intervals
-           around the median for notched boxplots. If bootstrap==None,
-           no bootstrapping is performed, and notches are calculated
-           using a Gaussian-based asymptotic approximation  (see McGill, R.,
-           Tukey, J.W., and Larsen, W.A., 1978, and Kendall and Stuart,
-           1967). Otherwise, bootstrap specifies the number of times to
-           bootstrap the median to determine it's 95% confidence intervals.
-           Values between 1000 and 10000 are recommended.
+        bootstrap : int, optional
+            Specifies whether to bootstrap the confidence intervals
+            around the median for notched boxplots. If `bootstrap` is None,
+            no bootstrapping is performed, and notches are calculated
+            using a Gaussian-based asymptotic approximation (see McGill,
+            R., Tukey, J.W., and Larsen, W.A., 1978, and Kendall and
+            Stuart, 1967). Otherwise, bootstrap specifies the number of
+            times to bootstrap the median to determine its 95%
+            confidence intervals. Values between 1000 and 10000 are
+            recommended.
 
-        usermedians : array-like or None (default)
-           An array or sequence whose first dimension (or length) is
-           compatible with *x*. This overrides the medians computed by
-           matplotlib for each element of *usermedians* that is not None.
-           When an element of *usermedians* == None, the median will be
-           computed by matplotlib as normal.
+        usermedians : array-like, optional
+            An array or sequence whose first dimension (or length) is
+            compatible with ``x``. This overrides the medians computed
+            by matplotlib for each element of ``usermedians`` that is not
+            `None`. When an element of ``usermedians`` is None, the median
+            will be computed by matplotlib as normal.
 
-        conf_intervals : array-like or None (default)
-           Array or sequence whose first dimension (or length) is compatible
-           with *x* and whose second dimension is 2. When the current element
-           of *conf_intervals* is not None, the notch locations computed by
-           matplotlib are overridden (assuming notch is True). When an
-           element of *conf_intervals* is None, boxplot compute notches the
-           method specified by the other kwargs (e.g., *bootstrap*).
+        conf_intervals : array-like, optional
+            Array or sequence whose first dimension (or length) is
+            compatible with ``x`` and whose second dimension is 2. When
+            the an element of ``conf_intervals`` is not None, the
+            notch locations computed by matplotlib are overridden
+            (provided ``notch`` is `True`). When an element of
+            ``conf_intervals`` is `None`, the notches are computed by the
+            method specified by the other kwargs (e.g., ``bootstrap``).
 
-        positions : array-like, default = [1, 2, ..., n]
-           Sets the positions of the boxes. The ticks and limits
-           are automatically set to match the positions.
+        positions : array-like, optional
+            Sets the positions of the boxes. The ticks and limits are
+            automatically set to match the positions. Defaults to
+            `range(1, N+1)` where N is the number of boxes to be drawn.
 
-        widths : array-like, default = 0.5
-           Either a scalar or a vector and sets the width of each box. The
-           default is 0.5, or ``0.15*(distance between extreme positions)``
-           if that is smaller.
+        widths : scalar or array-like
+            Sets the width of each box either with a scalar or a
+            sequence. The default is 0.5, or ``0.15*(distance between
+            extreme positions)``, if that is smaller.
 
-        labels : sequence or None (default)
-           Labels for each dataset. Length must be compatible with
-           dimensions  of *x*
+        patch_artist : bool, optional (False)
+            If `False` produces boxes with the Line2D artist. Otherwise,
+            boxes and drawn with Patch artists.
 
-        patch_artist : bool, default = False
-           If False produces boxes with the Line2D artist
-           If True produces boxes with the Patch artist
+        labels : sequence, optional
+            Labels for each dataset. Length must be compatible with
+            dimensions  of ``x``.
 
-        showmeans : bool, default = False
-           If True, will toggle one the rendering of the means
-
-        showcaps : bool, default = True
-           If True, will toggle one the rendering of the caps
-
-        showbox : bool, default = True
-           If True, will toggle one the rendering of box
-
-        showfliers : bool, default = True
-           If True, will toggle one the rendering of the fliers
-
-        boxprops : dict or None (default)
-           If provided, will set the plotting style of the boxes
-
-        whiskerprops : dict or None (default)
-           If provided, will set the plotting style of the whiskers
-
-        capprops : dict or None (default)
-           If provided, will set the plotting style of the caps
-
-        flierprops : dict or None (default)
-           If provided, will set the plotting style of the fliers
-
-        medianprops : dict or None (default)
-           If provided, will set the plotting style of the medians
-
-        meanprops : dict or None (default)
-            If provided, will set the plotting style of the means
-
-        meanline : bool, default = False
-            If True (and *showmeans* is True), will try to render the mean
-            as a line spanning the full width of the box according to
-            *meanprops*. Not recommended if *shownotches* is also True.
-            Otherwise, means will be shown as points.
-
-        manage_xticks : bool, default = True
+        manage_xticks : bool, optional (True)
             If the function should adjust the xlim and xtick locations.
+
+        autorange : bool, optional (False)
+            When `True` and the data are distributed such that the  25th and
+            75th percentiles are equal, ``whis`` is set to ``'range'`` such
+            that the whisker ends are at the minimum and maximum of the
+            data.
+
+        meanline : bool, optional (False)
+            If `True` (and ``showmeans`` is `True`), will try to render
+            the mean as a line spanning the full width of the box
+            according to ``meanprops`` (see below). Not recommended if
+            ``shownotches`` is also True. Otherwise, means will be shown
+            as points.
+
+        Other Parameters
+        ----------------
+        The following boolean options toggle the drawing of individual
+        components of the boxplots:
+            - showcaps: the caps on the ends of whiskers
+              (default is True)
+            - showbox: the central box (default is True)
+            - showfliers: the outliers beyond the caps (default is True)
+            - showmeans: the arithmetic means (default is False)
+
+        The remaining options can accept dictionaries that specify the
+        style of the individual artists:
+            - capprops
+            - boxprops
+            - whiskerprops
+            - flierprops
+            - medianprops
+            - meanprops
 
         Returns
         -------
-
         result : dict
-            A dictionary mapping each component of the boxplot
-            to a list of the :class:`matplotlib.lines.Line2D`
-            instances created. That dictionary has the following keys
-            (assuming vertical boxplots):
+          A dictionary mapping each component of the boxplot to a list
+          of the :class:`matplotlib.lines.Line2D` instances
+          created. That dictionary has the following keys (assuming
+          vertical boxplots):
 
-            - boxes: the main body of the boxplot showing the quartiles
-              and the median's confidence intervals if enabled.
-            - medians: horizonal lines at the median of each box.
-            - whiskers: the vertical lines extending to the most extreme,
-              n-outlier data points.
-            - caps: the horizontal lines at the ends of the whiskers.
-            - fliers: points representing data that extend beyond the
-              whiskers (outliers).
-            - means: points or lines representing the means.
+          - ``boxes``: the main body of the boxplot showing the
+            quartiles and the median's confidence intervals if
+            enabled.
+
+          - ``medians``: horizontal lines at the median of each box.
+
+          - ``whiskers``: the vertical lines extending to the most
+            extreme, non-outlier data points.
+
+          - ``caps``: the horizontal lines at the ends of the
+            whiskers.
+
+          - ``fliers``: points representing data that extend beyond
+            the whiskers (fliers).
+
+          - ``means``: points or lines representing the means.
 
         Examples
         --------
-
         .. plot:: mpl_examples/statistics/boxplot_demo.py
+
         """
+
         # If defined in matplotlibrc, apply the value from rc file
         # Overridden if argument is passed
         if whis is None:
@@ -3209,7 +3221,7 @@ class Axes(_AxesBase):
         if bootstrap is None:
             bootstrap = rcParams['boxplot.bootstrap']
         bxpstats = cbook.boxplot_stats(x, whis=whis, bootstrap=bootstrap,
-                                       labels=labels)
+                                       labels=labels, autorange=autorange)
         if notch is None:
             notch = rcParams['boxplot.notch']
         if vert is None:
@@ -3405,16 +3417,16 @@ class Axes(_AxesBase):
           If `True`, will produce a notched box plot
 
         showmeans : bool, default = False
-          If `True`, will toggle one the rendering of the means
+          If `True`, will toggle on the rendering of the means
 
         showcaps  : bool, default = True
-          If `True`, will toggle one the rendering of the caps
+          If `True`, will toggle on the rendering of the caps
 
         showbox  : bool, default = True
-          If `True`, will toggle one the rendering of box
+          If `True`, will toggle on the rendering of the box
 
         showfliers : bool, default = True
-          If `True`, will toggle one the rendering of the fliers
+          If `True`, will toggle on the rendering of the fliers
 
         boxprops : dict or None (default)
           If provided, will set the plotting style of the boxes
@@ -3455,10 +3467,10 @@ class Axes(_AxesBase):
             quartiles and the median's confidence intervals if
             enabled.
 
-          - ``medians``: horizonal lines at the median of each box.
+          - ``medians``: horizontal lines at the median of each box.
 
           - ``whiskers``: the vertical lines extending to the most
-            extreme, n-outlier data points.
+            extreme, non-outlier data points.
 
           - ``caps``: the horizontal lines at the ends of the
             whiskers.
@@ -3718,7 +3730,7 @@ class Axes(_AxesBase):
                 **kwargs):
         """
         Make a scatter plot of x vs y, where x and y are sequence like objects
-        of the same lengths.
+        of the same length.
 
         Parameters
         ----------
@@ -3728,7 +3740,7 @@ class Axes(_AxesBase):
         s : scalar or array_like, shape (n, ), optional, default: 20
             size in points^2.
 
-        c : color or sequence of color, optional, default : 'b'
+        c : color, sequence, or sequence of color, optional, default: 'b'
             `c` can be a single color format string, or a sequence of color
             specifications of length `N`, or a sequence of `N` numbers to be
             mapped to colors using the `cmap` and `norm` specified via kwargs
@@ -3805,28 +3817,36 @@ class Axes(_AxesBase):
         # Process **kwargs to handle aliases, conflicts with explicit kwargs:
 
         facecolors = None
-        ec = kwargs.pop('edgecolor', None)
-        if ec is not None:
-            edgecolors = ec
-        fc = kwargs.pop('facecolor', None)
-        if fc is not None:
-            facecolors = fc
+        edgecolors = kwargs.pop('edgecolor', edgecolors)
         fc = kwargs.pop('facecolors', None)
+        fc = kwargs.pop('facecolor', fc)
         if fc is not None:
             facecolors = fc
-        # 'color' should be deprecated in scatter, or clearly defined;
-        # since it isn't, I am giving it low priority.
         co = kwargs.pop('color', None)
         if co is not None:
+            try:
+                mcolors.colorConverter.to_rgba_array(co)
+            except ValueError:
+                raise ValueError("'color' kwarg must be an mpl color"
+                                 " spec or sequence of color specs.\n"
+                                 "For a sequence of values to be"
+                                 " color-mapped, use the 'c' kwarg instead.")
             if edgecolors is None:
                 edgecolors = co
             if facecolors is None:
                 facecolors = co
+            if c is not None:
+                raise ValueError("Supply a 'c' kwarg or a 'color' kwarg"
+                                 " but not both; they differ but"
+                                 " their functionalities overlap.")
         if c is None:
             if facecolors is not None:
                 c = facecolors
             else:
                 c = 'b'  # The original default
+            c_none = True
+        else:
+            c_none = False
 
         self._process_unit_info(xdata=x, ydata=y, kwargs=kwargs)
         x = self.convert_xunits(x)
@@ -3845,16 +3865,19 @@ class Axes(_AxesBase):
         # c is an array for mapping.  The potential ambiguity
         # with a sequence of 3 or 4 numbers is resolved in
         # favor of mapping, not rgb or rgba.
-        try:
-            c_array = np.asanyarray(c, dtype=float)
-            if c_array.size == x.size:
-                c = np.ma.ravel(c_array)
-            else:
-                # Wrong size; it must not be intended for mapping.
-                c_array = None
-        except ValueError:
-            # Failed to make a floating-point array; c must be color specs.
+        if c_none or co is not None:
             c_array = None
+        else:
+            try:
+                c_array = np.asanyarray(c, dtype=float)
+                if c_array.size == x.size:
+                    c = np.ma.ravel(c_array)
+                else:
+                    # Wrong size; it must not be intended for mapping.
+                    c_array = None
+            except ValueError:
+                # Failed to make a floating-point array; c must be color specs.
+                c_array = None
 
         if c_array is None:
             colors = c     # must be acceptable as PathCollection facecolors
@@ -4528,6 +4551,8 @@ class Axes(_AxesBase):
         """
         if not self._hold:
             self.cla()
+
+        kwargs = cbook.normalize_kwargs(kwargs, _alias_map)
 
         patches = []
         for poly in self._get_patches_for_fill(*args, **kwargs):

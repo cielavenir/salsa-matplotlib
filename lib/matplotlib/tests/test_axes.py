@@ -11,6 +11,8 @@ from nose.plugins.skip import SkipTest
 
 import datetime
 
+import pytz
+
 import numpy as np
 from numpy import ma
 from numpy import arange
@@ -18,6 +20,7 @@ from cycler import cycler
 
 import matplotlib
 from matplotlib.testing.decorators import image_comparison, cleanup
+from matplotlib.testing.noseclasses import KnownFailureTest
 import matplotlib.pyplot as plt
 import matplotlib.markers as mmarkers
 from numpy.testing import assert_array_equal
@@ -81,6 +84,8 @@ def test_formatter_ticker():
 
 @image_comparison(baseline_images=["formatter_large_small"])
 def test_formatter_large_small():
+    if tuple(map(int, np.__version__.split('.'))) >= (1, 11, 0):
+        raise KnownFailureTest("Fall out from a fixed numpy bug")
     # github issue #617, pull #619
     fig, ax = plt.subplots(1)
     x = [0.500000001, 0.500000002]
@@ -1275,6 +1280,13 @@ def test_scatter_2D():
     fig, ax = plt.subplots()
     ax.scatter(x, y, c=z, s=200, edgecolors='face')
 
+@cleanup
+def test_scatter_color():
+    # Try to catch cases where 'c' kwarg should have been used.
+    assert_raises(ValueError, plt.scatter, [1, 2], [1, 2],
+                  color=[0.1, 0.2])
+    assert_raises(ValueError, plt.scatter, [1, 2, 3], [1, 2, 3],
+                  color=[1, 2, 3])
 
 @cleanup
 def test_as_mpl_axes_api():
@@ -1780,14 +1792,22 @@ def test_boxplot_sym():
     ax.set_ylim((-30, 30))
 
 
-@image_comparison(baseline_images=['boxplot_autorange_whiskers'])
+@image_comparison(
+    baseline_images=['boxplot_autorange_false_whiskers',
+                     'boxplot_autorange_true_whiskers'],
+    extensions=['png'],
+)
 def test_boxplot_autorange_whiskers():
     x = np.ones(140)
     x = np.hstack([0, x, 2])
-    fig, ax = plt.subplots()
 
-    ax.boxplot([x, x], bootstrap=10000, notch=1)
-    ax.set_ylim((-5, 5))
+    fig1, ax1 = plt.subplots()
+    ax1.boxplot([x, x], bootstrap=10000, notch=1)
+    ax1.set_ylim((-5, 5))
+
+    fig2, ax2 = plt.subplots()
+    ax2.boxplot([x, x], bootstrap=10000, notch=1, autorange=True)
+    ax2.set_ylim((-5, 5))
 
 def _rc_test_bxp_helper(ax, rc_dict):
     x = np.linspace(-7, 7, 140)
@@ -4202,6 +4222,20 @@ def test_pandas_indexing_dates():
 
 
 @cleanup
+def test_pandas_errorbar_indexing():
+    try:
+        import pandas as pd
+    except ImportError:
+        raise SkipTest("Pandas not installed")
+
+    df = pd.DataFrame(np.random.uniform(size=(5, 4)),
+                      columns=['x', 'y', 'xe', 'ye'],
+                      index=[1, 2, 3, 4, 5])
+    fig, ax = plt.subplots()
+    ax.errorbar('x', 'y', xerr='xe', yerr='ye', data=df)
+
+
+@cleanup
 def test_pandas_indexing_hist():
     try:
         import pandas as pd
@@ -4212,6 +4246,96 @@ def test_pandas_indexing_hist():
     ser_2 = ser_1.iloc[1:]
     fig, axes = plt.subplots()
     axes.hist(ser_2)
+
+
+@cleanup
+def test_axis_set_tick_params_labelsize_labelcolor():
+    # Tests fix for issue 4346
+    axis_1 = plt.subplot()
+    axis_1.yaxis.set_tick_params(labelsize=30, labelcolor='red', direction='out')
+
+    # Expected values after setting the ticks
+    assert axis_1.yaxis.majorTicks[0]._size == 4.0
+    assert axis_1.yaxis.majorTicks[0]._color == 'k'
+    assert axis_1.yaxis.majorTicks[0]._labelsize == 30.0
+    assert axis_1.yaxis.majorTicks[0]._labelcolor == 'red'
+
+
+@cleanup
+def test_none_kwargs():
+    fig, ax = plt.subplots()
+    ln, = ax.plot(range(32), linestyle=None)
+    assert ln.get_linestyle() == '-'
+
+
+@cleanup
+def test_ls_ds_conflict():
+    assert_raises(ValueError, plt.plot, range(32),
+                  linestyle='steps-pre:', drawstyle='steps-post')
+
+
+@cleanup
+def test_ls_ds_conflict():
+    assert_raises(ValueError, plt.plot, range(32),
+                  linestyle='steps-pre:', drawstyle='steps-post')
+
+
+@image_comparison(baseline_images=['date_timezone_x'], extensions=['png'])
+def test_date_timezone_x():
+    # Tests issue 5575
+    time_index = [pytz.timezone('Canada/Eastern').localize(datetime.datetime(
+        year=2016, month=2, day=22, hour=x)) for x in range(3)]
+
+    # Same Timezone
+    fig = plt.figure(figsize=(20, 12))
+    plt.subplot(2, 1, 1)
+    plt.plot_date(time_index, [3] * 3, tz='Canada/Eastern')
+
+    # Different Timezone
+    plt.subplot(2, 1, 2)
+    plt.plot_date(time_index, [3] * 3, tz='UTC')
+
+
+@image_comparison(baseline_images=['date_timezone_y'],
+                  extensions=['png'])
+def test_date_timezone_y():
+    # Tests issue 5575
+    time_index = [pytz.timezone('Canada/Eastern').localize(datetime.datetime(
+        year=2016, month=2, day=22, hour=x)) for x in range(3)]
+
+    # Same Timezone
+    fig = plt.figure(figsize=(20, 12))
+    plt.subplot(2, 1, 1)
+    plt.plot_date([3] * 3,
+                  time_index, tz='Canada/Eastern', xdate=False, ydate=True)
+
+    # Different Timezone
+    plt.subplot(2, 1, 2)
+    plt.plot_date([3] * 3, time_index, tz='UTC', xdate=False, ydate=True)
+
+
+@image_comparison(baseline_images=['date_timezone_x_and_y'],
+                  extensions=['png'])
+def test_date_timezone_x_and_y():
+    # Tests issue 5575
+    time_index = [pytz.timezone('UTC').localize(datetime.datetime(
+        year=2016, month=2, day=22, hour=x)) for x in range(3)]
+
+    # Same Timezone
+    fig = plt.figure(figsize=(20, 12))
+    plt.subplot(2, 1, 1)
+    plt.plot_date(time_index, time_index, tz='UTC', ydate=True)
+
+    # Different Timezone
+    plt.subplot(2, 1, 2)
+    plt.plot_date(time_index, time_index, tz='US/Eastern', ydate=True)
+
+
+@cleanup
+def test_large_offset():
+    fig, ax = plt.subplots()
+    ax.plot((1 + np.array([0, 1.e-12])) * 1.e27)
+    fig.canvas.draw()
 
 
 if __name__ == '__main__':

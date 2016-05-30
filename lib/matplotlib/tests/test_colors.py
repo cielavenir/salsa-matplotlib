@@ -7,8 +7,15 @@ from distutils.version import LooseVersion as V
 
 from nose.tools import assert_raises, assert_equal, assert_true
 
+try:
+    # this is not available in nose + py2.6
+    from nose.tools import assert_sequence_equal
+except ImportError:
+    assert_sequence_equal = None
+
 import numpy as np
 from numpy.testing.utils import assert_array_equal, assert_array_almost_equal
+from nose.plugins.skip import SkipTest
 
 import matplotlib.colors as mcolors
 import matplotlib.cm as cm
@@ -16,6 +23,28 @@ import matplotlib.cbook as cbook
 import matplotlib.pyplot as plt
 from matplotlib.testing.decorators import (image_comparison,
                                            cleanup, knownfailureif)
+
+
+def test_resample():
+    """
+    Github issue #6025 pointed to incorrect ListedColormap._resample;
+    here we test the method for LinearSegmentedColormap as well.
+    """
+    n = 101
+    colorlist = np.empty((n, 4), float)
+    colorlist[:, 0] = np.linspace(0, 1, n)
+    colorlist[:, 1] = 0.2
+    colorlist[:, 2] = np.linspace(1, 0, n)
+    colorlist[:, 3] = 0.7
+    lsc = mcolors.LinearSegmentedColormap.from_list('lsc', colorlist)
+    lc = mcolors.ListedColormap(colorlist)
+    lsc3 = lsc._resample(3)
+    lc3 = lc._resample(3)
+    expected = np.array([[0.0, 0.2, 1.0, 0.7],
+                         [0.5, 0.2, 0.5, 0.7],
+                         [1.0, 0.2, 0.0, 0.7]], float)
+    assert_array_almost_equal(lsc3([0, 0.5, 1]), expected)
+    assert_array_almost_equal(lc3([0, 0.5, 1]), expected)
 
 
 def test_colormap_endian():
@@ -534,6 +563,23 @@ def _azimuth2math(azimuth, elevation):
     theta = np.radians((90 - azimuth) % 360)
     phi = np.radians(90 - elevation)
     return theta, phi
+
+
+def test_pandas_iterable():
+    try:
+        import pandas as pd
+    except ImportError:
+        raise SkipTest("Pandas not installed")
+    if assert_sequence_equal is None:
+        raise SkipTest("nose lacks required function")
+    # Using a list or series yields equivalent
+    # color maps, i.e the series isn't seen as
+    # a single color
+    lst = ['red', 'blue', 'green']
+    s = pd.Series(lst)
+    cm1 = mcolors.ListedColormap(lst, N=5)
+    cm2 = mcolors.ListedColormap(s, N=5)
+    assert_sequence_equal(cm1.colors, cm2.colors)
 
 
 if __name__ == '__main__':
