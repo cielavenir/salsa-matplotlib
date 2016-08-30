@@ -1,0 +1,55 @@
+From 2a95e2a75f2f536c98df9695c71ddb5610993eac Mon Sep 17 00:00:00 2001
+From: Sandro Tosi <morph@debian.org>
+Date: Tue, 30 Aug 2016 22:01:26 +0100
+Subject: =?UTF-8?q?From=20655c513a5e5440014677ee5afb08b0efa39f8e16=20Mon?=
+ =?UTF-8?q?=20Sep=2017=2000:00:00=202001=0AFrom:=20Antony=20Lee=20<anntzer?=
+ =?UTF-8?q?.lee@gmail.com>=0ADate:=20Thu,=2028=20Jul=202016=2019:26:02=20-?=
+ =?UTF-8?q?0700=0ASubject:=20[PATCH]=20Fix=20for=20PyQt5.7=20support.?=
+
+Just getting rid of a slot with an incorrect signature (for which
+PyQt5.7 is more strict).
+
+Tested on PyQt5.6.1 and 5.7, PyQt4.11.4, PySide 1.2.4.
+---
+ lib/matplotlib/backends/backend_qt5.py | 14 +++++---------
+ 1 file changed, 5 insertions(+), 9 deletions(-)
+
+diff --git a/lib/matplotlib/backends/backend_qt5.py b/lib/matplotlib/backends/backend_qt5.py
+index d89f3b9..f92c06f 100644
+--- a/lib/matplotlib/backends/backend_qt5.py
++++ b/lib/matplotlib/backends/backend_qt5.py
+@@ -459,18 +459,18 @@ class FigureManagerQT(FigureManagerBase):
+ 
+         self.window._destroying = False
+ 
++        # add text label to status bar
++        self.statusbar_label = QtWidgets.QLabel()
++        self.window.statusBar().addWidget(self.statusbar_label)
++
+         self.toolbar = self._get_toolbar(self.canvas, self.window)
+         if self.toolbar is not None:
+             self.window.addToolBar(self.toolbar)
+-            self.toolbar.message.connect(self._show_message)
++            self.toolbar.message.connect(self.statusbar_label.setText)
+             tbs_height = self.toolbar.sizeHint().height()
+         else:
+             tbs_height = 0
+ 
+-        # add text label to status bar
+-        self.statusbar_label = QtWidgets.QLabel()
+-        self.window.statusBar().addWidget(self.statusbar_label)
+-
+         # resize the main window so it will display the canvas with the
+         # requested size:
+         cs = canvas.sizeHint()
+@@ -491,10 +491,6 @@ class FigureManagerQT(FigureManagerBase):
+                 self.toolbar.update()
+         self.canvas.figure.add_axobserver(notify_axes_change)
+ 
+-    @QtCore.Slot()
+-    def _show_message(self, s):
+-        self.statusbar_label.setText(s)
+-
+     def full_screen_toggle(self):
+         if self.window.isFullScreen():
+             self.window.showNormal()
