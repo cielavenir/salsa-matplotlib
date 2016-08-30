@@ -1,4 +1,4 @@
-From bb0acaeb66a5238b410df8f3cce11603f063d6b2 Mon Sep 17 00:00:00 2001
+From 9cf83a8470cb0952ecdc76cafae6c2c53fc1aec5 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Sat, 9 Jan 2016 15:49:51 +0000
 Subject: bts800803 disable the GitHub Fork Me ribbon
@@ -8,7 +8,7 @@ Subject: bts800803 disable the GitHub Fork Me ribbon
  1 file changed, 6 deletions(-)
 
 diff --git a/doc/_templates/layout.html b/doc/_templates/layout.html
-index 755c019..031b161 100644
+index 79ce033..1565efb 100644
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
 @@ -170,12 +170,6 @@ color: #11557C;">new updates</a></p>
@@ -22,5 +22,5 @@ index 755c019..031b161 100644
 -</map>
 -
  <div style="background-color: white; text-align: left; padding: 10px 10px 15px 15px">
- <a href="{{ pathto('index') }}"><img src="{{
- pathto("_static/logo2.svg", 1) }}" width="540px" border="0" alt="matplotlib"/></a>
+ {%- if builder in ('htmlhelp', 'devhelp', 'latex') %}
+ <a href="{{ pathto('index') }}"><img src="{{pathto("_static/logo2.png", 1) }}" width="540px" border="0" alt="matplotlib"/></a>

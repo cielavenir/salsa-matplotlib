@@ -488,7 +488,7 @@ class CallbackRegistry(object):
     object to handle weak references to bound methods (or regular free
     functions).  This technique was shared by Peter Parente on his
     `"Mindtrove" blog
-    <http://mindtrove.info/articles/python-weak-references/>`_.
+    <http://mindtrove.info/python-weak-references/>`_.
     """
     def __init__(self):
         self.callbacks = dict()
@@ -938,10 +938,10 @@ class Xlator(dict):
       "Perl" : "Python",
       }
 
-      print multiple_replace(adict, text)
+      print(multiple_replace(adict, text))
 
       xlat = Xlator(adict)
-      print xlat.xlat(text)
+      print(xlat.xlat(text))
     """
 
     def _make_regex(self):
