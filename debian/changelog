@@ -1,4 +1,4 @@
-matplotlib (1.5.2-1) UNRELEASED; urgency=medium
+matplotlib (1.5.2-1) unstable; urgency=medium
 
   * New upstream candidate
   * debian/watch
@@ -6,7 +6,7 @@ matplotlib (1.5.2-1) UNRELEASED; urgency=medium
   * debian/patches/0008-From-655c513a5e5440014677ee5afb08b0efa39f8e16-Mon-Se.patch
     - support PyQt5.7; Closes: #835455
 
- -- Sandro Tosi <morph@debian.org>  Tue, 30 Aug 2016 22:02:37 +0100
+ -- Sandro Tosi <morph@debian.org>  Thu, 01 Sep 2016 18:52:24 +0100
 
 matplotlib (1.5.2~rc2-1) unstable; urgency=medium
 
