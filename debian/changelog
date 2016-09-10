@@ -5,10 +5,11 @@ matplotlib (2.0.0~beta4-1) UNRELEASED; urgency=medium
     - recognize only 2.x releases, and 'b' as a beta release
   * debian/control
     - add python-functools32 to b-d
+    - set version reqs for cycler to be >= 0.10.0
   * debian/copyright
     - remove refs to six.py, no longer shipped upstream
 
- -- Sandro Tosi <morph@debian.org>  Sat, 10 Sep 2016 18:39:34 +0100
+ -- Sandro Tosi <morph@debian.org>  Sat, 10 Sep 2016 19:22:34 +0100
 
 matplotlib (1.5.3-1) unstable; urgency=medium
 
