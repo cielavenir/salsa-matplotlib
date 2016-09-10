@@ -1,3 +1,9 @@
+matplotlib (1.5.3-1) UNRELEASED; urgency=medium
+
+  * New upstream candidate
+
+ -- Sandro Tosi <morph@debian.org>  Sat, 10 Sep 2016 12:38:06 +0100
+
 matplotlib (1.5.2-1) unstable; urgency=medium
 
   * New upstream candidate
