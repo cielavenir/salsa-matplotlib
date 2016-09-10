@@ -17,7 +17,7 @@ from matplotlib._pylab_helpers import Gcf
 import matplotlib.cbook as cbook
 from weakref import WeakKeyDictionary
 import numpy as np
-from matplotlib.externals import six
+import six
 import warnings
 
 
@@ -870,8 +870,7 @@ default_tools = {'home': ToolHome, 'back': ToolBack, 'forward': ToolForward,
 """Default tools"""
 
 default_toolbar_tools = [['navigation', ['home', 'back', 'forward']],
-                         ['zoompan', ['pan', 'zoom']],
-                         ['layout', ['subplots']],
+                         ['zoompan', ['pan', 'zoom', 'subplots']],
                          ['io', ['save']]]
 """Default tools in the toolbar"""
 

@@ -7,6 +7,7 @@ import shutil
 import sys
 import re
 import argparse
+import matplotlib
 
 def copy_if_out_of_date(original, derived):
     if (not os.path.exists(derived) or
@@ -38,14 +39,21 @@ def linkcheck():
 
 def html(buildername='html'):
     check_build()
-    copy_if_out_of_date('../lib/matplotlib/mpl-data/matplotlibrc', '_static/matplotlibrc')
+
+    rc = '../lib/matplotlib/mpl-data/matplotlibrc'
+    default_rc = os.path.join(matplotlib._get_data_path(), 'matplotlibrc')
+    if not os.path.exists(rc) and os.path.exists(default_rc):
+        rc = default_rc
+    copy_if_out_of_date(rc, '_static/matplotlibrc')
+
     if small_docs:
-        options = "-D plot_formats=png:80"
+        options = "-D plot_formats=png:100"
     else:
         options = ''
     if warnings_as_errors:
         options = options + ' -W'
-    if os.system('sphinx-build %s -b %s -d build/doctrees . build/%s' % (options, buildername, buildername)):
+    if os.system('sphinx-build -j %d %s -b %s -d build/doctrees . build/%s' % (
+            n_proc, options, buildername, buildername)):
         raise SystemExit("Building HTML failed.")
 
     # Clean out PDF files from the _images directory
@@ -60,7 +68,7 @@ def htmlhelp():
     with open('build/htmlhelp/index.html', 'r+') as fh:
         content = fh.read()
         fh.seek(0)
-        content = re.sub(r'<script>.*?</script>', '', content, 
+        content = re.sub(r'<script>.*?</script>', '', content,
                          flags=re.MULTILINE| re.DOTALL)
         fh.write(content)
         fh.truncate()
@@ -138,7 +146,8 @@ funcd = {
 
 
 small_docs = False
-warnings_as_errors = False
+warnings_as_errors = True
+n_proc = 1
 
 # Change directory to the one containing this file
 current_dir = os.getcwd()
@@ -167,9 +176,9 @@ for link, target in required_symlinks:
             raise RuntimeError("doc/{0} should be a directory or symlink -- it"
                                " isn't".format(link))
     if not os.path.exists(link):
-        if hasattr(os, 'symlink'):
+        try:
             os.symlink(target, link)
-        else:
+        except OSError:
             symlink_warnings.append('files copied to {0}'.format(link))
             shutil.copytree(os.path.join(link, '..', target), link)
 
@@ -184,14 +193,19 @@ parser.add_argument("cmd", help=("Command to execute. Can be multiple. "
 parser.add_argument("--small",
                     help="Smaller docs with only low res png figures",
                     action="store_true")
-parser.add_argument("--warningsaserrors",
-                    help="Turn Sphinx warnings into errors",
+parser.add_argument("--allowsphinxwarnings",
+                    help="Don't turn Sphinx warnings into errors",
                     action="store_true")
+parser.add_argument("-n",
+                    help="Number of parallel workers to use")
+
 args = parser.parse_args()
 if args.small:
     small_docs = True
-if args.warningsaserrors:
-    warnings_as_errors = True
+if args.allowsphinxwarnings:
+    warnings_as_errors = False
+if args.n is not None:
+    n_proc = int(args.n)
 
 if args.cmd:
     for command in args.cmd:

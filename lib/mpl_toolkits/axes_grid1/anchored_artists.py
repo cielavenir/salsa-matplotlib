@@ -1,7 +1,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 
 from matplotlib.patches import Rectangle, Ellipse
 
@@ -125,7 +125,7 @@ class AnchoredSizeBar(AnchoredOffsetbox):
 
         self.size_bar = AuxTransformBox(transform)
         self.size_bar.add_artist(Rectangle((0, 0), size, size_vertical,
-                                           fill=True, facecolor=color,
+                                           fill=False, facecolor=color,
                                            edgecolor=color))
 
         # if fontproperties is None, but `prop` is not, assume that

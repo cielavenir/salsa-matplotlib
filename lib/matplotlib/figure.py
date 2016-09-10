@@ -14,7 +14,7 @@ contains all the plot elements.  The following classes are defined
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 
 import warnings
 from operator import itemgetter
@@ -32,7 +32,7 @@ import matplotlib.cbook as cbook
 
 from matplotlib.cbook import Stack, iterable
 
-from matplotlib import _image
+from matplotlib import image as mimage
 from matplotlib.image import FigureImage
 
 import matplotlib.colorbar as cbar
@@ -667,7 +667,7 @@ class Figure(Artist):
         self.stale = True
         return im
 
-    def set_size_inches(self, w, h=None, forward=False):
+    def set_size_inches(self, w, h=None, forward=True):
         """
         set_size_inches(w,h, forward=False)
 
@@ -851,7 +851,7 @@ class Figure(Artist):
 
             rect = l,b,w,h
             fig.add_axes(rect)
-            fig.add_axes(rect, frameon=False, axisbg='g')
+            fig.add_axes(rect, frameon=False, facecolor='g')
             fig.add_axes(rect, polar=True)
             fig.add_axes(rect, projection='polar')
             fig.add_axes(ax)
@@ -932,7 +932,7 @@ class Figure(Artist):
             fig.add_subplot(1,1,1)
 
             # add subplot with red background
-            fig.add_subplot(212, axisbg='r')
+            fig.add_subplot(212, facecolor='r')
 
             # add a polar subplot
             fig.add_subplot(111, projection='polar')
@@ -1100,63 +1100,33 @@ class Figure(Artist):
         dsu = []
 
         for a in self.patches:
-            dsu.append((a.get_zorder(), a, a.draw, [renderer]))
+            dsu.append((a.get_zorder(), a))
 
         for a in self.lines:
-            dsu.append((a.get_zorder(), a, a.draw, [renderer]))
+            dsu.append((a.get_zorder(), a))
 
         for a in self.artists:
-            dsu.append((a.get_zorder(), a, a.draw, [renderer]))
+            dsu.append((a.get_zorder(), a))
 
-        # override the renderer default if self.suppressComposite
-        # is not None
-        not_composite = renderer.option_image_nocomposite()
-        if self.suppressComposite is not None:
-            not_composite = self.suppressComposite
-
-        if (len(self.images) <= 1 or not_composite or
-                not cbook.allequal([im.origin for im in self.images])):
-            for a in self.images:
-                dsu.append((a.get_zorder(), a, a.draw, [renderer]))
-        else:
-            # make a composite image blending alpha
-            # list of (_image.Image, ox, oy)
-            mag = renderer.get_image_magnification()
-            ims = [(im.make_image(mag), im.ox, im.oy, im.get_alpha())
-                   for im in self.images]
-
-            im = _image.from_images(int(self.bbox.height * mag),
-                                    int(self.bbox.width * mag),
-                                    ims)
-
-            im.is_grayscale = False
-            l, b, w, h = self.bbox.bounds
-
-            def draw_composite():
-                gc = renderer.new_gc()
-                gc.set_clip_rectangle(self.bbox)
-                gc.set_clip_path(self.get_clip_path())
-                renderer.draw_image(gc, l, b, im)
-                gc.restore()
-
-            dsu.append((self.images[0].get_zorder(), self.images[0],
-                        draw_composite, []))
+        for a in self.images:
+            dsu.append((a.get_zorder(), a))
 
         # render the axes
         for a in self.axes:
-            dsu.append((a.get_zorder(), a, a.draw, [renderer]))
+            dsu.append((a.get_zorder(), a))
 
         # render the figure text
         for a in self.texts:
-            dsu.append((a.get_zorder(), a, a.draw, [renderer]))
+            dsu.append((a.get_zorder(), a))
 
         for a in self.legends:
-            dsu.append((a.get_zorder(), a, a.draw, [renderer]))
+            dsu.append((a.get_zorder(), a))
 
         dsu = [row for row in dsu if not row[1].get_animated()]
         dsu.sort(key=itemgetter(0))
-        for zorder, a, func, args in dsu:
-            func(*args)
+
+        mimage._draw_list_compositing_images(
+            renderer, self, dsu, self.suppressComposite)
 
         renderer.close_group('figure')
         self.stale = False
@@ -1236,11 +1206,35 @@ class Figure(Artist):
             if *False*, legend marker is placed to the right of the legend
             label
 
+          *frameon*: [ *None* | bool ]
+            Control whether the legend should be drawn on a patch (frame).
+            Default is *None* which will take the value from the
+            ``legend.frameon`` :data:`rcParam<matplotlib.rcParams>`.
+
           *fancybox*: [ *None* | *False* | *True* ]
             if *True*, draw a frame with a round fancybox.  If *None*, use rc
 
           *shadow*: [ *None* | *False* | *True* ]
             If *True*, draw a shadow behind legend. If *None*, use rc settings.
+
+          *framealpha*: [ *None* | float ]
+            Control the alpha transparency of the legend's background.
+            Default is *None* which will take the value from the
+            ``legend.framealpha`` :data:`rcParam<matplotlib.rcParams>`.
+
+          *facecolor*: [ *None* | "inherit" | a color spec ]
+            Control the legend's background color.
+            Default is *None* which will take the value from the
+            ``legend.facecolor`` :data:`rcParam<matplotlib.rcParams>`.
+            If ``"inherit"``, it will take the ``axes.facecolor``
+            :data:`rcParam<matplotlib.rcParams>`.
+
+          *edgecolor*: [ *None* | "inherit" | a color spec ]
+            Control the legend's background patch edge color.
+            Default is *None* which will take the value from the
+            ``legend.edgecolor`` :data:`rcParam<matplotlib.rcParams>`.
+            If ``"inherit"``, it will take the ``axes.edgecolor``
+            :data:`rcParam<matplotlib.rcParams>`.
 
           *ncol* : integer
             number of columns. default is 1

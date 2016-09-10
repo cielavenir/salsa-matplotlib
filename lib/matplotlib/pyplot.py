@@ -18,7 +18,7 @@ is recommended that the namespaces be kept separate, e.g.::
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 
 import sys
 import warnings
@@ -400,7 +400,7 @@ def xkcd(scale=1, length=100, randomness=2):
     from matplotlib import patheffects
     context = rc_context()
     try:
-        rcParams['font.family'] = ['Humor Sans', 'Comic Sans MS']
+        rcParams['font.family'] = ['xkcd', 'Humor Sans', 'Comic Sans MS']
         rcParams['font.size'] = 14.0
         rcParams['path.sketch'] = (scale, length, randomness)
         rcParams['path.effects'] = [
@@ -411,7 +411,6 @@ def xkcd(scale=1, length=100, randomness=2):
         rcParams['grid.linewidth'] = 0.0
         rcParams['axes.grid'] = False
         rcParams['axes.unicode_minus'] = False
-        rcParams['axes.prop_cycle'] = cycler('color', ['b', 'r', 'c', 'm'])
         rcParams['axes.edgecolor'] = 'black'
         rcParams['xtick.major.size'] = 8
         rcParams['xtick.major.width'] = 3
@@ -839,28 +838,28 @@ def axes(*args, **kwargs):
 
     - ``axes()`` by itself creates a default full ``subplot(111)`` window axis.
 
-    - ``axes(rect, axisbg='w')`` where *rect* = [left, bottom, width,
-      height] in normalized (0, 1) units.  *axisbg* is the background
+    - ``axes(rect, facecolor='w')`` where *rect* = [left, bottom, width,
+      height] in normalized (0, 1) units.  *facecolor* is the background
       color for the axis, default white.
 
     - ``axes(h)`` where *h* is an axes instance makes *h* the current
       axis.  An :class:`~matplotlib.axes.Axes` instance is returned.
 
-    =======   ==============   ==============================================
-    kwarg     Accepts          Description
-    =======   ==============   ==============================================
-    axisbg    color            the axes background color
-    frameon   [True|False]     display the frame?
-    sharex    otherax          current axes shares xaxis attribute
-                               with otherax
-    sharey    otherax          current axes shares yaxis attribute
-                               with otherax
-    polar     [True|False]     use a polar axes?
-    aspect    [str | num]      ['equal', 'auto'] or a number.  If a number
-                               the ratio of x-unit/y-unit in screen-space.
-                               Also see
-                               :meth:`~matplotlib.axes.Axes.set_aspect`.
-    =======   ==============   ==============================================
+    =========   ==============   ==============================================
+    kwarg       Accepts          Description
+    =========   ==============   ==============================================
+    facecolor   color            the axes background color
+    frameon     [True|False]     display the frame?
+    sharex      otherax          current axes shares xaxis attribute
+                                 with otherax
+    sharey      otherax          current axes shares yaxis attribute
+                                 with otherax
+    polar       [True|False]     use a polar axes?
+    aspect      [str | num]      ['equal', 'auto'] or a number.  If a number
+                                 the ratio of x-unit/y-unit in screen-space.
+                                 Also see
+                                 :meth:`~matplotlib.axes.Axes.set_aspect`.
+    =========   ==============   ==============================================
 
     Examples:
 
@@ -976,7 +975,7 @@ def subplot(*args, **kwargs):
           # first, the plot (and its axes) previously created, will be removed
           plt.subplot(211)
           plt.plot(range(12))
-          plt.subplot(212, axisbg='y') # creates 2nd subplot with yellow background
+          plt.subplot(212, facecolor='y') # creates 2nd subplot with yellow background
 
        If you do not want this behavior, use the
        :meth:`~matplotlib.figure.Figure.add_subplot` method or the
@@ -984,7 +983,7 @@ def subplot(*args, **kwargs):
 
     Keyword arguments:
 
-      *axisbg*:
+      *facecolor*:
         The background color of the subplot, which can be any valid
         color specifier.  See :mod:`matplotlib.colors` for more
         information.
@@ -1927,7 +1926,7 @@ def colors():
     The example below creates a subplot with a dark
     slate gray background::
 
-       subplot(111, axisbg=(0.1843, 0.3098, 0.3098))
+       subplot(111, facecolor=(0.1843, 0.3098, 0.3098))
 
     Here is an example that creates a pale turquoise title::
 
@@ -2083,11 +2082,9 @@ def colormaps():
 
     ColorBrewer Qualitative:
 
-    (For plotting nominal data, :class:`ListedColormap` should be used,
+    (For plotting nominal data, :class:`ListedColormap` is used,
     not :class:`LinearSegmentedColormap`.  Different sets of colors are
-    recommended for different numbers of categories.  These continuous
-    versions of the qualitative schemes may be removed or converted in the
-    future.)
+    recommended for different numbers of categories.)
 
     * Accent
     * Dark2
@@ -3242,7 +3239,7 @@ def quiverkey(*args, **kw):
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 @_autogen_docstring(Axes.scatter)
-def scatter(x, y, s=20, c=None, marker='o', cmap=None, norm=None, vmin=None,
+def scatter(x, y, s=None, c=None, marker=None, cmap=None, norm=None, vmin=None,
             vmax=None, alpha=None, linewidths=None, verts=None, edgecolors=None,
             hold=None, data=None, **kwargs):
     ax = gca()
@@ -3375,7 +3372,7 @@ def step(x, y, *args, **kwargs):
 @_autogen_docstring(Axes.streamplot)
 def streamplot(x, y, u, v, density=1, linewidth=None, color=None, cmap=None,
                norm=None, arrowsize=1, arrowstyle='-|>', minlength=0.1,
-               transform=None, zorder=1, start_points=None, hold=None, data=None):
+               transform=None, zorder=2, start_points=None, hold=None, data=None):
     ax = gca()
     # allow callers to override the hold state by passing hold=True|False
     washold = ax.ishold()

@@ -13,8 +13,8 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import math
 
-from matplotlib.externals import six
-from matplotlib.externals.six.moves import map, xrange, zip, reduce
+import six
+from six.moves import map, xrange, zip, reduce
 
 import warnings
 from operator import itemgetter
@@ -29,7 +29,8 @@ from matplotlib import docstring
 import matplotlib.scale as mscale
 from matplotlib.tri.triangulation import Triangulation
 import numpy as np
-from matplotlib.colors import Normalize, colorConverter, LightSource
+from matplotlib import colors as mcolors
+from matplotlib.colors import Normalize, LightSource
 
 from . import art3d
 from . import proj3d
@@ -1592,7 +1593,10 @@ class Axes3D(Axes):
         if 'facecolors' in kwargs:
             fcolors = kwargs.pop('facecolors')
         else:
-            color = np.array(colorConverter.to_rgba(kwargs.pop('color', 'b')))
+            color = kwargs.pop('color', None)
+            if color is None:
+                color = self._get_lines.get_next_color()
+            color = np.array(mcolors.to_rgba(color))
             fcolors = None
 
         cmap = kwargs.get('cmap', None)
@@ -1710,7 +1714,7 @@ class Axes3D(Axes):
         if len(shade[mask]) > 0:
             norm = Normalize(min(shade[mask]), max(shade[mask]))
             shade[~mask] = min(shade[mask])
-            color = colorConverter.to_rgba_array(color)
+            color = mcolors.to_rgba_array(color)
             # shape of color should be (M, 4) (where M is number of faces)
             # shape of shade should be (M,)
             # colors should have final shape of (M, 4)
@@ -1860,7 +1864,10 @@ class Axes3D(Axes):
         had_data = self.has_data()
 
         # TODO: Support custom face colours
-        color = np.array(colorConverter.to_rgba(kwargs.pop('color', 'b')))
+        color = kwargs.pop('color', None)
+        if color is None:
+            color = self._get_lines.get_next_color()
+        color = np.array(mcolors.to_rgba(color))
 
         cmap = kwargs.get('cmap', None)
         norm = kwargs.pop('norm', None)
@@ -1947,7 +1954,7 @@ class Axes3D(Axes):
 
             polyverts = []
             normals = []
-            nsteps = round(len(topverts[0]) / stride)
+            nsteps = np.round(len(topverts[0]) / stride)
             if nsteps <= 1:
                 if len(topverts[0]) > 1:
                     nsteps = 2
@@ -1955,9 +1962,9 @@ class Axes3D(Axes):
                     continue
 
             stepsize = (len(topverts[0]) - 1) / (nsteps - 1)
-            for i in range(int(round(nsteps)) - 1):
-                i1 = int(round(i * stepsize))
-                i2 = int(round((i + 1) * stepsize))
+            for i in range(int(np.round(nsteps)) - 1):
+                i1 = int(np.round(i * stepsize))
+                i2 = int(np.round((i + 1) * stepsize))
                 polyverts.append([topverts[0][i1],
                     topverts[0][i2],
                     botverts[0][i2],
@@ -2344,7 +2351,7 @@ class Axes3D(Axes):
 
         return patches
 
-    def bar3d(self, x, y, z, dx, dy, dz, color='b',
+    def bar3d(self, x, y, z, dx, dy, dz, color=None,
               zsort='average', *args, **kwargs):
         '''
         Generate a 3D bar, or multiple bars.
@@ -2436,15 +2443,15 @@ class Axes3D(Axes):
 
         facecolors = []
         if color is None:
-            # no color specified
-            facecolors = [None] * len(x)
-        elif len(color) == len(x):
+            color = [self._get_patches_for_fill.get_next_color()]
+
+        if len(color) == len(x):
             # bar colors specified, need to expand to number of faces
             for c in color:
                 facecolors.extend([c] * 6)
         else:
             # a single color specified, or face colors specified explicitly
-            facecolors = list(colorConverter.to_rgba_array(color))
+            facecolors = list(mcolors.to_rgba_array(color))
             if len(facecolors) < len(x):
                 facecolors *= (6 * len(x))
 
@@ -2479,7 +2486,7 @@ class Axes3D(Axes):
 
             *X*, *Y*, *Z*:
                 The x, y and z coordinates of the arrow locations (default is
-                tip of arrow; see *pivot* kwarg)
+                tail of arrow; see *pivot* kwarg)
 
             *U*, *V*, *W*:
                 The x, y and z components of the arrow vectors
@@ -2502,6 +2509,12 @@ class Axes3D(Axes):
             *pivot*: [ 'tail' | 'middle' | 'tip' ]
                 The part of the arrow that is at the grid point; the arrow
                 rotates about this point, hence the name *pivot*.
+                Default is 'tail'
+
+            *normalize*: [False | True]
+                When True, all of the arrows will be the same length. This
+                defaults to False, where the arrows will be different lengths
+                depending on the values of u,v,w.
 
         Any additional keyword arguments are delegated to
         :class:`~matplotlib.collections.LineCollection`
@@ -2510,6 +2523,7 @@ class Axes3D(Axes):
         def calc_arrow(uvw, angle=15):
             """
             To calculate the arrow head. uvw should be a unit vector.
+            We normalize it here:
             """
             # get unit direction vector perpendicular to (u,v,w)
             norm = np.linalg.norm(uvw[:2])
@@ -2528,8 +2542,9 @@ class Axes3D(Axes):
             Rpos = np.array([[c+(x**2)*(1-c), x*y*(1-c), y*s],
                              [y*x*(1-c), c+(y**2)*(1-c), -x*s],
                              [-y*s, x*s, c]])
-            # opposite rotation negates everything but the diagonal
-            Rneg = Rpos * (np.eye(3)*2 - 1)
+            # opposite rotation negates all the sin terms
+            Rneg = Rpos.copy()
+            Rneg[[0,1,2,2],[2,2,0,1]] = -Rneg[[0,1,2,2],[2,2,0,1]]
 
             # multiply them to get the rotated vector
             return Rpos.dot(uvw), Rneg.dot(uvw)
@@ -2542,7 +2557,9 @@ class Axes3D(Axes):
         # arrow length ratio to the shaft length
         arrow_length_ratio = kwargs.pop('arrow_length_ratio', 0.3)
         # pivot point
-        pivot = kwargs.pop('pivot', 'tip')
+        pivot = kwargs.pop('pivot', 'tail')
+        # normalize
+        normalize = kwargs.pop('normalize', False)
 
         # handle args
         argi = 6
@@ -2601,9 +2618,12 @@ class Axes3D(Axes):
         norm = np.sqrt(np.sum(UVW**2, axis=1))
 
         # If any row of UVW is all zeros, don't make a quiver for it
-        mask = norm > 1e-10
+        mask = norm > 0
         XYZ = XYZ[mask]
-        UVW = UVW[mask] / norm[mask].reshape((-1, 1))
+        if normalize:
+            UVW = UVW[mask] / norm[mask].reshape((-1, 1))
+        else:
+            UVW = UVW[mask]
 
         if len(XYZ) > 0:
             # compute the shaft lines all at once with an outer product

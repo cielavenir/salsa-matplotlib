@@ -31,7 +31,7 @@ def test_colorcycle_basic():
 def test_marker_cycle():
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.set_prop_cycle(cycler('color', ['r', 'g', 'y']) +
+    ax.set_prop_cycle(cycler('c', ['r', 'g', 'y']) +
                       cycler('marker', ['.', '*', 'x']))
     xs = np.arange(10)
     ys = 0.25 * xs + 2
@@ -47,7 +47,7 @@ def test_marker_cycle():
     fig = plt.figure()
     ax = fig.add_subplot(111)
     # Test keyword arguments, numpy arrays, and generic iterators
-    ax.set_prop_cycle(color=np.array(['r', 'g', 'y']),
+    ax.set_prop_cycle(c=np.array(['r', 'g', 'y']),
                       marker=iter(['.', '*', 'x']))
     xs = np.arange(10)
     ys = 0.25 * xs + 2
@@ -66,16 +66,16 @@ def test_marker_cycle():
 def test_linestylecycle_basic():
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.set_prop_cycle(cycler('linestyle', ['-', '--', ':']))
+    ax.set_prop_cycle(cycler('ls', ['-', '--', ':']))
     xs = np.arange(10)
     ys = 0.25 * xs + 2
-    ax.plot(xs, ys, label='solid', lw=4)
+    ax.plot(xs, ys, label='solid', lw=4, color='k')
     ys = 0.45 * xs + 3
-    ax.plot(xs, ys, label='dashed', lw=4)
+    ax.plot(xs, ys, label='dashed', lw=4, color='k')
     ys = 0.65 * xs + 4
-    ax.plot(xs, ys, label='dotted', lw=4)
+    ax.plot(xs, ys, label='dotted', lw=4, color='k')
     ys = 0.85 * xs + 5
-    ax.plot(xs, ys, label='solid2', lw=4)
+    ax.plot(xs, ys, label='solid2', lw=4, color='k')
     ax.legend(loc='upper left')
 
 
@@ -84,7 +84,7 @@ def test_linestylecycle_basic():
 def test_fillcycle_basic():
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.set_prop_cycle(cycler('color',  ['r', 'g', 'y']) +
+    ax.set_prop_cycle(cycler('c',  ['r', 'g', 'y']) +
                       cycler('hatch', ['xx', 'O', '|-']) +
                       cycler('linestyle', ['-', '--', ':']))
     xs = np.arange(10)
@@ -129,9 +129,9 @@ def test_property_collision_plot():
     fig, ax = plt.subplots()
     ax.set_prop_cycle('linewidth', [2, 4])
     for c in range(1, 4):
-        ax.plot(np.arange(10), c * np.arange(10), lw=0.1)
-    ax.plot(np.arange(10), 4 * np.arange(10))
-    ax.plot(np.arange(10), 5 * np.arange(10))
+        ax.plot(np.arange(10), c * np.arange(10), lw=0.1, color='k')
+    ax.plot(np.arange(10), 4 * np.arange(10), color='k')
+    ax.plot(np.arange(10), 5 * np.arange(10), color='k')
 
 
 @image_comparison(baseline_images=['property_collision_fill'],
@@ -154,7 +154,7 @@ def test_valid_input_forms():
     ax.set_prop_cycle(None)
     ax.set_prop_cycle(cycler('linewidth', [1, 2]))
     ax.set_prop_cycle('color', 'rgywkbcm')
-    ax.set_prop_cycle('linewidth', (1, 2))
+    ax.set_prop_cycle('lw', (1, 2))
     ax.set_prop_cycle('linewidth', [1, 2])
     ax.set_prop_cycle('linewidth', iter([1, 2]))
     ax.set_prop_cycle('linewidth', np.array([1, 2]))
@@ -203,6 +203,13 @@ def test_invalid_input_forms():
             'linewidth', {'1': 1, '2': 2})
     assert_raises((TypeError, ValueError), ax.set_prop_cycle,
             linewidth=1, color='r')
+    assert_raises((TypeError, ValueError), ax.set_prop_cycle, 'foobar', [1, 2])
+    assert_raises((TypeError, ValueError), ax.set_prop_cycle,
+            foobar=[1, 2])
+    assert_raises((TypeError, ValueError), ax.set_prop_cycle,
+            cycler(foobar=[1, 2]))
+    assert_raises(ValueError, ax.set_prop_cycle,
+            cycler(color='rgb', c='cmy'))
 
 
 if __name__ == '__main__':
