@@ -192,7 +192,6 @@ def test_pep8_conformance_installed_files():
                           'texmanager.py',
                           'transforms.py',
                           'type1font.py',
-                          'widgets.py',
                           'testing/decorators.py',
                           'testing/jpl_units/Duration.py',
                           'testing/jpl_units/Epoch.py',
@@ -217,11 +216,9 @@ def test_pep8_conformance_installed_files():
                           'tests/test_subplots.py',
                           'tests/test_tightlayout.py',
                           'tests/test_triangulation.py',
-                          'compat/subprocess.py',
                           'backends/__init__.py',
                           'backends/backend_agg.py',
                           'backends/backend_cairo.py',
-                          'backends/backend_cocoaagg.py',
                           'backends/backend_gdk.py',
                           'backends/backend_gtk.py',
                           'backends/backend_gtk3.py',
@@ -229,7 +226,6 @@ def test_pep8_conformance_installed_files():
                           'backends/backend_gtkagg.py',
                           'backends/backend_gtkcairo.py',
                           'backends/backend_macosx.py',
-                          'backends/backend_mixed.py',
                           'backends/backend_pgf.py',
                           'backends/backend_ps.py',
                           'backends/backend_svg.py',
@@ -243,8 +239,7 @@ def test_pep8_conformance_installed_files():
                           'sphinxext/plot_directive.py',
                           'projections/__init__.py',
                           'projections/geo.py',
-                          'projections/polar.py',
-                          'externals/six.py']
+                          'projections/polar.py']
     expected_bad_files = ['*/matplotlib/' + s for s in expected_bad_files]
     assert_pep8_conformance(module=matplotlib,
                             exclude_files=exclude_files,

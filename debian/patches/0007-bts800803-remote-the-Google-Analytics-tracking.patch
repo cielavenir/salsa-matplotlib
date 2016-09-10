@@ -1,4 +1,4 @@
-From 87b199de3b35dce99a4c59bec882a0a72deae702 Mon Sep 17 00:00:00 2001
+From 0c01a137b3277a42250acd2ab5a31dfadf79303b Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Sat, 9 Jan 2016 16:51:28 +0000
 Subject: bts800803 remote the Google Analytics tracking
@@ -8,10 +8,10 @@ Subject: bts800803 remote the Google Analytics tracking
  1 file changed, 10 deletions(-)
 
 diff --git a/doc/_templates/layout.html b/doc/_templates/layout.html
-index 4bd6e76..eb5b4d0 100644
+index faa32a6..712a206 100644
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
-@@ -233,16 +233,6 @@ href="http://sphinx-doc.org/">Sphinx</a> {{ sphinx_version }}.{% endtrans %}
+@@ -224,16 +224,6 @@ href="http://sphinx-doc.org/">Sphinx</a> {{ sphinx_version }}.{% endtrans %}
      </div>
   {%- endblock %}
  

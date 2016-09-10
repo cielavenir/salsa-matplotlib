@@ -20,6 +20,19 @@ def test_bar3d():
         ax.bar(xs, ys, zs=z, zdir='y', color=cs, alpha=0.8)
 
 
+@cleanup
+def test_bar3d_dflt_smoke():
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    x = np.arange(4)
+    y = np.arange(5)
+    x2d, y2d = np.meshgrid(x, y)
+    x2d, y2d = x2d.ravel(), y2d.ravel()
+    z = x2d + y2d
+    ax.bar3d(x2d, y2d, x2d * 0, 1, 1, z)
+    fig.canvas.draw()
+
+
 @image_comparison(baseline_images=['contour3d'], remove_text=True)
 def test_contour3d():
     fig = plt.figure()
@@ -160,7 +173,7 @@ def test_text3d():
     ax.set_zlabel('Z axis')
 
 
-@image_comparison(baseline_images=['trisurf3d'], remove_text=True)
+@image_comparison(baseline_images=['trisurf3d'], remove_text=True, tol=0.03)
 def test_trisurf3d():
     n_angles = 36
     n_radii = 8
@@ -226,7 +239,7 @@ def test_quiver3d():
     w = (np.sqrt(2.0 / 3.0) * np.cos(np.pi * x) * np.cos(np.pi * y) *
             np.sin(np.pi * z))
 
-    ax.quiver(x, y, z, u, v, w, length=0.1)
+    ax.quiver(x, y, z, u, v, w, length=0.1, pivot='tip', normalize=True)
 
 @image_comparison(baseline_images=['quiver3d_empty'], remove_text=True)
 def test_quiver3d_empty():
@@ -240,7 +253,7 @@ def test_quiver3d_empty():
     w = (np.sqrt(2.0 / 3.0) * np.cos(np.pi * x) * np.cos(np.pi * y) *
             np.sin(np.pi * z))
 
-    ax.quiver(x, y, z, u, v, w, length=0.1)
+    ax.quiver(x, y, z, u, v, w, length=0.1, pivot='tip', normalize=True)
 
 @image_comparison(baseline_images=['quiver3d_masked'], remove_text=True)
 def test_quiver3d_masked():
@@ -258,7 +271,7 @@ def test_quiver3d_masked():
     u = np.ma.masked_where((-0.4 < x) & (x < 0.1), u, copy=False)
     v = np.ma.masked_where((0.1 < y) & (y < 0.7), v, copy=False)
 
-    ax.quiver(x, y, z, u, v, w, length=0.1)
+    ax.quiver(x, y, z, u, v, w, length=0.1, pivot='tip', normalize=True)
 
 @image_comparison(baseline_images=['quiver3d_pivot_middle'], remove_text=True,
                   extensions=['png'])
@@ -273,7 +286,7 @@ def test_quiver3d_pivot_middle():
     w = (np.sqrt(2.0 / 3.0) * np.cos(np.pi * x) * np.cos(np.pi * y) *
             np.sin(np.pi * z))
 
-    ax.quiver(x, y, z, u, v, w, length=0.1, pivot='middle')
+    ax.quiver(x, y, z, u, v, w, length=0.1, pivot='middle', normalize=True)
 
 @image_comparison(baseline_images=['quiver3d_pivot_tail'], remove_text=True,
                   extensions=['png'])
@@ -288,7 +301,7 @@ def test_quiver3d_pivot_tail():
     w = (np.sqrt(2.0 / 3.0) * np.cos(np.pi * x) * np.cos(np.pi * y) *
             np.sin(np.pi * z))
 
-    ax.quiver(x, y, z, u, v, w, length=0.1, pivot='tail')
+    ax.quiver(x, y, z, u, v, w, length=0.1, pivot='tail', normalize=True)
 
 
 @image_comparison(baseline_images=['axes3d_labelpad'], extensions=['png'])

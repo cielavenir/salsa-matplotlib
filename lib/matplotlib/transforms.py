@@ -32,7 +32,7 @@ themselves.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 
 import numpy as np
 from numpy import ma
@@ -1089,9 +1089,30 @@ class TransformedBbox(BboxBase):
 
     def get_points(self):
         if self._invalid:
-            points = self._transform.transform(self._bbox.get_points())
+            p = self._bbox.get_points()
+            # Transform all four points, then make a new bounding box
+            # from the result, taking care to make the orientation the
+            # same.
+            points = self._transform.transform(
+                [[p[0, 0], p[0, 1]],
+                 [p[1, 0], p[0, 1]],
+                 [p[0, 0], p[1, 1]],
+                 [p[1, 0], p[1, 1]]])
             points = np.ma.filled(points, 0.0)
-            self._points = points
+
+            xs = min(points[:, 0]), max(points[:, 0])
+            if p[0, 0] > p[1, 0]:
+                xs = xs[::-1]
+
+            ys = min(points[:, 1]), max(points[:, 1])
+            if p[0, 1] > p[1, 1]:
+                ys = ys[::-1]
+
+            self._points = np.array([
+                [xs[0], ys[0]],
+                [xs[1], ys[1]]
+            ])
+
             self._invalid = 0
         return self._points
     get_points.__doc__ = Bbox.get_points.__doc__
@@ -2008,7 +2029,7 @@ class Affine2D(Affine2DBase):
 
 class IdentityTransform(Affine2DBase):
     """
-    A special class that does on thing, the identity transform, in a
+    A special class that does one thing, the identity transform, in a
     fast way.
     """
     _mtx = np.identity(3)

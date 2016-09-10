@@ -1,17 +1,21 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 
 import functools
 import gc
+import inspect
 import os
 import sys
 import shutil
 import warnings
 import unittest
 
-import nose
+# Note - don't import nose up here - import it only as needed in functions. This
+# allows other functions here to be used by pytest-based testing suites without
+# requiring nose to be installed.
+
 import numpy as np
 
 import matplotlib as mpl
@@ -22,6 +26,7 @@ from matplotlib import cbook
 from matplotlib import ticker
 from matplotlib import pyplot as plt
 from matplotlib import ft2font
+from matplotlib import rcParams
 from matplotlib.testing.noseclasses import KnownFailureTest, \
      KnownFailureDidNotFailTest, ImageComparisonFailure
 from matplotlib.testing.compare import comparable_formats, compare_images, \
@@ -109,18 +114,57 @@ class CleanupTestCase(unittest.TestCase):
                     cls.original_settings)
 
 
-def cleanup(func):
-    @functools.wraps(func)
-    def wrapped_function(*args, **kwargs):
-        original_units_registry = matplotlib.units.registry.copy()
-        original_settings = mpl.rcParams.copy()
-        try:
-            func(*args, **kwargs)
-        finally:
-            _do_cleanup(original_units_registry,
-                        original_settings)
+def cleanup(style=None):
+    """
+    A decorator to ensure that any global state is reset before
+    running a test.
 
-    return wrapped_function
+    Parameters
+    ----------
+    style : str, optional
+        The name of the style to apply.
+    """
+
+    # If cleanup is used without arguments, `style` will be a
+    # callable, and we pass it directly to the wrapper generator.  If
+    # cleanup if called with an argument, it is a string naming a
+    # style, and the function will be passed as an argument to what we
+    # return.  This is a confusing, but somewhat standard, pattern for
+    # writing a decorator with optional arguments.
+
+    def make_cleanup(func):
+        if inspect.isgeneratorfunction(func):
+            @functools.wraps(func)
+            def wrapped_callable(*args, **kwargs):
+                original_units_registry = matplotlib.units.registry.copy()
+                original_settings = mpl.rcParams.copy()
+                matplotlib.style.use(style)
+                try:
+                    for yielded in func(*args, **kwargs):
+                        yield yielded
+                finally:
+                    _do_cleanup(original_units_registry,
+                                original_settings)
+        else:
+            @functools.wraps(func)
+            def wrapped_callable(*args, **kwargs):
+                original_units_registry = matplotlib.units.registry.copy()
+                original_settings = mpl.rcParams.copy()
+                matplotlib.style.use(style)
+                try:
+                    func(*args, **kwargs)
+                finally:
+                    _do_cleanup(original_units_registry,
+                                original_settings)
+
+        return wrapped_callable
+
+    if isinstance(style, six.string_types):
+        return make_cleanup
+    else:
+        result = make_cleanup(style)
+        style = 'classic'
+        return result
 
 
 def check_freetype_version(ver):
@@ -135,23 +179,19 @@ def check_freetype_version(ver):
 
     return found >= ver[0] and found <= ver[1]
 
+
 class ImageComparisonTest(CleanupTest):
     @classmethod
     def setup_class(cls):
-        cls._initial_settings = mpl.rcParams.copy()
+        CleanupTest.setup_class()
         try:
             matplotlib.style.use(cls._style)
+            matplotlib.testing.set_font_settings_for_testing()
+            cls._func()
         except:
             # Restore original settings before raising errors during the update.
-            mpl.rcParams.clear()
-            mpl.rcParams.update(cls._initial_settings)
+            CleanupTest.teardown_class()
             raise
-        # Because the setup of a CleanupTest might involve
-        # modifying a few rcparams, this setup should come
-        # last prior to running the image test.
-        CleanupTest.setup_class()
-        cls.original_settings = cls._initial_settings
-        cls._func()
 
     @classmethod
     def teardown_class(cls):
@@ -174,7 +214,8 @@ class ImageComparisonTest(CleanupTest):
 
     def test(self):
         baseline_dir, result_dir = _image_directories(self._func)
-
+        if self._style != 'classic':
+            raise KnownFailureTest('temporarily disabled until 2.0 tag')
         for fignum, baseline in zip(plt.get_fignums(), self._baseline_images):
             for extension in self._extensions:
                 will_fail = not extension in comparable_formats()
@@ -227,7 +268,7 @@ class ImageComparisonTest(CleanupTest):
 
                 yield (do_test,)
 
-def image_comparison(baseline_images=None, extensions=None, tol=13,
+def image_comparison(baseline_images=None, extensions=None, tol=0,
                      freetype_version=None, remove_text=False,
                      savefig_kwarg=None, style='classic'):
     """
@@ -251,7 +292,7 @@ def image_comparison(baseline_images=None, extensions=None, tol=13,
 
         Otherwise, a list of extensions to test. For example ['png','pdf'].
 
-      *tol*: (default 13)
+      *tol*: (default 0)
         The RMS threshold above which the test is considered failed.
 
       *freetype_version*: str or tuple
@@ -272,7 +313,6 @@ def image_comparison(baseline_images=None, extensions=None, tol=13,
         if desired. Defaults to the 'classic' style.
 
     """
-
     if baseline_images is None:
         raise ValueError('baseline_images must be specified')
 
@@ -375,6 +415,9 @@ def _image_directories(func):
 
 
 def switch_backend(backend):
+    # Local import to avoid a hard nose dependency and only incur the
+    # import time overhead at actual test-time.
+    import nose
     def switch_backend_decorator(func):
         def backend_switcher(*args, **kwargs):
             try:

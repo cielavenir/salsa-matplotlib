@@ -9,8 +9,8 @@ it imports matplotlib only at runtime.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
-from matplotlib.externals.six.moves import xrange, zip
+import six
+from six.moves import xrange, zip
 from itertools import repeat
 import collections
 
@@ -192,20 +192,7 @@ def deprecated(since, message='', name='', alternative='', pending=False,
         import textwrap
 
         if isinstance(func, classmethod):
-            try:
-                func = func.__func__
-            except AttributeError:
-                # classmethods in Python2.6 and below lack the __func__
-                # attribute so we need to hack around to get it
-                method = func.__get__(None, object)
-                if hasattr(method, '__func__'):
-                    func = method.__func__
-                elif hasattr(method, 'im_func'):
-                    func = method.im_func
-                else:
-                    # Nothing we can do really...  just return the original
-                    # classmethod
-                    return func
+            func = func.__func__
             is_classmethod = True
         else:
             is_classmethod = False
@@ -834,8 +821,7 @@ def get_sample_data(fname, asfileobj=True):
     if matplotlib.rcParams['examples.directory']:
         root = matplotlib.rcParams['examples.directory']
     else:
-        root = os.path.join(os.path.dirname(__file__),
-                            "mpl-data", "sample_data")
+        root = os.path.join(matplotlib._get_data_path(), 'sample_data')
     path = os.path.join(root, fname)
 
     if asfileobj:
@@ -1518,6 +1504,13 @@ def issubclass_safe(x, klass):
 
 def safe_masked_invalid(x, copy=False):
     x = np.array(x, subok=True, copy=copy)
+    if not x.dtype.isnative:
+        # Note that the argument to `byteswap` is 'inplace',
+        # thus if we have already made a copy, do the byteswap in
+        # place, else make a copy with the byte order swapped.
+        # Be explicit that we are swapping the byte order of the dtype
+        x = x.byteswap(copy).newbyteorder('S')
+
     try:
         xm = np.ma.masked_invalid(x, copy=False)
         xm.shrink_mask()
@@ -2557,6 +2550,15 @@ def index_of(y):
 
 def safe_first_element(obj):
     if isinstance(obj, collections.Iterator):
+        # needed to accept `array.flat` as input.
+        # np.flatiter reports as an instance of collections.Iterator
+        # but can still be indexed via [].
+        # This has the side effect of re-setting the iterator, but
+        # that is acceptable.
+        try:
+            return obj[0]
+        except TypeError:
+            pass
         raise RuntimeError("matplotlib does not support generators "
                            "as input")
     return next(iter(obj))
@@ -2692,3 +2694,66 @@ except AttributeError:
 else:
     def _putmask(a, mask, values):
         return np.copyto(a, values, where=mask)
+
+_lockstr = """\
+LOCKERROR: matplotlib is trying to acquire the lock
+    {!r}
+and has failed.  This maybe due to any other process holding this
+lock.  If you are sure no other matplotlib process is running try
+removing these folders and trying again.
+"""
+
+
+class Locked(object):
+    """
+    Context manager to handle locks.
+
+    Based on code from conda.
+
+    (c) 2012-2013 Continuum Analytics, Inc. / http://continuum.io
+    All Rights Reserved
+
+    conda is distributed under the terms of the BSD 3-clause license.
+    Consult LICENSE_CONDA or http://opensource.org/licenses/BSD-3-Clause.
+    """
+    LOCKFN = '.matplotlib_lock'
+
+    class TimeoutError(RuntimeError):
+        pass
+
+    def __init__(self, path):
+        self.path = path
+        self.end = "-" + str(os.getpid())
+        self.lock_path = os.path.join(self.path, self.LOCKFN + self.end)
+        self.pattern = os.path.join(self.path, self.LOCKFN + '-*')
+        self.remove = True
+
+    def __enter__(self):
+        retries = 50
+        sleeptime = 0.1
+        while retries:
+            files = glob.glob(self.pattern)
+            if files and not files[0].endswith(self.end):
+                time.sleep(sleeptime)
+                retries -= 1
+            else:
+                break
+        else:
+            err_str = _lockstr.format(self.pattern)
+            raise self.TimeoutError(err_str)
+
+        if not files:
+            try:
+                os.makedirs(self.lock_path)
+            except OSError:
+                pass
+        else:  # PID lock already here --- someone else will remove it.
+            self.remove = False
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.remove:
+            for path in self.lock_path, self.path:
+                try:
+                    os.rmdir(path)
+                except OSError:
+                    pass

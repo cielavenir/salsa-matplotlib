@@ -63,6 +63,7 @@ class Dashes
             }
             stroke.add_dash(val0, val1);
         }
+        stroke.dash_start(get_dash_offset() * dpi / 72.0);
     }
 };
 
@@ -107,6 +108,7 @@ class GCAgg
     e_snap_mode snap_mode;
 
     py::PathIterator hatchpath;
+    double hatch_linewidth;
 
     SketchParams sketch;
 

@@ -165,8 +165,8 @@ Example usage::
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
-from matplotlib.externals.six.moves import map, xrange, zip
+import six
+from six.moves import map, xrange, zip
 
 import copy
 import csv
@@ -2215,7 +2215,7 @@ def frange(xini, xfin=None, delta=None, **kw):
         npts = kw['npts']
         delta = (xfin-xini)/float(npts-endpoint)
     except KeyError:
-        npts = int(round((xfin-xini)/delta)) + endpoint
+        npts = int(np.round((xfin-xini)/delta)) + endpoint
         # round finds the nearest, so the endpoint can be up to
         # delta/2 larger than xfin.
 
@@ -2387,8 +2387,10 @@ def rec_append_fields(rec, names, arrs, dtypes=None):
             dtypes = dtypes * len(arrs)
         else:
             raise ValueError("dtypes must be None, a single dtype or a list")
-
-    newdtype = np.dtype(rec.dtype.descr + list(zip(names, dtypes)))
+    old_dtypes = rec.dtype.descr
+    if six.PY2:
+        old_dtypes = [(name.encode('utf-8'), dt) for name, dt in old_dtypes]
+    newdtype = np.dtype(old_dtypes + list(zip(names, dtypes)))
     newrec = np.recarray(rec.shape, dtype=newdtype)
     for field in rec.dtype.fields:
         newrec[field] = rec[field]
@@ -2596,8 +2598,10 @@ def rec_join(key, r1, r2, jointype='inner', defaults=None, r1postfix='1',
               if desc[0] not in key]
     r2desc = [(mapped_r2field(desc[0]), desc[1]) for desc in r2.dtype.descr
               if desc[0] not in key]
-    newdtype = np.dtype(keydesc + r1desc + r2desc)
-
+    all_dtypes = keydesc + r1desc + r2desc
+    if six.PY2:
+        all_dtypes = [(name.encode('utf-8'), dt) for name, dt in all_dtypes]
+    newdtype = np.dtype(all_dtypes)
     newrec = np.recarray((common_len + left_len + right_len,), dtype=newdtype)
 
     if defaults is not None:
@@ -2613,7 +2617,7 @@ def rec_join(key, r1, r2, jointype='inner', defaults=None, r1postfix='1',
 
     if jointype != 'inner' and defaults is not None:
         # fill in the defaults enmasse
-        newrec_fields = list(six.iterkeys(newrec.dtype.fields.keys))
+        newrec_fields = list(six.iterkeys(newrec.dtype.fields))
         for k, v in six.iteritems(defaults):
             if k in newrec_fields:
                 newrec[k] = v

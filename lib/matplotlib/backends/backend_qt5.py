@@ -1,12 +1,12 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
-from matplotlib.externals import six
+import six
 
 import os
 import re
 import signal
 import sys
-from matplotlib.externals.six import unichr
+from six import unichr
 
 import matplotlib
 
@@ -23,12 +23,10 @@ from matplotlib._pylab_helpers import Gcf
 from matplotlib.figure import Figure
 
 from matplotlib.widgets import SubplotTool
-try:
-    import matplotlib.backends.qt_editor.figureoptions as figureoptions
-except ImportError:
-    figureoptions = None
+import matplotlib.backends.qt_editor.figureoptions as figureoptions
 
-from .qt_compat import QtCore, QtGui, QtWidgets, _getSaveFileName, __version__
+from .qt_compat import (QtCore, QtGui, QtWidgets, _getSaveFileName,
+                        __version__, is_pyqt5)
 from matplotlib.backends.qt_editor.formsubplottool import UiSubplotTool
 
 backend_version = __version__
@@ -141,6 +139,9 @@ def _create_qApp():
             qApp.lastWindowClosed.connect(qApp.quit)
         else:
             qApp = app
+
+    if is_pyqt5():
+        qApp.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
 
 
 class Show(ShowBase):
@@ -331,7 +332,7 @@ class FigureCanvasQT(QtWidgets.QWidget, FigureCanvasBase):
         dpival = self.figure.dpi
         winch = w / dpival
         hinch = h / dpival
-        self.figure.set_size_inches(winch, hinch)
+        self.figure.set_size_inches(winch, hinch, forward=False)
         FigureCanvasBase.resize_event(self)
         self.draw_idle()
         QtWidgets.QWidget.resizeEvent(self, event)
@@ -490,6 +491,7 @@ class FigureManagerQT(FigureManagerBase):
             if self.toolbar is not None:
                 self.toolbar.update()
         self.canvas.figure.add_axobserver(notify_axes_change)
+        self.window.raise_()
 
     def full_screen_toggle(self):
         if self.window.isFullScreen():
@@ -562,6 +564,8 @@ class NavigationToolbar2QT(NavigationToolbar2, QtWidgets.QToolBar):
         NavigationToolbar2.__init__(self, canvas)
 
     def _icon(self, name):
+        if is_pyqt5():
+            name = name.replace('.png', '_large.png')
         return QtGui.QIcon(os.path.join(self.basedir, name))
 
     def _init_toolbar(self):
@@ -578,11 +582,10 @@ class NavigationToolbar2QT(NavigationToolbar2, QtWidgets.QToolBar):
                     a.setCheckable(True)
                 if tooltip_text is not None:
                     a.setToolTip(tooltip_text)
-
-        if figureoptions is not None:
-            a = self.addAction(self._icon("qt4_editor_options.png"),
-                               'Customize', self.edit_parameters)
-            a.setToolTip('Edit curves line and axes parameters')
+                if text == 'Subplots':
+                    a = self.addAction(self._icon("qt4_editor_options.png"),
+                                       'Customize', self.edit_parameters)
+                    a.setToolTip('Edit axis, curve and image parameters')
 
         self.buttons = {}
 
@@ -602,43 +605,39 @@ class NavigationToolbar2QT(NavigationToolbar2, QtWidgets.QToolBar):
         # reference holder for subplots_adjust window
         self.adj_window = None
 
-    if figureoptions is not None:
-        def edit_parameters(self):
-            allaxes = self.canvas.figure.get_axes()
-            if not allaxes:
-                QtWidgets.QMessageBox.warning(
-                    self.parent, "Error", "There are no axes to edit.")
-                return
-            if len(allaxes) == 1:
-                axes = allaxes[0]
-            else:
-                titles = []
-                for axes in allaxes:
-                    title = axes.get_title()
-                    ylabel = axes.get_ylabel()
-                    label = axes.get_label()
-                    if title:
-                        fmt = "%(title)s"
-                        if ylabel:
-                            fmt += ": %(ylabel)s"
-                        fmt += " (%(axes_repr)s)"
-                    elif ylabel:
-                        fmt = "%(axes_repr)s (%(ylabel)s)"
-                    elif label:
-                        fmt = "%(axes_repr)s (%(label)s)"
-                    else:
-                        fmt = "%(axes_repr)s"
-                    titles.append(fmt % dict(title=title,
-                                         ylabel=ylabel, label=label,
-                                         axes_repr=repr(axes)))
-                item, ok = QtWidgets.QInputDialog.getItem(
-                    self.parent, 'Customize', 'Select axes:', titles, 0, False)
-                if ok:
-                    axes = allaxes[titles.index(six.text_type(item))]
-                else:
-                    return
+        # Esthetic adjustments - we need to set these explicitly in PyQt5
+        # otherwise the layout looks different - but we don't want to set it if
+        # not using HiDPI icons otherwise they look worse than before.
+        if is_pyqt5():
+            self.setIconSize(QtCore.QSize(24, 24))
+            self.layout().setSpacing(12)
+            self.setMinimumHeight(48)
 
-            figureoptions.figure_edit(axes, self)
+    def edit_parameters(self):
+        allaxes = self.canvas.figure.get_axes()
+        if not allaxes:
+            QtWidgets.QMessageBox.warning(
+                self.parent, "Error", "There are no axes to edit.")
+            return
+        if len(allaxes) == 1:
+            axes = allaxes[0]
+        else:
+            titles = []
+            for axes in allaxes:
+                name = (axes.get_title() or
+                        " - ".join(filter(None, [axes.get_xlabel(),
+                                                 axes.get_ylabel()])) or
+                        "<anonymous {} (id: {:#x})>".format(
+                            type(axes).__name__, id(axes)))
+                titles.append(name)
+            item, ok = QtWidgets.QInputDialog.getItem(
+                self.parent, 'Customize', 'Select axes:', titles, 0, False)
+            if ok:
+                axes = allaxes[titles.index(six.text_type(item))]
+            else:
+                return
+
+        figureoptions.figure_edit(axes, self)
 
     def _update_buttons_checked(self):
         # sync button checkstates to match active mode

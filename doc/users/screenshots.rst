@@ -102,9 +102,7 @@ command, which includes customizations such as error bars:
 
 It's also simple to create stacked bars
 (`bar_stacked.py <../examples/pylab_examples/bar_stacked.html>`_),
-candlestick bars
-(`finance_demo.py <../examples/pylab_examples/finance_demo.html>`_),
-and horizontal bar charts
+or horizontal bar charts
 (`barh_demo.py <../examples/lines_bars_and_markers/barh_demo.html>`_).
 
 .. _screenshots_pie_demo:
@@ -184,18 +182,6 @@ for both.
 
 See :mod:`matplotlib.ticker` and :mod:`matplotlib.dates` for details and usage.
 
-.. _screenshots_jdh_demo:
-
-Financial charts
-================
-
-You can make sophisticated financial plots by combining the various
-plot functions, layout commands, and labeling tools provided by matplotlib.
-The following example emulates one of the financial plots in
-`ChartDirector <http://www.advsofteng.com/gallery_finance.html>`_:
-
-
-.. plot:: mpl_examples/pylab_examples/finance_work2.py
 
 
 .. _screenshots_basemap_demo:
@@ -252,9 +238,9 @@ Mathtext_examples
 
 Below is a sampling of the many TeX expressions now supported by matplotlib's
 internal mathtext engine.  The mathtext module provides TeX style mathematical
-expressions using `freetype2 <http://www.freetype.org/>`_
-and the BaKoMa computer modern or `STIX <http://www.stixfonts.org>`_ fonts.
-See the :mod:`matplotlib.mathtext` module for additional details.
+expressions using `FreeType <http://www.freetype.org/>`_
+and the DejaVu, BaKoMa computer modern, or `STIX <http://www.stixfonts.org>`_
+fonts.  See the :mod:`matplotlib.mathtext` module for additional details.
 
 .. plot:: mpl_examples/pylab_examples/mathtext_examples.py
 
@@ -279,7 +265,7 @@ rendering of strings with the *usetex* option.
 EEG demo
 =========
 
-You can embed matplotlib into pygtk, wx, Tk, FLTK, or Qt applications.
+You can embed matplotlib into pygtk, wx, Tk, or Qt applications.
 Here is a screenshot of an EEG viewer called `pbrain
 <http://github.com/nipy/pbrain>`__.
 

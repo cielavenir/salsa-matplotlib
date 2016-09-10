@@ -476,11 +476,12 @@ int convert_gcagg(PyObject *pygc, void *gcp)
           convert_from_attr(pygc, "_antialiased", &convert_bool, &gc->isaa) &&
           convert_from_attr(pygc, "_capstyle", &convert_cap, &gc->cap) &&
           convert_from_attr(pygc, "_joinstyle", &convert_join, &gc->join) &&
-          convert_from_attr(pygc, "_dashes", &convert_dashes, &gc->dashes) &&
+          convert_from_method(pygc, "get_dashes", &convert_dashes, &gc->dashes) &&
           convert_from_attr(pygc, "_cliprect", &convert_rect, &gc->cliprect) &&
           convert_from_method(pygc, "get_clip_path", &convert_clippath, &gc->clippath) &&
           convert_from_method(pygc, "get_snap", &convert_snap, &gc->snap_mode) &&
           convert_from_method(pygc, "get_hatch_path", &convert_path, &gc->hatchpath) &&
+          convert_from_method(pygc, "get_hatch_linewidth", &convert_double, &gc->hatch_linewidth) &&
           convert_from_method(pygc, "get_sketch_params", &convert_sketch_params, &gc->sketch))) {
         return 0;
     }

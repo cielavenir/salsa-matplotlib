@@ -1,7 +1,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 
 import io
 import os
@@ -27,7 +27,8 @@ from matplotlib.rcsetup import (validate_bool_maybe_none,
                                 validate_nseq_int,
                                 validate_nseq_float,
                                 validate_cycler,
-                                validate_hatch)
+                                validate_hatch,
+                                validate_hist_bins)
 
 
 mpl.rc('text', usetex=False)
@@ -201,15 +202,11 @@ def test_legend_facecolor():
     get_func = 'get_facecolor'
     rcparam = 'legend.facecolor'
     test_values = [({rcparam: 'r'},
-                    mcolors.colorConverter.to_rgba('r')),
-                   ({rcparam: 'inherit',
-                     'axes.facecolor': 'r'
-                     },
-                    mcolors.colorConverter.to_rgba('r')),
-                   ({rcparam: 'g',
-                     'axes.facecolor': 'r'},
-                   mcolors.colorConverter.to_rgba('g'))
-                   ]
+                    mcolors.to_rgba('r')),
+                   ({rcparam: 'inherit', 'axes.facecolor': 'r'},
+                    mcolors.to_rgba('r')),
+                   ({rcparam: 'g', 'axes.facecolor': 'r'},
+                    mcolors.to_rgba('g'))]
     for rc_dict, target in test_values:
         yield _legend_rcparam_helper, rc_dict, target, get_func
 
@@ -218,15 +215,11 @@ def test_legend_edgecolor():
     get_func = 'get_edgecolor'
     rcparam = 'legend.edgecolor'
     test_values = [({rcparam: 'r'},
-                    mcolors.colorConverter.to_rgba('r')),
-                   ({rcparam: 'inherit',
-                     'axes.edgecolor': 'r'
-                     },
-                    mcolors.colorConverter.to_rgba('r')),
-                   ({rcparam: 'g',
-                     'axes.facecolor': 'r'},
-                   mcolors.colorConverter.to_rgba('g'))
-                   ]
+                    mcolors.to_rgba('r')),
+                   ({rcparam: 'inherit', 'axes.edgecolor': 'r'},
+                    mcolors.to_rgba('r')),
+                   ({rcparam: 'g', 'axes.facecolor': 'r'},
+                    mcolors.to_rgba('g'))]
     for rc_dict, target in test_values:
         yield _legend_rcparam_helper, rc_dict, target, get_func
 
@@ -321,6 +314,10 @@ def test_validators():
                      ("cycler('c', 'rgb') * cycler('linestyle', ['-', '--'])",
                       (cycler('color', 'rgb') *
                           cycler('linestyle', ['-', '--']))),
+                     (cycler('ls', ['-', '--']),
+                      cycler('linestyle', ['-', '--'])),
+                     (cycler(mew=[2, 5]),
+                      cycler('markeredgewidth', [2, 5])),
                     ),
          # This is *so* incredibly important: validate_cycler() eval's
          # an arbitrary string! I think I have it locked down enough,
@@ -342,6 +339,8 @@ def test_validators():
                   ('cycler("waka", [1, 2, 3])', ValueError),  # not a property
                   ('cycler(c=[1, 2, 3])', ValueError),  # invalid values
                   ("cycler(lw=['a', 'b', 'c'])", ValueError),  # invalid values
+                  (cycler('waka', [1, 3, 5]), ValueError),  # not a property
+                  (cycler('color', ['C1', 'r', 'g']), ValueError)  # no CN
                  )
         },
         {'validator': validate_hatch,
@@ -363,7 +362,17 @@ def test_validators():
                     ),
          'fail': (('fish', ValueError),
                  ),
-        }
+        },
+        {'validator': validate_hist_bins,
+         'success': (('auto', 'auto'),
+                     ('10', 10),
+                     ('1, 2, 3', [1, 2, 3]),
+                     ([1, 2, 3], [1, 2, 3]),
+                     (np.arange(15), np.arange(15))
+                     ),
+         'fail': (('aardvark', ValueError),
+                  )
+         }
     )
 
     for validator_dict in validation_tests:

@@ -8,6 +8,13 @@
 # This can be a single directory or a comma-delimited list of directories.
 #basedirlist = /usr
 
+[test]
+# If you plan to develop matplotlib and run or add to the test suite,
+# set this to True.  It will download and build a specific version of
+# FreeType, and then use that to build the ft2font extension.  This
+# ensures that test images are exactly reproducible.
+#local_freetype = False
+
 [status]
 # To suppress display of the dependencies and their versions
 # at the top of the build log, uncomment the following line:
@@ -26,8 +33,8 @@
 #toolkits_tests = auto
 
 [gui_support]
-# Matplotlib supports multiple GUI toolkits, including Cocoa,
-# GTK, Fltk, MacOSX, Qt, Qt4, Tk, and WX. Support for many of
+# Matplotlib supports multiple GUI toolkits, including
+# GTK, MacOSX, Qt4, Qt5, Tk, and WX. Support for many of
 # these toolkits requires AGG, the Anti-Grain Geometry library,
 # which is provided by matplotlib and built by default.
 #
@@ -73,8 +80,8 @@
 [rc_options]
 # User-configurable options
 #
-# Default backend, one of: Agg, Cairo, CocoaAgg, GTK, GTKAgg, GTKCairo,
-# FltkAgg, MacOSX, Pdf, Ps, QtAgg, Qt4Agg, SVG, TkAgg, WX, WXAgg.
+# Default backend, one of: Agg, Cairo, GTK, GTKAgg, GTKCairo,
+# GTK3Agg, GTK3Cairo, MacOSX, Pdf, Ps, Qt4Agg, Qt5Agg, SVG, TkAgg, WX, WXAgg.
 #
 # The Agg, Ps, Pdf and SVG backends do not require external
 # dependencies. Do not choose GTK, GTKAgg, GTKCairo, MacOSX, or TkAgg

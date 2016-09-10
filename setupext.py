@@ -4,15 +4,15 @@ from distutils import sysconfig
 from distutils import version
 from distutils.core import Extension
 import glob
-import io
 import multiprocessing
 import os
 import re
 import subprocess
+from subprocess import check_output
 import sys
 import warnings
 from textwrap import fill
-
+import shutil
 import versioneer
 
 
@@ -20,31 +20,51 @@ PY3min = (sys.version_info[0] >= 3)
 PY32min = (PY3min and sys.version_info[1] >= 2 or sys.version_info[0] > 3)
 
 
-try:
-    from subprocess import check_output
-except ImportError:
-    # check_output is not available in Python 2.6
-    def check_output(*popenargs, **kwargs):
-        """
-        Run command with arguments and return its output as a byte
-        string.
+def _get_home():
+    """Find user's home directory if possible.
+    Otherwise, returns None.
 
-        Backported from Python 2.7 as it's implemented as pure python
-        on stdlib.
-        """
-        process = subprocess.Popen(
-            stdout=subprocess.PIPE, *popenargs, **kwargs)
-        output, unused_err = process.communicate()
-        retcode = process.poll()
-        if retcode:
-            cmd = kwargs.get("args")
-            if cmd is None:
-                cmd = popenargs[0]
-            error = subprocess.CalledProcessError(retcode, cmd)
-            error.output = output
-            raise error
-        return output
+    :see:
+        http://mail.python.org/pipermail/python-list/2005-February/325395.html
+    """
+    try:
+        if not PY3min and sys.platform == 'win32':
+            path = os.path.expanduser(b"~").decode(sys.getfilesystemencoding())
+        else:
+            path = os.path.expanduser("~")
+    except ImportError:
+        # This happens on Google App Engine (pwd module is not present).
+        pass
+    else:
+        if os.path.isdir(path):
+            return path
+    for evar in ('HOME', 'USERPROFILE', 'TMP'):
+        path = os.environ.get(evar)
+        if path is not None and os.path.isdir(path):
+            return path
+    return None
 
+
+def _get_xdg_cache_dir():
+    """
+    Returns the XDG cache directory, according to the `XDG
+    base directory spec
+    <http://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html>`_.
+    """
+    path = os.environ.get('XDG_CACHE_HOME')
+    if path is None:
+        path = _get_home()
+        if path is not None:
+            path = os.path.join(path, '.cache', 'matplotlib')
+    return path
+
+
+# This is the version of FreeType to use when building a local
+# version.  It must match the value in
+# lib/matplotlib.__init__.py
+LOCAL_FREETYPE_VERSION = '2.6.1'
+# md5 hash of the freetype tarball
+LOCAL_FREETYPE_HASH = '348e667d728c597360e4a87c16556597'
 
 if sys.platform != 'win32':
     if not PY3min:
@@ -76,24 +96,24 @@ if os.path.exists(setup_cfg):
         config = configparser.SafeConfigParser()
     config.read(setup_cfg)
 
-    try:
+    if config.has_option('status', 'suppress'):
         options['display_status'] = not config.getboolean("status", "suppress")
-    except:
-        pass
 
-    try:
+    if config.has_option('rc_options', 'backend'):
         options['backend'] = config.get("rc_options", "backend")
-    except:
-        pass
 
-    try:
+    if config.has_option('directories', 'basedirlist'):
         options['basedirlist'] = [
             x.strip() for x in
             config.get("directories", "basedirlist").split(',')]
-    except:
-        pass
+
+    if config.has_option('test', 'local_freetype'):
+        options['local_freetype'] = config.getboolean("test", "local_freetype")
 else:
     config = None
+
+lft = bool(os.environ.get('MPLLOCALFREETYPE', False))
+options['local_freetype'] = lft or options.get('local_freetype', False)
 
 
 def get_win32_compiler():
@@ -249,6 +269,21 @@ def make_extension(name, files, *args, **kwargs):
     ext.include_dirs.append('.')
 
     return ext
+
+
+def get_file_hash(filename):
+    """
+    Get the MD5 hash of a given filename.
+    """
+    import hashlib
+    BLOCKSIZE = 1 << 16
+    hasher = hashlib.md5()
+    with open(filename, 'rb') as fd:
+        buf = fd.read(BLOCKSIZE)
+        while len(buf) > 0:
+            hasher.update(buf)
+            buf = fd.read(BLOCKSIZE)
+    return hasher.hexdigest()
 
 
 class PkgConfig(object):
@@ -475,6 +510,14 @@ class SetupPackage(object):
 
         return 'version %s' % version
 
+    def do_custom_build(self):
+        """
+        If a package needs to do extra custom things, such as building a
+        third-party library, before building an extension, it should
+        override this method.
+        """
+        pass
+
 
 class OptionalPackage(SetupPackage):
     optional = True
@@ -560,13 +603,13 @@ class Python(SetupPackage):
 
         if major < 2:
             raise CheckFailed(
-                "Requires Python 2.6 or later")
-        elif major == 2 and minor1 < 6:
+                "Requires Python 2.7 or later")
+        elif major == 2 and minor1 < 7:
             raise CheckFailed(
-                "Requires Python 2.6 or later (in the 2.x series)")
-        elif major == 3 and minor1 < 1:
+                "Requires Python 2.7 or later (in the 2.x series)")
+        elif major == 3 and minor1 < 4:
             raise CheckFailed(
-                "Requires Python 3.1 or later (in the 3.x series)")
+                "Requires Python 3.4 or later (in the 3.x series)")
 
         return sys.version
 
@@ -707,6 +750,7 @@ class Tests(OptionalPackage):
             'matplotlib':
             baseline_images +
             [
+                'tests/cmr10.pfb',
                 'tests/mpltest.ttf',
                 'tests/test_rcparams.rc',
                 'tests/test_utf32_be_rcparams.rc',
@@ -897,6 +941,9 @@ class FreeType(SetupPackage):
     name = "freetype"
 
     def check(self):
+        if options.get('local_freetype'):
+            return "Using local version for testing"
+
         if sys.platform == 'win32':
             check_include_file(get_include_dirs(), 'ft2build.h', 'freetype')
             return 'Using unknown version found on system.'
@@ -942,15 +989,118 @@ class FreeType(SetupPackage):
                 return '.'.join([major, minor, patch])
 
     def add_flags(self, ext):
-        pkg_config.setup_extension(
-            ext, 'freetype2',
-            default_include_dirs=[
-                'include/freetype2', 'freetype2',
-                'lib/freetype2/include',
-                'lib/freetype2/include/freetype2'],
-            default_library_dirs=[
-                'freetype2/lib'],
-            default_libraries=['freetype', 'z'])
+        if options.get('local_freetype'):
+            src_path = os.path.join(
+                'build', 'freetype-{0}'.format(LOCAL_FREETYPE_VERSION))
+            # Statically link to the locally-built freetype.
+            # This is certainly broken on Windows.
+            ext.include_dirs.insert(0, os.path.join(src_path, 'include'))
+            ext.extra_objects.insert(
+                0, os.path.join(src_path, 'objs', '.libs', 'libfreetype.a'))
+            ext.define_macros.append(('FREETYPE_BUILD_TYPE', 'local'))
+        else:
+            pkg_config.setup_extension(
+                ext, 'freetype2',
+                default_include_dirs=[
+                    'include/freetype2', 'freetype2',
+                    'lib/freetype2/include',
+                    'lib/freetype2/include/freetype2'],
+                default_library_dirs=[
+                    'freetype2/lib'],
+                default_libraries=['freetype', 'z'])
+            ext.define_macros.append(('FREETYPE_BUILD_TYPE', 'system'))
+
+    def do_custom_build(self):
+        # We're using a system freetype
+        if not options.get('local_freetype'):
+            return
+
+        src_path = os.path.join(
+            'build', 'freetype-{0}'.format(LOCAL_FREETYPE_VERSION))
+
+        # We've already built freetype
+        if os.path.isfile(
+                os.path.join(src_path, 'objs', '.libs', 'libfreetype.a')):
+            return
+
+        tarball = 'freetype-{0}.tar.gz'.format(LOCAL_FREETYPE_VERSION)
+        tarball_path = os.path.join('build', tarball)
+        try:
+            tarball_cache_dir = _get_xdg_cache_dir()
+            tarball_cache_path = os.path.join(tarball_cache_dir, tarball)
+        except:
+            # again, do not really care if this fails
+            tarball_cache_dir = None
+            tarball_cache_path = None
+        if not os.path.isfile(tarball_path):
+            if (tarball_cache_path is not None and
+                    os.path.isfile(tarball_cache_path)):
+                if get_file_hash(tarball_cache_path) == LOCAL_FREETYPE_HASH:
+                    try:
+                        # fail on Lpy, oh well
+                        os.makedirs('build', exist_ok=True)
+                        shutil.copy(tarball_cache_path, tarball_path)
+                        print('Using cached tarball: {}'
+                              .format(tarball_cache_path))
+                    except:
+                        # If this fails, oh well just re-download
+                        pass
+
+            if not os.path.isfile(tarball_path):
+
+                if sys.version_info[0] == 2:
+                    from urllib import urlretrieve
+                else:
+                    from urllib.request import urlretrieve
+                if not os.path.exists('build'):
+                    os.makedirs('build')
+
+                sourceforge_url = (
+                    'http://downloads.sourceforge.net/project/freetype'
+                    '/freetype2/{0}/'.format(LOCAL_FREETYPE_VERSION)
+                )
+                url_fmts = (
+                    sourceforge_url + '{0}',
+                    'http://download.savannah.gnu.org/releases/freetype/{0}'
+                    )
+                for url_fmt in url_fmts:
+                    tarball_url = url_fmt.format(tarball)
+
+                    print("Downloading {0}".format(tarball_url))
+                    try:
+                        urlretrieve(tarball_url, tarball_path)
+                    except:
+                        print("Failed to download {0}".format(tarball_url))
+                    else:
+                        break
+                if not os.path.isfile(tarball_path):
+                    raise IOError("Failed to download freetype")
+                if get_file_hash(tarball_path) == LOCAL_FREETYPE_HASH:
+                    try:
+                        # this will fail on LPy, oh well
+                        os.makedirs(tarball_cache_dir, exist_ok=True)
+                        shutil.copy(tarball_path, tarball_cache_path)
+                        print('Cached tarball at: {}'
+                              .format(tarball_cache_path))
+                    except:
+                        # again, we do not care if this fails, can
+                        # always re download
+                        pass
+
+            if get_file_hash(tarball_path) != LOCAL_FREETYPE_HASH:
+                raise IOError(
+                    "{0} does not match expected hash.".format(tarball))
+
+        print("Building {0}".format(tarball))
+        cflags = 'CFLAGS="{0} -fPIC" '.format(os.environ.get('CFLAGS', ''))
+
+        subprocess.check_call(
+            ['tar', 'zxf', tarball], cwd='build')
+        subprocess.check_call(
+            [cflags + './configure --with-zlib=no --with-bzip2=no '
+             '--with-png=no --with-harfbuzz=no'], shell=True, cwd=src_path)
+        subprocess.check_call(
+            [cflags + 'make'], shell=True, cwd=src_path)
 
 
 class FT2Font(SetupPackage):
@@ -1072,11 +1222,13 @@ class Image(SetupPackage):
         sources = [
             'src/_image.cpp',
             'src/mplutils.cpp',
-            'src/_image_wrapper.cpp'
+            'src/_image_wrapper.cpp',
+            'src/py_converters.cpp'
             ]
         ext = make_extension('matplotlib._image', sources)
         Numpy().add_flags(ext)
         LibAgg().add_flags(ext)
+
         return ext
 
 
@@ -1146,11 +1298,31 @@ class Tri(SetupPackage):
         return ext
 
 
-class Externals(SetupPackage):
-    name = "externals"
+class Six(SetupPackage):
+    name = "six"
+    min_version = "1.10"
 
-    def get_packages(self):
-        return ['matplotlib.externals']
+    def check(self):
+        try:
+            import six
+        except ImportError:
+            return (
+                "six was not found."
+                "pip will attempt to install it "
+                "after matplotlib.")
+
+        if not is_min_version(six.__version__, self.min_version):
+            return ("The installed version of six is {inst_ver} but "
+                    "a the minimum required version is {min_ver}. "
+                    "pip/easy install will attempt to install a "
+                    "newer version."
+                    ).format(min_ver=self.min_version,
+                             inst_ver=six.__version__)
+
+        return "using six version %s" % six.__version__
+
+    def get_install_requires(self):
+        return ['six>={0}'.format(self.min_version)]
 
 
 class Pytz(SetupPackage):
@@ -1182,11 +1354,10 @@ class Cycler(SetupPackage):
                 "cycler was not found. "
                 "pip will attempt to install it "
                 "after matplotlib.")
-
         return "using cycler version %s" % cycler.__version__
 
     def get_install_requires(self):
-        return ['cycler']
+        return ['cycler>=0.10']
 
 
 class Dateutil(SetupPackage):
@@ -1219,6 +1390,53 @@ class Dateutil(SetupPackage):
         if self.version is not None:
             dateutil += self.version
         return [dateutil]
+
+
+class FuncTools32(SetupPackage):
+    name = "functools32"
+
+    def check(self):
+        if sys.version_info[:2] < (3, 2):
+            try:
+                import functools32
+            except ImportError:
+                return (
+                    "functools32 was not found. It is required for"
+                    "Python versions prior to 3.2")
+
+            return "using functools32"
+        else:
+            return "Not required"
+
+    def get_install_requires(self):
+        if sys.version_info[:2] < (3, 2):
+            return ['functools32']
+        else:
+            return []
+
+
+class Subprocess32(SetupPackage):
+    name = "subprocess32"
+
+    def check(self):
+        if sys.version_info[:2] < (3, 2):
+            try:
+                import subprocess32
+            except ImportError:
+                return (
+                    "subprocess32 was not found. It used "
+                    " for Python versions prior to 3.2 to improves"
+                    " functionality on Linux and OSX")
+
+            return "using subprocess32"
+        else:
+            return "Not required"
+
+    def get_install_requires(self):
+        if sys.version_info[:2] < (3, 2) and os.name == 'posix':
+            return ['subprocess32']
+        else:
+            return []
 
 
 class Tornado(OptionalPackage):
@@ -1274,7 +1492,7 @@ class Pyparsing(SetupPackage):
         return "using pyparsing version %s" % pyparsing.__version__
 
     def get_install_requires(self):
-        versionstring = 'pyparsing>=1.5.6,!=2.0.4,!=2.1.2'
+        versionstring = 'pyparsing>=1.5.6,!=2.0.4,!=2.1.2,!=2.1.6'
         if self.is_ok():
             return [versionstring]
         else:
@@ -1643,14 +1861,10 @@ class BackendMacOSX(OptionalBackendPackage):
 
     def get_extension(self):
         sources = [
-            'src/_macosx.m',
-            'src/py_converters.cpp',
-            'src/path_cleanup.cpp'
+            'src/_macosx.m'
             ]
 
         ext = make_extension('matplotlib.backends._macosx', sources)
-        Numpy().add_flags(ext)
-        LibAgg().add_flags(ext)
         ext.extra_link_args.extend(['-framework', 'Cocoa'])
         return ext
 
@@ -1845,23 +2059,21 @@ class Ghostscript(SetupPackage):
     optional = True
 
     def check(self):
-        try:
-            if sys.platform == 'win32':
-                command = 'gswin32c --version'
-                try:
-                    output = check_output(command, shell=True,
-                                          stderr=subprocess.STDOUT)
-                except subprocess.CalledProcessError:
-                    command = 'gswin64c --version'
-                    output = check_output(command, shell=True,
-                                          stderr=subprocess.STDOUT)
-            else:
-                command = 'gs --version'
+        if sys.platform == 'win32':
+            # mgs is the name in miktex
+            gs_execs = ['gswin32c', 'gswin64c', 'mgs', 'gs']
+        else:
+            gs_execs = ['gs']
+        for gs_exec in gs_execs:
+            try:
+                command = gs_exec + ' --version'
                 output = check_output(command, shell=True,
                                       stderr=subprocess.STDOUT)
-            return "version %s" % output.decode()[:-1]
-        except (IndexError, ValueError, subprocess.CalledProcessError):
-            raise CheckFailed()
+                return "version %s" % output.decode()[:-1]
+            except (IndexError, ValueError, subprocess.CalledProcessError):
+                pass
+
+        raise CheckFailed()
 
 
 class LaTeX(SetupPackage):

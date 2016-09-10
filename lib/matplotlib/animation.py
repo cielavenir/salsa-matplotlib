@@ -20,8 +20,8 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
-from matplotlib.externals.six.moves import xrange, zip
+import six
+from six.moves import xrange, zip
 
 import os
 import platform
@@ -569,7 +569,7 @@ class ImageMagickBase(object):
     def _init_from_registry(cls):
         if sys.platform != 'win32' or rcParams[cls.exec_key] != 'convert':
             return
-        from matplotlib.externals.six.moves import winreg
+        from six.moves import winreg
         for flag in (0, winreg.KEY_WOW64_32KEY, winreg.KEY_WOW64_64KEY):
             try:
                 hkey = winreg.OpenKeyEx(winreg.HKEY_LOCAL_MACHINE,
@@ -923,7 +923,8 @@ class Animation(object):
         # cache and restore.
         axes = set(a.axes for a in artists)
         for a in axes:
-            a.figure.canvas.restore_region(bg_cache[a])
+            if a in bg_cache:
+                a.figure.canvas.restore_region(bg_cache[a])
 
     def _setup_blit(self):
         # Setting up the blit requires: a cache of the background for the
@@ -949,7 +950,7 @@ class Animation(object):
     def _end_redraw(self, evt):
         # Now that the redraw has happened, do the post draw flushing and
         # blit handling. Then re-enable all of the original events.
-        self._post_draw(None, self._blit)
+        self._post_draw(None, False)
         self.event_source.start()
         self._fig.canvas.mpl_disconnect(self._resize_id)
         self._resize_id = self._fig.canvas.mpl_connect('resize_event',
@@ -1080,7 +1081,7 @@ class ArtistAnimation(TimedAnimation):
     Before calling this function, all plotting should have taken place
     and the relevant artists saved.
 
-    frame_info is a list, with each list entry a collection of artists that
+    *artists* is a list, with each list entry a collection of artists that
     represent what needs to be enabled on each frame. These will be disabled
     for other frames.
     '''
@@ -1100,11 +1101,11 @@ class ArtistAnimation(TimedAnimation):
             for artist in f:
                 artist.set_visible(False)
                 artist.set_animated(self._blit)
-                # Assemble a list of unique axes that need flushing
-                if artist.axes.figure not in figs:
-                    figs.add(artist.axes.figure)
+                # Assemble a list of unique figures that need flushing
+                if artist.get_figure() not in figs:
+                    figs.add(artist.get_figure())
 
-        # Flush the needed axes
+        # Flush the needed figures
         for fig in figs:
             fig.canvas.draw_idle()
 
