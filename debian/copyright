@@ -265,9 +265,6 @@ Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991, 1992, 1993, 1997 Adobe Sy
 Files: lib/matplotlib/mpl-data/fonts/afm/pcrro8a.afm
 Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991, 1992 Adobe Systems Incorporated.  All Rights Reserved.
 
-Files: lib/six.py
-Author: Benjamin Peterson <benjamin@python.org>
-
 Files: src/_tkmini.h
 Copyright:  Copyright (c) 1987-1994 The Regents of the University of California.
  Copyright (c) 1993-1996 Lucent Technologies.
@@ -493,10 +490,6 @@ License: MIT
 
 Files: lib/matplotlib/backends/web_backend/jquery/js/jquery-1.11.3.js lib/matplotlib/backends/web_backend/jquery/js/jquery-1.11.3.min.js
 Copyright: Copyright 2005, 2014 jQuery Foundation, Inc. and other contributors
-License: MIT
-
-Files: lib/matplotlib/externals/six.py
-Copyright: Copyright (c) 2010-2015 Benjamin Peterson
 License: MIT
 
 Files: lib/matplotlib/testing/disable_internet.py
