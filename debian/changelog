@@ -1,4 +1,4 @@
-matplotlib (2.0.0~beta4-1) UNRELEASED; urgency=medium
+matplotlib (2.0.0~beta4-1) experimental; urgency=medium
 
   * New upstream beta release for the new version 2.x
   * debian/watch
@@ -14,7 +14,7 @@ matplotlib (2.0.0~beta4-1) UNRELEASED; urgency=medium
   * debian/python-matplotlib-data.install
     - dont install nib files, removed upstream
 
- -- Sandro Tosi <morph@debian.org>  Sun, 25 Sep 2016 17:05:47 +0100
+ -- Sandro Tosi <morph@debian.org>  Sun, 25 Sep 2016 18:08:39 +0100
 
 matplotlib (1.5.3-1) unstable; urgency=medium
 
