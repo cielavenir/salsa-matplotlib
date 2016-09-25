@@ -5,11 +5,12 @@ matplotlib (2.0.0~beta4-1) UNRELEASED; urgency=medium
     - recognize only 2.x releases, and 'b' as a beta release
   * debian/control
     - add python-functools32 to b-d
+    - add colorspacious to b-d, needed by doc
     - set version reqs for cycler to be >= 0.10.0
   * debian/copyright
     - remove refs to six.py, no longer shipped upstream
 
- -- Sandro Tosi <morph@debian.org>  Sat, 10 Sep 2016 19:22:34 +0100
+ -- Sandro Tosi <morph@debian.org>  Sun, 25 Sep 2016 15:45:54 +0100
 
 matplotlib (1.5.3-1) unstable; urgency=medium
 
