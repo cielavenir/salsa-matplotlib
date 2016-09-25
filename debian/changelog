@@ -11,8 +11,10 @@ matplotlib (2.0.0~beta4-1) UNRELEASED; urgency=medium
     - remove refs to six.py, no longer shipped upstream
   * debian/rules
     - use absolute (not relative) paths when building doc
+  * debian/python-matplotlib-data.install
+    - dont install nib files, removed upstream
 
- -- Sandro Tosi <morph@debian.org>  Sun, 25 Sep 2016 16:22:30 +0100
+ -- Sandro Tosi <morph@debian.org>  Sun, 25 Sep 2016 17:05:47 +0100
 
 matplotlib (1.5.3-1) unstable; urgency=medium
 
