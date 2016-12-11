@@ -3,8 +3,9 @@ matplotlib (2.0.0~rc1-1) UNRELEASED; urgency=medium
   * New upstream release candidate for the new version 2.x
   * debian/control
     - add pandas to b-d, needed for tests
+    - add subprocess32 to b-d
 
- -- Sandro Tosi <morph@debian.org>  Sun, 11 Dec 2016 10:50:02 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 11 Dec 2016 10:53:55 -0500
 
 matplotlib (2.0.0~beta4-1) experimental; urgency=medium
 
