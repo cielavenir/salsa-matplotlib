@@ -1,8 +1,10 @@
 /* -*- mode: c++; c-basic-offset: 4 -*- */
 
 /*
- * The Python Imaging Library.
- * $Id$
+ * This code is derived from The Python Imaging Library and is covered
+ * by the PIL license.
+ *
+ * See LICENSE/LICENSE.PIL for details.
  *
  */
 
@@ -406,10 +408,19 @@ int load_tkinter_funcs(void)
     // Load tkinter global funcs from tkinter compiled module.
     // Return 0 for success, non-zero for failure.
     int ret = -1;
-    void *tkinter_lib;
+    void *main_program, *tkinter_lib;
     char *tkinter_libname;
     PyObject *pModule = NULL, *pSubmodule = NULL, *pString = NULL;
 
+    // Try loading from the main program namespace first
+    main_program = dlopen(NULL, RTLD_LAZY);
+    if (_func_loader(main_program) == 0) {
+        return 0;
+    }
+    // Clear exception triggered when we didn't find symbols above.
+    PyErr_Clear();
+
+    // Now try finding the tkinter compiled module
     pModule = PyImport_ImportModule(TKINTER_PKG);
     if (pModule == NULL) {
         goto exit;

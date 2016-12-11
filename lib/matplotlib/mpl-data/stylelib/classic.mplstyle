@@ -34,6 +34,7 @@ patch.force_edgecolor  : True
 patch.edgecolor        : k
 patch.antialiased      : True    # render patches in antialiased (no jaggies)
 
+hatch.color            : k
 hatch.linewidth        : 1.0
 
 hist.bins              : 10
@@ -173,7 +174,6 @@ mathtext.default : it # The default font to use for math.
 # default face and edge color, default tick sizes,
 # default fontsizes for ticklabels, and so on.  See
 # http://matplotlib.org/api/axes_api.html#module-matplotlib.axes
-axes.hold           : True    # whether to clear the axes by default on
 axes.facecolor      : w       # axes background color
 axes.edgecolor      : k       # axes edge color
 axes.linewidth      : 1.0     # edge linewidth
@@ -204,6 +204,10 @@ axes.formatter.useoffset      : True    # If True, the tick label formatter
                                         # to an offset when the data range is very
                                         # small compared to the minimum absolute
                                         # value of the data.
+axes.formatter.offset_threshold : 2      # When useoffset is True, the offset
+                                         # will be used when it can remove
+                                         # at least this number of significant
+                                         # digits from tick labels.
 
 axes.unicode_minus  : True    # use unicode for the minus symbol
                               # rather than hyphen.  See
@@ -229,6 +233,7 @@ date.autoformatter.day    : %b %d %Y
 date.autoformatter.hour   : %H:%M:%S
 date.autoformatter.minute : %H:%M:%S.%f
 date.autoformatter.second : %H:%M:%S.%f
+date.autoformatter.microsecond : %H:%M:%S.%f
 
 ### TICKS
 # see http://matplotlib.org/api/axis_api.html#matplotlib.axis.Tick
@@ -290,10 +295,10 @@ legend.borderaxespad : 0.5   # the border between the axes and legend edge in fr
 legend.columnspacing : 2.    # the border between the axes and legend edge in fraction of fontsize
 legend.shadow        : False
 legend.frameon       : True   # whether or not to draw a frame around legend
-legend.framealpha    : None    # opacity of of legend frame
+legend.framealpha    : None    # opacity of legend frame
 legend.scatterpoints : 3 # number of scatter points
-legend.facecolor     : inherit   # legend background color (when None inherits from axes.facecolor)
-legend.edgecolor     : inherit   # legend edge color (when None inherits from axes.facecolor)
+legend.facecolor     : inherit   # legend background color (when 'inherit' uses axes.facecolor)
+legend.edgecolor     : inherit   # legend edge color (when 'inherit' uses axes.edgecolor)
 
 
 
@@ -315,8 +320,10 @@ figure.subplot.left    : 0.125  # the left side of the subplots of the figure
 figure.subplot.right   : 0.9    # the right side of the subplots of the figure
 figure.subplot.bottom  : 0.1    # the bottom of the subplots of the figure
 figure.subplot.top     : 0.9    # the top of the subplots of the figure
-figure.subplot.wspace  : 0.2    # the amount of width reserved for blank space between subplots
-figure.subplot.hspace  : 0.2    # the amount of height reserved for white space between subplots
+figure.subplot.wspace  : 0.2    # the amount of width reserved for blank space between subplots,
+                                # expressed as a fraction of the average axis width
+figure.subplot.hspace  : 0.2    # the amount of height reserved for white space between subplots,
+                                # expressed as a fraction of the average axis height
 
 ### IMAGES
 image.aspect : equal             # equal | auto | a number

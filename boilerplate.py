@@ -50,15 +50,19 @@ PLOT_TEMPLATE = AUTOGEN_MSG + """
 @_autogen_docstring(Axes.%(func)s)
 def %(func)s(%(argspec)s):
     %(ax)s = gca()
-    # allow callers to override the hold state by passing hold=True|False
-    %(washold)s = %(ax)s.ishold()
+    # Deprecated: allow callers to override the hold state
+    # by passing hold=True|False
+    %(washold)s = %(ax)s._hold
 %(sethold)s
     if hold is not None:
-        %(ax)s.hold(hold)
+        %(ax)s._hold = hold
+        from matplotlib.cbook import mplDeprecation
+        warnings.warn("The 'hold' keyword argument is deprecated since 2.0.",
+                      mplDeprecation)
     try:
         %(ret)s = %(ax)s.%(func)s(%(call)s)
     finally:
-        %(ax)s.hold(%(washold)s)
+        %(ax)s._hold = %(washold)s
 %(mappable)s
     return %(ret)s
 """
@@ -79,6 +83,27 @@ def {name}():
     set the default colormap to {name} and apply to current image if any.
     See help(colormaps) for more information
     '''
+    rc('image', cmap='{name}')
+    im = gci()
+
+    if im is not None:
+        im.set_cmap(cm.{name})
+
+"""
+
+CMAP_TEMPLATE_DEPRECATED = AUTOGEN_MSG + """
+def {name}():
+    '''
+    set the default colormap to {name} and apply to current image if any.
+    See help(colormaps) for more information
+    '''
+    from matplotlib.cbook import warn_deprecated
+    warn_deprecated(
+                    "2.0",
+                    name="{name}",
+                    obj_type="colormap"
+                    )
+
     rc('image', cmap='{name}')
     im = gci()
 
@@ -322,16 +347,18 @@ def boilerplate_gen():
         'spring',
         'summer',
         'winter',
-        'spectral',
-
         'magma',
         'inferno',
         'plasma',
-        'viridis'
+        'viridis',
+        "nipy_spectral"
     )
+    deprecated_cmaps = ("spectral", )
     # add all the colormaps (autumn, hsv, ....)
     for name in cmaps:
         yield CMAP_TEMPLATE.format(name=name)
+    for name in deprecated_cmaps:
+        yield CMAP_TEMPLATE_DEPRECATED.format(name=name)
 
     yield ''
     yield '_setup_pyplot_info_docstrings()'

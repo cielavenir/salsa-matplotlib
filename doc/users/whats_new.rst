@@ -82,13 +82,16 @@ New rcparams added
 |`ytick.minor.right`,             |                                                  |
 |`ytick.major.right`              |                                                  |
 +---------------------------------+--------------------------------------------------+
-|`hist.bins`                      | the default number of bins to use in             |
+|`hist.bins`                      | The default number of bins to use in             |
 |                                 | `~matplotlib.axes.Axes.hist`.  This can be an    |
 |                                 | `int`, a list of floats, or ``'auto'`` if numpy  |
 |                                 | >= 1.11 is installed.                            |
 +---------------------------------+--------------------------------------------------+
-|`lines.scale_dashes`             | If the line dash patterns should scale with      |
-|                                 | linewidth                                        |
+|`lines.scale_dashes`             | Whether the line dash patterns should scale with |
+|                                 | linewidth.                                       |
++---------------------------------+--------------------------------------------------+
+|`axes.formatter.offset_threshold`| Minimum number of digits saved in tick labels    |
+|                                 | that triggers using an offset.                   |
 +---------------------------------+--------------------------------------------------+
 
 
@@ -147,7 +150,7 @@ unrelated to style.  These parameters include::
   'interactive', 'backend', 'backend.qt4', 'webagg.port',
   'webagg.port_retries', 'webagg.open_in_browser', 'backend_fallback',
   'toolbar', 'timezone', 'datapath', 'figure.max_open_warning',
-  'savefig.directory', 'tk.window_focus', 'hardcopy.docstring'
+  'savefig.directory', 'tk.window_focus', 'docstring.hardcopy'
 
 
 Change in default font
@@ -216,6 +219,18 @@ Support for HiDPI (Retina) displays in the NbAgg and WebAgg backends
 The NbAgg and WebAgg backends will now use the full resolution of your
 high-pixel-density display.
 
+Change in the default animation codec
+-------------------------------------
+
+The default animation codec has been changed from ``mpeg4`` to ``h264``,
+which is more efficient. It can be set via the ``animation.codec`` rcParam.
+
+Deprecated support for mencoder in animation
+--------------------------------------------
+
+The use of mencoder for writing video files with mpl is problematic;
+switching to ffmpeg is strongly advised.  All support for mencoder
+will be removed in version 2.2.
 
 
 Previous Whats New

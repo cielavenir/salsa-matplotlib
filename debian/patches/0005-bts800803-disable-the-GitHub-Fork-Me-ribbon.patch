@@ -1,4 +1,4 @@
-From 53f947c219b586f065d53a7097bb0cdb34fb3686 Mon Sep 17 00:00:00 2001
+From c79623b7597f0b498326416b29f3cbef2f5f8233 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Sat, 9 Jan 2016 15:49:51 +0000
 Subject: bts800803 disable the GitHub Fork Me ribbon

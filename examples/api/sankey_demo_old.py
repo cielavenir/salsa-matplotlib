@@ -1,4 +1,10 @@
-#!/usr/bin/env python
+"""
+==========================
+Yet another Sankey diagram
+==========================
+
+This example showcases a more complex sankey diagram.
+"""
 
 from __future__ import print_function
 

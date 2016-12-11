@@ -17,8 +17,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.testing.decorators import cleanup, image_comparison
 
-import sys
-
 
 @cleanup
 def test_invisible_Line_rendering():
@@ -112,10 +110,6 @@ def test_linestyle_variants():
 
 @cleanup
 def test_valid_linestyles():
-    if sys.version_info[:2] < (2, 7):
-        raise nose.SkipTest("assert_raises as context manager "
-                            "not supported with Python < 2.7")
-
     line = mlines.Line2D([], [])
     with assert_raises(ValueError):
         line.set_linestyle('aardvark')
@@ -135,10 +129,6 @@ def test_drawstyle_variants():
 
 @cleanup
 def test_valid_drawstyles():
-    if sys.version_info[:2] < (2, 7):
-        raise nose.SkipTest("assert_raises as context manager "
-                            "not supported with Python < 2.7")
-
     line = mlines.Line2D([], [])
     with assert_raises(ValueError):
         line.set_drawstyle('foobar')
@@ -178,7 +168,7 @@ def test_marker_fill_styles():
                     markeredgewidth=2)
 
     ax.set_ylim([0, 7.5])
-    ax.set_xlim([-5, 135])
+    ax.set_xlim([-5, 155])
 
 
 @image_comparison(baseline_images=['scaled_lines'], style='default')

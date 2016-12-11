@@ -14,6 +14,35 @@ How-To
 Plotting: howto
 ===============
 
+.. _howto-datetime64:
+
+Plot `numpy.datetime64` values
+------------------------------
+
+For matplotlib to plot dates (or any scalar with units) a converter
+to float needs to be registered with the `matplolib.units` module.  The
+current best converters for `datetime64` values are in `pandas`.  Simply
+importing `pandas` ::
+
+  import pandas as pd
+
+should be sufficient as `pandas` will try to install the converters
+on import.  If that does not work, or you need to reset `munits.registry`
+you can explicitly install the `pandas` converters by ::
+
+  from pandas.tseries import converter as pdtc
+  pdtc.register()
+
+If you only want to use the `pandas` converter for `datetime64` values ::
+
+  from pandas.tseries import converter as pdtc
+  import matplotlib.units as munits
+  import numpy as np
+
+  munits.registry[np.datetime64] = pdtc.DatetimeConverter()
+
+
+
 .. _howto-findobj:
 
 Find all objects in a figure of a certain type
@@ -147,9 +176,11 @@ The other parameters you can configure are, with their defaults
 *top* = 0.9
     the top of the subplots of the figure
 *wspace* = 0.2
-    the amount of width reserved for blank space between subplots
+    the amount of width reserved for blank space between subplots,
+    expressed as a fraction of the average axis width
 *hspace* = 0.2
-    the amount of height reserved for white space between subplots
+    the amount of height reserved for white space between subplots,
+    expressed as a fraction of the average axis height
 
 If you want additional control, you can create an
 :class:`~matplotlib.axes.Axes` using the
@@ -201,7 +232,7 @@ Here is an example that gets a bounding box in relative figure coordinates
 (0..1) of each of the labels and uses it to move the left of the subplots
 over so that the tick labels fit in the figure
 
-.. plot:: pyplots/auto_subplots_adjust.py
+.. plot:: mpl_examples/pyplots/auto_subplots_adjust.py
    :include-source:
 
 .. _howto-ticks:
@@ -244,7 +275,7 @@ behavior by specifying the coordinates of the label.  The example
 below shows the default behavior in the left subplots, and the manual
 setting in the right subplots.
 
-.. plot:: pyplots/align_ylabels.py
+.. plot:: mpl_examples/pyplots/align_ylabels.py
    :include-source:
 
 .. _date-index-plots:

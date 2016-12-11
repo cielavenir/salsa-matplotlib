@@ -27,6 +27,7 @@ from matplotlib.testing.noseclasses import KnownFailureTest
 import matplotlib.pyplot as plt
 import matplotlib.markers as mmarkers
 import matplotlib.patches as mpatches
+import matplotlib.colors as mcolors
 from numpy.testing import assert_allclose, assert_array_equal
 from matplotlib.cbook import IgnoredKeywordWarning
 import matplotlib.colors as mcolors
@@ -165,6 +166,33 @@ def test_autoscale_tiny_range():
         y1 = 10**(-11 - i)
         ax[i].plot([0, 1], [1, 1 + y1])
 
+
+@cleanup(style='default')
+def test_autoscale_tight():
+    fig, ax = plt.subplots(1, 1)
+    ax.plot([1, 2, 3, 4])
+    ax.autoscale(enable=True, axis='x', tight=False)
+    ax.autoscale(enable=True, axis='y', tight=True)
+    assert_allclose(ax.get_xlim(), (-0.15, 3.15))
+    assert_allclose(ax.get_ylim(), (1.0, 4.0))
+
+@cleanup(style='default')
+def test_use_sticky_edges():
+    fig, ax = plt.subplots()
+    ax.imshow([[0, 1], [2, 3]], origin='lower')
+    assert_allclose(ax.get_xlim(), (-0.5, 1.5))
+    assert_allclose(ax.get_ylim(), (-0.5, 1.5))
+    ax.use_sticky_edges = False
+    ax.autoscale()
+    xlim = (-0.5 - 2 * ax._xmargin, 1.5 + 2 * ax._xmargin)
+    ylim = (-0.5 - 2 * ax._ymargin, 1.5 + 2 * ax._ymargin)
+    assert_allclose(ax.get_xlim(), xlim)
+    assert_allclose(ax.get_ylim(), ylim)
+    # Make sure it is reversible:
+    ax.use_sticky_edges = True
+    ax.autoscale()
+    assert_allclose(ax.get_xlim(), (-0.5, 1.5))
+    assert_allclose(ax.get_ylim(), (-0.5, 1.5))
 
 @image_comparison(baseline_images=['offset_points'],
                   remove_text=True)
@@ -1712,6 +1740,23 @@ def test_bxp_nobox():
     ax.bxp(logstats, showbox=False)
 
 
+@image_comparison(baseline_images=['bxp_no_flier_stats'],
+                  remove_text=True, extensions=['png'],
+                  savefig_kwarg={'dpi': 40},
+                  style='default')
+def test_bxp_no_flier_stats():
+    np.random.seed(937)
+    logstats = matplotlib.cbook.boxplot_stats(
+        np.random.lognormal(mean=1.25, sigma=1., size=(37, 4))
+    )
+    for ls in logstats:
+        ls.pop('fliers', None)
+
+    fig, ax = plt.subplots()
+    ax.set_yscale('log')
+    ax.bxp(logstats, showfliers=False)
+
+
 @image_comparison(baseline_images=['bxp_withmean_point'],
                   remove_text=True, extensions=['png'],
                   savefig_kwarg={'dpi': 40},
@@ -1815,6 +1860,9 @@ def test_bxp_bad_positions():
                   tol=1,
                   style='default')
 def test_boxplot():
+    # Randomness used for bootstrapping.
+    np.random.seed(937)
+
     x = np.linspace(-7, 7, 140)
     x = np.hstack([-25, x, 25])
     fig, ax = plt.subplots()
@@ -1833,6 +1881,9 @@ def test_boxplot():
                   remove_text=True, extensions=['png'],
                   style='default')
 def test_boxplot_sym2():
+    # Randomness used for bootstrapping.
+    np.random.seed(937)
+
     x = np.linspace(-7, 7, 140)
     x = np.hstack([-25, x, 25])
     fig, [ax1, ax2] = plt.subplots(1, 2)
@@ -1864,6 +1915,9 @@ def test_boxplot_sym():
     style='default'
 )
 def test_boxplot_autorange_whiskers():
+    # Randomness used for bootstrapping.
+    np.random.seed(937)
+
     x = np.ones(140)
     x = np.hstack([0, x, 2])
 
@@ -1886,6 +1940,9 @@ def _rc_test_bxp_helper(ax, rc_dict):
                   savefig_kwarg={'dpi': 100}, remove_text=True,
                   tol=1, style='default')
 def test_boxplot_rc_parameters():
+    # Randomness used for bootstrapping.
+    np.random.seed(937)
+
     fig, ax = plt.subplots(3)
 
     rc_axis0 = {
@@ -1948,6 +2005,9 @@ def test_boxplot_rc_parameters():
                   remove_text=True, extensions=['png'],
                   savefig_kwarg={'dpi': 40}, style='default')
 def test_boxplot_with_CIarray():
+    # Randomness used for bootstrapping.
+    np.random.seed(937)
+
     x = np.linspace(-7, 7, 140)
     x = np.hstack([-25, x, 25])
     fig = plt.figure()
@@ -1996,6 +2056,14 @@ def test_boxplot_bad_ci_1():
     fig, ax = plt.subplots()
     assert_raises(ValueError, ax.boxplot, [x, x],
                   conf_intervals=[[1, 2]])
+
+
+@cleanup
+def test_boxplot_zorder():
+    x = np.arange(10)
+    fix, ax = plt.subplots()
+    assert ax.boxplot(x)['boxes'][0].get_zorder() == 2
+    assert ax.boxplot(x, zorder=10)['boxes'][0].get_zorder() == 10
 
 
 @cleanup
@@ -2762,6 +2830,90 @@ def test_eb_line_zorder():
     ax.set_title("errorbar zorder test")
 
 
+@image_comparison(
+    baseline_images=['vlines_basic', 'vlines_with_nan', 'vlines_masked'],
+    extensions=['png']
+)
+def test_vlines():
+    # normal
+    x1 = [2, 3, 4, 5, 7]
+    y1 = [2, -6, 3, 8, 2]
+    fig1, ax1 = plt.subplots()
+    ax1.vlines(x1, 0, y1, colors='g', linewidth=5)
+
+    # GH #7406
+    x2 = [2, 3, 4, 5, 6, 7]
+    y2 = [2, -6, 3, 8, np.nan, 2]
+    fig2, (ax2, ax3, ax4) = plt.subplots(nrows=3, figsize=(4, 8))
+    ax2.vlines(x2, 0, y2, colors='g', linewidth=5)
+
+    x3 = [2, 3, 4, 5, 6, 7]
+    y3 = [np.nan, 2, -6, 3, 8, 2]
+    ax3.vlines(x3, 0, y3, colors='r', linewidth=3, linestyle='--')
+
+    x4 = [2, 3, 4, 5, 6, 7]
+    y4 = [np.nan, 2, -6, 3, 8, np.nan]
+    ax4.vlines(x4, 0, y4, colors='k', linewidth=2)
+
+    # tweak the x-axis so we can see the lines better
+    for ax in [ax1, ax2, ax3, ax4]:
+        ax.set_xlim(0, 10)
+
+    # check that the y-lims are all automatically the same
+    assert ax1.get_ylim() == ax2.get_ylim()
+    assert ax1.get_ylim() == ax3.get_ylim()
+    assert ax1.get_ylim() == ax4.get_ylim()
+
+    fig3, ax5 = plt.subplots()
+    x5 = np.ma.masked_equal([2, 4, 6, 8, 10, 12], 8)
+    ymin5 = np.ma.masked_equal([0, 1, -1, 0, 2, 1], 2)
+    ymax5 = np.ma.masked_equal([13, 14, 15, 16, 17, 18], 18)
+    ax5.vlines(x5, ymin5, ymax5, colors='k', linewidth=2)
+    ax5.set_xlim(0, 15)
+
+
+@image_comparison(
+    baseline_images=['hlines_basic', 'hlines_with_nan', 'hlines_masked'],
+    extensions=['png']
+)
+def test_hlines():
+    # normal
+    y1 = [2, 3, 4, 5, 7]
+    x1 = [2, -6, 3, 8, 2]
+    fig1, ax1 = plt.subplots()
+    ax1.hlines(y1, 0, x1, colors='g', linewidth=5)
+
+    # GH #7406
+    y2 = [2, 3, 4, 5, 6, 7]
+    x2 = [2, -6, 3, 8, np.nan, 2]
+    fig2, (ax2, ax3, ax4) = plt.subplots(nrows=3, figsize=(4, 8))
+    ax2.hlines(y2, 0, x2, colors='g', linewidth=5)
+
+    y3 = [2, 3, 4, 5, 6, 7]
+    x3 = [np.nan, 2, -6, 3, 8, 2]
+    ax3.hlines(y3, 0, x3, colors='r', linewidth=3, linestyle='--')
+
+    y4 = [2, 3, 4, 5, 6, 7]
+    x4 = [np.nan, 2, -6, 3, 8, np.nan]
+    ax4.hlines(y4, 0, x4, colors='k', linewidth=2)
+
+    # tweak the y-axis so we can see the lines better
+    for ax in [ax1, ax2, ax3, ax4]:
+        ax.set_ylim(0, 10)
+
+    # check that the x-lims are all automatically the same
+    assert ax1.get_xlim() == ax2.get_xlim()
+    assert ax1.get_xlim() == ax3.get_xlim()
+    assert ax1.get_xlim() == ax4.get_xlim()
+
+    fig3, ax5 = plt.subplots()
+    y5 = np.ma.masked_equal([2, 4, 6, 8, 10, 12], 8)
+    xmin5 = np.ma.masked_equal([0, 1, -1, 0, 2, 1], 2)
+    xmax5 = np.ma.masked_equal([13, 14, 15, 16, 17, 18], 18)
+    ax5.hlines(y5, xmin5, xmax5, colors='k', linewidth=2)
+    ax5.set_ylim(0, 15)
+
+
 @image_comparison(baseline_images=['step_linestyle', 'step_linestyle'],
                   remove_text=True)
 def test_step_linestyle():
@@ -2834,16 +2986,17 @@ def test_subplot_key_hash():
 
 @image_comparison(baseline_images=['specgram_freqs',
                                    'specgram_freqs_linear'],
-                  remove_text=True, extensions=['png'], tol=0.07)
+                  remove_text=True, extensions=['png'], tol=0.07,
+                  style='default')
 def test_specgram_freqs():
     '''test axes.specgram in default (psd) mode with sinusoidal stimuli'''
-    n = 10000
-    Fs = 100.
+    n = 1000
+    Fs = 10.
 
     fstims1 = [Fs/4, Fs/5, Fs/11]
     fstims2 = [Fs/4.7, Fs/5.6, Fs/11.9]
 
-    NFFT = int(1000 * Fs / min(fstims1 + fstims2))
+    NFFT = int(10 * Fs / min(fstims1 + fstims2))
     noverlap = int(NFFT / 2)
     pad_to = int(2 ** np.ceil(np.log2(NFFT)))
 
@@ -2887,15 +3040,16 @@ def test_specgram_freqs():
 
 @image_comparison(baseline_images=['specgram_noise',
                                    'specgram_noise_linear'],
-                  remove_text=True, extensions=['png'], tol=0.01)
+                  remove_text=True, extensions=['png'], tol=0.01,
+                  style='default')
 def test_specgram_noise():
     '''test axes.specgram in default (psd) mode with noise stimuli'''
     np.random.seed(0)
 
-    n = 10000
-    Fs = 100.
+    n = 1000
+    Fs = 10.
 
-    NFFT = int(1000 * Fs / 11)
+    NFFT = int(10 * Fs / 11)
     noverlap = int(NFFT / 2)
     pad_to = int(2 ** np.ceil(np.log2(NFFT)))
 
@@ -2934,16 +3088,17 @@ def test_specgram_noise():
 
 @image_comparison(baseline_images=['specgram_magnitude_freqs',
                                    'specgram_magnitude_freqs_linear'],
-                  remove_text=True, extensions=['png'], tol=0.07)
+                  remove_text=True, extensions=['png'], tol=0.07,
+                  style='default')
 def test_specgram_magnitude_freqs():
     '''test axes.specgram in magnitude mode with sinusoidal stimuli'''
-    n = 10000
-    Fs = 100.
+    n = 1000
+    Fs = 10.
 
     fstims1 = [Fs/4, Fs/5, Fs/11]
     fstims2 = [Fs/4.7, Fs/5.6, Fs/11.9]
 
-    NFFT = int(1000 * Fs / min(fstims1 + fstims2))
+    NFFT = int(100 * Fs / min(fstims1 + fstims2))
     noverlap = int(NFFT / 2)
     pad_to = int(2 ** np.ceil(np.log2(NFFT)))
 
@@ -2989,15 +3144,16 @@ def test_specgram_magnitude_freqs():
 
 @image_comparison(baseline_images=['specgram_magnitude_noise',
                                    'specgram_magnitude_noise_linear'],
-                  remove_text=True, extensions=['png'])
+                  remove_text=True, extensions=['png'],
+                  style='default')
 def test_specgram_magnitude_noise():
     '''test axes.specgram in magnitude mode with noise stimuli'''
     np.random.seed(0)
 
-    n = 10000
-    Fs = 100.
+    n = 1000
+    Fs = 10.
 
-    NFFT = int(1000 * Fs / 11)
+    NFFT = int(10 * Fs / 11)
     noverlap = int(NFFT / 2)
     pad_to = int(2 ** np.ceil(np.log2(NFFT)))
 
@@ -3035,16 +3191,17 @@ def test_specgram_magnitude_noise():
 
 
 @image_comparison(baseline_images=['specgram_angle_freqs'],
-                  remove_text=True, extensions=['png'], tol=0.007)
+                  remove_text=True, extensions=['png'], tol=0.007,
+                  style='default')
 def test_specgram_angle_freqs():
     '''test axes.specgram in angle mode with sinusoidal stimuli'''
-    n = 10000
-    Fs = 100.
+    n = 1000
+    Fs = 10.
 
     fstims1 = [Fs/4, Fs/5, Fs/11]
     fstims2 = [Fs/4.7, Fs/5.6, Fs/11.9]
 
-    NFFT = int(1000 * Fs / min(fstims1 + fstims2))
+    NFFT = int(10 * Fs / min(fstims1 + fstims2))
     noverlap = int(NFFT / 2)
     pad_to = int(2 ** np.ceil(np.log2(NFFT)))
 
@@ -3064,10 +3221,6 @@ def test_specgram_angle_freqs():
     ax11 = fig1.add_subplot(3, 1, 1)
     ax12 = fig1.add_subplot(3, 1, 2)
     ax13 = fig1.add_subplot(3, 1, 3)
-
-    ax11.hold(True)
-    ax12.hold(True)
-    ax13.hold(True)
 
     spec11 = ax11.specgram(y, NFFT=NFFT, Fs=Fs, noverlap=noverlap,
                            pad_to=pad_to, sides='default', mode='angle')
@@ -3090,15 +3243,16 @@ def test_specgram_angle_freqs():
 
 
 @image_comparison(baseline_images=['specgram_angle_noise'],
-                  remove_text=True, extensions=['png'])
+                  remove_text=True, extensions=['png'],
+                  style='default')
 def test_specgram_noise_angle():
     '''test axes.specgram in angle mode with noise stimuli'''
     np.random.seed(0)
 
-    n = 10000
-    Fs = 100.
+    n = 1000
+    Fs = 10.
 
-    NFFT = int(1000 * Fs / 11)
+    NFFT = int(10 * Fs / 11)
     noverlap = int(NFFT / 2)
     pad_to = int(2 ** np.ceil(np.log2(NFFT)))
 
@@ -3111,10 +3265,6 @@ def test_specgram_noise_angle():
     ax11 = fig1.add_subplot(3, 1, 1)
     ax12 = fig1.add_subplot(3, 1, 2)
     ax13 = fig1.add_subplot(3, 1, 3)
-
-    ax11.hold(True)
-    ax12.hold(True)
-    ax13.hold(True)
 
     spec11 = ax11.specgram(y, NFFT=NFFT, Fs=Fs, noverlap=noverlap,
                            pad_to=pad_to, sides='default', mode='angle')
@@ -3137,16 +3287,17 @@ def test_specgram_noise_angle():
 
 
 @image_comparison(baseline_images=['specgram_phase_freqs'],
-                  remove_text=True, extensions=['png'])
+                  remove_text=True, extensions=['png'],
+                  style='default')
 def test_specgram_freqs_phase():
     '''test axes.specgram in phase mode with sinusoidal stimuli'''
-    n = 10000
-    Fs = 100.
+    n = 1000
+    Fs = 10.
 
     fstims1 = [Fs/4, Fs/5, Fs/11]
     fstims2 = [Fs/4.7, Fs/5.6, Fs/11.9]
 
-    NFFT = int(1000 * Fs / min(fstims1 + fstims2))
+    NFFT = int(10 * Fs / min(fstims1 + fstims2))
     noverlap = int(NFFT / 2)
     pad_to = int(2 ** np.ceil(np.log2(NFFT)))
 
@@ -3166,10 +3317,6 @@ def test_specgram_freqs_phase():
     ax11 = fig1.add_subplot(3, 1, 1)
     ax12 = fig1.add_subplot(3, 1, 2)
     ax13 = fig1.add_subplot(3, 1, 3)
-
-    ax11.hold(True)
-    ax12.hold(True)
-    ax13.hold(True)
 
     spec11 = ax11.specgram(y, NFFT=NFFT, Fs=Fs, noverlap=noverlap,
                            pad_to=pad_to, sides='default', mode='phase')
@@ -3192,15 +3339,16 @@ def test_specgram_freqs_phase():
 
 
 @image_comparison(baseline_images=['specgram_phase_noise'],
-                  remove_text=True, extensions=['png'])
+                  remove_text=True, extensions=['png'],
+                  style='default')
 def test_specgram_noise_phase():
     '''test axes.specgram in phase mode with noise stimuli'''
     np.random.seed(0)
 
-    n = 10000
-    Fs = 100.
+    n = 1000
+    Fs = 10.
 
-    NFFT = int(1000 * Fs / 11)
+    NFFT = int(10 * Fs / 11)
     noverlap = int(NFFT / 2)
     pad_to = int(2 ** np.ceil(np.log2(NFFT)))
 
@@ -3213,10 +3361,6 @@ def test_specgram_noise_phase():
     ax11 = fig1.add_subplot(3, 1, 1)
     ax12 = fig1.add_subplot(3, 1, 2)
     ax13 = fig1.add_subplot(3, 1, 3)
-
-    ax11.hold(True)
-    ax12.hold(True)
-    ax13.hold(True)
 
     spec11 = ax11.specgram(y, NFFT=NFFT, Fs=Fs, noverlap=noverlap,
                            pad_to=pad_to, sides='default',
@@ -4403,7 +4547,17 @@ def test_adjust_numtick_aspect():
 @image_comparison(baseline_images=["auto_numticks"], style='default',
                   extensions=['png'])
 def test_auto_numticks():
+    # Make tiny, empty subplots, verify that there are only 3 ticks.
     fig, axes = plt.subplots(4, 4)
+
+
+@image_comparison(baseline_images=["auto_numticks_log"], style='default',
+                  extensions=['png'])
+def test_auto_numticks_log():
+    # Verify that there are not too many ticks with a large log range.
+    fig, ax = plt.subplots()
+    matplotlib.rcParams['axes.autolimit_mode'] = 'round_numbers'
+    ax.loglog([1e-20, 1e5], [1e-16, 10])
 
 
 @cleanup
@@ -4586,6 +4740,49 @@ def test_bar_color_cycle():
         brs = ax.bar(range(3), range(3))
         for br in brs:
             assert ccov(ln.get_color()) == ccov(br.get_facecolor())
+
+
+@cleanup(style='default')
+def test_fillbetween_cycle():
+    fig, ax = plt.subplots()
+
+    for j in range(3):
+        cc = ax.fill_between(range(3), range(3))
+        target = mcolors.to_rgba('C{}'.format(j))
+        assert tuple(cc.get_facecolors().squeeze()) == tuple(target)
+
+    for j in range(3, 6):
+        cc = ax.fill_betweenx(range(3), range(3))
+        target = mcolors.to_rgba('C{}'.format(j))
+        assert tuple(cc.get_facecolors().squeeze()) == tuple(target)
+
+    target = mcolors.to_rgba('k')
+
+    for al in ['facecolor', 'facecolors', 'color']:
+        cc = ax.fill_between(range(3), range(3), **{al: 'k'})
+        assert tuple(cc.get_facecolors().squeeze()) == tuple(target)
+
+    edge_target = mcolors.to_rgba('k')
+    for j, el in enumerate(['edgecolor', 'edgecolors'], start=6):
+        cc = ax.fill_between(range(3), range(3), **{el: 'k'})
+        face_target = mcolors.to_rgba('C{}'.format(j))
+        assert tuple(cc.get_facecolors().squeeze()) == tuple(face_target)
+        assert tuple(cc.get_edgecolors().squeeze()) == tuple(edge_target)
+
+
+@cleanup
+def test_log_margins():
+    plt.rcParams['axes.autolimit_mode'] = 'data'
+    fig, ax = plt.subplots()
+    margin = 0.05
+    ax.set_xmargin(margin)
+    ax.semilogx([10, 100], [10, 100])
+    xlim0, xlim1 = ax.get_xlim()
+    transform = ax.xaxis.get_transform()
+    xlim0t, xlim1t = transform.transform([xlim0, xlim1])
+    x0t, x1t = transform.transform([10, 100])
+    delta = (x1t - x0t) * margin
+    assert_allclose([xlim0t + delta, xlim1t - delta], [x0t, x1t])
 
 
 if __name__ == '__main__':

@@ -36,7 +36,7 @@ except ImportError:
 import contextlib
 import tempfile
 import warnings
-from matplotlib.cbook import iterable, is_string_like
+from matplotlib.cbook import iterable, is_string_like, deprecated
 from matplotlib.compat import subprocess
 from matplotlib import verbose
 from matplotlib import rcParams, rcParamsDefault, rc_context
@@ -60,10 +60,22 @@ else:
 # how-to-encode-series-of-images-into-h264-using-x264-api-c-c )
 
 
+def adjusted_figsize(w, h, dpi, n):
+    wnew = int(w * dpi / n) * n / dpi
+    hnew = int(h * dpi / n) * n / dpi
+    return wnew, hnew
+
+
 # A registry for available MovieWriter classes
 class MovieWriterRegistry(object):
     def __init__(self):
         self.avail = dict()
+        self._registered = dict()
+        self._dirty = False
+
+    def set_dirty(self):
+        """Sets a flag to re-setup the writers"""
+        self._dirty = True
 
     # Returns a decorator that can be used on classes to register them under
     # a name. As in:
@@ -72,19 +84,36 @@ class MovieWriterRegistry(object):
     #    pass
     def register(self, name):
         def wrapper(writerClass):
+            self._registered[name] = writerClass
             if writerClass.isAvailable():
                 self.avail[name] = writerClass
             return writerClass
         return wrapper
 
+    def ensure_not_dirty(self):
+        """If dirty, reasks the writers if they are available"""
+        if self._dirty:
+            self.reset_available_writers()
+
+    def reset_available_writers(self):
+        """Reset the available state of all registered writers"""
+        self.avail = {}
+        for name, writerClass in self._registered.items():
+            if writerClass.isAvailable():
+                self.avail[name] = writerClass
+        self._dirty = False
+
     def list(self):
         ''' Get a list of available MovieWriters.'''
+        self.ensure_not_dirty()
         return list(self.avail.keys())
 
     def is_available(self, name):
+        self.ensure_not_dirty()
         return name in self.avail
 
     def __getitem__(self, name):
+        self.ensure_not_dirty()
         if not self.avail:
             raise RuntimeError("No MovieWriters available!")
         return self.avail[name]
@@ -110,10 +139,6 @@ class MovieWriter(object):
     frame_format: string
         The format used in writing frame data, defaults to 'rgba'
     '''
-
-    # Specifies whether the size of all frames need to be identical
-    # i.e. whether we can use savefig.bbox = 'tight'
-    frame_size_can_vary = False
 
     def __init__(self, fps=5, codec=None, bitrate=None, extra_args=None,
                  metadata=None):
@@ -166,10 +191,22 @@ class MovieWriter(object):
     @property
     def frame_size(self):
         'A tuple (width,height) in pixels of a movie frame.'
-        width_inches, height_inches = self.fig.get_size_inches()
-        return width_inches * self.dpi, height_inches * self.dpi
+        w, h = self.fig.get_size_inches()
+        return int(w * self.dpi), int(h * self.dpi)
 
-    def setup(self, fig, outfile, dpi, *args):
+    def _adjust_frame_size(self):
+        if self.codec == 'h264':
+            wo, ho = self.fig.get_size_inches()
+            w, h = adjusted_figsize(wo, ho, self.dpi, 2)
+            if not (wo, ho) == (w, h):
+                self.fig.set_size_inches(w, h, forward=True)
+                verbose.report('figure size (inches) has been adjusted '
+                               'from %s x %s to %s x %s' % (wo, ho, w, h),
+                               level='helpful')
+        verbose.report('frame size in pixels is %s x %s' % self.frame_size,
+                       level='debug')
+
+    def setup(self, fig, outfile, dpi):
         '''
         Perform setup for writing the movie file.
 
@@ -184,20 +221,21 @@ class MovieWriter(object):
         self.outfile = outfile
         self.fig = fig
         self.dpi = dpi
+        self._adjust_frame_size()
 
         # Run here so that grab_frame() can write the data to a pipe. This
         # eliminates the need for temp files.
         self._run()
 
     @contextlib.contextmanager
-    def saving(self, *args):
+    def saving(self, *args, **kw):
         '''
         Context manager to facilitate writing the movie file.
 
-        ``*args`` are any parameters that should be passed to `setup`.
+        ``*args, **kw`` are any parameters that should be passed to `setup`.
         '''
         # This particular sequence is what contextlib.contextmanager wants
-        self.setup(*args)
+        self.setup(*args, **kw)
         yield
         self.finish()
 
@@ -275,10 +313,11 @@ class MovieWriter(object):
         Check to see if a MovieWriter subclass is actually available by
         running the commandline tool.
         '''
-        if not cls.bin_path():
+        bin_path = cls.bin_path()
+        if not bin_path:
             return False
         try:
-            p = subprocess.Popen(cls.bin_path(),
+            p = subprocess.Popen(bin_path,
                              shell=False,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,
@@ -291,10 +330,6 @@ class MovieWriter(object):
 
 class FileMovieWriter(MovieWriter):
     '`MovieWriter` subclass that handles writing to a file.'
-
-    # In general, if frames are writen to files on disk, it's not important
-    # that they all be identically sized
-    frame_size_can_vary = True
 
     def __init__(self, *args, **kwargs):
         MovieWriter.__init__(self, *args, **kwargs)
@@ -321,6 +356,8 @@ class FileMovieWriter(MovieWriter):
         self.fig = fig
         self.outfile = outfile
         self.dpi = dpi
+        self._adjust_frame_size()
+
         self.clear_temp = clear_temp
         self.temp_prefix = frame_prefix
         self._frame_counter = 0  # used for generating sequential file names
@@ -376,10 +413,9 @@ class FileMovieWriter(MovieWriter):
         try:
             # Tell the figure to save its data to the sink, using the
             # frame format and dpi.
-            myframesink = self._frame_sink()
-            self.fig.savefig(myframesink, format=self.frame_format,
-                             dpi=self.dpi, **savefig_kwargs)
-            myframesink.close()
+            with self._frame_sink() as myframesink:
+                self.fig.savefig(myframesink, format=self.frame_format,
+                                 dpi=self.dpi, **savefig_kwargs)
 
         except RuntimeError:
             out, err = self._proc.communicate()
@@ -397,9 +433,19 @@ class FileMovieWriter(MovieWriter):
         # Check error code for creating file here, since we just run
         # the process here, rather than having an open pipe.
         if self._proc.returncode:
-            raise RuntimeError('Error creating movie, return code: '
-                               + str(self._proc.returncode)
-                               + ' Try running with --verbose-debug')
+            try:
+                stdout = [s.decode() for s in self._proc._stdout_buff]
+                stderr = [s.decode() for s in self._proc._stderr_buff]
+                verbose.report("MovieWriter.finish: stdout: %s" % stdout,
+                               level='helpful')
+                verbose.report("MovieWriter.finish: stderr: %s" % stderr,
+                               level='helpful')
+            except Exception as e:
+                pass
+            msg = ('Error creating movie, return code: ' +
+                   str(self._proc.returncode) +
+                   ' Try setting mpl.verbose.set_level("helpful")')
+            raise RuntimeError(msg)
 
     def cleanup(self):
         MovieWriter.cleanup(self)
@@ -466,9 +512,9 @@ class FFMpegFileWriter(FileMovieWriter, FFMpegBase):
     def _args(self):
         # Returns the command line parameters for subprocess to use
         # ffmpeg to create a movie using a collection of temp images
-        return [self.bin_path(), '-i', self._base_temp_name(),
-                '-vframes', str(self._frame_counter),
-                '-r', str(self.fps)] + self.output_args
+        return [self.bin_path(), '-r', str(self.fps),
+                '-i', self._base_temp_name(),
+                '-vframes', str(self._frame_counter)] + self.output_args
 
 
 # Base class of avconv information.  AVConv has identical arguments to
@@ -525,9 +571,20 @@ class MencoderBase(object):
         return args
 
 
-# Combine Mencoder options with pipe-based writing
+# The message must be a single line; internal newlines cause sphinx failure.
+mencoder_dep = ("Support for mencoder is only partially functional, "
+                "and will be removed entirely in 2.2. "
+                "Please use ffmpeg instead.")
+
+
 @writers.register('mencoder')
 class MencoderWriter(MovieWriter, MencoderBase):
+
+    @deprecated('2.0', message=mencoder_dep)
+    def __init__(self, *args, **kwargs):
+        with rc_context(rc={'animation.codec': 'mpeg4'}):
+            super(MencoderWriter, self).__init__(*args, **kwargs)
+
     def _args(self):
         # Returns the command line parameters for subprocess to use
         # mencoder to create a movie
@@ -541,6 +598,11 @@ class MencoderWriter(MovieWriter, MencoderBase):
 @writers.register('mencoder_file')
 class MencoderFileWriter(FileMovieWriter, MencoderBase):
     supported_formats = ['png', 'jpeg', 'tga', 'sgi']
+
+    @deprecated('2.0', message=mencoder_dep)
+    def __init__(self, *args, **kwargs):
+        with rc_context(rc={'animation.codec': 'mpeg4'}):
+            super(MencoderFileWriter, self).__init__(*args, **kwargs)
 
     def _args(self):
         # Returns the command line parameters for subprocess to use
@@ -583,12 +645,28 @@ class ImageMagickBase(object):
                 binpath = ''
         rcParams[cls.exec_key] = rcParamsDefault[cls.exec_key] = binpath
 
+    @classmethod
+    def isAvailable(cls):
+        '''
+        Check to see if a ImageMagickWriter is actually available
+
+        Done by first checking the windows registry (if applicable) and then
+        running the commandline tool.
+        '''
+        bin_path = cls.bin_path()
+        if bin_path == "convert":
+            cls._init_from_registry()
+        return super(ImageMagickBase, cls).isAvailable()
 
 ImageMagickBase._init_from_registry()
 
 
+# Note: the base classes need to be in that order to get
+# isAvailable() from ImageMagickBase called and not the
+# one from MovieWriter. The latter is then called by the
+# former.
 @writers.register('imagemagick')
-class ImageMagickWriter(MovieWriter, ImageMagickBase):
+class ImageMagickWriter(ImageMagickBase, MovieWriter):
     def _args(self):
         return ([self.bin_path(),
                  '-size', '%ix%i' % self.frame_size, '-depth', '8',
@@ -597,8 +675,12 @@ class ImageMagickWriter(MovieWriter, ImageMagickBase):
                 + self.output_args)
 
 
+# Note: the base classes need to be in that order to get
+# isAvailable() from ImageMagickBase called and not the
+# one from MovieWriter. The latter is then called by the
+# former.
 @writers.register('imagemagick_file')
-class ImageMagickFileWriter(FileMovieWriter, ImageMagickBase):
+class ImageMagickFileWriter(ImageMagickBase, FileMovieWriter):
     supported_formats = ['png', 'jpeg', 'ppm', 'tiff', 'sgi', 'bmp',
                          'pbm', 'raw', 'rgba']
 
@@ -733,7 +815,7 @@ class Animation(object):
         elif (not is_string_like(writer) and
                 any(arg is not None
                     for arg in (fps, codec, bitrate, extra_args, metadata))):
-            raise RuntimeError('Passing in values for arguments for arguments '
+            raise RuntimeError('Passing in values for arguments '
                                'fps, codec, bitrate, extra_args, or metadata '
                                'is not supported when writer is an existing '
                                'MovieWriter instance. These should instead be '
@@ -789,26 +871,16 @@ class Animation(object):
                                                         metadata=metadata)
                 except IndexError:
                     raise ValueError("Cannot save animation: no writers are "
-                                     "available. Please install mencoder or "
+                                     "available. Please install "
                                      "ffmpeg to save animations.")
 
         verbose.report('Animation.save using %s' % type(writer),
                        level='helpful')
 
-        # FIXME: Using 'bbox_inches' doesn't currently work with
-        # writers that pipe the data to the command because this
-        # requires a fixed frame size (see Ryan May's reply in this
-        # thread: [1]). Thus we drop the 'bbox_inches' argument if it
-        # exists in savefig_kwargs.
-        #
-        # [1] (http://matplotlib.1069221.n5.nabble.com/
-        # Animation-class-let-save-accept-kwargs-which-
-        # are-passed-on-to-savefig-td39627.html)
-        #
-        if 'bbox_inches' in savefig_kwargs and not writer.frame_size_can_vary:
+        if 'bbox_inches' in savefig_kwargs:
             warnings.warn("Warning: discarding the 'bbox_inches' argument in "
-                          "'savefig_kwargs' as it not supported by "
-                          "{0}).".format(writer.__class__.__name__))
+                          "'savefig_kwargs' as it may cause frame size "
+                          "to vary, which is inappropriate for animation.")
             savefig_kwargs.pop('bbox_inches')
 
         # Create a new sequence of frames for saved data. This is different
@@ -818,12 +890,10 @@ class Animation(object):
         # since GUI widgets are gone. Either need to remove extra code to
         # allow for this non-existent use case or find a way to make it work.
         with rc_context():
-            # See above about bbox_inches savefig kwarg
-            if (not writer.frame_size_can_vary and
-                    rcParams['savefig.bbox'] == 'tight'):
-                verbose.report("Disabling savefig.bbox = 'tight', as it is "
-                               "not supported by "
-                               "{0}.".format(writer.__class__.__name__),
+            if (rcParams['savefig.bbox'] == 'tight'):
+                verbose.report("Disabling savefig.bbox = 'tight', as it "
+                               "may cause frame size to vary, which "
+                               "is inappropriate for animation.",
                                level='helpful')
                 rcParams['savefig.bbox'] = None
             with writer.saving(self._fig, filename, dpi):
