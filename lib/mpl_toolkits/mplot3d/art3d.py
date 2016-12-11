@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # art3d.py, original mplot3d version by John Porter
 # Parts rewritten by Reinier Heeres <reinier@heeres.eu>
 # Minor additions by Ben Axelrod <baxelrod@coroware.com>
@@ -622,7 +621,8 @@ class Poly3DCollection(PolyCollection):
         if len(cedge) != len(xyzlist):
             if len(cedge) == 0:
                 cedge = cface
-            cedge = cedge.repeat(len(xyzlist), axis=0)
+            else:
+                cedge = cedge.repeat(len(xyzlist), axis=0)
 
         # if required sort by depth (furthest drawn first)
         if self._zsort:

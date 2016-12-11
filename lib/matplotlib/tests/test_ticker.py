@@ -1,7 +1,6 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
 import nose.tools
 from nose.tools import assert_equal, assert_raises
 from numpy.testing import assert_almost_equal
@@ -94,11 +93,11 @@ def test_LogLocator_set_params():
     Should not exception.
     """
     loc = mticker.LogLocator()
-    loc.set_params(numticks=8, numdecs=8, subs=[2.0], base=8)
-    nose.tools.assert_equal(loc.numticks, 8)
+    loc.set_params(numticks=7, numdecs=8, subs=[2.0], base=4)
+    nose.tools.assert_equal(loc.numticks, 7)
     nose.tools.assert_equal(loc.numdecs, 8)
-    nose.tools.assert_equal(loc.base, 8)
-    nose.tools.assert_equal(loc.subs, [2.0])
+    nose.tools.assert_equal(loc._base, 4)
+    nose.tools.assert_equal(list(loc._subs), [2.0])
 
 
 def test_NullLocator_set_params():
@@ -163,20 +162,24 @@ def test_SymmetricalLogLocator_set_params():
     See if change was successful.
     Should not exception.
     """
-    # since we only test for the params change. I will pass empty transform
-    sym = mticker.SymmetricalLogLocator(None)
+    sym = mticker.SymmetricalLogLocator(base=10, linthresh=1)
     sym.set_params(subs=[2.0], numticks=8)
     nose.tools.assert_equal(sym._subs, [2.0])
     nose.tools.assert_equal(sym.numticks, 8)
 
 
-@cleanup
+@cleanup(style='classic')
 def test_ScalarFormatter_offset_value():
     fig, ax = plt.subplots()
     formatter = ax.get_xaxis().get_major_formatter()
 
     def check_offset_for(left, right, offset):
-        ax.set_xlim(left, right)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.filterwarnings('always', 'Attempting to set identical',
+                                    UserWarning)
+            ax.set_xlim(left, right)
+        assert_equal(len(w), 1 if left == right else 0)
+
         # Update ticks.
         next(ax.get_xaxis().iter_ticks())
         assert_equal(formatter.offset, offset)
@@ -236,7 +239,7 @@ def test_LogFormatter_sublabel():
     ax.xaxis.set_major_locator(mticker.LogLocator(base=10, subs=[]))
     ax.xaxis.set_minor_locator(mticker.LogLocator(base=10,
                                                   subs=np.arange(2, 10)))
-    ax.xaxis.set_major_formatter(mticker.LogFormatter())
+    ax.xaxis.set_major_formatter(mticker.LogFormatter(labelOnlyBase=True))
     ax.xaxis.set_minor_formatter(mticker.LogFormatter(labelOnlyBase=False))
     # axis range above 3 decades, only bases are labeled
     ax.set_xlim(1, 1e4)
@@ -246,17 +249,24 @@ def test_LogFormatter_sublabel():
     assert np.all(show_major_labels)
     _sub_labels(ax.xaxis, subs=[])
 
-    # axis range at 2 to 3 decades, label sub 3
+    # For the next two, if the numdec threshold in LogFormatter.set_locs
+    # were 3, then the label sub would be 3 for 2-3 decades and (2,5)
+    # for 1-2 decades.  With a threshold of 1, subs are not labeled.
+    # axis range at 2 to 3 decades
     ax.set_xlim(1, 800)
-    _sub_labels(ax.xaxis, subs=[3])
+    _sub_labels(ax.xaxis, subs=[])
 
-    # axis range at 1 to 2 decades, label subs 2 and 5
+    # axis range at 1 to 2 decades
     ax.set_xlim(1, 80)
-    _sub_labels(ax.xaxis, subs=[2, 5])
+    _sub_labels(ax.xaxis, subs=[])
 
-    # axis range at 0 to 1 decades, label subs 2, 3, 6
+    # axis range at 0.4 to 1 decades, label subs 2, 3, 4, 6
     ax.set_xlim(1, 8)
-    _sub_labels(ax.xaxis, subs=[2, 3, 6])
+    _sub_labels(ax.xaxis, subs=[2, 3, 4, 6])
+
+    # axis range at 0 to 0.4 decades, label all
+    ax.set_xlim(0.5, 0.9)
+    _sub_labels(ax.xaxis, subs=np.arange(2, 10, dtype=int))
 
 
 def _logfe_helper(formatter, base, locs, i, expected_result):
@@ -307,6 +317,7 @@ def test_LogFormatterExponent():
 def test_LogFormatterSciNotation():
     test_cases = {
         10: (
+             (-1, '${-10^{0}}$'),
              (1e-05, '${10^{-5}}$'),
              (1, '${10^{0}}$'),
              (100000, '${10^{5}}$'),

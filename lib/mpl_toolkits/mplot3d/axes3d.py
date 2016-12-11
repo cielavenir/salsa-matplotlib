@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # axes3d.py, original mplot3d version by John Porter
 # Created: 23 Sep 2005
 # Parts fixed by Reinier Heeres <reinier@heeres.eu>
@@ -800,10 +799,6 @@ class Axes3D(Axes):
     @docstring.dedent_interpd
     def set_zscale(self, value, **kwargs) :
         """
-        call signature::
-
-          set_zscale(value)
-
         Set the scaling of the z-axis: %(scale)s
 
         ACCEPTS: [%(scale)s]

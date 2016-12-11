@@ -19,7 +19,7 @@ consider: the location being annotated represented by the argument
 ``xy`` and the location of the text ``xytext``.  Both of these
 arguments are ``(x,y)`` tuples.
 
-.. plot:: pyplots/annotation_basic.py
+.. plot:: mpl_examples/pyplots/annotation_basic.py
    :include-source:
 
 
@@ -51,9 +51,7 @@ coordinates, one could do::
                 )
 
 For physical coordinate systems (points or pixels) the origin is the
-(bottom, left) of the figure or axes.  If the value is negative,
-however, the origin is from the (right, top) of the figure or axes,
-analogous to negative indexing of sequences.
+bottom-left of the figure or axes.
 
 Optionally, you can enable drawing of an arrow from the text to the annotated
 point by giving a dictionary of arrow properties in the optional keyword
@@ -82,7 +80,7 @@ keyword args like ``horizontalalignment``, ``verticalalignment`` and
 ``fontsize`` are passed from `~matplotlib.Axes.annotate` to the
 ``Text`` instance.
 
-.. plot:: pyplots/annotation_polar.py
+.. plot:: mpl_examples/pyplots/annotation_polar.py
    :include-source:
 
 For more on all the wild and wonderful things you can do with

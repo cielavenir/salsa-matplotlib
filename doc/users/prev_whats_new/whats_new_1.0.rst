@@ -69,7 +69,7 @@ figures since the last call.  Eric has done a lot of testing on the
 user interface toolkits and versions and platforms he has access to,
 but it is not possible to test them all, so please report problems to
 the `mailing list
-<http://mail.python.org/mailman/listinfo/matplotlib users>`__
+<https://mail.python.org/mailman/listinfo/matplotlib-users>`__
 and `bug tracker
 <http://github.com/matplotlib/matplotlib/issues>`__.
 
@@ -82,7 +82,7 @@ supporting mixing of 2D and 3D graphs in the same figure, and/or
 multiple 3D graphs in a single figure, using the "projection" keyword
 argument to add_axes or add_subplot.  Thanks Ben Root.
 
-.. plot:: pyplots/whats_new_1_subplot3d.py
+.. plot:: mpl_examples/pyplots/whats_new_1_subplot3d.py
 
 tick_params
 ------------

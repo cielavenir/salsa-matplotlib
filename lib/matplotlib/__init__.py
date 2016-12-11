@@ -135,7 +135,7 @@ from ._version import get_versions
 __version__ = str(get_versions()['version'])
 del get_versions
 
-__version__numpy__ = str('1.6')  # minimum required numpy version
+__version__numpy__ = str('1.7.1')  # minimum required numpy version
 
 __bibtex__ = """@Article{Hunter:2007,
   Author    = {Hunter, J. D.},
@@ -870,8 +870,13 @@ _deprecated_ignore_map = {
     }
 
 _obsolete_set = set(['tk.pythoninspect', 'legend.isaxes'])
+
+# The following may use a value of None to suppress the warning.
+_deprecated_set = set(['axes.hold'])  # do NOT include in _all_deprecated
+
 _all_deprecated = set(chain(_deprecated_ignore_map,
-                            _deprecated_map, _obsolete_set))
+                            _deprecated_map,
+                            _obsolete_set))
 
 
 class RcParams(dict):
@@ -887,6 +892,8 @@ class RcParams(dict):
                     six.iteritems(defaultParams)
                     if key not in _all_deprecated)
     msg_depr = "%s is deprecated and replaced with %s; please use the latter."
+    msg_depr_set = ("%s is deprecated. Please remove it from your "
+                    "matplotlibrc and/or style files.")
     msg_depr_ignore = "%s is deprecated and ignored. Use %s"
     msg_obsolete = ("%s is obsolete. Please remove it from your matplotlibrc "
                     "and/or style files.")
@@ -903,6 +910,8 @@ class RcParams(dict):
                 warnings.warn(self.msg_depr % (key, alt_key))
                 key = alt_key
                 val = alt_val(val)
+            elif key in _deprecated_set and val is not None:
+                warnings.warn(self.msg_depr_set % key)
             elif key in _deprecated_ignore_map:
                 alt = _deprecated_ignore_map[key]
                 warnings.warn(self.msg_depr_ignore % (key, alt))
@@ -1528,7 +1537,14 @@ default_test_modules = [
     ]
 
 
-def verify_test_dependencies():
+def _init_tests():
+    try:
+        import faulthandler
+    except ImportError:
+        pass
+    else:
+        faulthandler.enable()
+
     if not os.path.isdir(os.path.join(os.path.dirname(__file__), 'tests')):
         raise ImportError("matplotlib test data is not installed")
 
@@ -1563,37 +1579,36 @@ def verify_test_dependencies():
         raise
 
 
+def _get_extra_test_plugins():
+    from .testing.noseclasses import KnownFailure
+    from nose.plugins import attrib
+
+    return [KnownFailure, attrib.Plugin]
+
+
 def test(verbosity=1):
     """run the matplotlib test suite"""
-    verify_test_dependencies()
-    try:
-        import faulthandler
-    except ImportError:
-        pass
-    else:
-        faulthandler.enable()
+    _init_tests()
 
     old_backend = rcParams['backend']
     try:
         use('agg')
         import nose
         import nose.plugins.builtin
-        from .testing.noseclasses import KnownFailure
         from nose.plugins.manager import PluginManager
         from nose.plugins import multiprocess
 
         # store the old values before overriding
-        plugins = []
-        plugins.append(KnownFailure())
+        plugins = _get_extra_test_plugins()
         plugins.extend([plugin() for plugin in nose.plugins.builtin.plugins])
 
-        manager = PluginManager(plugins=plugins)
+        manager = PluginManager(plugins=[x() for x in plugins])
         config = nose.config.Config(verbosity=verbosity, plugins=manager)
 
         # Nose doesn't automatically instantiate all of the plugins in the
         # child processes, so we have to provide the multiprocess plugin with
         # a list.
-        multiprocess._instantiate_plugins = [KnownFailure]
+        multiprocess._instantiate_plugins = plugins
 
         success = nose.run(
             defaultTest=default_test_modules,
@@ -1622,14 +1637,12 @@ def _replacer(data, key):
 
 _DATA_DOC_APPENDIX = """
 
-Notes
------
+.. note::
+    In addition to the above described arguments, this function can take a
+    **data** keyword argument. If such a **data** argument is given, the
+    following arguments are replaced by **data[<arg>]**:
 
-In addition to the above described arguments, this function can take a
-**data** keyword argument. If such a **data** argument is given, the
-following arguments are replaced by **data[<arg>]**:
-
-{replaced}
+    {replaced}
 """
 
 

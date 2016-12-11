@@ -193,14 +193,16 @@ class Patch(artist.Artist):
         Updates this :class:`Patch` from the properties of *other*.
         """
         artist.Artist.update_from(self, other)
-        self.set_edgecolor(other.get_edgecolor())
-        self.set_facecolor(other.get_facecolor())
-        self.set_fill(other.get_fill())
-        self.set_hatch(other.get_hatch())
-        self.set_linewidth(other.get_linewidth())
-        self.set_linestyle(other.get_linestyle())
+        # For some properties we don't need or don't want to go through the
+        # getters/setters, so we just copy them directly.
+        self._edgecolor = other._edgecolor
+        self._facecolor = other._facecolor
+        self._fill = other._fill
+        self._hatch = other._hatch
+        self._linewidth = other._linewidth
+        # Use setters, getters where we need the extra work they do.
+        self.set_linestyle(other._linestyle)  # also sets dash properties
         self.set_transform(other.get_data_transform())
-        self.set_alpha(other.get_alpha())
 
     def get_extents(self):
         """
@@ -354,7 +356,7 @@ class Patch(artist.Artist):
             except TypeError:
                 raise TypeError('alpha must be a float or None')
         artist.Artist.set_alpha(self, alpha)
-        self._set_facecolor(self._facecolor)
+        self._set_facecolor(self._original_facecolor)
         self._set_edgecolor(self._original_edgecolor)
         # stale is already True
 
@@ -372,9 +374,8 @@ class Patch(artist.Artist):
         self._linewidth = float(w)
         # scale the dash pattern by the linewidth
         offset, ls = self._us_dashes
-        self._dashes = mlines._scale_dashes(offset,
-                                            ls,
-                                            self._linewidth)[1]
+        self._dashoffset, self._dashes = mlines._scale_dashes(
+            offset, ls, self._linewidth)
         self.stale = True
 
     def set_lw(self, lw):
@@ -417,9 +418,8 @@ class Patch(artist.Artist):
         # get the unscalled dash pattern
         offset, ls = self._us_dashes = mlines._get_dash_pattern(ls)
         # scale the dash pattern by the linewidth
-        self._dashes = mlines._scale_dashes(offset,
-                                            ls,
-                                            self._linewidth)[1]
+        self._dashoffset, self._dashes = mlines._scale_dashes(
+            offset, ls, self._linewidth)
         self.stale = True
 
     def set_ls(self, ls):
@@ -1197,7 +1197,7 @@ class FancyArrow(Polygon):
 
         """
         if head_width is None:
-            head_width = 20 * width
+            head_width = 3 * width
         if head_length is None:
             head_length = 1.5 * head_width
 
@@ -1236,7 +1236,7 @@ class FancyArrow(Polygon):
                     # The half-arrows contain the midpoint of the stem,
                     # which we can omit from the full arrow. Including it
                     # twice caused a problem with xpdf.
-                    coords = np.concatenate([left_half_arrow[:-1],
+                    coords = np.concatenate([left_half_arrow[:-2],
                                              right_half_arrow[-2::-1]])
                 else:
                     raise ValueError("Got unknown shape: %s" % shape)
@@ -4271,7 +4271,7 @@ class FancyArrowPatch(Patch):
         if self._edgecolor[3] == 0:
             lw = 0
         gc.set_linewidth(lw)
-        gc.set_linestyle(self._linestyle)
+        gc.set_dashes(self._dashoffset, self._dashes)
 
         gc.set_antialiased(self._antialiased)
         self._set_gc_clip(gc)

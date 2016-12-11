@@ -234,7 +234,6 @@ class _ImageBase(martist.Artist, cm.ScalarMappable):
         self.set_filterrad(filterrad)
         self.set_interpolation(interpolation)
         self.set_resample(resample)
-        self.set_margins(False)
         self.axes = ax
 
         self._imcache = None
@@ -341,10 +340,9 @@ class _ImageBase(martist.Artist, cm.ScalarMappable):
         # means scaling the transform just slightly to account for the
         # extra subpixel.
         if (t.is_affine and round_to_pixel_border and
-            (out_width_base % 1.0 != 0.0 or
-             out_height_base % 1.0 != 0.0)):
-            out_width = int(ceil(out_width_base) + 1)
-            out_height = int(ceil(out_height_base) + 1)
+                (out_width_base % 1.0 != 0.0 or out_height_base % 1.0 != 0.0)):
+            out_width = int(ceil(out_width_base))
+            out_height = int(ceil(out_height_base))
             extra_width = (out_width - out_width_base) / out_width_base
             extra_height = (out_height - out_height_base) / out_height_base
             t += Affine2D().scale(
@@ -524,7 +522,7 @@ class _ImageBase(martist.Artist, cm.ScalarMappable):
 
     def write_png(self, fname):
         """Write the image to png file with fname"""
-        im = self.to_rgba(self._A, bytes=True, norm=False)
+        im = self.to_rgba(self._A, bytes=True, norm=True)
         _png.write_png(im, fname)
 
     def set_data(self, A):
@@ -742,6 +740,8 @@ class AxesImage(_ImageBase):
         xmin, xmax, ymin, ymax = extent
         corners = (xmin, ymin), (xmax, ymax)
         self.axes.update_datalim(corners)
+        self.sticky_edges.x[:] = [xmin, xmax]
+        self.sticky_edges.y[:] = [ymin, ymax]
         if self.axes._autoscaleXon:
             self.axes.set_xlim((xmin, xmax), auto=None)
         if self.axes._autoscaleYon:

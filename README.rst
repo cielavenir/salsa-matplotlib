@@ -13,7 +13,7 @@ application servers, and various graphical user interface toolkits.
 Installation
 =============
 
-For installation instructions and requirements, see the INSTALL file.
+For installation instructions and requirements, see the INSTALL file or the `install <http://matplotlib.org/users/installing.html>`_ documentation. If you think you may want to contribute to matplotlib, check out the `guide to working with the source code <http://matplotlib.org/devel/gitwash/index.html>`_.
 
 Testing
 =======
@@ -36,8 +36,24 @@ Contact
 =======
 matplotlib's communication channels include active mailing lists:
 
-* Matplotlib-announce (https://mail.python.org/mailman/listinfo/matplotlib-announce),
-* Matplotlib-devel (https://mail.python.org/mailman/listinfo/matplotlib-devel),
-* Matplotlib-users (https://mail.python.org/mailman/listinfo/matplotlib-users).
+* `Users <https://mail.python.org/mailman/listinfo/matplotlib-users>`_ mailing list: matplotlib-users@python.org
+* `Announcement  <https://mail.python.org/mailman/listinfo/matplotlib-announce>`_ mailing list: matplotlib-announce@python.org
+* `Development <https://mail.python.org/mailman/listinfo/matplotlib-devel>`_ mailing list: matplotlib-devel@python.org
 
-The latter is probably a good starting point for general questions and discussions.
+
+The first is a good starting point for general questions and discussions.
+
+
+.. image:: https://badges.gitter.im/Join%20Chat.svg
+   :alt: Join the chat at https://gitter.im/matplotlib/matplotlib
+   :target: https://gitter.im/matplotlib/matplotlib?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+
+Contribute
+==========
+You've discovered a bug or something else you want to change - excellent!
+
+You've worked out a way to fix it – even better!
+
+You want to tell us about it – best of all!
+
+Start at the `contributing guide <http://matplotlib.org/devdocs/devel/contributing.html>`_!

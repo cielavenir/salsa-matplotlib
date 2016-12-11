@@ -145,6 +145,14 @@ def validate_bool_maybe_none(b):
         raise ValueError('Could not convert "%s" to boolean' % b)
 
 
+def deprecate_axes_hold(value):
+    if value is None:
+        return None  # converted to True where accessed in figure.py,
+                     # axes/_base.py
+    warnings.warn("axes.hold is deprecated, will be removed in 3.0")
+    return validate_bool(value)
+
+
 def validate_float(s):
     """convert s to float or raise"""
     try:
@@ -682,7 +690,7 @@ def validate_hatch(s):
         raise ValueError("Unknown hatch symbol(s): %s" % list(unknown))
     return s
 validate_hatchlist = _listify_validator(validate_hatch)
-
+validate_dashlist = _listify_validator(validate_nseq_float())
 
 _prop_validators = {
         'color': _listify_validator(validate_color_for_prop_cycle,
@@ -701,6 +709,7 @@ _prop_validators = {
         'alpha': validate_floatlist,
         'marker': validate_stringlist,
         'hatch': validate_hatchlist,
+        'dashes': validate_dashlist,
     }
 _prop_aliases = {
         'c': 'color',
@@ -865,6 +874,21 @@ def validate_hist_bins(s):
     raise ValueError("'hist.bins' must be 'auto', an int or " +
                      "a sequence of floats")
 
+def validate_animation_writer_path(p):
+    # Make sure it's a string and then figure out if the animations
+    # are already loaded and reset the writers (which will validate
+    # the path on next call)
+    if not isinstance(p, six.text_type):
+        raise ValueError("path must be a (unicode) string")
+    from sys import modules
+    # set dirty, so that the next call to the registry will re-evaluate
+    # the state.
+    # only set dirty if already loaded. If not loaded, the load will
+    # trigger the checks.
+    if "matplotlib.animation" in modules:
+        modules["matplotlib.animation"].writers.set_dirty()
+    return p
+
 
 # a map from key -> value, converter
 defaultParams = {
@@ -915,6 +939,7 @@ defaultParams = {
     'patch.antialiased': [True, validate_bool],     # antialiased (no jaggies)
 
     ## hatch props
+    'hatch.color': ['k', validate_color],
     'hatch.linewidth': [1.0, validate_float],
 
     ## Histogram properties
@@ -987,7 +1012,7 @@ defaultParams = {
                          'Sand', 'Script MT', 'Felipa', 'cursive'],
                         validate_stringlist],
     'font.fantasy':    [['Comic Sans MS', 'Chicago', 'Charcoal', 'Impact'
-                         'Western', 'Humor Sans', 'fantasy', 'xkcd'],
+                         'Western', 'Humor Sans', 'xkcd', 'fantasy'],
                         validate_stringlist],
     'font.monospace':  [['DejaVu Sans Mono', 'Bitstream Vera Sans Mono',
                          'Computer Modern Typewriter',
@@ -1036,7 +1061,7 @@ defaultParams = {
 
     # axes props
     'axes.axisbelow':        ['line', validate_axisbelow],
-    'axes.hold':             [True, validate_bool],
+    'axes.hold':             [None, deprecate_axes_hold],
     'axes.facecolor':        ['w', validate_color],  # background color; white
     'axes.edgecolor':        ['k', validate_color],  # edge color; black
     'axes.linewidth':        [0.8, validate_float],  # edge linewidth
@@ -1070,6 +1095,7 @@ defaultParams = {
                                # Use the current locale to format ticks
     'axes.formatter.use_mathtext': [False, validate_bool],
     'axes.formatter.useoffset': [True, validate_bool],
+    'axes.formatter.offset_threshold': [4, validate_int],
     'axes.unicode_minus': [True, validate_bool],
     'axes.color_cycle': [
         ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
@@ -1160,7 +1186,7 @@ defaultParams = {
     'xtick.major.pad':   [3.5, validate_float],    # distance to label in points
     'xtick.minor.pad':   [3.4, validate_float],    # distance to label in points
     'xtick.color':       ['k', validate_color],  # color of the xtick labels
-    'xtick.minor.visible':   [False, validate_bool],    # visiablility of the x axis minor ticks
+    'xtick.minor.visible':   [False, validate_bool],    # visibility of the x axis minor ticks
     'xtick.minor.top':   [True, validate_bool],  # draw x axis top minor ticks
     'xtick.minor.bottom':    [True, validate_bool],    # draw x axis bottom minor ticks
     'xtick.major.top':   [True, validate_bool],  # draw x axis top major ticks
@@ -1179,7 +1205,7 @@ defaultParams = {
     'ytick.major.pad':   [3.5, validate_float],     # distance to label in points
     'ytick.minor.pad':   [3.4, validate_float],     # distance to label in points
     'ytick.color':       ['k', validate_color],   # color of the ytick labels
-    'ytick.minor.visible':   [False, validate_bool],    # visiablility of the y axis minor ticks
+    'ytick.minor.visible':   [False, validate_bool],    # visibility of the y axis minor ticks
     'ytick.minor.left':   [True, validate_bool],  # draw y axis left minor ticks
     'ytick.minor.right':    [True, validate_bool],    # draw y axis right minor ticks
     'ytick.major.left':   [True, validate_bool],  # draw y axis left major ticks
@@ -1309,25 +1335,25 @@ defaultParams = {
     # Animation settings
     'animation.html':         ['none', validate_movie_html_fmt],
     'animation.writer':       ['ffmpeg', validate_movie_writer],
-    'animation.codec':        ['mpeg4', six.text_type],
+    'animation.codec':        ['h264', six.text_type],
     'animation.bitrate':      [-1, validate_int],
     # Controls image format when frames are written to disk
     'animation.frame_format': ['png', validate_movie_frame_fmt],
     # Path to FFMPEG binary. If just binary name, subprocess uses $PATH.
-    'animation.ffmpeg_path':  ['ffmpeg', six.text_type],
+    'animation.ffmpeg_path':  ['ffmpeg', validate_animation_writer_path],
 
     # Additional arguments for ffmpeg movie writer (using pipes)
     'animation.ffmpeg_args':   [[], validate_stringlist],
     # Path to AVConv binary. If just binary name, subprocess uses $PATH.
-    'animation.avconv_path':   ['avconv', six.text_type],
+    'animation.avconv_path':   ['avconv', validate_animation_writer_path],
     # Additional arguments for avconv movie writer (using pipes)
     'animation.avconv_args':   [[], validate_stringlist],
     # Path to MENCODER binary. If just binary name, subprocess uses $PATH.
-    'animation.mencoder_path': ['mencoder', six.text_type],
+    'animation.mencoder_path': ['mencoder', validate_animation_writer_path],
     # Additional arguments for mencoder movie writer (using pipes)
     'animation.mencoder_args': [[], validate_stringlist],
      # Path to convert binary. If just binary name, subprocess uses $PATH
-    'animation.convert_path':  ['convert', six.text_type],
+    'animation.convert_path':  ['convert', validate_animation_writer_path],
      # Additional arguments for mencoder movie writer (using pipes)
 
     'animation.convert_args':  [[], validate_stringlist],
