@@ -1922,7 +1922,7 @@ or tuple of floats
             dictionary of kwargs to be passed to errorbar method. *ecolor* and
             *capsize* may be specified here rather than as independent kwargs.
 
-        align : {'edge',  'center'}, optional
+        align : {'center', 'edge'}, optional
             If 'edge', aligns bars by their left edges (for vertical bars) and
             by their bottom edges (for horizontal bars). If 'center', interpret
             the `left` argument as the coordinates of the centers of the bars.
@@ -2128,9 +2128,9 @@ or tuple of floats
             r.update(kwargs)
             r.get_path()._interpolation_steps = 100
             if orientation == 'vertical':
-                r.sticky_edges.y.append(0)
+                r.sticky_edges.y.append(b)
             elif orientation == 'horizontal':
-                r.sticky_edges.x.append(0)
+                r.sticky_edges.x.append(l)
             self.add_patch(r)
             patches.append(r)
 
@@ -3986,8 +3986,11 @@ or tuple of floats
         else:
             colors = None  # use cmap, norm after collection is created
 
-        # c will be unchanged unless it is the same length as x:
-        x, y, s, c = cbook.delete_masked_points(x, y, s, c)
+        # Anything in maskargs will be unchanged unless it is the same length
+        # as x:
+        maskargs = x, y, s, c, colors, edgecolors, linewidths
+        x, y, s, c, colors, edgecolors, linewidths =\
+            cbook.delete_masked_points(*maskargs)
 
         scales = s   # Renamed for readability below.
 
@@ -5843,10 +5846,10 @@ or tuple of floats
                 colLabels=None, colColours=None, colLoc='center',
                 loc='bottom', bbox=None):
 
-        Returns a :class:`matplotlib.table.Table` instance.  For finer
-        grained control over tables, use the
-        :class:`~matplotlib.table.Table` class and add it to the axes
-        with :meth:`~matplotlib.axes.Axes.add_table`.
+        Returns a :class:`matplotlib.table.Table` instance. Either `cellText`
+        or `cellColours` must be provided. For finer grained control over
+        tables, use the :class:`~matplotlib.table.Table` class and add it to
+        the axes with :meth:`~matplotlib.axes.Axes.add_table`.
 
         Thanks to John Gill for providing the class and table.
 
