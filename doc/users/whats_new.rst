@@ -53,7 +53,7 @@ New rcparams added
 +---------------------------------+--------------------------------------------------+
 | Parameter                       | Description                                      |
 +=================================+==================================================+
-|`date.autoformatter.year`        | foramt string for 'year' scale dates             |
+|`date.autoformatter.year`        | format string for 'year' scale dates             |
 +---------------------------------+--------------------------------------------------+
 |`date.autoformatter.month`       | format string for 'month' scale dates            |
 +---------------------------------+--------------------------------------------------+
@@ -73,7 +73,7 @@ New rcparams added
 +---------------------------------+--------------------------------------------------+
 |`xtick.top`, `xtick.minor.top`,  | Control where major and minor ticks are drawn.   |
 |`xtick.major.top`                | The global values are `and` ed with the          |
-|`xtick.bottom`,                  | corosponding major/minor values.                 |
+|`xtick.bottom`,                  | corresponding major/minor values.                |
 |`xtick.minor.bottom`,            |                                                  |
 |`xtick.major.bottom`             |                                                  |
 |`ytick.left`, `ytick.minor.left`,|                                                  |

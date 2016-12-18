@@ -176,6 +176,25 @@ def test_autoscale_tight():
     assert_allclose(ax.get_xlim(), (-0.15, 3.15))
     assert_allclose(ax.get_ylim(), (1.0, 4.0))
 
+
+@cleanup(style='default')
+def test_autoscale_log_shared():
+    # related to github #7587
+    # array starts at zero to trigger _minpos handling
+    x = np.arange(100, dtype=float)
+    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+    ax1.loglog(x, x)
+    ax2.semilogx(x, x)
+    ax1.autoscale(tight=True)
+    ax2.autoscale(tight=True)
+    plt.draw()
+    lims = (x[1], x[-1])
+    assert_allclose(ax1.get_xlim(), lims)
+    assert_allclose(ax1.get_ylim(), lims)
+    assert_allclose(ax2.get_xlim(), lims)
+    assert_allclose(ax2.get_ylim(), (x[0], x[-1]))
+
+
 @cleanup(style='default')
 def test_use_sticky_edges():
     fig, ax = plt.subplots()
@@ -4783,6 +4802,22 @@ def test_log_margins():
     x0t, x1t = transform.transform([10, 100])
     delta = (x1t - x0t) * margin
     assert_allclose([xlim0t + delta, xlim1t - delta], [x0t, x1t])
+
+
+@cleanup
+def test_scatter_color_masking():
+    x = np.array([1, 2, 3])
+    y = np.array([1, np.nan, 3])
+    colors = np.array(['k', 'w', 'k'])
+    linewidths = np.array([1, 2, 3])
+    s = plt.scatter(x, y, color=colors, linewidths=linewidths)
+
+    facecolors = s.get_facecolors()
+    linecolors = s.get_edgecolors()
+    linewidths = s.get_linewidths()
+    assert_array_equal(facecolors[1], np.array([0, 0, 0, 1]))
+    assert_array_equal(linecolors[1], np.array([0, 0, 0, 1]))
+    assert linewidths[1] == 3
 
 
 if __name__ == '__main__':

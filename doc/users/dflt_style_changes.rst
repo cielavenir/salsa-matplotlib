@@ -426,13 +426,14 @@ obscuring data too much.
     fig, (old, new) = plt.subplots(ncols=2, sharey=True)
     with plt.style.context('default'):
         new.boxplot(data, labels=['A', 'B', 'C', 'D'])
-        new.set_title('New boxplots')
+        new.set_title('v2.0')
 
     with plt.style.context('classic'):
         old.boxplot(data, labels=['A', 'B', 'C', 'D'])
-        old.set_title('Old boxplots')
+        old.set_title('classic')
 
-    new.set_ylim(bottom=0)
+    new.set_yscale('log')
+    old.set_yscale('log')
 
 The previous defaults can be restored by setting::
 
@@ -551,7 +552,7 @@ default.  The default face color is now ``'C0'`` instead of ``'b'``.
 The previous defaults can be restored by setting::
 
     mpl.rcParams['patch.force_edgecolor'] = True
-    mpl.rcParams['patch.facecolor'] = True
+    mpl.rcParams['patch.facecolor'] = 'b'
 
 or by setting::
 
@@ -968,6 +969,11 @@ or create a new `~matplotlib.ticker.MaxNLocator`::
   import matplotlib.ticker as mticker
   ax.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10])
 
+The algorithm used by `~matplotlib.ticker.MaxNLocator` has been
+improved, and this may change the choice of tick locations in some
+cases.  This also affects `~matplotlib.ticker.AutoLocator`, which
+uses ``MaxNLocator`` internally.
+
 For a log-scaled axis the default locator is the
 `~matplotlib.ticker.LogLocator`.  Previously the maximum number
 of ticks was set to 15, and could not be changed. Now there is a
@@ -1041,6 +1047,15 @@ Z-order
   behavior of plotting ticks and grids above lines, set
   ``rcParams['axes.axisbelow'] = False``.
 
+
+``LogFormatter`` labeling of minor ticks
+========================================
+
+Minor ticks on a log axis are now labeled when the axis view limits
+span a range less than or equal to the interval between two major
+ticks.  See `~matplotlib.ticker.LogFormatter` for details. The
+minor tick labeling is turned off when using ``mpl.style.use('classic')``,
+but cannot be controlled independently via ``rcParams``.
 
 
 ``ScalarFormatter`` tick label formatting with offsets
@@ -1123,10 +1138,3 @@ mplot3d
   - grid.color
   - grid.linewidth
   - grid.linestyle
-
-
-
-TEMPORARY NOTES TOM IS KEEPING IN THE SOURCE SO THEY DO NOT GET LOST
-====================================================================
-
-- lines.color change, only hits raw usage of Line2D
