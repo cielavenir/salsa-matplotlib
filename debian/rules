@@ -198,11 +198,6 @@ install-indep: build-indep
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/local.conf
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/pdfcorefonts/readme.txt
 	chmod 644 $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/images/*.svg
-	# link to fonts in ttf-lyx
-	for font in cmex10.ttf cmmi10.ttf cmr10.ttf cmsy10.ttf ; \
-	do \
-	    ln -sf /usr/share/fonts/truetype/lyx/$$font $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/$$font; \
-	done
 
 # binary
 binary-indep: build-indep install-indep
