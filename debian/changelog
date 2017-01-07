@@ -4,8 +4,10 @@ matplotlib (2.0.0~rc2-2) UNRELEASED; urgency=medium
     - use bakoma fonts shipped with mpl: the fonts from fonts-lyx have been
       changed and some math symbols are not rendered correctly using them:
       Closes: #843656, #831020
+    - make sure to maintain the baseline_images dir in tests/ by using a dummy
+      file (else dh_python* will remove an empty dir); Closes: #838301
 
- -- Sandro Tosi <morph@debian.org>  Fri, 06 Jan 2017 18:37:03 -0500
+ -- Sandro Tosi <morph@debian.org>  Fri, 06 Jan 2017 21:11:22 -0500
 
 matplotlib (2.0.0~rc2-1) unstable; urgency=medium
 
