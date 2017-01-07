@@ -10,8 +10,9 @@ matplotlib (2.0.0~rc2-2) UNRELEASED; urgency=medium
     - exclude basemap from b-d if build profile is 'stage1', which breaks a
       circular dependency loop and will allow to bootstrap a new arch easier;
       Closes: #849943
+    - add breaks to -data for mpl versions before 2.x; Closes: #847468
 
- -- Sandro Tosi <morph@debian.org>  Fri, 06 Jan 2017 23:38:22 -0500
+ -- Sandro Tosi <morph@debian.org>  Fri, 06 Jan 2017 23:52:24 -0500
 
 matplotlib (2.0.0~rc2-1) unstable; urgency=medium
 
