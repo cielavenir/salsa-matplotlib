@@ -2258,10 +2258,12 @@ or tuple of floats
             dictionary of kwargs to be passed to errorbar method. `ecolor` and
             `capsize` may be specified here rather than as independent kwargs.
 
-        align : ['edge' | 'center'], optional, default: 'edge'
-            If `edge`, aligns bars by their left edges (for vertical bars) and
-            by their bottom edges (for horizontal bars). If `center`, interpret
-            the `left` argument as the coordinates of the centers of the bars.
+        align : {'center', 'edge'}, optional
+            If 'edge', aligns bars by their left edges (for vertical
+            bars) and by their bottom edges (for horizontal bars). If
+            'center', interpret the `bottom` argument as the
+            coordinates of the centers of the bars.  To align on the
+            align bars on the top edge pass a negative 'height'.
 
         log : boolean, optional, default: False
             If true, sets the axis to be log scale
@@ -7097,14 +7099,14 @@ or tuple of floats
         Parameters
         ----------
         x : 1-D array or sequence
-            Array or sequence containing the data
+            Array or sequence containing the data.
 
         %(Spectral)s
 
         %(PSD)s
 
         mode : [ 'default' | 'psd' | 'magnitude' | 'angle' | 'phase' ]
-            What sort of spectrum to use.  Default is 'psd'. which takes
+            What sort of spectrum to use.  Default is 'psd', which takes
             the power spectral density.  'complex' returns the complex-valued
             frequency spectrum.  'magnitude' returns the magnitude spectrum.
             'angle' returns the phase spectrum without unwrapping.  'phase'
@@ -7132,10 +7134,11 @@ or tuple of floats
             A :class:`matplotlib.colors.Colormap` instance; if *None*, use
             default determined by rc
 
-        xextent :
-            The image extent along the x-axis. xextent = (xmin,xmax)
-            The default is (0,max(bins)), where bins is the return
-            value from :func:`~matplotlib.mlab.specgram`
+        xextent : [None | (xmin, xmax)]
+            The image extent along the x-axis. The default sets *xmin* to the
+            left border of the first bin (*spectrum* column) and *xmax* to the
+            right border of the last bin. Note that for *noverlap>0* the width
+            of the bins is smaller than those of the segments.
 
         **kwargs :
             Additional kwargs are passed on to imshow which makes the
@@ -7149,14 +7152,14 @@ or tuple of floats
         Returns
         -------
         spectrum : 2-D array
-            columns are the periodograms of successive segments
+            Columns are the periodograms of successive segments.
 
         freqs : 1-D array
-            The frequencies corresponding to the rows in *spectrum*
+            The frequencies corresponding to the rows in *spectrum*.
 
         t : 1-D array
-            The times corresponding to midpoints of segments (i.e the columns
-            in *spectrum*)
+            The times corresponding to midpoints of segments (i.e., the columns
+            in *spectrum*).
 
         im : instance of class :class:`~matplotlib.image.AxesImage`
             The image created by imshow containing the spectrogram
@@ -7187,8 +7190,12 @@ or tuple of floats
         if not self._hold:
             self.cla()
 
+        if NFFT is None:
+            NFFT = 256  # same default as in mlab.specgram()
         if Fc is None:
-            Fc = 0
+            Fc = 0  # same default as in mlab._spectral_helper()
+        if noverlap is None:
+            noverlap = 128  # same default as in mlab.specgram()
 
         if mode == 'complex':
             raise ValueError('Cannot plot a complex specgram')
@@ -7221,7 +7228,9 @@ or tuple of floats
         Z = np.flipud(Z)
 
         if xextent is None:
-            xextent = 0, np.amax(t)
+            # padding is needed for first and last segment:
+            pad_xextent = (NFFT-noverlap) / Fs / 2
+            xextent = np.min(t) - pad_xextent, np.max(t) + pad_xextent
         xmin, xmax = xextent
         freqs += Fc
         extent = xmin, xmax, freqs[0], freqs[-1]

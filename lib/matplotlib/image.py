@@ -368,8 +368,11 @@ class _ImageBase(martist.Artist, cm.ScalarMappable):
                     # values to carry the over/under/bad information
                     rgba = np.empty((A.shape[0], A.shape[1], 4), dtype=A.dtype)
                     rgba[..., 0] = A  # normalized data
-                    rgba[..., 1] = A < 0  # under data
-                    rgba[..., 2] = A > 1  # over data
+                    # this is to work around spurious warnings coming
+                    # out of masked arrays.
+                    with np.errstate(invalid='ignore'):
+                        rgba[..., 1] = A < 0  # under data
+                        rgba[..., 2] = A > 1  # over data
                     rgba[..., 3] = ~A.mask  # bad data
                     A = rgba
                     output = np.zeros((out_height, out_width, 4),
@@ -1357,7 +1360,7 @@ def thumbnail(infile, thumbfile, scale=0.1, interpolation='bilinear',
     *thumbfile*.
 
       *infile* the image file -- must be PNG or Pillow-readable if you
-         have `Pillow <http://python-pillow.github.io/>`_ installed
+         have `Pillow <http://python-pillow.org/>`_ installed
 
       *thumbfile*
         the thumbnail filename
