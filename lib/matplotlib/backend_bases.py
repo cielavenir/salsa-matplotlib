@@ -871,7 +871,7 @@ class GraphicsContextBase(object):
         off in pixels.
 
         See p107 of to PostScript `BLUEBOOK
-        <http://www-cdf.fnal.gov/offline/PostScript/BLUEBOOK.PDF>`_
+        <https://www-cdf.fnal.gov/offline/PostScript/BLUEBOOK.PDF>`_
         for more info.
 
         Default value is None
@@ -2496,7 +2496,7 @@ def key_press_handler(event, canvas, toolbar=None):
     toggle_xscale_keys = rcParams['keymap.xscale']
     all = rcParams['keymap.all_axes']
 
-    # toggle fullscreen mode (default key 'f')
+    # toggle fullscreen mode ('f', 'ctrl + f')
     if event.key in fullscreen_keys:
         try:
             canvas.manager.full_screen_toggle()

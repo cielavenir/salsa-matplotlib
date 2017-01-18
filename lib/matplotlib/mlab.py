@@ -1275,7 +1275,9 @@ def specgram(x, NFFT=None, Fs=None, detrend=None, window=None,
 
     """
     if noverlap is None:
-        noverlap = 128
+        noverlap = 128  # default in _spectral_helper() is noverlap = 0
+    if NFFT is None:
+        NFFT = 256  # same default as in _spectral_helper()
 
     spec, freqs, t = _spectral_helper(x=x, y=None, NFFT=NFFT, Fs=Fs,
                                       detrend_func=detrend, window=window,
@@ -1933,7 +1935,7 @@ def dist_point_to_segment(p, s0, s1):
       *p*, *s0*, *s1* are *xy* sequences
 
     This algorithm from
-    http://softsurfer.com/Archive/algorithm_0102/algorithm_0102.htm#Distance%20to%20Ray%20or%20Segment
+    http://geomalgorithms.com/a02-_lines.html
     """
     p = np.asarray(p, np.float_)
     s0 = np.asarray(s0, np.float_)

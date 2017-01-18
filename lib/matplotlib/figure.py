@@ -650,7 +650,7 @@ class Figure(Artist):
         (:meth:`~matplotlib.axes.Axes.imshow`) which will be resampled
         to fit the current axes.  If you want a resampled image to
         fill the entire figure, you can define an
-        :class:`~matplotlib.axes.Axes` with size [0,1,0,1].
+        :class:`~matplotlib.axes.Axes` with extent [0,0,1,1].
 
         An :class:`matplotlib.image.FigureImage` instance is returned.
 
@@ -713,7 +713,8 @@ class Figure(Artist):
         self.bbox_inches.p1 = w, h
 
         if forward:
-            dpival = self.dpi
+            ratio = getattr(self.canvas, '_dpi_ratio', 1)
+            dpival = self.dpi / ratio
             canvasw = w * dpival
             canvash = h * dpival
             manager = getattr(self.canvas, 'manager', None)

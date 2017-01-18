@@ -1,4 +1,4 @@
-From 43ba3eb65614ef1295325515eafb66f33528d947 Mon Sep 17 00:00:00 2001
+From d72c8194f490c3b62493433cdd15fb63e6264d5c Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Thu, 8 Oct 2015 09:47:11 -0700
 Subject: Fixes the path to search for matplotlibrc file
@@ -11,10 +11,10 @@ Patch-Name: 20_matplotlibrc_path_search_fix.patch
  1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
-index f18b6bd..626ccc3 100644
+index 004cc59..845a3bd 100644
 --- a/lib/matplotlib/__init__.py
 +++ b/lib/matplotlib/__init__.py
-@@ -709,10 +709,12 @@ def _get_data_path():
+@@ -712,10 +712,12 @@ def _get_data_path():
          return path
  
      _file = _decode_filesystem_path(__file__)
@@ -28,7 +28,7 @@ index f18b6bd..626ccc3 100644
      # setuptools' namespace_packages may highjack this init file
      # so need to try something known to be in matplotlib, not basemap
      import matplotlib.afm
-@@ -840,7 +842,7 @@ def matplotlib_fname():
+@@ -843,7 +845,7 @@ def matplotlib_fname():
                      home, '.matplotlib', 'matplotlibrc')
              return fname
  

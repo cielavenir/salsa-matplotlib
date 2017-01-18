@@ -1,4 +1,4 @@
-From e28fb493516d8b2ffc18a0687922f0347a47e0bf Mon Sep 17 00:00:00 2001
+From e45abaab24803aef023469559d21c9fe14e5c74d Mon Sep 17 00:00:00 2001
 From: SVN-Git Migration <python-modules-team@lists.alioth.debian.org>
 Date: Thu, 8 Oct 2015 09:47:16 -0700
 Subject: gtk3cairo_check_no-multiprocessing
@@ -9,10 +9,10 @@ Patch-Name: gtk3cairo_check_no-multiprocessing.patch
  1 file changed, 1 deletion(-)
 
 diff --git a/setupext.py b/setupext.py
-index 1e1fb16..a4b36e2 100644
+index a590b23..d1edaff 100644
 --- a/setupext.py
 +++ b/setupext.py
-@@ -1715,7 +1715,6 @@ class BackendGtk3Agg(OptionalBackendPackage):
+@@ -1717,7 +1717,6 @@ class BackendGtk3Agg(OptionalBackendPackage):
      def check_requirements(self):
          if 'TRAVIS' in os.environ:
              raise CheckFailed("Can't build with Travis")

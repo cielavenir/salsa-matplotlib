@@ -27,7 +27,8 @@ steps in the color space. Researchers have found that the human brain
 perceives changes in the lightness parameter as changes in the data
 much better than, for example, changes in hue. Therefore, colormaps
 which have monotonically increasing lightness through the colormap
-will be better interpreted by the viewer.
+will be better interpreted by the viewer. A wonderful example of 
+perceptually uniform colormaps is [colorcet]_.
 
 Color can be represented in 3D space in various ways. One way to represent color
 is using CIELAB. In CIELAB, color space is represented by lightness,
@@ -168,7 +169,8 @@ Color vision deficiencies
 
 There is a lot of information available about color blindness (*e.g.*,
 [colorblindness]_). Additionally, there are tools available to convert images to
-how they look for different types of color vision deficiencies (*e.g.*, [asp]_).
+how they look for different types of color vision deficiencies (*e.g.*,
+[vischeck]_).
 
 The most common form of color vision deficiency involves differentiating between
 red and green. Thus, avoiding colormaps with both red and green will avoid many
@@ -178,14 +180,15 @@ problems in general.
 References
 ==========
 
+.. [colorcet] https://github.com/bokeh/colorcet
 .. [Ware] http://ccom.unh.edu/sites/default/files/publications/Ware_1988_CGA_Color_sequences_univariate_maps.pdf
 .. [Moreland] http://www.sandia.gov/~kmorel/documents/ColorMaps/ColorMapsExpanded.pdf
 .. [list-colormaps] https://gist.github.com/endolith/2719900#id7
-.. [mycarta-banding] http://mycarta.wordpress.com/2012/10/14/the-rainbow-is-deadlong-live-the-rainbow-part-4-cie-lab-heated-body/
-.. [mycarta-jet] http://mycarta.wordpress.com/2012/10/06/the-rainbow-is-deadlong-live-the-rainbow-part-3/
-.. [mycarta-lablinear] http://mycarta.wordpress.com/2012/12/06/the-rainbow-is-deadlong-live-the-rainbow-part-5-cie-lab-linear-l-rainbow/
-.. [mycarta-cubelaw] http://mycarta.wordpress.com/2013/02/21/perceptual-rainbow-palette-the-method/
+.. [mycarta-banding] https://mycarta.wordpress.com/2012/10/14/the-rainbow-is-deadlong-live-the-rainbow-part-4-cie-lab-heated-body/
+.. [mycarta-jet] https://mycarta.wordpress.com/2012/10/06/the-rainbow-is-deadlong-live-the-rainbow-part-3/
+.. [mycarta-lablinear] https://mycarta.wordpress.com/2012/12/06/the-rainbow-is-deadlong-live-the-rainbow-part-5-cie-lab-linear-l-rainbow/
+.. [mycarta-cubelaw] https://mycarta.wordpress.com/2013/02/21/perceptual-rainbow-palette-the-method/
 .. [bw] http://www.tannerhelland.com/3643/grayscale-image-algorithm-vb6/
 .. [colorblindness] http://www.color-blindness.com/
-.. [asp] http://aspnetresources.com/tools/colorBlindness
+.. [vischeck] http://www.vischeck.com/vischeck/
 .. [IBM] http://www.research.ibm.com/people/l/lloydt/color/color.HTM
