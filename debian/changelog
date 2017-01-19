@@ -1,4 +1,4 @@
-matplotlib (2.0.0-1) UNRELEASED; urgency=medium
+matplotlib (2.0.0-1) unstable; urgency=medium
 
   * New upstream release
   * debian/rules
@@ -15,7 +15,7 @@ matplotlib (2.0.0-1) UNRELEASED; urgency=medium
   * debian/copyright
     - extend packaging copyright years
 
- -- Sandro Tosi <morph@debian.org>  Wed, 18 Jan 2017 20:12:18 -0500
+ -- Sandro Tosi <morph@debian.org>  Wed, 18 Jan 2017 20:12:37 -0500
 
 matplotlib (2.0.0~rc2-1) unstable; urgency=medium
 
