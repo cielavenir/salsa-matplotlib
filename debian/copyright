@@ -61,7 +61,7 @@ License:
  Agreement.
 
 Files: debian/*
-Copyright: Copyright (C) 2008-2016 Sandro Tosi <morph@debian.org>
+Copyright: Copyright (C) 2008-2017 Sandro Tosi <morph@debian.org>
 License: same as upstream
 
 Files: lib/matplotlib/backends/backend_wxagg.py
