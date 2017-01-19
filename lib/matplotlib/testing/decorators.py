@@ -408,7 +408,7 @@ def _pytest_image_comparison(baseline_images, extensions, tol,
     return decorator
 
 
-def image_comparison(baseline_images, extensions=None, tol=0,
+def image_comparison(baseline_images, extensions=None, tol=0.306,
                      freetype_version=None, remove_text=False,
                      savefig_kwarg=None,
                      # Default of mpl_test_settings fixture and cleanup too.
