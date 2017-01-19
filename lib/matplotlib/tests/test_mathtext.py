@@ -162,7 +162,6 @@ for fonts, chars in font_test_specs:
     for set in chars:
         font_tests.append(wrapper % set)
 
-
 @pytest.fixture
 def baseline_images(request, fontset, index):
     return ['%s_%s_%02d' % (request.param, fontset, index)]
@@ -174,7 +173,7 @@ def baseline_images(request, fontset, index):
                          ['cm', 'stix', 'stixsans', 'dejavusans',
                           'dejavuserif'])
 @pytest.mark.parametrize('baseline_images', ['mathtext'], indirect=True)
-@image_comparison(baseline_images=None)
+@image_comparison(baseline_images=None, tol=0.310)
 def test_mathtext_rendering(baseline_images, fontset, index, test):
     matplotlib.rcParams['mathtext.fontset'] = fontset
     fig = plt.figure(figsize=(5.25, 0.75))
@@ -188,7 +187,7 @@ def test_mathtext_rendering(baseline_images, fontset, index, test):
                          ['cm', 'stix', 'stixsans', 'dejavusans',
                           'dejavuserif'])
 @pytest.mark.parametrize('baseline_images', ['mathfont'], indirect=True)
-@image_comparison(baseline_images=None, extensions=['png'])
+@image_comparison(baseline_images=None, extensions=['png'], tol=0.310)
 def test_mathfont_rendering(baseline_images, fontset, index, test):
     matplotlib.rcParams['mathtext.fontset'] = fontset
     fig = plt.figure(figsize=(5.25, 0.75))
