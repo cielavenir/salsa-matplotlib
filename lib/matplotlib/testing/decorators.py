@@ -266,7 +266,7 @@ class ImageComparisonTest(CleanupTest):
 
                 yield do_test, fignum, actual_fname, expected_fname
 
-def image_comparison(baseline_images=None, extensions=None, tol=0,
+def image_comparison(baseline_images=None, extensions=None, tol=0.306,
                      freetype_version=None, remove_text=False,
                      savefig_kwarg=None, style='classic'):
     """

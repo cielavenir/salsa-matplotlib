@@ -5,3 +5,4 @@ gtk3cairo_check_no-multiprocessing.patch
 0005-bts800803-disable-the-GitHub-Fork-Me-ribbon.patch
 0006-bts800803-dont-use-the-Raleway-font-from-the-Google-.patch
 0007-bts800803-remote-the-Google-Analytics-tracking.patch
+0008-Increase-test-tollerance.patch
