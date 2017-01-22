@@ -6,3 +6,4 @@ gtk3cairo_check_no-multiprocessing.patch
 0006-bts800803-dont-use-the-Raleway-font-from-the-Google-.patch
 0007-bts800803-remote-the-Google-Analytics-tracking.patch
 0008-Increase-test-tollerance.patch
+0009-Add-a-newline-separator-in-fc-list-call.patch
