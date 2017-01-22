@@ -1,3 +1,11 @@
+matplotlib (2.0.0-3) UNRELEASED; urgency=medium
+
+  * debian/patches/0009-Add-a-newline-separator-in-fc-list-call.patch
+    - generate a list of fonts by splitting the output of fc-list by new lines;
+      Closes: #852060
+
+ -- Sandro Tosi <morph@debian.org>  Sat, 21 Jan 2017 21:34:52 -0500
+
 matplotlib (2.0.0-2) unstable; urgency=medium
 
   * debian/control
