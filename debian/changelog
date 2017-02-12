@@ -3,8 +3,10 @@ matplotlib (2.0.0+dfsg1-1) UNRELEASED; urgency=medium
   * Import upstream tarball with necked_tensile_specimen.png removed
   * exclude necked_tensile_specimen.png from upstream tarball, as that file
     contains a non-free color calibration profile; Closes: #854280
+  * debian/copyright
+    - add pdfcorefiles license grant
 
- -- Sandro Tosi <morph@debian.org>  Sun, 12 Feb 2017 13:57:19 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 12 Feb 2017 15:41:27 -0500
 
 matplotlib (2.0.0-3) unstable; urgency=medium
 
