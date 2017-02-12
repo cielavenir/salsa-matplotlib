@@ -2,10 +2,10 @@
 2fa7c27b825af1954e6077bd8c3da5c767aa8b6a
 2fa7c27b825af1954e6077bd8c3da5c767aa8b6a
 e56d16e832c34e4e84834585724e4b192f36cfd8
-e56d16e832c34e4e84834585724e4b192f36cfd8
-matplotlib_2.0.0.orig.tar.gz
-fdec09942507ad4d0c41a608ff886d66176b505c
-52201231
+b358b1f4101ba111166b027228d545973408d1b9
+matplotlib_2.0.0+dfsg1.orig.tar.gz
+5c28c23485ee7641ff137764f8ff8b8dee40ec86
+52007676
 debianTag="debian/%e%v"
 patchedTag="patched/%e%v"
 upstreamTag="upstream/%e%u"
