@@ -1,4 +1,4 @@
-From d72c8194f490c3b62493433cdd15fb63e6264d5c Mon Sep 17 00:00:00 2001
+From 425309281d1b8e3d454f548b2ac24706ec8e280a Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Thu, 8 Oct 2015 09:47:11 -0700
 Subject: Fixes the path to search for matplotlibrc file

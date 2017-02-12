@@ -1,4 +1,4 @@
-From 2a32abbf5314ca94e6c87cf6da5f28ce4cbfff1c Mon Sep 17 00:00:00 2001
+From a5cd4b859131a425f31b5804d3d6b01b7531b7b3 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Sat, 9 Jan 2016 16:03:45 +0000
 Subject: bts800803 dont use the Raleway font (from the Google Fonts API)

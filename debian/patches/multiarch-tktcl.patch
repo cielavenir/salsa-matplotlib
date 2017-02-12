@@ -1,4 +1,4 @@
-From 02caa673ed1374fd3a0f781f0496a5ba2acba456 Mon Sep 17 00:00:00 2001
+From 0550a696e0c1f836b3e3250d182e39e7e4c1620c Mon Sep 17 00:00:00 2001
 From: Julian Taylor <jtaylor@ubuntu.com>
 Date: Thu, 8 Oct 2015 09:47:15 -0700
 Subject: adapt setup to find multiarched tk/tcl
