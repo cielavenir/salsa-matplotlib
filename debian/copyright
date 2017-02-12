@@ -260,6 +260,48 @@ License:
  mathematical fonts, please contact MicroPress, Inc., 68-30 Harrow
  Street, Forest Hills, NY 11375, USA - Phone: (718) 575-1816.
 
+Files: lib/matplotlib/mpl-data/fonts/ttf/cmb10.ttf lib/matplotlib/mpl-data/fonts/ttf/cmex10.ttf lib/matplotlib/mpl-data/fonts/ttf/cmmi10.ttf lib/matplotlib/mpl-data/fonts/ttf/cmr10.ttf lib/matplotlib/mpl-data/fonts/ttf/cmss10.ttf lib/matplotlib/mpl-data/fonts/ttf/cmsy10.ttf lib/matplotlib/mpl-data/fonts/ttf/cmtt10.ttf
+Copyright: Copyright (C) 1994, Basil K. Malyshev. All Rights Reserved.
+License: from LICENSE/LICENSE_BAKOMA
+                        BaKoMa Fonts Licence
+                        --------------------
+ .
+  This licence covers two font packs (known as BaKoMa Fonts Colelction,
+  which is available at `CTAN:fonts/cm/ps-type1/bakoma/'):
+ .
+    1) BaKoMa-CM (1.1/12-Nov-94)
+       Computer Modern Fonts in PostScript Type 1 and TrueType font formats.
+ .
+    2) BaKoMa-AMS (1.2/19-Jan-95)
+       AMS TeX fonts in PostScript Type 1 and TrueType font formats.
+ .
+  Copyright (C) 1994, 1995, Basil K. Malyshev. All Rights Reserved.
+ .
+  Permission to copy and distribute these fonts for any purpose is
+  hereby granted without fee, provided that the above copyright notice,
+  author statement and this permission notice appear in all copies of
+  these fonts and related documentation.
+ .
+  Permission to modify and distribute modified fonts for any purpose is
+  hereby granted without fee, provided that the copyright notice,
+  author statement, this permission notice and location of original
+  fonts (http://www.ctan.org/tex-archive/fonts/cm/ps-type1/bakoma)
+  appear in all copies of modified fonts and related documentation.
+ .
+  Permission to use these fonts (embedding into PostScript, PDF, SVG
+  and printing by using any software) is hereby granted without fee.
+  It is not required to provide any notices about using these fonts.
+ .
+ Basil K. Malyshev
+ INSTITUTE FOR HIGH ENERGY PHYSICS
+ IHEP, OMVT
+ Moscow Region
+ 142281 PROTVINO
+ RUSSIA
+ .
+ E-Mail:        bakoma@mail.ru
+      or        malyshev@mail.ihep.ru
+
 Files: lib/matplotlib/mpl-data/fonts/pdfcorefonts/*
 Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991, 1992, 1993, 1997 Adobe Systems Incorporated.  All Rights Reserved.
 License:

@@ -1,4 +1,4 @@
-matplotlib (2.0.0+dfsg1-1) UNRELEASED; urgency=medium
+matplotlib (2.0.0+dfsg1-1) unstable; urgency=medium
 
   * Import upstream tarball with necked_tensile_specimen.png removed
   * exclude necked_tensile_specimen.png from upstream tarball, as that file
@@ -6,8 +6,10 @@ matplotlib (2.0.0+dfsg1-1) UNRELEASED; urgency=medium
   * debian/copyright
     - add pdfcorefiles license grant
     - add copyright notices for all AFM fonts
+    - add license and copyright notice to TTG BaKoMa fonts files;
+      Closes: #854279
 
- -- Sandro Tosi <morph@debian.org>  Sun, 12 Feb 2017 15:51:56 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 12 Feb 2017 16:13:26 -0500
 
 matplotlib (2.0.0-3) unstable; urgency=medium
 
