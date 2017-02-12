@@ -5,8 +5,9 @@ matplotlib (2.0.0+dfsg1-1) UNRELEASED; urgency=medium
     contains a non-free color calibration profile; Closes: #854280
   * debian/copyright
     - add pdfcorefiles license grant
+    - add copyright notices for all AFM fonts
 
- -- Sandro Tosi <morph@debian.org>  Sun, 12 Feb 2017 15:41:27 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 12 Feb 2017 15:51:56 -0500
 
 matplotlib (2.0.0-3) unstable; urgency=medium
 
