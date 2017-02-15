@@ -7,3 +7,4 @@ gtk3cairo_check_no-multiprocessing.patch
 0007-bts800803-remote-the-Google-Analytics-tracking.patch
 0008-Increase-test-tollerance.patch
 0009-Add-a-newline-separator-in-fc-list-call.patch
+0010-remove-interpolation_none_vs_nearest.py.patch
