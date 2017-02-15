@@ -21,7 +21,7 @@ build-indep-stamp: $(DEFPY:%=build-%-stamp)
 	dh_testdir
 
 	# build the doc
-	-( cd doc ; MPLCONFIGDIR=. MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ \
+	( cd doc ; MPLCONFIGDIR=. MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ \
 		PYTHONPATH=$(CURDIR)/build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py --small html )
 
 	touch $@
