@@ -731,10 +731,12 @@ class _AxesBase(martist.Artist):
             place axis elements in different locations.
 
         """
+        labels_align = matplotlib.rcParams["xtick.alignment"]
+
         return (self.get_xaxis_transform(which='tick1') +
                 mtransforms.ScaledTranslation(0, -1 * pad_points / 72.0,
                                               self.figure.dpi_scale_trans),
-                "top", "center")
+                "top", labels_align)
 
     def get_xaxis_text2_transform(self, pad_points):
         """
@@ -757,10 +759,11 @@ class _AxesBase(martist.Artist):
             place axis elements in different locations.
 
         """
+        labels_align = matplotlib.rcParams["xtick.alignment"]
         return (self.get_xaxis_transform(which='tick2') +
                 mtransforms.ScaledTranslation(0, pad_points / 72.0,
                                               self.figure.dpi_scale_trans),
-                "bottom", "center")
+                "bottom", labels_align)
 
     def get_yaxis_transform(self, which='grid'):
         """
@@ -808,10 +811,11 @@ class _AxesBase(martist.Artist):
             place axis elements in different locations.
 
         """
+        labels_align = matplotlib.rcParams["ytick.alignment"]
         return (self.get_yaxis_transform(which='tick1') +
                 mtransforms.ScaledTranslation(-1 * pad_points / 72.0, 0,
                                               self.figure.dpi_scale_trans),
-                "center_baseline", "right")
+                labels_align, "right")
 
     def get_yaxis_text2_transform(self, pad_points):
         """
@@ -834,10 +838,12 @@ class _AxesBase(martist.Artist):
             place axis elements in different locations.
 
         """
+        labels_align = matplotlib.rcParams["ytick.alignment"]
+
         return (self.get_yaxis_transform(which='tick2') +
                 mtransforms.ScaledTranslation(pad_points / 72.0, 0,
                                               self.figure.dpi_scale_trans),
-                "center_baseline", "left")
+                labels_align, "left")
 
     def _update_transScale(self):
         self.transScale.set(
@@ -2278,7 +2284,18 @@ class _AxesBase(martist.Artist):
             # ignore non-finite data limits if good limits exist
             finite_dl = [d for d in dl if np.isfinite(d).all()]
             if len(finite_dl):
+                # if finite limits exist for atleast one axis (and the
+                # other is infinite), restore the finite limits
+                x_finite = [d for d in dl
+                            if (np.isfinite(d.intervalx).all() and
+                                (d not in finite_dl))]
+                y_finite = [d for d in dl
+                            if (np.isfinite(d.intervaly).all() and
+                                (d not in finite_dl))]
+
                 dl = finite_dl
+                dl.extend(x_finite)
+                dl.extend(y_finite)
 
             bb = mtransforms.BboxBase.union(dl)
             x0, x1 = getattr(bb, interval)
@@ -2560,13 +2577,10 @@ class _AxesBase(martist.Artist):
                 raise ValueError("scilimits must be a sequence of 2 integers")
         if style[:3] == 'sci':
             sb = True
-        elif style in ['plain', 'comma']:
+        elif style == 'plain':
             sb = False
-            if style == 'plain':
-                cb = False
-            else:
-                cb = True
-                raise NotImplementedError("comma style remains to be added")
+        elif style == 'comma':
+            raise NotImplementedError("comma style remains to be added")
         elif style == '':
             sb = None
         else:
@@ -3371,7 +3385,7 @@ class _AxesBase(martist.Artist):
             elif scale == 'symlog':
                 s = ax._scale
                 ax.set_minor_locator(
-                    mticker.SymmetricalLogLocator(s.base, s.subs))
+                    mticker.SymmetricalLogLocator(s._transform, s.subs))
             else:
                 ax.set_minor_locator(mticker.AutoMinorLocator())
 

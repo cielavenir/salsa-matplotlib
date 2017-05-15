@@ -1,4 +1,4 @@
-From 90ee017367a8755086b1ed0a39a931dce0a2c383 Mon Sep 17 00:00:00 2001
+From 9b634f43daf541f7aae7926720d70cbd91fbc51d Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Thu, 8 Oct 2015 09:47:14 -0700
 Subject: Try to use also StayPuft (a free font) for xkcd
@@ -13,7 +13,7 @@ Patch-Name: 70_bts720549_try_StayPuft_for_xkcd.patch
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/lib/matplotlib/pyplot.py b/lib/matplotlib/pyplot.py
-index 09e044e..0ea97d3 100644
+index 6bb51fd..24abd9f 100644
 --- a/lib/matplotlib/pyplot.py
 +++ b/lib/matplotlib/pyplot.py
 @@ -401,7 +401,7 @@ def xkcd(scale=1, length=100, randomness=2):

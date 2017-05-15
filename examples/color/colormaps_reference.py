@@ -1,4 +1,8 @@
 """
+==================
+Colormap reference
+==================
+
 Reference for colormaps included with Matplotlib.
 
 This reference example shows all colormaps included with Matplotlib. Note that
@@ -35,29 +39,30 @@ Miscellaneous:
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 # Have colormaps separated into categories:
 # http://matplotlib.org/examples/color/colormaps_reference.html
-
-cmaps = [('Perceptually Uniform Sequential',
-                            ['viridis', 'inferno', 'plasma', 'magma']),
-         ('Sequential',     ['Blues', 'BuGn', 'BuPu',
-                             'GnBu', 'Greens', 'Greys', 'Oranges', 'OrRd',
-                             'PuBu', 'PuBuGn', 'PuRd', 'Purples', 'RdPu',
-                             'Reds', 'YlGn', 'YlGnBu', 'YlOrBr', 'YlOrRd']),
-         ('Sequential (2)', ['afmhot', 'autumn', 'bone', 'cool',
-                             'copper', 'gist_heat', 'gray', 'hot',
-                             'pink', 'spring', 'summer', 'winter']),
-         ('Diverging',      ['BrBG', 'bwr', 'coolwarm', 'PiYG', 'PRGn', 'PuOr',
-                             'RdBu', 'RdGy', 'RdYlBu', 'RdYlGn', 'Spectral',
-                             'seismic']),
-         ('Qualitative',    ['Accent', 'Dark2', 'Paired', 'Pastel1',
-                             'Pastel2', 'Set1', 'Set2', 'Set3', 'Vega10',
-                             'Vega20', 'Vega20b', 'Vega20c']),
-         ('Miscellaneous',  ['gist_earth', 'terrain', 'ocean', 'gist_stern',
-                             'brg', 'CMRmap', 'cubehelix',
-                             'gnuplot', 'gnuplot2', 'gist_ncar',
-                             'nipy_spectral', 'jet', 'rainbow',
-                             'gist_rainbow', 'hsv', 'flag', 'prism'])]
+cmaps = [('Perceptually Uniform Sequential', [
+            'viridis', 'plasma', 'inferno', 'magma']),
+         ('Sequential', [
+            'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
+            'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+            'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']),
+         ('Sequential (2)', [
+            'binary', 'gist_yarg', 'gist_gray', 'gray', 'bone', 'pink',
+            'spring', 'summer', 'autumn', 'winter', 'cool', 'Wistia',
+            'hot', 'afmhot', 'gist_heat', 'copper']),
+         ('Diverging', [
+            'PiYG', 'PRGn', 'BrBG', 'PuOr', 'RdGy', 'RdBu',
+            'RdYlBu', 'RdYlGn', 'Spectral', 'coolwarm', 'bwr', 'seismic']),
+         ('Qualitative', [
+            'Pastel1', 'Pastel2', 'Paired', 'Accent',
+            'Dark2', 'Set1', 'Set2', 'Set3',
+            'tab10', 'tab20', 'tab20b', 'tab20c']),
+         ('Miscellaneous', [
+            'flag', 'prism', 'ocean', 'gist_earth', 'terrain', 'gist_stern',
+            'gnuplot', 'gnuplot2', 'CMRmap', 'cubehelix', 'brg', 'hsv',
+            'gist_rainbow', 'rainbow', 'jet', 'nipy_spectral', 'gist_ncar'])]
 
 
 nrows = max(len(cmap_list) for cmap_category, cmap_list in cmaps)
@@ -65,7 +70,7 @@ gradient = np.linspace(0, 1, 256)
 gradient = np.vstack((gradient, gradient))
 
 
-def plot_color_gradients(cmap_category, cmap_list):
+def plot_color_gradients(cmap_category, cmap_list, nrows):
     fig, axes = plt.subplots(nrows=nrows)
     fig.subplots_adjust(top=0.95, bottom=0.01, left=0.2, right=0.99)
     axes[0].set_title(cmap_category + ' colormaps', fontsize=14)
@@ -81,7 +86,8 @@ def plot_color_gradients(cmap_category, cmap_list):
     for ax in axes:
         ax.set_axis_off()
 
+
 for cmap_category, cmap_list in cmaps:
-    plot_color_gradients(cmap_category, cmap_list)
+    plot_color_gradients(cmap_category, cmap_list, nrows)
 
 plt.show()

@@ -323,9 +323,10 @@ class Figure(Artist):
         if frameon is None:
             frameon = rcParams['figure.frameon']
 
-        self.dpi_scale_trans = Affine2D()
-        self.dpi = dpi
         self.bbox_inches = Bbox.from_bounds(0, 0, *figsize)
+        self.dpi_scale_trans = Affine2D().scale(dpi, dpi)
+        # do not use property as it will trigger
+        self._dpi = dpi
         self.bbox = TransformedBbox(self.bbox_inches, self.dpi_scale_trans)
 
         self.frameon = frameon
@@ -413,6 +414,7 @@ class Figure(Artist):
     def _set_dpi(self, dpi):
         self._dpi = dpi
         self.dpi_scale_trans.clear().scale(dpi, dpi)
+        self.set_size_inches(*self.get_size_inches())
         self.callbacks.process('dpi_changed', self)
     dpi = property(_get_dpi, _set_dpi)
 
@@ -682,15 +684,12 @@ class Figure(Artist):
         return im
 
     def set_size_inches(self, w, h=None, forward=True):
-        """
-        set_size_inches(w,h, forward=False)
+        """Set the figure size in inches (1in == 2.54cm)
 
-        Set the figure size in inches (1in == 2.54cm)
-
-        Usage::
+        Usage ::
 
              fig.set_size_inches(w,h)  # OR
-             fig.set_size_inches((w,h) )
+             fig.set_size_inches((w,h))
 
         optional kwarg *forward=True* will cause the canvas size to be
         automatically updated; e.g., you can resize the figure window
@@ -713,13 +712,15 @@ class Figure(Artist):
         self.bbox_inches.p1 = w, h
 
         if forward:
-            ratio = getattr(self.canvas, '_dpi_ratio', 1)
-            dpival = self.dpi / ratio
-            canvasw = w * dpival
-            canvash = h * dpival
-            manager = getattr(self.canvas, 'manager', None)
-            if manager is not None:
-                manager.resize(int(canvasw), int(canvash))
+            canvas = getattr(self, 'canvas')
+            if canvas is not None:
+                ratio = getattr(self.canvas, '_dpi_ratio', 1)
+                dpival = self.dpi / ratio
+                canvasw = w * dpival
+                canvash = h * dpival
+                manager = getattr(self.canvas, 'manager', None)
+                if manager is not None:
+                    manager.resize(int(canvasw), int(canvash))
         self.stale = True
 
     def get_size_inches(self):

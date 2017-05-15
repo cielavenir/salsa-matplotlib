@@ -1,4 +1,4 @@
-From 14eb5c49d02c27e6057bae6c63b34001b3234e8d Mon Sep 17 00:00:00 2001
+From 4f0e6a0558924e33aeae0c1efd12ab5fcc9e3003 Mon Sep 17 00:00:00 2001
 From: SVN-Git Migration <python-modules-team@lists.alioth.debian.org>
 Date: Thu, 8 Oct 2015 09:47:16 -0700
 Subject: gtk3cairo_check_no-multiprocessing

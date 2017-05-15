@@ -137,7 +137,7 @@ del get_versions
 
 __version__numpy__ = str('1.7.1')  # minimum required numpy version
 
-__bibtex__ = """@Article{Hunter:2007,
+__bibtex__ = r"""@Article{Hunter:2007,
   Author    = {Hunter, J. D.},
   Title     = {Matplotlib: A 2D graphics environment},
   Journal   = {Computing In Science \& Engineering},
@@ -395,7 +395,7 @@ def checkdep_tex():
                              stderr=subprocess.PIPE)
         stdout, stderr = s.communicate()
         line = stdout.decode('ascii').split('\n')[0]
-        pattern = '3\.1\d+'
+        pattern = r'3\.1\d+'
         match = re.search(pattern, line)
         v = match.group(0)
         return v
@@ -639,7 +639,7 @@ def _get_config_or_cache_dir(xdg_base):
     h = get_home()
     if h is not None:
         p = os.path.join(h, '.matplotlib')
-    if (sys.platform.startswith('linux') and xdg_base):
+    if sys.platform.startswith(('linux', 'freebsd')) and xdg_base:
         p = os.path.join(xdg_base, 'matplotlib')
 
     if p is not None:
@@ -1257,9 +1257,9 @@ def rc(group, **kwargs):
 
       rc('font', **font)  # pass in the font dict as kwargs
 
-    This enables you to easily switch between several configurations.
-    Use :func:`~matplotlib.pyplot.rcdefaults` to restore the default
-    rc params after changes.
+    This enables you to easily switch between several configurations.  Use
+    ``matplotlib.style.use('default')`` or :func:`~matplotlib.rcdefaults` to
+    restore the default rc params after changes.
     """
 
     aliases = {
@@ -1286,13 +1286,24 @@ def rc(group, **kwargs):
 
 
 def rcdefaults():
-    """
-    Restore the default rc params.  These are not the params loaded by
-    the rc file, but mpl's internal params.  See rc_file_defaults for
-    reloading the default params from the rc file
+    """Restore the rc params from Matplotlib's internal defaults.
+
+    See Also
+    --------
+    rc_file_defaults :
+        Restore the rc params from the rc file originally loaded by Matplotlib.
+    matplotlib.style.use :
+        Use a specific style file.  Call ``style.use('default')`` to restore
+        the default style.
     """
     rcParams.clear()
     rcParams.update(rcParamsDefault)
+
+
+def rc_file_defaults():
+    """Restore the rc params from the original rc file loaded by Matplotlib.
+    """
+    rcParams.update(rcParamsOrig)
 
 
 def rc_file(fname):
@@ -1349,16 +1360,9 @@ class rc_context(object):
         rcParams.update(self._rcparams)
 
 
-def rc_file_defaults():
-    """
-    Restore the default rc params from the original matplotlib rc that
-    was loaded
-    """
-    rcParams.update(rcParamsOrig)
-
-_use_error_msg = """ This call to matplotlib.use() has no effect
-because the backend has already been chosen;
-matplotlib.use() must be called *before* pylab, matplotlib.pyplot,
+_use_error_msg = """
+This call to matplotlib.use() has no effect because the backend has already
+been chosen; matplotlib.use() must be called *before* pylab, matplotlib.pyplot,
 or matplotlib.backends is imported for the first time.
 """
 
@@ -1474,6 +1478,7 @@ else:
 
 default_test_modules = [
     'matplotlib.tests.test_agg',
+    'matplotlib.tests.test_afm',
     'matplotlib.tests.test_animation',
     'matplotlib.tests.test_arrow_patches',
     'matplotlib.tests.test_artist',
@@ -1504,6 +1509,7 @@ default_test_modules = [
     'matplotlib.tests.test_image',
     'matplotlib.tests.test_legend',
     'matplotlib.tests.test_lines',
+    'matplotlib.tests.test_marker',
     'matplotlib.tests.test_mathtext',
     'matplotlib.tests.test_mlab',
     'matplotlib.tests.test_offsetbox',
@@ -1567,8 +1573,8 @@ def _init_tests():
             "Expected freetype version {0}. "
             "Found freetype version {1}. "
             "Freetype build type is {2}local".format(
-                ft2font.__freetype_version__,
                 LOCAL_FREETYPE_VERSION,
+                ft2font.__freetype_version__,
                 "" if ft2font.__freetype_build_type__ == 'local' else "not "
             )
         )

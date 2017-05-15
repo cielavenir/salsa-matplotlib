@@ -298,8 +298,9 @@ _str_err_msg = ('You must supply exactly {n:d} comma-separated values, '
 
 
 class validate_nseq_float(object):
-    def __init__(self, n=None):
+    def __init__(self, n=None, allow_none=False):
         self.n = n
+        self.allow_none = allow_none
 
     def __call__(self, s):
         """return a seq of n floats or raise"""
@@ -313,7 +314,10 @@ class validate_nseq_float(object):
             raise ValueError(err_msg.format(n=self.n, num=len(s), s=s))
 
         try:
-            return [float(val) for val in s]
+            return [float(val)
+                    if not self.allow_none or val is not None
+                    else val
+                    for val in s]
         except ValueError:
             raise ValueError('Could not convert all entries to floats')
 
@@ -464,6 +468,11 @@ validate_mathtext_default = ValidateInStrings(
 validate_verbose = ValidateInStrings(
     'verbose',
     ['silent', 'helpful', 'debug', 'debug-annoying'])
+
+_validate_alignment = ValidateInStrings(
+    'alignment',
+    ['center', 'top', 'bottom', 'baseline',
+     'center_baseline'])
 
 def validate_whiskers(s):
     if s=='range':
@@ -690,7 +699,7 @@ def validate_hatch(s):
         raise ValueError("Unknown hatch symbol(s): %s" % list(unknown))
     return s
 validate_hatchlist = _listify_validator(validate_hatch)
-validate_dashlist = _listify_validator(validate_nseq_float())
+validate_dashlist = _listify_validator(validate_nseq_float(allow_none=True))
 
 _prop_validators = {
         'color': _listify_validator(validate_color_for_prop_cycle,
@@ -923,9 +932,10 @@ defaultParams = {
     'lines.solid_joinstyle': ['round', validate_joinstyle],
     'lines.dash_capstyle':   ['butt', validate_capstyle],
     'lines.solid_capstyle':  ['projecting', validate_capstyle],
-    'lines.dashed_pattern':  [[2.8, 1.2], validate_nseq_float()],
-    'lines.dashdot_pattern': [[4.8, 1.2, 0.8, 1.2], validate_nseq_float()],
-    'lines.dotted_pattern':  [[1.1, 1.1], validate_nseq_float()],
+    'lines.dashed_pattern':  [[3.7, 1.6], validate_nseq_float(allow_none=True)],
+    'lines.dashdot_pattern': [[6.4, 1.6, 1, 1.6],
+                              validate_nseq_float(allow_none=True)],
+    'lines.dotted_pattern':  [[1, 1.65], validate_nseq_float(allow_none=True)],
     'lines.scale_dashes':  [True, validate_bool],
 
     # marker props
@@ -1195,6 +1205,7 @@ defaultParams = {
     # fontsize of the xtick labels
     'xtick.labelsize':   ['medium', validate_fontsize],
     'xtick.direction':   ['out', six.text_type],            # direction of xticks
+    'xtick.alignment': ["center", _validate_alignment],
 
     'ytick.left':        [True, validate_bool],  # draw ticks on the left side
     'ytick.right':       [False, validate_bool],  # draw ticks on the right side
@@ -1214,6 +1225,8 @@ defaultParams = {
     # fontsize of the ytick labels
     'ytick.labelsize':   ['medium', validate_fontsize],
     'ytick.direction':   ['out', six.text_type],            # direction of yticks
+    'ytick.alignment': ["center_baseline", _validate_alignment],
+
 
     'grid.color':        ['#b0b0b0', validate_color],  # grid color
     'grid.linestyle':    ['-', six.text_type],      # solid

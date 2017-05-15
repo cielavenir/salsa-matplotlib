@@ -1,4 +1,4 @@
-From 5435bb1019cd07eadce3bae2adb1f80654761906 Mon Sep 17 00:00:00 2001
+From dfc6ae15ca2d808ec4944440160dcbccc8dcac38 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Sat, 9 Jan 2016 15:49:51 +0000
 Subject: bts800803 disable the GitHub Fork Me ribbon
@@ -8,10 +8,10 @@ Subject: bts800803 disable the GitHub Fork Me ribbon
  1 file changed, 6 deletions(-)
 
 diff --git a/doc/_templates/layout.html b/doc/_templates/layout.html
-index ad1c55a..2e716f5 100644
+index aa1f278..b5735bf 100644
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
-@@ -161,12 +161,6 @@ parents[-1].link|e }}" />
+@@ -162,12 +162,6 @@ parents[-1].link|e }}" />
  
  {% block relbar1 %}
  

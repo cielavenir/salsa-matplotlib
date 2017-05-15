@@ -979,8 +979,8 @@ def subplot(*args, **kwargs):
 
     .. note::
 
-       Creating a new subplot with a position which is entirely inside a
-       pre-existing axes will trigger the larger axes to be deleted::
+       Creating a subplot will delete any pre-existing subplot that overlaps
+       with it beyond sharing a boundary::
 
           import matplotlib.pyplot as plt
           # plot a line, implicitly creating a subplot(111)
@@ -1106,9 +1106,8 @@ def subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True,
         :class:`~matplotlib.gridspec.GridSpec` constructor used to create the
         grid the subplots are placed on.
 
-    fig_kw : dict, optional
-        Dict with keywords passed to the :func:`figure` call.  Note that all
-        keywords not recognized above will be automatically included here.
+    **fig_kw :
+        All additional keyword arguments are passed to the :func:`figure` call.
 
     Returns
     -------
@@ -2214,7 +2213,7 @@ def _setup_pyplot_info_docstrings():
 
     commands = get_plot_commands()
 
-    first_sentence = re.compile("(?:\s*).+?\.(?:\s+|$)", flags=re.DOTALL)
+    first_sentence = re.compile(r"(?:\s*).+?\.(?:\s+|$)", flags=re.DOTALL)
 
     # Collect the first sentence of the docstring for all of the
     # plotting commands.
