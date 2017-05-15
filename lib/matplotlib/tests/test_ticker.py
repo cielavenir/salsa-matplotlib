@@ -13,7 +13,7 @@ from matplotlib.testing.decorators import cleanup
 import warnings
 
 
-@cleanup(style='classic')
+@cleanup(style='_classic_test')
 def test_MaxNLocator():
     loc = mticker.MaxNLocator(nbins=5)
     test_value = np.array([20., 40., 60., 80., 100.])
@@ -172,7 +172,7 @@ def test_SymmetricalLogLocator_set_params():
     nose.tools.assert_equal(sym.numticks, 8)
 
 
-@cleanup(style='classic')
+@cleanup(style='_classic_test')
 def test_ScalarFormatter_offset_value():
     fig, ax = plt.subplots()
     formatter = ax.get_xaxis().get_major_formatter()
@@ -321,24 +321,24 @@ def test_LogFormatterExponent():
 def test_LogFormatterSciNotation():
     test_cases = {
         10: (
-             (-1, '${-10^{0}}$'),
-             (1e-05, '${10^{-5}}$'),
-             (1, '${10^{0}}$'),
-             (100000, '${10^{5}}$'),
-             (2e-05, '${2\\times10^{-5}}$'),
-             (2, '${2\\times10^{0}}$'),
-             (200000, '${2\\times10^{5}}$'),
-             (5e-05, '${5\\times10^{-5}}$'),
-             (5, '${5\\times10^{0}}$'),
-             (500000, '${5\\times10^{5}}$'),
+             (-1, '$\\mathdefault{-10^{0}}$'),
+             (1e-05, '$\\mathdefault{10^{-5}}$'),
+             (1, '$\\mathdefault{10^{0}}$'),
+             (100000, '$\\mathdefault{10^{5}}$'),
+             (2e-05, '$\\mathdefault{2\\times10^{-5}}$'),
+             (2, '$\\mathdefault{2\\times10^{0}}$'),
+             (200000, '$\\mathdefault{2\\times10^{5}}$'),
+             (5e-05, '$\\mathdefault{5\\times10^{-5}}$'),
+             (5, '$\\mathdefault{5\\times10^{0}}$'),
+             (500000, '$\\mathdefault{5\\times10^{5}}$'),
         ),
         2: (
-            (0.03125, '${2^{-5}}$'),
-            (1, '${2^{0}}$'),
-            (32, '${2^{5}}$'),
-            (0.0375, '${1.2\\times2^{-5}}$'),
-            (1.2, '${1.2\\times2^{0}}$'),
-            (38.4, '${1.2\\times2^{5}}$'),
+            (0.03125, '$\\mathdefault{2^{-5}}$'),
+            (1, '$\\mathdefault{2^{0}}$'),
+            (32, '$\\mathdefault{2^{5}}$'),
+            (0.0375, '$\\mathdefault{1.2\\times2^{-5}}$'),
+            (1.2, '$\\mathdefault{1.2\\times2^{0}}$'),
+            (38.4, '$\\mathdefault{1.2\\times2^{5}}$'),
         )
     }
 

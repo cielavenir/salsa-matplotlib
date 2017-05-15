@@ -481,13 +481,18 @@ class CallbackRegistry(object):
         self._cid = 0
         self._func_cid_map = {}
 
+    # In general, callbacks may not be pickled; thus, we simply recreate an
+    # empty dictionary at unpickling.  In order to ensure that `__setstate__`
+    # (which just defers to `__init__`) is called, `__getstate__` must
+    # return a truthy value (for pickle protocol>=3, i.e. Py3, the
+    # *actual* behavior is that `__setstate__` will be called as long as
+    # `__getstate__` does not return `None`, but this is undocumented -- see
+    # http://bugs.python.org/issue12290).
+
     def __getstate__(self):
-        # We cannot currently pickle the callables in the registry, so
-        # return an empty dictionary.
-        return {}
+        return True
 
     def __setstate__(self, state):
-        # re-initialise an empty callback registry
         self.__init__()
 
     def connect(self, s, func):
@@ -1891,9 +1896,12 @@ def boxplot_stats(X, whis=1.5, bootstrap=None, labels=None,
         fewer dimensions.
 
     whis : float, string, or sequence (default = 1.5)
-        As a float, determines the reach of the whiskers past the first
-        and third quartiles (e.g., Q3 + whis*IQR, QR = interquartile
-        range, Q3-Q1). Beyond the whiskers, data are considered outliers
+        As a float, determines the reach of the whiskers to the beyond the
+        first and third quartiles. In other words, where IQR is the
+        interquartile range (`Q3-Q1`), the upper whisker will extend to last
+        datum less than `Q3 + whis*IQR`). Similarly, the lower whisker will
+        extend to the first datum greater than `Q1 - whis*IQR`.
+        Beyond the whiskers, data are considered outliers
         and are plotted as individual points. This can be set this to an
         ascending sequence of percentile (e.g., [5, 95]) to set the
         whiskers at specific percentiles of the data. Finally, `whis`
@@ -1957,8 +1965,8 @@ def boxplot_stats(X, whis=1.5, bootstrap=None, labels=None,
         M = len(data)
         percentiles = [2.5, 97.5]
 
-        ii = np.random.randint(M, size=(N, M))
-        bsData = x[ii]
+        bs_index = np.random.randint(M, size=(N, M))
+        bsData = data[bs_index]
         estimate = np.median(bsData, axis=1, overwrite_input=True)
 
         CI = np.percentile(estimate, percentiles)

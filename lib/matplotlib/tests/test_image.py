@@ -26,12 +26,11 @@ from numpy.testing import (
 from matplotlib.testing.noseclasses import KnownFailureTest
 from copy import copy
 from numpy import ma
+import matplotlib.image as mimage
 import matplotlib.colors as colors
-import matplotlib.pyplot as plt
-import matplotlib.mlab as mlab
-import numpy as np
 
 import nose
+import nose.tools
 
 try:
     from PIL import Image
@@ -59,6 +58,7 @@ def test_image_interps():
     ax3 = fig.add_subplot(313)
     ax3.imshow(X, interpolation='bicubic')
     ax3.set_ylabel('bicubic')
+
 
 @image_comparison(baseline_images=['interp_nearest_vs_none'],
                   extensions=['pdf', 'svg'], remove_text=True)
@@ -161,21 +161,24 @@ def test_imsave_color_alpha():
     # acceptably preserved through a save/read roundtrip.
     from numpy import random
     random.seed(1)
-    data = random.rand(16, 16, 4)
 
-    buff = io.BytesIO()
-    plt.imsave(buff, data)
+    for origin in ['lower', 'upper']:
+        data = random.rand(16, 16, 4)
+        buff = io.BytesIO()
+        plt.imsave(buff, data, origin=origin)
 
-    buff.seek(0)
-    arr_buf = plt.imread(buff)
+        buff.seek(0)
+        arr_buf = plt.imread(buff)
 
-    # Recreate the float -> uint8 conversion of the data
-    # We can only expect to be the same with 8 bits of precision,
-    # since that's what the PNG file used.
-    data = (255*data).astype('uint8')
-    arr_buf = (255*arr_buf).astype('uint8')
+        # Recreate the float -> uint8 conversion of the data
+        # We can only expect to be the same with 8 bits of precision,
+        # since that's what the PNG file used.
+        data = (255*data).astype('uint8')
+        if origin == 'lower':
+            data = data[::-1]
+        arr_buf = (255*arr_buf).astype('uint8')
 
-    assert_array_equal(data, arr_buf)
+        assert_array_equal(data, arr_buf)
 
 @image_comparison(baseline_images=['image_alpha'], remove_text=True)
 def test_image_alpha():
@@ -754,12 +757,57 @@ def test_imshow_endianess():
     ax2.imshow(Z.astype('>f8'), **kwargs)
 
 
+@image_comparison(baseline_images=['imshow_masked_interpolation'],
+                  remove_text=True, style='default')
+def test_imshow_masked_interpolation():
+
+    cm = copy(plt.get_cmap('viridis'))
+    cm.set_over('r')
+    cm.set_under('b')
+    cm.set_bad('k')
+
+    N = 20
+    n = colors.Normalize(vmin=0, vmax=N*N-1)
+
+    # data = np.random.random((N, N))*N*N
+    data = np.arange(N*N, dtype='float').reshape(N, N)
+
+    data[5, 5] = -1
+
+    data[15, 5] = 1e5
+
+    # data[3, 3] = np.nan
+
+    data[15, 15] = np.inf
+
+    mask = np.zeros_like(data).astype('bool')
+    mask[5, 15] = True
+
+    data = np.ma.masked_array(data, mask)
+
+    fig, ax_grid = plt.subplots(3, 6)
+    for interp, ax in zip(sorted(mimage._interpd_), ax_grid.ravel()):
+        ax.set_title(interp)
+        ax.imshow(data, norm=n, cmap=cm, interpolation=interp)
+        ax.axis('off')
+
+
 @cleanup
 def test_imshow_no_warn_invalid():
     with warnings.catch_warnings(record=True) as warns:
         warnings.simplefilter("always")
         plt.imshow([[1, 2], [3, np.nan]])
     assert len(warns) == 0
+
+
+@cleanup
+def test_empty_imshow():
+    fig, ax = plt.subplots()
+    im = ax.imshow([[]])
+    im.set_extent([-5, 5, -5, 5])
+    fig.canvas.draw()
+
+    nose.tools.assert_raises(RuntimeError, im.make_image, fig._cachedRenderer)
 
 
 if __name__ == '__main__':

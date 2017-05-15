@@ -3,7 +3,7 @@ from __future__ import (absolute_import, division, print_function,
 
 import six
 from six.moves import xrange
-from itertools import chain
+from itertools import chain, product
 from distutils.version import LooseVersion
 import io
 
@@ -228,6 +228,34 @@ def test_basic_annotate():
 
     ax.annotate('local max', xy=(3, 1), xycoords='data',
                 xytext=(3, 3), textcoords='offset points')
+
+
+@image_comparison(baseline_images=['arrow_simple'],
+                  extensions=['png'], remove_text=True)
+def test_arrow_simple():
+    # Simple image test for ax.arrow
+    # kwargs that take discrete values
+    length_includes_head = (True, False)
+    shape = ('full', 'left', 'right')
+    head_starts_at_zero = (True, False)
+    # Create outer product of values
+    kwargs = list(product(length_includes_head, shape, head_starts_at_zero))
+
+    fig, axs = plt.subplots(3, 4)
+    for i, (ax, kwarg) in enumerate(zip(axs.flatten(), kwargs)):
+        ax.set_xlim(-2, 2)
+        ax.set_ylim(-2, 2)
+        # Unpack kwargs
+        (length_includes_head, shape, head_starts_at_zero) = kwarg
+        theta = 2 * np.pi * i / 12
+        # Draw arrow
+        ax.arrow(0, 0, np.sin(theta), np.cos(theta),
+                 width=theta/100,
+                 length_includes_head=length_includes_head,
+                 shape=shape,
+                 head_starts_at_zero=head_starts_at_zero,
+                 head_width=theta / 10,
+                 head_length=theta / 10)
 
 
 @image_comparison(baseline_images=['polar_axes'])
@@ -1139,6 +1167,15 @@ def test_bar_ticklabel_fail():
                   extensions=['png'])
 def test_bar_tick_label_multiple():
     # From 2516: plot bar with array of string labels for x axis
+    ax = plt.gca()
+    ax.bar([1, 2.5], [1, 2], width=[0.2, 0.5], tick_label=['a', 'b'],
+           align='center')
+
+@image_comparison(baseline_images=['bar_tick_label_multiple_old_label_alignment'],
+                  extensions=['png'])
+def test_bar_tick_label_multiple_old_alignment():
+    # Test that the algnment for class is backward compatible
+    matplotlib.rcParams["ytick.alignment"] = "center"
     ax = plt.gca()
     ax.bar([1, 2.5], [1, 2], width=[0.2, 0.5], tick_label=['a', 'b'],
            align='center')
@@ -2301,6 +2338,16 @@ def test_manage_xticks():
     assert_array_equal(old_xlim, new_xlim)
 
 
+@cleanup
+def test_tick_space_size_0():
+    # allow font size to be zero, which affects ticks when there is
+    # no other text in the figure.
+    plt.plot([0, 1], [0, 1])
+    matplotlib.rcParams.update({'font.size': 0})
+    b = io.BytesIO()
+    plt.savefig(b, dpi=80, format='raw')
+
+
 @image_comparison(baseline_images=['errorbar_basic', 'errorbar_mixed',
                                    'errorbar_basic'])
 def test_errorbar():
@@ -2353,6 +2400,22 @@ def test_errorbar():
     ax = fig.gca()
     ax.errorbar("x", "y", xerr=0.2, yerr=0.4, data=data)
     ax.set_title("Simplest errorbars, 0.2 in x, 0.4 in y")
+
+
+@cleanup
+def test_errorbar_colorcycle():
+
+    f, ax = plt.subplots()
+    x = np.arange(10)
+    y = 2*x
+
+    e1, _, _ = ax.errorbar(x, y, c=None)
+    e2, _, _ = ax.errorbar(x, 2*y, c=None)
+    ln1, = ax.plot(x, 4*y)
+
+    assert mcolors.to_rgba(e1.get_color()) == mcolors.to_rgba('C0')
+    assert mcolors.to_rgba(e2.get_color()) == mcolors.to_rgba('C1')
+    assert mcolors.to_rgba(ln1.get_color()) == mcolors.to_rgba('C2')
 
 
 @cleanup
@@ -2417,6 +2480,18 @@ def test_errorbar_limits():
                  color='cyan')
     ax.set_xlim((0, 5.5))
     ax.set_title('Errorbar upper and lower limits')
+
+
+@cleanup
+def test_errobar_nonefmt():
+    # Check that passing 'none' as a format still plots errorbars
+    x = np.arange(5)
+    y = np.arange(5)
+
+    plotline, _, barlines = plt.errorbar(x, y, xerr=1, yerr=1, fmt='none')
+    assert plotline is None
+    for errbar in barlines:
+        assert np.all(errbar.get_color() == mcolors.to_rgba('C0'))
 
 
 @image_comparison(baseline_images=['hist_stacked_stepfilled',
@@ -4323,18 +4398,6 @@ def test_rc_major_minor_tick():
         assert yax._minor_tick_kw['tick2On'] == True
 
 
-@cleanup
-def test_bar_negative_width():
-    fig, ax = plt.subplots()
-    res = ax.bar(range(1, 5), range(1, 5), width=-1)
-    assert_equal(len(res), 4)
-    for indx, b in enumerate(res):
-        assert_equal(b._x, indx)
-        assert_equal(b._width, 1)
-        assert_equal(b._height, indx + 1)
-
-
-@cleanup
 def test_square_plot():
     x = np.arange(4)
     y = np.array([1., 3., 5., 7.])
@@ -4824,6 +4887,34 @@ def test_scatter_color_masking():
 def test_eventplot_legend():
     plt.eventplot([1.0], label='Label')
     plt.legend()
+
+
+# Test all 4 combinations of logs/symlogs for minorticks_on()
+@cleanup
+def test_minorticks_on():
+    for xscale in ['symlog', 'log']:
+        for yscale in ['symlog', 'log']:
+            fig, ax = plt.subplots()
+            ax.plot([1, 2, 3, 4])
+            ax.set_xscale(xscale)
+            ax.set_yscale(yscale)
+            ax.minorticks_on()
+
+
+@cleanup
+def test_twinx_knows_limits():
+    fig, ax = plt.subplots()
+
+    ax.axvspan(1, 2)
+    xtwin = ax.twinx()
+    xtwin.plot([0, 0.5], [1, 2])
+    # control axis
+    fig2, ax2 = plt.subplots()
+
+    ax2.axvspan(1, 2)
+    ax2.plot([0, 0.5], [1, 2])
+
+    assert((xtwin.viewLim.intervalx == ax2.viewLim.intervalx).all())
 
 
 if __name__ == '__main__':
