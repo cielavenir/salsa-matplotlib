@@ -1,3 +1,9 @@
+matplotlib (2.0.2-1) UNRELEASED; urgency=medium
+
+  * New upstream release
+
+ -- Sandro Tosi <morph@debian.org>  Sat, 27 May 2017 22:28:54 -0400
+
 matplotlib (2.0.0+dfsg1-2) unstable; urgency=medium
 
   * debian/rules
