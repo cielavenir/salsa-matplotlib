@@ -80,59 +80,6 @@ Files: lib/matplotlib/table.py
 Author: John Gill <jng@europe.renre.com>
 Copyright: 2004 John Gill and John Hunter
 
-Files: lib/matplotlib/delaunay/VoronoiDiagramGenerator.{cpp, h}
-Author: The author of this software is Steven Fortune.
-Copyright: Copyright (c) 1994 by AT&T Bell Laboratories.
-License:
- Permission to use, copy, modify, and distribute this software for any
- purpose without fee is hereby granted, provided that this entire notice
- is included in all copies of any software which is or includes a copy
- or modification of this software and in all copies of the supporting
- documentation for such software.
- THIS SOFTWARE IS BEING PROVIDED "AS IS", WITHOUT ANY EXPRESS OR IMPLIED
- WARRANTY.  IN PARTICULAR, NEITHER THE AUTHORS NOR AT&T MAKE ANY
- REPRESENTATION OR WARRANTY OF ANY KIND CONCERNING THE MERCHANTABILITY
- OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR PURPOSE.
-Comment:
- This code was originally written by Stephan Fortune in C code.  I, Shane O'Sullivan,
- have since modified it, encapsulating it in a C++ class and, fixing memory leaks and
- adding accessors to the Voronoi Edges.
- Permission to use, copy, modify, and distribute this software for any
- purpose without fee is hereby granted, provided that this entire notice
- is included in all copies of any software which is or includes a copy
- or modification of this software and in all copies of the supporting
- documentation for such software.
- THIS SOFTWARE IS BEING PROVIDED "AS IS", WITHOUT ANY EXPRESS OR IMPLIED
- WARRANTY.  IN PARTICULAR, NEITHER THE AUTHORS NOR AT&T MAKE ANY
- REPRESENTATION OR WARRANTY OF ANY KIND CONCERNING THE MERCHANTABILITY
- OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR PURPOSE.
-
-Files: lib/matplotlib/delaunay/./__init__.py
-Author: Robert Kern <robert.kern@gmail.com>
-Copyright: Copyright 2005 Robert Kern.
-License: BSD-style license. See LICENSE.txt in the scipy source directory.
-
-Files: lib/matplotlib/testing/image_util.py
-Copyright: Copyright (c) 1997-2009 by Secret Labs AB
-           Copyright (c) 1995-2009 by Fredrik Lundh
-License:
- Permission to use, copy, modify, and distribute this software and its
- associated documentation for any purpose and without fee is hereby
- granted, provided that the above copyright notice appears in all
- copies, and that both that copyright notice and this permission notice
- appear in supporting documentation, and that the name of Secret Labs
- AB or the author not be used in advertising or publicity pertaining to
- distribution of the software without specific, written prior
- permission.
- .
- SECRET LABS AB AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO
- THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
- FITNESS.  IN NO EVENT SHALL SECRET LABS AB OR THE AUTHOR BE LIABLE FOR
- ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
- OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
 Files: lib/matplotlib/mpl-data/fonts/ttf/(non STIX)*.ttf
 Copyright: Copyright (c) 2003 by Bitstream, Inc. All Rights
            Reserved. Bitstream Vera is a trademark of Bitstream, Inc.
