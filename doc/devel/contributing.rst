@@ -14,25 +14,62 @@ Submitting a bug report
 
 If you find a bug in the code or documentation, do not hesitate to submit a
 ticket to the
-`Bug Tracker <https://github.com/matplotlib/matplotlib/issues>`_. You are
-also welcome to post feature requests or pull requests.
+`Bug Tracker <https://github.com/matplotlib/matplotlib/issues>`_. You are also
+welcome to post feature requests or pull requests.
 
+If you are reporting a bug, please do your best to include the following:
+
+ 1. A short, top-level summary of the bug. In most cases, this should be 1-2
+    sentences.
+
+ 2. A short, self-contained code snippet to reproduce the bug, ideally allowing
+    a simple copy and paste to reproduce. Please do your best to reduce the code
+    snippet to the minimum required.
+
+ 3. The actual outcome of the code snippet
+
+ 4. The expected outcome of the code snippet
+
+ 5. The Matplotlib version, Python version and platform that you are using. You
+    can grab the version with the following commands::
+
+        >>> import matplotlib
+        >>> matplotlib.__version__
+        '1.5.3'
+        >>> import platform
+        >>> platform.python_version()
+        '2.7.12'
+
+We have preloaded the issue creation page with a Markdown template that you can
+use to organize this information.
+
+Thank you for your help in keeping bug reports complete, targeted and descriptive.
 
 Retrieving and installing the latest version of the code
 ========================================================
 
-When working on the Matplotlib source, setting up a `virtual
-environment
-<http://docs.python-guide.org/en/latest/dev/virtualenvs/>`_ or a
-`conda environment <http://conda.pydata.org/docs/using/envs.html>`_ is
-recommended.
+When developing Matplotlib, sources must be downloaded, built, and installed into
+a local environment on your machine.
+
+Follow the instructions detailed :ref:`here <install_from_source>` to set up your
+environment to build Matplotlib from source.
 
 .. warning::
 
-   If you already have a version of Matplotlib installed, use an
-   virtual environment or uninstall using the same method you used
-   to install it.  Installing multiple versions of Matplotlib via different
-   methods into the same environment may not always work as expected.
+   When working on Matplotlib sources, having multiple versions installed by
+   different methods into the same environment may not always work as expected.
+
+To work on Matplotlib sources, it is strongly recommended to set up an alternative
+development environment, using the something like `virtual environments in python
+<http://docs.python-guide.org/en/latest/dev/virtualenvs/>`_, or a
+`conda environment <http://conda.pydata.org/docs/using/envs.html>`_.
+
+If you choose to use an already existing environment, and not a clean virtual or
+conda environment, uninstall the current version of Matplotlib in that enviroment
+using the same method used to install it.
+
+If working on Matplotlib documentation only, the above steps are *not* absolutely
+necessary.
 
 We use `Git <https://git-scm.com/>`_ for version control and
 `GitHub <https://github.com/>`_ for hosting our main repository.
@@ -40,9 +77,12 @@ We use `Git <https://git-scm.com/>`_ for version control and
 You can check out the latest sources with the command (see
 :ref:`set-up-fork` for more details)::
 
-    git clone git@github.com:matplotlib/matplotlib.git
+    git clone https://github.com:matplotlib/matplotlib.git
 
-and navigate to the :file:`matplotlib` directory.
+and navigate to the :file:`matplotlib` directory. If you have the proper privileges,
+you can use ``git@`` instead of  ``https://``, which works through the ssh protocol
+and might be easier to use if you are using 2-factor authentication.
+
 
 To make sure the tests run locally you must build against the correct version
 of freetype.  To configure the build system to fetch and build it either export
@@ -93,14 +133,16 @@ environment is set up properly::
   python tests.py
 
 
-.. _nose: https://nose.readthedocs.io/en/latest/
+.. _pytest: http://doc.pytest.org/en/latest/
 .. _pep8: https://pep8.readthedocs.io/en/latest/
+.. _mock: https://docs.python.org/dev/library/unittest.mock.html
+.. _Ghostscript: https://www.ghostscript.com/
+.. _Inkscape: https://inkscape.org>
 
 .. note::
 
-  **Additional dependencies for testing**: nose_ (version 1.0 or later), `mock
-  <https://docs.python.org/dev/library/unittest.mock.html>`_ (if python < 3.3), `Ghostscript
-  <https://www.ghostscript.com/>`_, `Inkscape <https://inkscape.org>`_
+  **Additional dependencies for testing**: pytest_ (version 3.0 or later),
+  mock_ (if python < 3.3), Ghostscript_, Inkscape_
 
 .. seealso::
 
@@ -127,7 +169,7 @@ then submit a "pull request" (PR):
 
  3. Clone this copy to your local disk::
 
-        $ git clone git@github.com:YourLogin/matplotlib.git
+        $ git clone https://github.com:YourLogin/matplotlib.git
 
  4. Create a branch to hold your changes::
 
@@ -385,8 +427,8 @@ Developing a new backend
 ------------------------
 
 If you are working on a custom backend, the *backend* setting in
-:file:`matplotlibrc` (:ref:`customizing-matplotlib`) supports an
-external backend via the ``module`` directive.  if
+:file:`matplotlibrc` (:ref:`sphx_glr_tutorials_introductory_customizing.py`) supports an
+external backend via the ``module`` directive.  If
 :file:`my_backend.py` is a Matplotlib backend in your
 :envvar:`PYTHONPATH`, you can set it on one of several ways
 
@@ -394,15 +436,10 @@ external backend via the ``module`` directive.  if
 
     backend : module://my_backend
 
-
 * with the :envvar:`MPLBACKEND` environment variable::
 
     > export MPLBACKEND="module://my_backend"
     > python simple_plot.py
-
-* from the command shell with the `-d` flag::
-
-    > python simple_plot.py -dmodule://my_backend
 
 * with the use directive in your script::
 
@@ -416,9 +453,8 @@ Writing examples
 
 We have hundreds of examples in subdirectories of
 :file:`matplotlib/examples`, and these are automatically generated
-when the website is built to show up both in the `examples
-<../examples/index.html>`_ and `gallery
-<../gallery.html>`_ sections of the website.
+when the website is built to show up in the `examples
+<../gallery/index.html>` section of the website.
 
 Any sample data that the example uses should be kept small and
 distributed with Matplotlib in the

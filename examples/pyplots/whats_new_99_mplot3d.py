@@ -1,5 +1,9 @@
-import random
+"""
+======================
+Whats New 0.99 Mplot3d
+======================
 
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm

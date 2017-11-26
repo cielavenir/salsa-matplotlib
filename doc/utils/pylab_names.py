@@ -4,11 +4,9 @@ autogenerate some tables for pylab namespace
 """
 from pylab import *
 d = locals()
-keys = d.keys()
-keys.sort()
 
 modd = dict()
-for k in keys:
+for k in sorted(d):
     o = d[k]
     if not callable(o):
         continue
@@ -37,25 +35,20 @@ for k in keys:
     mod, k, doc = mod.strip(), k.strip(), doc.strip()[:80]
     modd.setdefault(mod, []).append((k, doc))
 
-mods = modd.keys()
-mods.sort()
-for mod in mods:
-    border = '*'*len(mod)
+for mod in sorted(modd):
+    border = '*' * len(mod)
     print(mod)
     print(border)
 
     print()
     funcs, docs = zip(*modd[mod])
-    maxfunc = max([len(f) for f in funcs])
-    maxdoc = max(40, max([len(d) for d in docs]) )
-    border = ' '.join(['='*maxfunc, '='*maxdoc])
+    maxfunc = max(len(f) for f in funcs)
+    maxdoc = max(40, max(len(d) for d in docs))
+    border = '=' * maxfunc + ' ' + '=' * maxdoc
     print(border)
-    print(' '.join(['symbol'.ljust(maxfunc), 'description'.ljust(maxdoc)]))
+    print('{:<{}} {:<{}}'.format('symbol', maxfunc, 'description', maxdoc))
     print(border)
     for func, doc in modd[mod]:
-        row = ' '.join([func.ljust(maxfunc), doc.ljust(maxfunc)])
-        print(row)
-
+        print('{:<{}} {:<{}}'.format(func, maxfunc, doc, maxdoc))
     print(border)
     print()
-    #break

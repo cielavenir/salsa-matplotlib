@@ -358,8 +358,9 @@ class SymmetricalLogScale(ScaleBase):
            The base of the logarithm
 
         *linthreshx*/*linthreshy*:
-          The range (-*x*, *x*) within which the plot is linear (to
-          avoid having the plot go to infinity around zero).
+          A single float which defines the range (-*x*, *x*), within
+          which the plot is linear. This avoids having the plot go to
+          infinity around zero.
 
         *subsx*/*subsy*:
            Where to place the subticks between each major tick.
@@ -519,9 +520,7 @@ _scale_mapping = {
 
 
 def get_scale_names():
-    names = list(six.iterkeys(_scale_mapping))
-    names.sort()
-    return names
+    return sorted(_scale_mapping)
 
 
 def scale_factory(scale, axis, **kwargs):

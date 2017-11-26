@@ -7,7 +7,7 @@
  */
 #include "Python.h"
 #include "numpy/noprefix.h"
-#include "qhull/qhull_a.h"
+#include "libqhull/qhull_a.h"
 #include <stdio.h>
 
 
@@ -108,6 +108,10 @@ delaunay_impl(int npoints, const double* x, const double* y,
     PyArrayObject* neighbors = NULL;
     int* triangles_ptr;
     int* neighbors_ptr;
+    double x_mean = 0.0;
+    double y_mean = 0.0;
+
+    QHULL_LIB_CHECK
 
     /* Allocate points. */
     points = (coordT*)malloc(npoints*ndim*sizeof(coordT));
@@ -117,10 +121,18 @@ delaunay_impl(int npoints, const double* x, const double* y,
         goto error_before_qhull;
     }
 
+    /* Determine mean x, y coordinates. */
+    for (i = 0; i < npoints; ++i) {
+        x_mean += x[i];
+        y_mean += y[i];
+    }
+    x_mean /= npoints;
+    y_mean /= npoints;
+
     /* Prepare points array to pass to qhull. */
     for (i = 0; i < npoints; ++i) {
-        points[2*i  ] = x[i];
-        points[2*i+1] = y[i];
+        points[2*i  ] = x[i] - x_mean;
+        points[2*i+1] = y[i] - y_mean;
     }
 
     /* qhull expects a FILE* to write errors to. */

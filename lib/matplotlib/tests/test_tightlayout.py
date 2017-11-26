@@ -6,10 +6,8 @@ import warnings
 
 import numpy as np
 
-from matplotlib.testing.decorators import image_comparison, knownfailureif
+from matplotlib.testing.decorators import image_comparison
 import matplotlib.pyplot as plt
-from nose.tools import assert_raises
-from numpy.testing import assert_array_equal
 from matplotlib.offsetbox import AnchoredOffsetbox, DrawingArea
 from matplotlib.patches import Rectangle
 
@@ -60,7 +58,7 @@ def test_tight_layout3():
 
 
 @image_comparison(baseline_images=['tight_layout4'],
-                  freetype_version=('2.4.5', '2.4.9'))
+                  freetype_version=('2.5.5', '2.6.1'))
 def test_tight_layout4():
     'Test tight_layout for subplot2grid'
 
@@ -266,3 +264,12 @@ def test_tight_layout_offsetboxes():
                 child.set_visible(False)
 
     plt.tight_layout()
+
+
+def test_empty_layout():
+    """Tests that tight layout doesn't cause an error when there are
+    no axes.
+    """
+
+    fig = plt.gcf()
+    fig.tight_layout()

@@ -47,7 +47,7 @@ def get_auth_token():
         with open(os.path.join(os.path.expanduser('~'), '.ghoauth')) as f:
             token, = f
             return token
-    except:
+    except Exception:
         pass
 
     import keyring
@@ -183,8 +183,7 @@ def get_milestone_id(project, milestone, auth=False, **params):
     for mstone in milestones:
         if mstone['title'] == milestone:
             return mstone['number']
-    else:
-        raise ValueError("milestone %s not found" % milestone)
+    raise ValueError("milestone %s not found" % milestone)
 
 def is_pull_request(issue):
     """Return True if the given issue is a pull request."""

@@ -21,7 +21,8 @@ All of these dependencies *except graphviz* can be installed through pip::
 
 or all of them via conda and pip::
 
-  conda install sphinx numpydoc ipython mock graphviz pillow
+  conda install sphinx numpydoc ipython mock graphviz pillow \
+    sphinx-gallery
   pip install colorspacious
 
 To build the HTML documentation, type ``python make.py html`` in this
@@ -70,4 +71,3 @@ python documentation system built on top of ReST.  This directory contains
 
 * mpl_examples - a link to the Matplotlib examples in case any
   documentation wants to literal include them
-

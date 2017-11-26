@@ -55,10 +55,7 @@ def stackplot(axes, x, *args, **kwargs):
     element in the stacked area plot.
     """
 
-    if len(args) == 1:
-        y = np.atleast_2d(*args)
-    elif len(args) > 1:
-        y = np.row_stack(args)
+    y = np.row_stack(args)
 
     labels = iter(kwargs.pop('labels', []))
 
@@ -86,7 +83,6 @@ def stackplot(axes, x, *args, **kwargs):
 
     elif baseline == 'weighted_wiggle':
         m, n = y.shape
-        center = np.zeros(n)
         total = np.sum(y, 0)
         # multiply by 1/total (or zero) to avoid infinities in the division:
         inv_total = np.zeros_like(total)

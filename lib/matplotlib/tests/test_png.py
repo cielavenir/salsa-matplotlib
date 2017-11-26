@@ -17,14 +17,13 @@ on_win = (sys.platform == 'win32')
 
 
 @image_comparison(baseline_images=['pngsuite'], extensions=['png'],
-                  tol=0.01 if on_win else 0)
+                  tol=0.03)
 def test_pngsuite():
     dirname = os.path.join(
         os.path.dirname(__file__),
         'baseline_images',
         'pngsuite')
-    files = glob.glob(os.path.join(dirname, 'basn*.png'))
-    files.sort()
+    files = sorted(glob.iglob(os.path.join(dirname, 'basn*.png')))
 
     fig = plt.figure(figsize=(len(files), 2))
 

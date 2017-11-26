@@ -9,6 +9,10 @@ The axis handles unit conversions and the artists keep a pointer to their axis
 parent. You must initialize the artists with the axis instance if you want to
 use them with unit data, or else they will not know how to convert the units
 to scalars.
+
+.. only:: builder_html
+
+   This example requires :download:`basic_units.py <basic_units.py>`
 """
 import random
 import matplotlib.lines as lines
@@ -23,6 +27,9 @@ import matplotlib.pyplot as plt
 fig, ax = plt.subplots()
 ax.xaxis.set_units(cm)
 ax.yaxis.set_units(cm)
+
+# Fixing random state for reproducibility
+np.random.seed(19680801)
 
 if 0:
     # test a line collection

@@ -1,5 +1,7 @@
 """
-Demo of a function to create Hinton diagrams.
+===============
+Hinton diagrams
+===============
 
 Hinton diagrams are useful for visualizing the values of a 2D array (e.g.
 a weight matrix): Positive and negative values are represented by white and
@@ -36,5 +38,8 @@ def hinton(matrix, max_weight=None, ax=None):
 
 
 if __name__ == '__main__':
+    # Fixing random state for reproducibility
+    np.random.seed(19680801)
+
     hinton(np.random.rand(20, 20) - 0.5)
     plt.show()

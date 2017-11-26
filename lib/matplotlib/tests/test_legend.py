@@ -1,21 +1,19 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
-from six.moves import xrange
 try:
     # mock in python 3.3+
     from unittest import mock
 except ImportError:
     import mock
-from nose.tools import assert_equal
 import numpy as np
 
-from matplotlib.testing.decorators import image_comparison, cleanup
+from matplotlib.testing.decorators import image_comparison
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import matplotlib.transforms as mtrans
+import matplotlib.transforms as mtransforms
 import matplotlib.collections as mcollections
+from matplotlib.legend_handler import HandlerTuple
 
 
 @image_comparison(baseline_images=['legend_auto1'], remove_text=True)
@@ -58,9 +56,9 @@ def test_various_labels():
     # tests all sorts of label types
     fig = plt.figure()
     ax = fig.add_subplot(121)
-    ax.plot(list(xrange(4)), 'o', label=1)
+    ax.plot(np.arange(4), 'o', label=1)
     ax.plot(np.linspace(4, 4.1), 'o', label='D\xe9velopp\xe9s')
-    ax.plot(list(xrange(4, 1, -1)), 'o', label='__nolegend__')
+    ax.plot(np.arange(4, 1, -1), 'o', label='__nolegend__')
     ax.legend(numpoints=1, loc=0)
 
 
@@ -74,6 +72,21 @@ def test_labels_first():
     ax.plot(np.ones(10)*5, ':x', label="x")
     ax.plot(np.arange(20, 10, -1), 'd', label="diamond")
     ax.legend(loc=0, markerfirst=False)
+
+
+@image_comparison(baseline_images=['legend_multiple_keys'], extensions=['png'],
+                  remove_text=True)
+def test_multiple_keys():
+    # test legend entries with multiple keys
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    p1, = ax.plot([1, 2, 3], '-o')
+    p2, = ax.plot([2, 3, 4], '-x')
+    p3, = ax.plot([3, 4, 5], '-d')
+    ax.legend([(p1, p2), (p2, p1), p3], ['two keys', 'pad=0', 'one key'],
+              numpoints=1,
+              handler_map={(p1, p2): HandlerTuple(ndivide=None),
+                           (p2, p1): HandlerTuple(ndivide=None, pad=0)})
 
 
 @image_comparison(baseline_images=['rgba_alpha'],
@@ -96,7 +109,7 @@ def test_alpha_rcparam():
     ax.plot(range(10), lw=5)
     with mpl.rc_context(rc={'legend.framealpha': .75}):
         leg = plt.legend(['Longlabel that will go away'], loc=10)
-        # this alpha is going to be over-ridden by the rcparam whith
+        # this alpha is going to be over-ridden by the rcparam with
         # sets the alpha of the patch to be non-None which causes the alpha
         # value of the face color to be discarded.  This behavior may not be
         # ideal, but it is what it is and we should keep track of it changing
@@ -107,9 +120,9 @@ def test_alpha_rcparam():
 def test_fancy():
     # using subplot triggers some offsetbox functionality untested elsewhere
     plt.subplot(121)
-    plt.scatter(list(xrange(10)), list(xrange(10, 0, -1)), label='XX\nXX')
+    plt.scatter(np.arange(10), np.arange(10, 0, -1), label='XX\nXX')
     plt.plot([5] * 10, 'o--', label='XX')
-    plt.errorbar(list(xrange(10)), list(xrange(10)), xerr=0.5,
+    plt.errorbar(np.arange(10), np.arange(10), xerr=0.5,
                  yerr=0.5, label='XX')
     plt.legend(loc="center left", bbox_to_anchor=[1.0, 0.5],
                ncol=2, shadow=True, title="My legend", numpoints=1)
@@ -127,16 +140,16 @@ def test_framealpha():
                   remove_text=True)
 def test_rc():
     # using subplot triggers some offsetbox functionality untested elsewhere
-    fig = plt.figure()
+    plt.figure()
     ax = plt.subplot(121)
-    ax.scatter(list(xrange(10)), list(xrange(10, 0, -1)), label='three')
+    ax.scatter(np.arange(10), np.arange(10, 0, -1), label='three')
     ax.legend(loc="center left", bbox_to_anchor=[1.0, 0.5],
               title="My legend")
 
     mpl.rcParams['legend.scatterpoints'] = 1
-    fig = plt.figure()
+    plt.figure()
     ax = plt.subplot(121)
-    ax.scatter(list(xrange(10)), list(xrange(10, 0, -1)), label='one')
+    ax.scatter(np.arange(10), np.arange(10, 0, -1), label='one')
     ax.legend(loc="center left", bbox_to_anchor=[1.0, 0.5],
               title="My legend")
 
@@ -188,14 +201,13 @@ def test_hatching():
     ax.legend(handlelength=4, handleheight=4)
 
 
-@cleanup
 def test_legend_remove():
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
     lines = ax.plot(range(10))
     leg = fig.legend(lines, "test")
     leg.remove()
-    assert_equal(fig.legends, [])
+    assert fig.legends == []
     leg = ax.legend("test")
     leg.remove()
     assert ax.get_legend() is None
@@ -203,28 +215,24 @@ def test_legend_remove():
 
 class TestLegendFunction(object):
     # Tests the legend function on the Axes and pyplot.
-    @cleanup
     def test_legend_handle_label(self):
         lines = plt.plot(range(10))
         with mock.patch('matplotlib.legend.Legend') as Legend:
             plt.legend(lines, ['hello world'])
         Legend.assert_called_with(plt.gca(), lines, ['hello world'])
 
-    @cleanup
     def test_legend_no_args(self):
         lines = plt.plot(range(10), label='hello world')
         with mock.patch('matplotlib.legend.Legend') as Legend:
             plt.legend()
         Legend.assert_called_with(plt.gca(), lines, ['hello world'])
 
-    @cleanup
     def test_legend_label_args(self):
         lines = plt.plot(range(10), label='hello world')
         with mock.patch('matplotlib.legend.Legend') as Legend:
             plt.legend(['foobar'])
         Legend.assert_called_with(plt.gca(), lines, ['foobar'])
 
-    @cleanup
     def test_legend_handler_map(self):
         lines = plt.plot(range(10), label='hello world')
         with mock.patch('matplotlib.axes.Axes.'
@@ -233,7 +241,6 @@ class TestLegendFunction(object):
             plt.legend(handler_map={'1': 2})
         handles_labels.assert_called_with({'1': 2})
 
-    @cleanup
     def test_kwargs(self):
         fig, ax = plt.subplots(1, 1)
         th = np.linspace(0, 2*np.pi, 1024)
@@ -243,7 +250,6 @@ class TestLegendFunction(object):
             ax.legend(handles=(lnc, lns), labels=('a', 'b'))
         Legend.assert_called_with(ax, (lnc, lns), ('a', 'b'))
 
-    @cleanup
     def test_warn_args_kwargs(self):
         fig, ax = plt.subplots(1, 1)
         th = np.linspace(0, 2*np.pi, 1024)
@@ -273,7 +279,6 @@ def test_legend_stackplot():
     ax.legend(loc=0)
 
 
-@cleanup
 def test_cross_figure_patch_legend():
     fig, ax = plt.subplots()
     fig2, ax2 = plt.subplots()
@@ -282,7 +287,6 @@ def test_cross_figure_patch_legend():
     fig2.legend(brs, 'foo')
 
 
-@cleanup
 def test_nanscatter():
     fig, ax = plt.subplots()
 
@@ -319,7 +323,7 @@ def test_not_covering_scatter():
                   extensions=['png'])
 def test_not_covering_scatter_transform():
     # Offsets point to top left, the default auto position
-    offset = mtrans.Affine2D().translate(-20, 20)
+    offset = mtransforms.Affine2D().translate(-20, 20)
     x = np.linspace(0, 30, 1000)
     plt.plot(x, x)
 
@@ -328,7 +332,6 @@ def test_not_covering_scatter_transform():
     plt.legend(['foo', 'bar'], loc='best')
 
 
-@cleanup
 def test_linecollection_scaled_dashes():
     lines1 = [[(0, .5), (.5, 1)], [(.3, .6), (.2, .2)]]
     lines2 = [[[0.7, .2], [.8, .4]], [[.5, .7], [.6, .1]]]
@@ -350,6 +353,18 @@ def test_linecollection_scaled_dashes():
         assert oh.get_linestyles()[0][0] == lh._dashOffset
 
 
-if __name__ == '__main__':
-    import nose
-    nose.runmodule(argv=['-s', '--with-doctest'], exit=False)
+def test_handler_numpoints():
+    '''test legend handler with numponts less than or equal to 1'''
+    # related to #6921 and PR #8478
+    fig, ax = plt.subplots()
+    ax.plot(range(5), label='test')
+    ax.legend(numpoints=0.5)
+
+
+def test_shadow_framealpha():
+    # Test if framealpha is activated when shadow is True
+    # and framealpha is not explicitly passed'''
+    fig, ax = plt.subplots()
+    ax.plot(range(100), label="test")
+    leg = ax.legend(shadow=True, facecolor='w')
+    assert leg.get_frame().get_alpha() == 1

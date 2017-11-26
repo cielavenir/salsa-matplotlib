@@ -4,6 +4,8 @@
 .. currentmodule:: matplotlib.axes
 
 .. autoclass:: Axes
+   :no-members:
+   :no-undoc-members:
 
 .. contents:: Table of Contents
    :depth: 2
@@ -19,6 +21,7 @@ Basic
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.plot
@@ -56,6 +59,7 @@ Spans
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.axhline
@@ -68,6 +72,7 @@ Spectral
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.acorr
@@ -85,6 +90,7 @@ Statistics
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.boxplot
@@ -98,6 +104,7 @@ Binned
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.hexbin
@@ -109,6 +116,7 @@ Contours
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.clabel
@@ -120,6 +128,7 @@ Array
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.imshow
@@ -134,6 +143,7 @@ Unstructured Triangles
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.tripcolor
@@ -147,6 +157,7 @@ Text and Annotations
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.annotate
@@ -160,6 +171,7 @@ Fields
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.barbs
@@ -173,6 +185,7 @@ Clearing
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.cla
@@ -185,6 +198,7 @@ Appearance
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
 
@@ -215,6 +229,7 @@ Property cycle
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.set_prop_cycle
@@ -226,6 +241,7 @@ Axis / limits
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
 
@@ -239,6 +255,7 @@ Axis Limits and direction
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.invert_xaxis
@@ -265,6 +282,7 @@ Axis Labels, title, and legend
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.get_xlabel
@@ -285,6 +303,7 @@ Axis scales
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.set_xscale
@@ -300,6 +319,7 @@ Autoscaling and margins
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.use_sticky_edges
@@ -328,6 +348,7 @@ Aspect ratio
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.apply_aspect
@@ -344,6 +365,7 @@ Ticks and tick labels
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.xaxis_date
@@ -385,6 +407,7 @@ Units
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.convert_xunits
@@ -397,6 +420,7 @@ Adding Artists
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.add_artist
@@ -413,6 +437,7 @@ Twinning
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.twinx
@@ -426,6 +451,7 @@ Axes Position
 =============
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.get_anchor
@@ -445,6 +471,7 @@ Async/Event based
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.stale
@@ -458,6 +485,7 @@ Interactive
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
 
@@ -502,6 +530,7 @@ Children
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.get_children
@@ -515,6 +544,7 @@ Drawing
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.draw
@@ -534,6 +564,7 @@ Bulk property manipulation
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.set
@@ -547,8 +578,10 @@ General Artist Properties
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
+   Axes.set_agg_filter
    Axes.set_alpha
    Axes.set_animated
    Axes.set_clip_box
@@ -556,18 +589,16 @@ General Artist Properties
    Axes.set_clip_path
    Axes.set_gid
    Axes.set_label
+   Axes.set_path_effects
+   Axes.set_rasterized
+   Axes.set_sketch_params
+   Axes.set_snap
+   Axes.set_transform
    Axes.set_url
    Axes.set_visible
    Axes.set_zorder
-   Axes.set_rasterized
-   Axes.set_sketch_params
-   Axes.set_agg_filter
-   Axes.set_snap
-   Axes.set_transform
-   Axes.set_path_effects
 
    Axes.get_agg_filter
-   Axes.get_sketch_params
    Axes.get_alpha
    Axes.get_animated
    Axes.get_clip_box
@@ -575,18 +606,16 @@ General Artist Properties
    Axes.get_clip_path
    Axes.get_gid
    Axes.get_label
+   Axes.get_path_effects
+   Axes.get_rasterized
+   Axes.get_sketch_params
+   Axes.get_snap
+   Axes.get_transform
    Axes.get_url
    Axes.get_visible
    Axes.get_zorder
-   Axes.get_rasterized
-   Axes.get_transform
-   Axes.get_snap
-   Axes.get_path_effects
-
 
    Axes.axes
-   Axes.get_axes
-   Axes.set_axes
    Axes.set_figure
    Axes.get_figure
 
@@ -595,6 +624,7 @@ Artist Methods
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.is_figure_set
@@ -610,6 +640,7 @@ non-rectilinear Axes.
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.name
@@ -629,6 +660,7 @@ Other
 
 .. autosummary::
    :toctree: _as_gen
+   :template: autosummary.rst
    :nosignatures:
 
    Axes.zorder

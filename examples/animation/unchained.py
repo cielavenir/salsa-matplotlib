@@ -12,6 +12,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
+# Fixing random state for reproducibility
+np.random.seed(19680801)
+
+
 # Create new Figure with black background
 fig = plt.figure(figsize=(8, 8), facecolor='black')
 
@@ -21,7 +25,7 @@ ax = plt.subplot(111, frameon=False)
 # Generate random data
 data = np.random.uniform(0, 1, (64, 75))
 X = np.linspace(-1, 1, data.shape[-1])
-G = 1.5 * np.exp(-4 * X * X)
+G = 1.5 * np.exp(-4 * X ** 2)
 
 # Generate line plots
 lines = []

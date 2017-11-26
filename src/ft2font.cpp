@@ -506,6 +506,7 @@ FT2Font::FT2Font(FT_Open_Args &open_args, long hinting_factor_) : image(), face(
 
     error = FT_Set_Char_Size(face, 12 * 64, 0, 72 * (unsigned int)hinting_factor, 72);
     if (error) {
+        FT_Done_Face(face);
         throw "Could not set the fontsize";
     }
 
@@ -600,9 +601,7 @@ void FT2Font::set_text(
     FT_Bool use_kerning = FT_HAS_KERNING(face);
     FT_UInt previous = 0;
 
-    glyphs.resize(0);
-    pen.x = 0;
-    pen.y = 0;
+    clear();
 
     bbox.xMin = bbox.yMin = 32000;
     bbox.xMax = bbox.yMax = -32000;

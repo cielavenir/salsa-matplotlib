@@ -1,3 +1,9 @@
+"""
+============
+Data Browser
+============
+
+"""
 import numpy as np
 
 
@@ -71,6 +77,8 @@ class PointBrowser(object):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
+    # Fixing random state for reproducibility
+    np.random.seed(19680801)
 
     X = np.random.rand(100, 200)
     xs = np.mean(X, axis=1)

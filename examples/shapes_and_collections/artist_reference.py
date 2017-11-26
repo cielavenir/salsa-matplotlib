@@ -1,5 +1,7 @@
 """
+================================
 Reference for matplotlib artists
+================================
 
 This example displays several of matplotlib's graphics primitives (artists)
 drawn using matplotlib API. A full list of artists and the documentation is
@@ -9,14 +11,14 @@ Copyright (c) 2010, Bartosz Telenczuk
 BSD License
 """
 import matplotlib.pyplot as plt
-plt.rcdefaults()
-
 import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.path as mpath
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 from matplotlib.collections import PatchCollection
+
+
+plt.rcdefaults()
 
 
 def label(xy, text):
@@ -56,7 +58,8 @@ patches.append(ellipse)
 label(grid[4], "Ellipse")
 
 # add an arrow
-arrow = mpatches.Arrow(grid[5, 0] - 0.05, grid[5, 1] - 0.05, 0.1, 0.1, width=0.1)
+arrow = mpatches.Arrow(grid[5, 0] - 0.05, grid[5, 1] - 0.05, 0.1, 0.1,
+                       width=0.1)
 patches.append(arrow)
 label(grid[5], "Arrow")
 
@@ -65,14 +68,13 @@ Path = mpath.Path
 path_data = [
     (Path.MOVETO, [0.018, -0.11]),
     (Path.CURVE4, [-0.031, -0.051]),
-    (Path.CURVE4, [-0.115,  0.073]),
-    (Path.CURVE4, [-0.03 ,  0.073]),
-    (Path.LINETO, [-0.011,  0.039]),
-    (Path.CURVE4, [0.043,  0.121]),
+    (Path.CURVE4, [-0.115, 0.073]),
+    (Path.CURVE4, [-0.03, 0.073]),
+    (Path.LINETO, [-0.011, 0.039]),
+    (Path.CURVE4, [0.043, 0.121]),
     (Path.CURVE4, [0.075, -0.005]),
     (Path.CURVE4, [0.035, -0.027]),
-    (Path.CLOSEPOLY, [0.018, -0.11])
-    ]
+    (Path.CLOSEPOLY, [0.018, -0.11])]
 codes, verts = zip(*path_data)
 path = mpath.Path(verts + grid[6], codes)
 patch = mpatches.PathPatch(path)
@@ -97,8 +99,8 @@ collection.set_array(np.array(colors))
 ax.add_collection(collection)
 ax.add_line(line)
 
-plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
 plt.axis('equal')
 plt.axis('off')
+plt.tight_layout()
 
 plt.show()

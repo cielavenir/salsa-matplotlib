@@ -1,9 +1,14 @@
-# This figure shows the name of several matplotlib elements composing a figure
+"""
+===================
+Anatomy of a figure
+===================
+
+This figure shows the name of several matplotlib elements composing a figure
+"""
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator, FuncFormatter
-
 
 np.random.seed(19680801)
 

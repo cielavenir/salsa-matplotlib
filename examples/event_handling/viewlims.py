@@ -1,5 +1,11 @@
-# Creates two identical panels.  Zooming in on the right panel will show
-# a rectangle in the first panel, denoting the zoomed region.
+"""
+========
+Viewlims
+========
+
+Creates two identical panels.  Zooming in on the right panel will show
+a rectangle in the first panel, denoting the zoomed region.
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
@@ -30,8 +36,8 @@ class MandelbrotDisplay(object):
         self.y = np.linspace(ystart, yend, self.height).reshape(-1, 1)
         c = self.x + 1.0j * self.y
         threshold_time = np.zeros((self.height, self.width))
-        z = np.zeros(threshold_time.shape, dtype=np.complex)
-        mask = np.ones(threshold_time.shape, dtype=np.bool)
+        z = np.zeros(threshold_time.shape, dtype=complex)
+        mask = np.ones(threshold_time.shape, dtype=bool)
         for i in range(self.niter):
             z[mask] = z[mask]**self.power + c[mask]
             mask = (np.abs(z) < self.radius)
@@ -42,7 +48,7 @@ class MandelbrotDisplay(object):
         ax.set_autoscale_on(False)  # Otherwise, infinite loop
 
         # Get the number of points from the number of pixels in the window
-        dims = ax.axesPatch.get_window_extent().bounds
+        dims = ax.patch.get_window_extent().bounds
         self.width = int(dims[2] + 0.5)
         self.height = int(dims[2] + 0.5)
 

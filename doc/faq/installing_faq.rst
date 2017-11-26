@@ -34,7 +34,7 @@ and run it with::
 
 This will give you additional information about which backends matplotlib is
 loading, version information, and more. At this point you might want to make
-sure you understand matplotlib's :ref:`configuration <customizing-matplotlib>`
+sure you understand matplotlib's :ref:`configuration <sphx_glr_tutorials_introductory_customizing.py>`
 process, governed by the :file:`matplotlibrc` configuration file which contains
 instructions within and the concept of the matplotlib backend.
 
@@ -222,8 +222,8 @@ You can now install matplotlib and all its dependencies with::
 
     pip install matplotlib
 
-Macports
-^^^^^^^^
+Macports Python
+^^^^^^^^^^^^^^^
 
 For Python 2.7::
 
@@ -235,8 +235,8 @@ For Python 3.4::
     sudo port install py34-pip
     sudo pip-3.4 install matplotlib
 
-Homebrew
-^^^^^^^^
+Homebrew Python
+^^^^^^^^^^^^^^^
 
 For Python 2.7::
 
