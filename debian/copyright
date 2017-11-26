@@ -745,8 +745,8 @@ Copyright: Copyright (C) 2002-2005 Maxim Shemanarev (McSeem)
  Copyright (C) 2003 Hansruedi Baer (MacOS support)
 License: ANTIGRAIN
 
-Files: extern/qhull/*
-Copyright: Copyright (c) 1993-2012 C.B. Barber and The Geometry Center
+Files: extern/libqhull/*
+Copyright: Copyright (c) 1993-2015 The Geometry Center, qhull@qhull.org
 License:
  This software includes Qhull from C.B. Barber and The Geometry Center.
  Qhull is copyrighted as noted above.  Qhull is free software and may
@@ -758,7 +758,6 @@ License:
  2. A copy of this text file must be distributed along with any copies
     of Qhull that you redistribute; this includes copies that you have
     modified, or copies of programs or other software products that
-    C
     include Qhull.
  .
  3. If you modify Qhull, you must include a notice giving the
