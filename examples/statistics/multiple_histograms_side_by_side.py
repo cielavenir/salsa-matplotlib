@@ -1,7 +1,7 @@
 """
-=======================================================
-Demo of how to produce multiple histograms side by side
-=======================================================
+==========================================
+Producing multiple histograms side by side
+==========================================
 
 This example plots horizontal histograms of different samples along
 a categorical x-axis. Additionally, the histograms are plotted to
@@ -24,7 +24,7 @@ http://docs.astropy.org/en/stable/visualization/histogram.html
 import numpy as np
 import matplotlib.pyplot as plt
 
-np.random.seed(0)
+np.random.seed(19680801)
 number_of_bins = 20
 
 # An example of three data sets to compare

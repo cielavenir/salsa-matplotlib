@@ -9,6 +9,7 @@ import distutils.command.build_ext
 import glob
 import multiprocessing
 import os
+import platform
 import re
 import subprocess
 from subprocess import check_output
@@ -63,7 +64,8 @@ def _get_xdg_cache_dir():
 
 # This is the version of FreeType to use when building a local
 # version.  It must match the value in
-# lib/matplotlib.__init__.py
+# lib/matplotlib.__init__.py and also needs to be changed below in the
+# embedded windows build script (grep for "REMINDER" in this file)
 LOCAL_FREETYPE_VERSION = '2.6.1'
 # md5 hash of the freetype tarball
 LOCAL_FREETYPE_HASH = '348e667d728c597360e4a87c16556597'
@@ -174,8 +176,17 @@ def get_base_dirs():
     if options['basedirlist']:
         return options['basedirlist']
 
+    if os.environ.get('MPLBASEDIRLIST'):
+        return os.environ.get('MPLBASEDIRLIST').split(os.pathsep)
+
+    win_bases = ['win32_static', ]
+    # on conda windows, we also add the <installdir>\Library of the local interpreter,
+    # as conda installs libs/includes there
+    if os.getenv('CONDA_DEFAULT_ENV'):
+        win_bases.append(os.path.join(os.getenv('CONDA_DEFAULT_ENV'), "Library"))
+
     basedir_map = {
-        'win32': ['win32_static', ],
+        'win32': win_bases,
         'darwin': ['/usr/local/', '/usr', '/usr/X11',
                    '/opt/X11', '/opt/local'],
         'sunos5': [os.getenv('MPLIB_BASE') or '/usr/local', ],
@@ -190,8 +201,11 @@ def get_include_dirs():
     Returns a list of standard include directories on this platform.
     """
     include_dirs = [os.path.join(d, 'include') for d in get_base_dirs()]
-    include_dirs.extend(
-        os.environ.get('CPLUS_INCLUDE_PATH', '').split(os.pathsep))
+    if sys.platform != 'win32':
+        # gcc includes this dir automatically, so also look for headers in
+        # these dirs
+        include_dirs.extend(
+            os.environ.get('CPLUS_INCLUDE_PATH', '').split(os.pathsep))
     return include_dirs
 
 
@@ -401,6 +415,14 @@ class CheckFailed(Exception):
 
 class SetupPackage(object):
     optional = False
+    pkg_names = {
+        "apt-get": None,
+        "yum": None,
+        "dnf": None,
+        "brew": None,
+        "port": None,
+        "windows_url": None
+        }
 
     def check(self):
         """
@@ -527,6 +549,56 @@ class SetupPackage(object):
         """
         pass
 
+    def install_help_msg(self):
+        """
+        Do not override this method !
+
+        Generate the help message to show if the package is not installed.
+        To use this in subclasses, simply add the dictionary `pkg_names` as
+        a class variable:
+
+        pkg_names = {
+            "apt-get": <Name of the apt-get package>,
+            "yum": <Name of the yum package>,
+            "dnf": <Name of the dnf package>,
+            "brew": <Name of the brew package>,
+            "port": <Name of the port package>,
+            "windows_url": <The url which has installation instructions>
+            }
+
+        All the dictionary keys are optional. If a key is not present or has
+        the value `None` no message is provided for that platform.
+        """
+        def _try_managers(*managers):
+            for manager in managers:
+                pkg_name = self.pkg_names.get(manager, None)
+                if pkg_name:
+                    try:
+                        # `shutil.which()` can be used when Python 2.7 support
+                        # is dropped. It is available in Python 3.3+
+                        _ = check_output(["which", manager],
+                                         stderr=subprocess.STDOUT)
+                        return ('Try installing {0} with `{1} install {2}`'
+                                .format(self.name, manager, pkg_name))
+                    except subprocess.CalledProcessError:
+                        pass
+
+        message = None
+        if sys.platform == "win32":
+            url = self.pkg_names.get("windows_url", None)
+            if url:
+                message = ('Please check {0} for instructions to install {1}'
+                           .format(url, self.name))
+        elif sys.platform == "darwin":
+            message = _try_managers("brew", "port")
+        elif sys.platform.startswith("linux"):
+            release = platform.linux_distribution()[0].lower()
+            if release in ('debian', 'ubuntu'):
+                message = _try_managers('apt-get')
+            elif release in ('centos', 'redhat', 'fedora'):
+                message = _try_managers('dnf', 'yum')
+        return message
+
 
 class OptionalPackage(SetupPackage):
     optional = True
@@ -641,8 +713,11 @@ class Matplotlib(SetupPackage):
             'matplotlib.sphinxext',
             'matplotlib.style',
             'matplotlib.testing',
+            'matplotlib.testing._nose',
+            'matplotlib.testing._nose.plugins',
             'matplotlib.testing.jpl_units',
             'matplotlib.tri',
+            'matplotlib.cbook'
             ]
 
     def get_py_modules(self):
@@ -712,28 +787,28 @@ class Toolkits(OptionalPackage):
 
 class Tests(OptionalPackage):
     name = "tests"
-    nose_min_version = '0.11.1'
+    pytest_min_version = '3.0.0'
     default_config = False
 
     def check(self):
         super(Tests, self).check()
 
         msgs = []
-        msg_template = ('{package} is required to run the matplotlib test '
-                        'suite. Please install it with pip or your preferred'
-                        ' tool to run the test suite')
+        msg_template = ('{package} is required to run the Matplotlib test '
+                        'suite. Please install it with pip or your preferred '
+                        'tool to run the test suite')
 
-        bad_nose = msg_template.format(
-            package='nose %s or later' % self.nose_min_version
+        bad_pytest = msg_template.format(
+            package='pytest %s or later' % self.pytest_min_version
         )
         try:
-            import nose
-            if is_min_version(nose.__version__, self.nose_min_version):
-                msgs += ['using nose version %s' % nose.__version__]
+            import pytest
+            if is_min_version(pytest.__version__, self.pytest_min_version):
+                msgs += ['using pytest version %s' % pytest.__version__]
             else:
-                msgs += [bad_nose]
+                msgs += [bad_pytest]
         except ImportError:
-            msgs += [bad_nose]
+            msgs += [bad_pytest]
 
         if PY3min:
             msgs += ['using unittest.mock']
@@ -953,13 +1028,24 @@ class LibAgg(SetupPackage):
 
 class FreeType(SetupPackage):
     name = "freetype"
+    pkg_names = {
+        "apt-get": "libfreetype6-dev",
+        "yum": "freetype-devel",
+        "dnf": "freetype-devel",
+        "brew": "freetype",
+        "port": "freetype",
+        "windows_url": "http://gnuwin32.sourceforge.net/packages/freetype.htm"
+        }
 
     def check(self):
         if options.get('local_freetype'):
             return "Using local version for testing"
 
         if sys.platform == 'win32':
-            check_include_file(get_include_dirs(), 'ft2build.h', 'freetype')
+            try:
+                check_include_file(get_include_dirs(), 'ft2build.h', 'freetype')
+            except CheckFailed:
+                check_include_file(get_include_dirs(), 'freetype2\\ft2build.h', 'freetype')
             return 'Using unknown version found on system.'
 
         status, output = getstatusoutput("freetype-config --ftversion")
@@ -1009,8 +1095,12 @@ class FreeType(SetupPackage):
             # Statically link to the locally-built freetype.
             # This is certainly broken on Windows.
             ext.include_dirs.insert(0, os.path.join(src_path, 'include'))
+            if sys.platform == 'win32':
+                libfreetype = 'libfreetype.lib'
+            else:
+                libfreetype = 'libfreetype.a'
             ext.extra_objects.insert(
-                0, os.path.join(src_path, 'objs', '.libs', 'libfreetype.a'))
+                0, os.path.join(src_path, 'objs', '.libs', libfreetype))
             ext.define_macros.append(('FREETYPE_BUILD_TYPE', 'local'))
         else:
             pkg_config.setup_extension(
@@ -1033,8 +1123,12 @@ class FreeType(SetupPackage):
             'build', 'freetype-{0}'.format(LOCAL_FREETYPE_VERSION))
 
         # We've already built freetype
-        if os.path.isfile(
-                os.path.join(src_path, 'objs', '.libs', 'libfreetype.a')):
+        if sys.platform == 'win32':
+            libfreetype = 'libfreetype.lib'
+        else:
+            libfreetype = 'libfreetype.a'
+
+        if os.path.isfile(os.path.join(src_path, 'objs', '.libs', libfreetype)):
             return
 
         tarball = 'freetype-{0}.tar.gz'.format(LOCAL_FREETYPE_VERSION)
@@ -1051,12 +1145,15 @@ class FreeType(SetupPackage):
                     os.path.isfile(tarball_cache_path)):
                 if get_file_hash(tarball_cache_path) == LOCAL_FREETYPE_HASH:
                     try:
-                        # fail on Lpy, oh well
-                        os.makedirs('build', exist_ok=True)
+                        os.makedirs('build')
+                    except OSError:
+                        # Don't care if it exists.
+                        pass
+                    try:
                         shutil.copy(tarball_cache_path, tarball_path)
                         print('Using cached tarball: {}'
                               .format(tarball_cache_path))
-                    except:
+                    except OSError:
                         # If this fails, oh well just re-download
                         pass
 
@@ -1069,52 +1166,91 @@ class FreeType(SetupPackage):
                 if not os.path.exists('build'):
                     os.makedirs('build')
 
-                sourceforge_url = (
-                    'http://downloads.sourceforge.net/project/freetype'
-                    '/freetype2/{0}/'.format(LOCAL_FREETYPE_VERSION)
-                )
-                url_fmts = (
-                    sourceforge_url + '{0}',
-                    'http://download.savannah.gnu.org/releases/freetype/{0}'
-                    )
+                url_fmts = [
+                    'https://downloads.sourceforge.net/project/freetype'
+                    '/freetype2/{version}/{tarball}',
+                    'https://download.savannah.gnu.org/releases/freetype'
+                    '/{tarball}'
+                ]
                 for url_fmt in url_fmts:
-                    tarball_url = url_fmt.format(tarball)
+                    tarball_url = url_fmt.format(
+                        version=LOCAL_FREETYPE_VERSION, tarball=tarball)
 
                     print("Downloading {0}".format(tarball_url))
                     try:
                         urlretrieve(tarball_url, tarball_path)
-                    except:
+                    except IOError:  # URLError (a subclass) on Py3.
                         print("Failed to download {0}".format(tarball_url))
                     else:
-                        break
-                if not os.path.isfile(tarball_path):
+                        if get_file_hash(tarball_path) != LOCAL_FREETYPE_HASH:
+                            print("Invalid hash.")
+                        else:
+                            break
+                else:
                     raise IOError("Failed to download freetype")
-                if get_file_hash(tarball_path) == LOCAL_FREETYPE_HASH:
-                    try:
-                        # this will fail on LPy, oh well
-                        os.makedirs(tarball_cache_dir, exist_ok=True)
-                        shutil.copy(tarball_path, tarball_cache_path)
-                        print('Cached tarball at: {}'
-                              .format(tarball_cache_path))
-                    except:
-                        # again, we do not care if this fails, can
-                        # always re download
-                        pass
+                try:
+                    os.makedirs(tarball_cache_dir)
+                except OSError:
+                    # Don't care if it exists.
+                    pass
+                try:
+                    shutil.copy(tarball_path, tarball_cache_path)
+                    print('Cached tarball at: {}'.format(tarball_cache_path))
+                except OSError:
+                    # If this fails, we can always re-download.
+                    pass
 
             if get_file_hash(tarball_path) != LOCAL_FREETYPE_HASH:
                 raise IOError(
                     "{0} does not match expected hash.".format(tarball))
 
         print("Building {0}".format(tarball))
-        cflags = 'CFLAGS="{0} -fPIC" '.format(os.environ.get('CFLAGS', ''))
+        if sys.platform != 'win32':
+            # compilation on all other platforms than windows
+            cflags = 'CFLAGS="{0} -fPIC" '.format(os.environ.get('CFLAGS', ''))
 
-        subprocess.check_call(
-            ['tar', 'zxf', tarball], cwd='build')
-        subprocess.check_call(
-            [cflags + './configure --with-zlib=no --with-bzip2=no '
-             '--with-png=no --with-harfbuzz=no'], shell=True, cwd=src_path)
-        subprocess.check_call(
-            [cflags + 'make'], shell=True, cwd=src_path)
+            subprocess.check_call(
+                ['tar', 'zxf', tarball], cwd='build')
+            subprocess.check_call(
+                [cflags + './configure --with-zlib=no --with-bzip2=no '
+                 '--with-png=no --with-harfbuzz=no'], shell=True, cwd=src_path)
+            subprocess.check_call(
+                [cflags + 'make'], shell=True, cwd=src_path)
+        else:
+            # compilation on windows
+            FREETYPE_BUILD_CMD = """\
+call "%ProgramFiles%\\Microsoft SDKs\\Windows\\v7.0\\Bin\\SetEnv.Cmd" /Release /{xXX} /xp
+call "{vcvarsall}" {xXX}
+set MSBUILD=C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\MSBuild.exe
+rd /S /Q %FREETYPE%\\objs
+%MSBUILD% %FREETYPE%\\builds\\windows\\{vc20xx}\\freetype.sln /t:Clean;Build /p:Configuration="{config}";Platform={WinXX}
+echo Build completed, moving result"
+:: move to the "normal" path for the unix builds...
+mkdir %FREETYPE%\\objs\\.libs
+:: REMINDER: fix when changing the version
+copy %FREETYPE%\\objs\\{vc20xx}\\{xXX}\\freetype261.lib %FREETYPE%\\objs\\.libs\\libfreetype.lib
+if errorlevel 1 (
+  rem This is a py27 version, which has a different location for the lib file :-/
+  copy %FREETYPE%\\objs\\win32\\{vc20xx}\\freetype261.lib %FREETYPE%\\objs\\.libs\\libfreetype.lib
+)
+"""
+            from setup_external_compile import fixproj, prepare_build_cmd, VS2010, X64, tar_extract
+            # Note: freetype has no build profile for 2014, so we don't bother...
+            vc = 'vc2010' if VS2010 else 'vc2008'
+            WinXX = 'x64' if X64 else 'Win32'
+            tar_extract(tarball_path, "build")
+            # This is only false for py2.7, even on py3.5...
+            if not VS2010:
+                fixproj(os.path.join(src_path, 'builds', 'windows', vc, 'freetype.sln'), WinXX)
+                fixproj(os.path.join(src_path, 'builds', 'windows', vc, 'freetype.vcproj'), WinXX)
+
+            cmdfile = os.path.join("build", 'build_freetype.cmd')
+            with open(cmdfile, 'w') as cmd:
+                cmd.write(prepare_build_cmd(FREETYPE_BUILD_CMD, vc20xx=vc, WinXX=WinXX,
+                                            config='Release' if VS2010 else 'LIB Release'))
+
+            os.environ['FREETYPE'] = src_path
+            subprocess.check_call([cmdfile], shell=True)
 
 
 class FT2Font(SetupPackage):
@@ -1134,6 +1270,14 @@ class FT2Font(SetupPackage):
 
 class Png(SetupPackage):
     name = "png"
+    pkg_names = {
+        "apt-get": "libpng12-dev",
+        "yum": "libpng-devel",
+        "dnf": "libpng-devel",
+        "brew": "libpng",
+        "port": "libpng",
+        "windows_url": "http://gnuwin32.sourceforge.net/packages/libpng.htm"
+        }
 
     def check(self):
         if sys.platform == 'win32':
@@ -1175,14 +1319,14 @@ class Qhull(SetupPackage):
         self.__class__.found_external = True
         try:
             return self._check_for_pkg_config(
-                'qhull', 'qhull/qhull_a.h', min_version='2003.1')
+                'libqhull', 'libqhull/qhull_a.h', min_version='2015.2')
         except CheckFailed as e:
             self.__class__.found_pkgconfig = False
             # Qhull may not be in the pkg-config system but may still be
             # present on this system, so check if the header files can be
             # found.
             include_dirs = [
-                os.path.join(x, 'qhull') for x in get_include_dirs()]
+                os.path.join(x, 'libqhull') for x in get_include_dirs()]
             if has_include_file(include_dirs, 'qhull_a.h'):
                 return 'Using system Qhull (version unknown, no pkg-config info)'
             else:
@@ -1195,7 +1339,7 @@ class Qhull(SetupPackage):
                                        default_libraries=['qhull'])
         else:
             ext.include_dirs.append('extern')
-            ext.sources.extend(glob.glob('extern/qhull/*.c'))
+            ext.sources.extend(sorted(glob.glob('extern/libqhull/*.c')))
 
 
 class TTConv(SetupPackage):
@@ -1271,21 +1415,6 @@ class Contour(SetupPackage):
         return ext
 
 
-class Delaunay(SetupPackage):
-    name = "delaunay"
-
-    def get_packages(self):
-        return ['matplotlib.delaunay']
-
-    def get_extension(self):
-        sources = ["_delaunay.cpp", "VoronoiDiagramGenerator.cpp",
-                   "delaunay_utils.cpp", "natneighbors.cpp"]
-        sources = [os.path.join('lib/matplotlib/delaunay', s) for s in sources]
-        ext = make_extension('matplotlib._delaunay', sources)
-        Numpy().add_flags(ext)
-        return ext
-
-
 class QhullWrap(SetupPackage):
     name = "qhull_wrap"
 
@@ -1348,7 +1477,7 @@ class Pytz(SetupPackage):
         except ImportError:
             return (
                 "pytz was not found. "
-                "pip will attempt to install it "
+                "pip/easy_install may attempt to install it "
                 "after matplotlib.")
 
         return "using pytz version %s" % pytz.__version__
@@ -1366,7 +1495,7 @@ class Cycler(SetupPackage):
         except ImportError:
             return (
                 "cycler was not found. "
-                "pip will attempt to install it "
+                "pip/easy_install may attempt to install it "
                 "after matplotlib.")
         return "using cycler version %s" % cycler.__version__
 
@@ -1377,7 +1506,7 @@ class Cycler(SetupPackage):
 class Dateutil(SetupPackage):
     name = "dateutil"
 
-    def __init__(self, version=None):
+    def __init__(self, version='>=2.0'):
         self.version = version
 
     def check(self):
@@ -1398,25 +1527,25 @@ class Dateutil(SetupPackage):
         return [dateutil]
 
 
-class FuncTools32(SetupPackage):
-    name = "functools32"
+class BackportsFuncToolsLRUCache(SetupPackage):
+    name = "backports.functools_lru_cache"
 
     def check(self):
         if not PY3min:
             try:
-                import functools32
+                import backports.functools_lru_cache
             except ImportError:
                 return (
-                    "functools32 was not found. It is required for"
+                    "backports.functools_lru_cache was not found. It is required for"
                     "Python versions prior to 3.2")
 
-            return "using functools32"
+            return "using backports.functools_lru_cache"
         else:
             return "Not required"
 
     def get_install_requires(self):
         if not PY3min:
-            return ['functools32']
+            return ['backports.functools_lru_cache']
         else:
             return []
 
@@ -1462,17 +1591,6 @@ class Tornado(OptionalPackage):
 
 class Pyparsing(SetupPackage):
     name = "pyparsing"
-    # pyparsing 2.0.4 has broken python 3 support.
-    # pyparsing 2.1.2 is broken in python3.4/3.3.
-    def is_ok(self):
-        # pyparsing 2.0.0 bug, but it may be patched in distributions
-        try:
-            import pyparsing
-            f = pyparsing.Forward()
-            f <<= pyparsing.Literal('a')
-            return f is not None
-        except (ImportError, TypeError):
-            return False
 
     def check(self):
         try:
@@ -1483,26 +1601,10 @@ class Pyparsing(SetupPackage):
                 "support. pip/easy_install may attempt to install it "
                 "after matplotlib.")
 
-        required = [1, 5, 6]
-        if [int(x) for x in pyparsing.__version__.split('.')] < required:
-            return (
-                "matplotlib requires pyparsing >= {0}".format(
-                    '.'.join(str(x) for x in required)))
-
-        if not self.is_ok():
-            return (
-                "Your pyparsing contains a bug that will be monkey-patched by "
-                "matplotlib.  For best results, upgrade to pyparsing 2.0.1 or "
-                "later.")
-
         return "using pyparsing version %s" % pyparsing.__version__
 
     def get_install_requires(self):
-        versionstring = 'pyparsing>=1.5.6,!=2.0.4,!=2.1.2,!=2.1.6'
-        if self.is_ok():
-            return [versionstring]
-        else:
-            return [versionstring + ',!=2.0.0']
+        return ['pyparsing>=2.0.1,!=2.0.4,!=2.1.2,!=2.1.6']
 
 
 class BackendAgg(OptionalBackendPackage):
@@ -1664,12 +1766,6 @@ class BackendGtk(OptionalBackendPackage):
 
 class BackendGtkAgg(BackendGtk):
     name = "gtkagg"
-
-    def check(self):
-        try:
-            return super(BackendGtkAgg, self).check()
-        except:
-            raise
 
     def get_package_data(self):
         return {'matplotlib': ['mpl-data/*.glade']}
@@ -1930,17 +2026,14 @@ class BackendQtBase(OptionalBackendPackage):
             p = multiprocessing.Pool()
 
         except:
-            # Can't do multiprocessing, fall back to normal approach ( this will fail if importing both PyQt4 and PyQt5 )
+            # Can't do multiprocessing, fall back to normal approach
+            # (this will fail if importing both PyQt4 and PyQt5).
             try:
                 # Try in-process
                 msg = self.callback(self)
-
             except RuntimeError:
-                raise CheckFailed("Could not import: are PyQt4 & PyQt5 both installed?")
-
-            except:
-                # Raise any other exceptions
-                raise
+                raise CheckFailed(
+                    "Could not import: are PyQt4 & PyQt5 both installed?")
 
         else:
             # Multiprocessing OK
@@ -2016,8 +2109,17 @@ class BackendQt4(BackendQtBase):
         BackendQtBase.__init__(self, *args, **kwargs)
         self.callback = backend_qt4_internal_check
 
+def backend_pyside2_internal_check(self):
+    try:
+        from PySide2 import __version__
+        from PySide2 import QtCore
+    except ImportError:
+        raise CheckFailed("PySide2 not found")
+    else:
+        return ("Qt: %s, PySide2: %s" %
+                (QtCore.__version__, __version__))
 
-def backend_qt5_internal_check(self):
+def backend_pyqt5_internal_check(self):
     try:
         from PyQt5 import QtCore
     except ImportError:
@@ -2031,6 +2133,22 @@ def backend_qt5_internal_check(self):
     else:
         return ("Qt: %s, PyQt: %s" % (self.convert_qt_version(qt_version), pyqt_version_str))
 
+def backend_qt5_internal_check(self):
+    successes = []
+    failures = []
+    try:
+        successes.append(backend_pyside2_internal_check(self))
+    except CheckFailed as e:
+        failures.append(str(e))
+
+    try:
+        successes.append(backend_pyqt5_internal_check(self))
+    except CheckFailed as e:
+        failures.append(str(e))
+
+    if len(successes) == 0:
+        raise CheckFailed('; '.join(failures))
+    return '; '.join(successes + failures)
 
 class BackendQt5(BackendQtBase):
     name = "qt5agg"

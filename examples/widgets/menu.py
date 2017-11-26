@@ -1,3 +1,9 @@
+"""
+====
+Menu
+====
+
+"""
 from __future__ import division, print_function
 import numpy as np
 import matplotlib
@@ -126,8 +132,8 @@ class Menu(object):
         self.menuitems = menuitems
         self.numitems = len(menuitems)
 
-        maxw = max([item.labelwidth for item in menuitems])
-        maxh = max([item.labelheight for item in menuitems])
+        maxw = max(item.labelwidth for item in menuitems)
+        maxh = max(item.labelheight for item in menuitems)
 
         totalh = self.numitems*maxh + (self.numitems + 1)*2*MenuItem.pady
 

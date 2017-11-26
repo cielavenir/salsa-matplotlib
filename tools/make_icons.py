@@ -11,7 +11,7 @@ Generates SVG, PDF in one size (size they are vectors) and PNG, PPM and GIF in
 """
 
 import matplotlib
-matplotlib.use('agg')
+matplotlib.use('agg')  # noqa
 
 import six
 
@@ -69,8 +69,8 @@ def make_matplotlib_icon():
     ax.set_axisbelow(True)
 
     N = 7
-    arc = 2. * np.pi
-    theta = np.arange(0.0, arc, arc/N)
+    arc = 2 * np.pi
+    theta = np.arange(0, arc, arc / N)
     radii = 10 * np.array([0.2, 0.6, 0.8, 0.7, 0.4, 0.5, 0.8])
     width = np.pi / 4 * np.array([0.4, 0.4, 0.6, 0.8, 0.2, 0.5, 0.3])
     bars = ax.bar(theta, radii, width=width, bottom=0.0, linewidth=1,
@@ -79,11 +79,9 @@ def make_matplotlib_icon():
     for r, bar in zip(radii, bars):
         bar.set_facecolor(cm.jet(r/10.))
 
-    for label in ax.get_xticklabels() + ax.get_yticklabels():
-        label.set_visible(False)
-
-    for line in ax.get_ygridlines() + ax.get_xgridlines():
-        line.set_lw(0.0)
+    ax.tick_params(labelleft=False, labelright=False,
+                   labelbottom=False, labeltop=False)
+    ax.grid(lw=0.0)
 
     ax.set_yticks(np.arange(1, 9, 2))
     ax.set_rmax(9)

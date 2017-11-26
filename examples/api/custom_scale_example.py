@@ -86,8 +86,7 @@ class MercatorLatitudeScale(mscale.ScaleBase):
         """
         class DegreeFormatter(Formatter):
             def __call__(self, x, pos=None):
-                # \u00b0 : degree symbol
-                return "%d\u00b0" % (np.degrees(x))
+                return "%d\N{DEGREE SIGN}" % np.degrees(x)
 
         axis.set_major_locator(FixedLocator(
             np.radians(np.arange(-90, 90, 10))))
@@ -118,6 +117,7 @@ class MercatorLatitudeScale(mscale.ScaleBase):
         input_dims = 1
         output_dims = 1
         is_separable = True
+        has_inverse = True
 
         def __init__(self, thresh):
             mtransforms.Transform.__init__(self)
@@ -153,6 +153,7 @@ class MercatorLatitudeScale(mscale.ScaleBase):
         input_dims = 1
         output_dims = 1
         is_separable = True
+        has_inverse = True
 
         def __init__(self, thresh):
             mtransforms.Transform.__init__(self)

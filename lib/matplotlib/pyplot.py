@@ -29,7 +29,7 @@ import matplotlib
 import matplotlib.colorbar
 from matplotlib import style
 from matplotlib import _pylab_helpers, interactive
-from matplotlib.cbook import dedent, silent_list, is_string_like, is_numlike
+from matplotlib.cbook import dedent, silent_list, is_numlike
 from matplotlib.cbook import _string_to_bool
 from matplotlib.cbook import deprecated
 from matplotlib import docstring
@@ -66,7 +66,7 @@ from .ticker import TickHelper, Formatter, FixedFormatter, NullFormatter,\
            Locator, IndexLocator, FixedLocator, NullLocator,\
            LinearLocator, LogLocator, AutoLocator, MultipleLocator,\
            MaxNLocator
-
+from matplotlib.backends import pylab_setup
 
 ## Backend detection ##
 def _backend_selection():
@@ -75,8 +75,7 @@ def _backend_selection():
         loop, and if not switches to a compatible one.
     """
     backend = rcParams['backend']
-    if not rcParams['backend_fallback'] or \
-                     backend not in _interactive_bk:
+    if not rcParams['backend_fallback'] or backend not in _interactive_bk:
         return
     is_agg_backend = rcParams['backend'].endswith('Agg')
     if 'wx' in sys.modules and not backend in ('WX', 'WXAgg'):
@@ -111,7 +110,6 @@ _backend_selection()
 
 ## Global ##
 
-from matplotlib.backends import pylab_setup
 _backend_mod, new_figure_manager, draw_if_interactive, _show = pylab_setup()
 
 _IP_REGISTERED = None
@@ -276,33 +274,24 @@ def pause(interval):
     """
     Pause for *interval* seconds.
 
-    If there is an active figure it will be updated and displayed,
-    and the GUI event loop will run during the pause.
+    If there is an active figure, it will be updated and displayed before the
+    pause, and the GUI event loop (if any) will run during the pause.
 
-    If there is no active figure, or if a non-interactive backend
-    is in use, this executes time.sleep(interval).
+    This can be used for crude animation.  For more complex animation, see
+    :mod:`matplotlib.animation`.
 
-    This can be used for crude animation. For more complex
-    animation, see :mod:`matplotlib.animation`.
-
-    This function is experimental; its behavior may be changed
-    or extended in a future release.
-
+    This function is experimental; its behavior may be changed or extended in a
+    future release.
     """
-    backend = rcParams['backend']
-    if backend in _interactive_bk:
-        figManager = _pylab_helpers.Gcf.get_active()
-        if figManager is not None:
-            canvas = figManager.canvas
-            if canvas.figure.stale:
-                canvas.draw()
-            show(block=False)
-            canvas.start_event_loop(interval)
-            return
-
-    # No on-screen figure is active, so sleep() is all we need.
-    import time
-    time.sleep(interval)
+    manager = _pylab_helpers.Gcf.get_active()
+    if manager is not None:
+        canvas = manager.canvas
+        if canvas.figure.stale:
+            canvas.draw_idle()
+        show(block=False)
+        canvas.start_event_loop(interval)
+    else:
+        time.sleep(interval)
 
 
 @docstring.copy_dedent(matplotlib.rc)
@@ -362,7 +351,7 @@ def setp(*args, **kwargs):
 
 def xkcd(scale=1, length=100, randomness=2):
     """
-    Turns on `xkcd <http://xkcd.com/>`_ sketch-style drawing mode.
+    Turns on `xkcd <https://xkcd.com/>`_ sketch-style drawing mode.
     This will only have effect on things drawn after this function is
     called.
 
@@ -432,6 +421,7 @@ def figure(num=None,  # autoincrement if None, else integer from 1-N
            edgecolor=None,  # defaults to rc figure.edgecolor
            frameon=True,
            FigureClass=Figure,
+           clear=False,
            **kwargs
            ):
     """
@@ -458,10 +448,19 @@ def figure(num=None,  # autoincrement if None, else integer from 1-N
         resolution of the figure. If not provided, defaults to rc figure.dpi.
 
     facecolor :
-        the background color. If not provided, defaults to rc figure.facecolor
+        the background color. If not provided, defaults to rc figure.facecolor.
 
     edgecolor :
-        the border color. If not provided, defaults to rc figure.edgecolor
+        the border color. If not provided, defaults to rc figure.edgecolor.
+
+    frameon : bool, optional, default: True
+        If False, suppress drawing the figure frame.
+
+    FigureClass : class derived from matplotlib.figure.Figure
+        Optionally use a custom Figure instance.
+
+    clear : bool, optional, default: False
+        If True and the figure already exists, then it is cleared.
 
     Returns
     -------
@@ -496,7 +495,7 @@ def figure(num=None,  # autoincrement if None, else integer from 1-N
     figLabel = ''
     if num is None:
         num = next_num
-    elif is_string_like(num):
+    elif isinstance(num, six.string_types):
         figLabel = num
         allLabels = get_figlabels()
         if figLabel not in allLabels:
@@ -559,6 +558,9 @@ def figure(num=None,  # autoincrement if None, else integer from 1-N
         if _INSTALL_FIG_OBSERVER:
             fig.stale_callback = _auto_draw_if_interactive
 
+    if clear:
+        figManager.canvas.figure.clear()
+
     return figManager.canvas.figure
 
 
@@ -592,9 +594,7 @@ def fignum_exists(num):
 
 def get_fignums():
     """Return a list of existing figure numbers."""
-    fignums = list(six.iterkeys(_pylab_helpers.Gcf.figs))
-    fignums.sort()
-    return fignums
+    return sorted(_pylab_helpers.Gcf.figs)
 
 
 def get_figlabels():
@@ -653,7 +653,7 @@ def close(*args):
             # if we are dealing with a type UUID, we
             # can use its integer representation
             _pylab_helpers.Gcf.destroy(arg.int)
-        elif is_string_like(arg):
+        elif isinstance(arg, six.string_types):
             allLabels = get_figlabels()
             if arg in allLabels:
                 num = get_fignums()[allLabels.index(arg)]
@@ -743,7 +743,7 @@ def figimage(*args, **kwargs):
     return gcf().figimage(*args, **kwargs)
 
 
-def figlegend(handles, labels, loc, **kwargs):
+def figlegend(*args, **kwargs):
     """
     Place a legend in the figure.
 
@@ -760,7 +760,14 @@ def figlegend(handles, labels, loc, **kwargs):
 
     A :class:`matplotlib.legend.Legend` instance is returned.
 
-    Example::
+    Examples
+    --------
+
+    To make a legend from existing artists on every axes::
+
+      figlegend()
+
+    To make a legend for a list of lines and labels::
 
       figlegend( (line1, line2, line3),
                  ('label1', 'label2', 'label3'),
@@ -771,7 +778,7 @@ def figlegend(handles, labels, loc, **kwargs):
        :func:`~matplotlib.pyplot.legend`
 
     """
-    return gcf().legend(handles, labels, loc, **kwargs)
+    return gcf().legend(*args, **kwargs)
 
 
 ## Figure and Axes hybrid ##
@@ -858,7 +865,8 @@ def axes(*args, **kwargs):
       color for the axis, default white.
 
     - ``axes(h)`` where *h* is an axes instance makes *h* the current
-      axis.  An :class:`~matplotlib.axes.Axes` instance is returned.
+      axis and the parent of *h* the current figure.
+      An :class:`~matplotlib.axes.Axes` instance is returned.
 
     =========   ==============   ==============================================
     kwarg       Accepts          Description
@@ -892,7 +900,8 @@ def axes(*args, **kwargs):
     arg = args[0]
 
     if isinstance(arg, Axes):
-        a = gcf().sca(arg)
+        sca(arg)
+        a = arg
     else:
         rect = arg
         a = gcf().add_axes(rect, **kwargs)
@@ -1018,12 +1027,12 @@ def subplot(*args, **kwargs):
             For additional information on :func:`axes` and
             :func:`subplot` keyword arguments.
 
-        :file:`examples/pie_and_polar_charts/polar_scatter_demo.py`
+        :file:`gallery/pie_and_polar_charts/polar_scatter.py`
             For an example
 
     **Example:**
 
-    .. plot:: mpl_examples/subplots_axes_and_figures/subplot_demo.py
+    .. plot:: gallery/subplots_axes_and_figures/subplot.py
 
     """
     # if subplot called without arguments, create subplot(1,1,1)
@@ -1167,113 +1176,19 @@ def subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True,
     figure
     subplot
     """
-    # for backwards compatibility
-    if isinstance(sharex, bool):
-        if sharex:
-            sharex = "all"
-        else:
-            sharex = "none"
-    if isinstance(sharey, bool):
-        if sharey:
-            sharey = "all"
-        else:
-            sharey = "none"
-    share_values = ["all", "row", "col", "none"]
-    if sharex not in share_values:
-        # This check was added because it is very easy to type
-        # `subplots(1, 2, 1)` when `subplot(1, 2, 1)` was intended.
-        # In most cases, no error will ever occur, but mysterious behavior will
-        # result because what was intended to be the subplot index is instead
-        # treated as a bool for sharex.
-        if isinstance(sharex, int):
-            warnings.warn("sharex argument to subplots() was an integer."
-                          " Did you intend to use subplot() (without 's')?")
-
-        raise ValueError("sharex [%s] must be one of %s" %
-                         (sharex, share_values))
-    if sharey not in share_values:
-        raise ValueError("sharey [%s] must be one of %s" %
-                         (sharey, share_values))
-    if subplot_kw is None:
-        subplot_kw = {}
-    if gridspec_kw is None:
-        gridspec_kw = {}
-
     fig = figure(**fig_kw)
-    gs = GridSpec(nrows, ncols, **gridspec_kw)
-
-    # Create empty object array to hold all axes.  It's easiest to make it 1-d
-    # so we can just append subplots upon creation, and then
-    nplots = nrows*ncols
-    axarr = np.empty(nplots, dtype=object)
-
-    # Create first subplot separately, so we can share it if requested
-    ax0 = fig.add_subplot(gs[0, 0], **subplot_kw)
-    axarr[0] = ax0
-
-    r, c = np.mgrid[:nrows, :ncols]
-    r = r.flatten() * ncols
-    c = c.flatten()
-    lookup = {
-            "none": np.arange(nplots),
-            "all": np.zeros(nplots, dtype=int),
-            "row": r,
-            "col": c,
-            }
-    sxs = lookup[sharex]
-    sys = lookup[sharey]
-
-    # Note off-by-one counting because add_subplot uses the MATLAB 1-based
-    # convention.
-    for i in range(1, nplots):
-        if sxs[i] == i:
-            subplot_kw['sharex'] = None
-        else:
-            subplot_kw['sharex'] = axarr[sxs[i]]
-        if sys[i] == i:
-            subplot_kw['sharey'] = None
-        else:
-            subplot_kw['sharey'] = axarr[sys[i]]
-        axarr[i] = fig.add_subplot(gs[i // ncols, i % ncols], **subplot_kw)
-
-    # returned axis array will be always 2-d, even if nrows=ncols=1
-    axarr = axarr.reshape(nrows, ncols)
-
-    # turn off redundant tick labeling
-    if sharex in ["col", "all"] and nrows > 1:
-        # turn off all but the bottom row
-        for ax in axarr[:-1, :].flat:
-            for label in ax.get_xticklabels():
-                label.set_visible(False)
-            ax.xaxis.offsetText.set_visible(False)
-
-    if sharey in ["row", "all"] and ncols > 1:
-        # turn off all but the first column
-        for ax in axarr[:, 1:].flat:
-            for label in ax.get_yticklabels():
-                label.set_visible(False)
-            ax.yaxis.offsetText.set_visible(False)
-
-    if squeeze:
-        # Reshape the array to have the final desired dimension (nrow,ncol),
-        # though discarding unneeded dimensions that equal 1.  If we only have
-        # one subplot, just return it instead of a 1-element array.
-        if nplots == 1:
-            ret = fig, axarr[0, 0]
-        else:
-            ret = fig, axarr.squeeze()
-    else:
-        # returned axis array will be always 2-d, even if nrows=ncols=1
-        ret = fig, axarr.reshape(nrows, ncols)
-
-    return ret
+    axs = fig.subplots(nrows=nrows, ncols=ncols, sharex=sharex, sharey=sharey,
+                       squeeze=squeeze, subplot_kw=subplot_kw,
+                       gridspec_kw=gridspec_kw)
+    return fig, axs
 
 
-def subplot2grid(shape, loc, rowspan=1, colspan=1, **kwargs):
+def subplot2grid(shape, loc, rowspan=1, colspan=1, fig=None, **kwargs):
     """
     Create a subplot in a grid.  The grid is specified by *shape*, at
     location of *loc*, spanning *rowspan*, *colspan* cells in each
-    direction.  The index for loc is 0-based. ::
+    direction.  The index for loc is 0-based.  The current figure will
+    be used unless *fig* is specified. ::
 
       subplot2grid(shape, loc, rowspan=1, colspan=1)
 
@@ -1284,7 +1199,9 @@ def subplot2grid(shape, loc, rowspan=1, colspan=1, **kwargs):
       subplot(subplotspec)
     """
 
-    fig = gcf()
+    if fig is None:
+        fig = gcf()
+
     s1, s2 = shape
     subplotspec = GridSpec(s1, s2).new_subplotspec(loc,
                                                    rowspan=rowspan,
@@ -1890,9 +1807,9 @@ def get_plot_commands():
 
     import inspect
 
-    exclude = set(['colormaps', 'colors', 'connect', 'disconnect',
-                   'get_plot_commands', 'get_current_fig_manager',
-                   'ginput', 'plotting', 'waitforbuttonpress'])
+    exclude = {'colormaps', 'colors', 'connect', 'disconnect',
+               'get_plot_commands', 'get_current_fig_manager', 'ginput',
+               'plotting', 'waitforbuttonpress'}
     exclude |= set(colormaps())
     this_module = inspect.getmodule(get_plot_commands)
 
@@ -1903,10 +1820,10 @@ def get_plot_commands():
         if inspect.isfunction(obj) and inspect.getmodule(obj) is this_module:
             commands.add(name)
 
-    commands = list(commands)
-    commands.sort()
-    return commands
+    return sorted(commands)
 
+
+@deprecated('2.1')
 def colors():
     """
     This is a do-nothing function to provide you with help on how
@@ -1993,66 +1910,17 @@ def colormaps():
       for nominal data that has no inherent ordering, where color is used
       only to distinguish categories
 
-    The base colormaps are derived from those of the same name provided
-    with Matlab:
+    Matplotlib ships with 4 perceptually uniform color maps which are
+    the recommended color maps for sequential data:
 
-      =========   =======================================================
+      =========   ===================================================
       Colormap    Description
-      =========   =======================================================
-      autumn      sequential linearly-increasing shades of red-orange-yellow
-      bone        sequential increasing black-white color map with
-                  a tinge of blue, to emulate X-ray film
-      cool        linearly-decreasing shades of cyan-magenta
-      copper      sequential increasing shades of black-copper
-      flag        repetitive red-white-blue-black pattern (not cyclic at
-                  endpoints)
-      gray        sequential linearly-increasing black-to-white
-                  grayscale
-      hot         sequential black-red-yellow-white, to emulate blackbody
-                  radiation from an object at increasing temperatures
-      hsv         cyclic red-yellow-green-cyan-blue-magenta-red, formed
-                  by changing the hue component in the HSV color space
+      =========   ===================================================
       inferno     perceptually uniform shades of black-red-yellow
-      jet         a spectral map with dark endpoints, blue-cyan-yellow-red;
-                  based on a fluid-jet simulation by NCSA [#]_
       magma       perceptually uniform shades of black-red-white
-      pink        sequential increasing pastel black-pink-white, meant
-                  for sepia tone colorization of photographs
       plasma      perceptually uniform shades of blue-red-yellow
-      prism       repetitive red-yellow-green-blue-purple-...-green pattern
-                  (not cyclic at endpoints)
-      spring      linearly-increasing shades of magenta-yellow
-      summer      sequential linearly-increasing shades of green-yellow
       viridis     perceptually uniform shades of blue-green-yellow
-      winter      linearly-increasing shades of blue-green
-      =========   =======================================================
-
-    For the above list only, you can also set the colormap using the
-    corresponding pylab shortcut interface function, similar to Matlab::
-
-      imshow(X)
-      hot()
-      jet()
-
-    The next set of palettes are from the `Yorick scientific visualisation
-    package <http://dhmunro.github.io/yorick-doc/>`_, an evolution of
-    the GIST package, both by David H. Munro:
-
-      ============  =======================================================
-      Colormap      Description
-      ============  =======================================================
-      gist_earth    mapmaker's colors from dark blue deep ocean to green
-                    lowlands to brown highlands to white mountains
-      gist_heat     sequential increasing black-red-orange-white, to emulate
-                    blackbody radiation from an iron bar as it grows hotter
-      gist_ncar     pseudo-spectral black-blue-green-yellow-red-purple-white
-                    colormap from National Center for Atmospheric
-                    Research [#]_
-      gist_rainbow  runs through the colors in spectral order from red to
-                    violet at full saturation (like *hsv* but not cyclic)
-      gist_stern    "Stern special" color table from Interactive Data
-                    Language software
-      ============  =======================================================
+      =========   ===================================================
 
     The following colormaps are based on the `ColorBrewer
     <http://colorbrewer2.org>`_ color specifications and designs developed by
@@ -2115,6 +1983,57 @@ def colormaps():
     * Set2
     * Set3
 
+    A set of colormaps derived from those of the same name provided
+    with Matlab are also included:
+
+      =========   =======================================================
+      Colormap    Description
+      =========   =======================================================
+      autumn      sequential linearly-increasing shades of red-orange-yellow
+      bone        sequential increasing black-white color map with
+                  a tinge of blue, to emulate X-ray film
+      cool        linearly-decreasing shades of cyan-magenta
+      copper      sequential increasing shades of black-copper
+      flag        repetitive red-white-blue-black pattern (not cyclic at
+                  endpoints)
+      gray        sequential linearly-increasing black-to-white
+                  grayscale
+      hot         sequential black-red-yellow-white, to emulate blackbody
+                  radiation from an object at increasing temperatures
+      hsv         cyclic red-yellow-green-cyan-blue-magenta-red, formed
+                  by changing the hue component in the HSV color space
+      jet         a spectral map with dark endpoints, blue-cyan-yellow-red;
+                  based on a fluid-jet simulation by NCSA [#]_
+      pink        sequential increasing pastel black-pink-white, meant
+                  for sepia tone colorization of photographs
+      prism       repetitive red-yellow-green-blue-purple-...-green pattern
+                  (not cyclic at endpoints)
+      spring      linearly-increasing shades of magenta-yellow
+      summer      sequential linearly-increasing shades of green-yellow
+      winter      linearly-increasing shades of blue-green
+      =========   =======================================================
+
+    A set of palettes from the `Yorick scientific visualisation
+    package <https://dhmunro.github.io/yorick-doc/>`_, an evolution of
+    the GIST package, both by David H. Munro are included:
+
+      ============  =======================================================
+      Colormap      Description
+      ============  =======================================================
+      gist_earth    mapmaker's colors from dark blue deep ocean to green
+                    lowlands to brown highlands to white mountains
+      gist_heat     sequential increasing black-red-orange-white, to emulate
+                    blackbody radiation from an iron bar as it grows hotter
+      gist_ncar     pseudo-spectral black-blue-green-yellow-red-purple-white
+                    colormap from National Center for Atmospheric
+                    Research [#]_
+      gist_rainbow  runs through the colors in spectral order from red to
+                    violet at full saturation (like *hsv* but not cyclic)
+      gist_stern    "Stern special" color table from Interactive Data
+                    Language software
+      ============  =======================================================
+
+
     Other miscellaneous schemes:
 
       ============= =======================================================
@@ -2175,14 +2094,14 @@ def colormaps():
 
     .. [#] Resembles "BkBlAqGrYeOrReViWh200" from NCAR Command
       Language. See `Color Table Gallery
-      <http://www.ncl.ucar.edu/Document/Graphics/color_table_gallery.shtml>`_
+      <https://www.ncl.ucar.edu/Document/Graphics/color_table_gallery.shtml>`_
 
     .. [#] See `Diverging Color Maps for Scientific Visualization
       <http://www.kennethmoreland.com/color-maps/>`_ by Kenneth Moreland.
 
     .. [#] See `A Color Map for Effective Black-and-White Rendering of
       Color-Scale Images
-      <http://www.mathworks.com/matlabcentral/fileexchange/2662-cmrmap-m>`_
+      <https://www.mathworks.com/matlabcentral/fileexchange/2662-cmrmap-m>`_
       by Carey Rappaport
 
     .. [#] Changed to distinguish from ColorBrewer's *Spectral* map.
@@ -2191,7 +2110,7 @@ def colormaps():
 
 
     """
-    return sorted(cm.cmap_d.keys())
+    return sorted(cm.cmap_d)
 
 
 def _setup_pyplot_info_docstrings():
@@ -2372,6 +2291,11 @@ def polar(*args, **kwargs):
     strings, as in :func:`~matplotlib.pyplot.plot`.
 
     """
+    # If an axis already exists, check if it has a polar projection
+    if gcf().get_axes():
+        if not isinstance(gca(), PolarAxes):
+            warnings.warn('Trying to create polar plot on an axis that does '
+                          'not have a polar projection.')
     ax = gca(polar=True)
     ret = ax.plot(*args, **kwargs)
     return ret
@@ -2381,7 +2305,7 @@ def plotfile(fname, cols=(0,), plotfuncs=None,
              comments='#', skiprows=0, checkrows=5, delimiter=',',
              names=None, subplots=True, newfig=True, **kwargs):
     """
-    Plot the data in in a file.
+    Plot the data in a file.
 
     *cols* is a sequence of column identifiers to plot.  An identifier
     is either an int or a string.  If it is an int, it indicates the
@@ -2447,7 +2371,7 @@ def plotfile(fname, cols=(0,), plotfuncs=None,
 
     def getname_val(identifier):
         'return the name and column data for identifier'
-        if is_string_like(identifier):
+        if isinstance(identifier, six.string_types):
             return identifier, r[identifier]
         elif is_numlike(identifier):
             name = r.dtype.names[int(identifier)]
@@ -2688,20 +2612,19 @@ def axvspan(xmin, xmax, ymin=0, ymax=1, hold=None, **kwargs):
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 @_autogen_docstring(Axes.bar)
-def bar(left, height, width=0.8, bottom=None, hold=None, data=None, **kwargs):
+def bar(*args, **kwargs):
     ax = gca()
     # Deprecated: allow callers to override the hold state
     # by passing hold=True|False
     washold = ax._hold
-
+    hold = kwargs.pop('hold', None)
     if hold is not None:
         ax._hold = hold
         from matplotlib.cbook import mplDeprecation
         warnings.warn("The 'hold' keyword argument is deprecated since 2.0.",
                       mplDeprecation)
     try:
-        ret = ax.bar(left, height, width=width, bottom=bottom, data=data,
-                     **kwargs)
+        ret = ax.bar(*args, **kwargs)
     finally:
         ax._hold = washold
 
@@ -2710,19 +2633,19 @@ def bar(left, height, width=0.8, bottom=None, hold=None, data=None, **kwargs):
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 @_autogen_docstring(Axes.barh)
-def barh(bottom, width, height=0.8, left=None, hold=None, **kwargs):
+def barh(*args, **kwargs):
     ax = gca()
     # Deprecated: allow callers to override the hold state
     # by passing hold=True|False
     washold = ax._hold
-
+    hold = kwargs.pop('hold', None)
     if hold is not None:
         ax._hold = hold
         from matplotlib.cbook import mplDeprecation
         warnings.warn("The 'hold' keyword argument is deprecated since 2.0.",
                       mplDeprecation)
     try:
-        ret = ax.barh(bottom, width, height=height, left=left, **kwargs)
+        ret = ax.barh(*args, **kwargs)
     finally:
         ax._hold = washold
 
@@ -3006,8 +2929,8 @@ def fill_between(x, y1, y2=0, where=None, interpolate=False, step=None,
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 @_autogen_docstring(Axes.fill_betweenx)
-def fill_betweenx(y, x1, x2=0, where=None, step=None, hold=None, data=None,
-                  **kwargs):
+def fill_betweenx(y, x1, x2=0, where=None, step=None, interpolate=False,
+                  hold=None, data=None, **kwargs):
     ax = gca()
     # Deprecated: allow callers to override the hold state
     # by passing hold=True|False
@@ -3019,8 +2942,8 @@ def fill_betweenx(y, x1, x2=0, where=None, step=None, hold=None, data=None,
         warnings.warn("The 'hold' keyword argument is deprecated since 2.0.",
                       mplDeprecation)
     try:
-        ret = ax.fill_betweenx(y, x1, x2=x2, where=where, step=step, data=data,
-                               **kwargs)
+        ret = ax.fill_betweenx(y, x1, x2=x2, where=where, step=step,
+                               interpolate=interpolate, data=data, **kwargs)
     finally:
         ax._hold = washold
 
@@ -3031,7 +2954,7 @@ def fill_betweenx(y, x1, x2=0, where=None, step=None, hold=None, data=None,
 @_autogen_docstring(Axes.hexbin)
 def hexbin(x, y, C=None, gridsize=100, bins=None, xscale='linear',
            yscale='linear', extent=None, cmap=None, norm=None, vmin=None,
-           vmax=None, alpha=None, linewidths=None, edgecolors='none',
+           vmax=None, alpha=None, linewidths=None, edgecolors='face',
            reduce_C_function=np.mean, mincnt=None, marginals=False, hold=None,
            data=None, **kwargs):
     ax = gca()
@@ -3059,10 +2982,10 @@ def hexbin(x, y, C=None, gridsize=100, bins=None, xscale='linear',
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 @_autogen_docstring(Axes.hist)
-def hist(x, bins=None, range=None, normed=False, weights=None, cumulative=False,
+def hist(x, bins=None, range=None, density=None, weights=None, cumulative=False,
          bottom=None, histtype='bar', align='mid', orientation='vertical',
          rwidth=None, log=False, color=None, label=None, stacked=False,
-         hold=None, data=None, **kwargs):
+         normed=None, hold=None, data=None, **kwargs):
     ax = gca()
     # Deprecated: allow callers to override the hold state
     # by passing hold=True|False
@@ -3074,11 +2997,11 @@ def hist(x, bins=None, range=None, normed=False, weights=None, cumulative=False,
         warnings.warn("The 'hold' keyword argument is deprecated since 2.0.",
                       mplDeprecation)
     try:
-        ret = ax.hist(x, bins=bins, range=range, normed=normed,
+        ret = ax.hist(x, bins=bins, range=range, density=density,
                       weights=weights, cumulative=cumulative, bottom=bottom,
                       histtype=histtype, align=align, orientation=orientation,
                       rwidth=rwidth, log=log, color=color, label=label,
-                      stacked=stacked, data=data, **kwargs)
+                      stacked=stacked, normed=normed, data=data, **kwargs)
     finally:
         ax._hold = washold
 
@@ -3276,7 +3199,7 @@ def phase_spectrum(x, Fs=None, Fc=None, window=None, pad_to=None, sides=None,
 def pie(x, explode=None, labels=None, colors=None, autopct=None,
         pctdistance=0.6, shadow=False, labeldistance=1.1, startangle=None,
         radius=None, counterclock=True, wedgeprops=None, textprops=None,
-        center=(0, 0), frame=False, hold=None, data=None):
+        center=(0, 0), frame=False, rotatelabels=False, hold=None, data=None):
     ax = gca()
     # Deprecated: allow callers to override the hold state
     # by passing hold=True|False
@@ -3293,7 +3216,7 @@ def pie(x, explode=None, labels=None, colors=None, autopct=None,
                      labeldistance=labeldistance, startangle=startangle,
                      radius=radius, counterclock=counterclock,
                      wedgeprops=wedgeprops, textprops=textprops, center=center,
-                     frame=frame, data=data)
+                     frame=frame, rotatelabels=rotatelabels, data=data)
     finally:
         ax._hold = washold
 
@@ -3575,8 +3498,8 @@ def step(x, y, *args, **kwargs):
 @_autogen_docstring(Axes.streamplot)
 def streamplot(x, y, u, v, density=1, linewidth=None, color=None, cmap=None,
                norm=None, arrowsize=1, arrowstyle='-|>', minlength=0.1,
-               transform=None, zorder=None, start_points=None, hold=None,
-               data=None):
+               transform=None, zorder=None, start_points=None, maxlength=4.0,
+               integration_direction='both', hold=None, data=None):
     ax = gca()
     # Deprecated: allow callers to override the hold state
     # by passing hold=True|False
@@ -3592,7 +3515,10 @@ def streamplot(x, y, u, v, density=1, linewidth=None, color=None, cmap=None,
                             color=color, cmap=cmap, norm=norm,
                             arrowsize=arrowsize, arrowstyle=arrowstyle,
                             minlength=minlength, transform=transform,
-                            zorder=zorder, start_points=start_points, data=data)
+                            zorder=zorder, start_points=start_points,
+                            maxlength=maxlength,
+                            integration_direction=integration_direction,
+                            data=data)
     finally:
         ax._hold = washold
     sci(ret.lines)

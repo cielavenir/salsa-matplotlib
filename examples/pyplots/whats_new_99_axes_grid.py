@@ -1,6 +1,12 @@
+"""
+========================
+Whats New 0.99 Axes Grid
+========================
+
+"""
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid.axes_rgb import RGBAxes
+from mpl_toolkits.axes_grid1.axes_rgb import RGBAxes
 
 def get_demo_image():
     # prepare image

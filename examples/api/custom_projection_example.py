@@ -43,12 +43,11 @@ class GeoAxes(Axes):
             self._round_to = round_to
 
         def __call__(self, x, pos=None):
-            degrees = (x / np.pi) * 180.0
-            degrees = np.round(degrees / self._round_to) * self._round_to
+            degrees = np.round(np.rad2deg(x) / self._round_to) * self._round_to
             if rcParams['text.usetex'] and not rcParams['text.latex.unicode']:
                 return r"$%0.0f^\circ$" % degrees
             else:
-                return "%0.0f\u00b0" % degrees
+                return "%0.0f\N{DEGREE SIGN}" % degrees
 
     RESOLUTION = 75
 
@@ -278,8 +277,7 @@ class GeoAxes(Axes):
 
         In this case, we want them to be displayed in degrees N/S/E/W.
         """
-        lon = lon * (180.0 / np.pi)
-        lat = lat * (180.0 / np.pi)
+        lon, lat = np.rad2deg([lon, lat])
         if lat >= 0.0:
             ns = 'N'
         else:
@@ -288,7 +286,8 @@ class GeoAxes(Axes):
             ew = 'E'
         else:
             ew = 'W'
-        return '%f\u00b0%s, %f\u00b0%s' % (abs(lat), ns, abs(lon), ew)
+        return ('%f\N{DEGREE SIGN}%s, %f\N{DEGREE SIGN}%s'
+                % (abs(lat), ns, abs(lon), ew))
 
     def set_longitude_grid(self, degrees):
         """
@@ -298,10 +297,9 @@ class GeoAxes(Axes):
         class -- it provides a more convenient interface to set the
         ticking than set_xticks would.
         """
-        number = (360.0 / degrees) + 1
-        self.xaxis.set_major_locator(
-            FixedLocator(
-                np.linspace(-np.pi, np.pi, number, True)[1:-1]))
+        # Skip -180 and 180, which are the fixed limits.
+        grid = np.arange(-180 + degrees, 180, degrees)
+        self.xaxis.set_major_locator(FixedLocator(np.deg2rad(grid)))
         self.xaxis.set_major_formatter(self.ThetaFormatter(degrees))
 
     def set_latitude_grid(self, degrees):
@@ -312,10 +310,9 @@ class GeoAxes(Axes):
         class -- it provides a more convenient interface than
         set_yticks would.
         """
-        number = (180.0 / degrees) + 1
-        self.yaxis.set_major_locator(
-            FixedLocator(
-                np.linspace(-np.pi / 2.0, np.pi / 2.0, number, True)[1:-1]))
+        # Skip -90 and 90, which are the fixed limits.
+        grid = np.arange(-90 + degrees, 90, degrees)
+        self.yaxis.set_major_locator(FixedLocator(np.deg2rad(grid)))
         self.yaxis.set_major_formatter(self.ThetaFormatter(degrees))
 
     def set_longitude_grid_ends(self, degrees):
@@ -330,7 +327,7 @@ class GeoAxes(Axes):
         class -- it provides an interface to something that has no
         analogy in the base Axes class.
         """
-        self._longitude_cap = degrees * (np.pi / 180.0)
+        self._longitude_cap = np.deg2rad(degrees)
         self._xaxis_pretransform \
             .clear() \
             .scale(1.0, self._longitude_cap * 2.0) \
@@ -437,15 +434,11 @@ class HammerAxes(GeoAxes):
             self._resolution = resolution
 
         def transform_non_affine(self, xy):
-            x = xy[:, 0:1]
-            y = xy[:, 1:2]
-
-            quarter_x = 0.25 * x
-            half_y = 0.5 * y
-            z = np.sqrt(1.0 - quarter_x*quarter_x - half_y*half_y)
-            longitude = 2 * np.arctan((z*x) / (2.0 * (2.0*z*z - 1.0)))
+            x, y = xy.T
+            z = np.sqrt(1 - (x / 4) ** 2 - (y / 2) ** 2)
+            longitude = 2 * np.arctan((z * x) / (2 * (2 * z ** 2 - 1)))
             latitude = np.arcsin(y*z)
-            return np.concatenate((longitude, latitude), 1)
+            return np.column_stack([longitude, latitude])
         transform_non_affine.__doc__ = Transform.transform_non_affine.__doc__
 
         def inverted(self):

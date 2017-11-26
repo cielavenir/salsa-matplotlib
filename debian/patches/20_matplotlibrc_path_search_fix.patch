@@ -1,4 +1,4 @@
-From 39246bfeaecf0537fa586c09bae2428f67858690 Mon Sep 17 00:00:00 2001
+From aee1a63e1f8380a2bf054213f6ca4d21a228c5d4 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Thu, 8 Oct 2015 09:47:11 -0700
 Subject: Fixes the path to search for matplotlibrc file
@@ -7,14 +7,14 @@ Forwarded: not-needed
 
 Patch-Name: 20_matplotlibrc_path_search_fix.patch
 ---
- lib/matplotlib/__init__.py | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ lib/matplotlib/__init__.py | 44 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
 
 diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
-index 530c889..cae5129 100644
+index 00488a13..11c37442 100644
 --- a/lib/matplotlib/__init__.py
 +++ b/lib/matplotlib/__init__.py
-@@ -712,10 +712,12 @@ def _get_data_path():
+@@ -634,10 +634,12 @@ def _get_data_path():
          return path
  
      _file = _decode_filesystem_path(__file__)
@@ -28,12 +28,50 @@ index 530c889..cae5129 100644
      # setuptools' namespace_packages may highjack this init file
      # so need to try something known to be in matplotlib, not basemap
      import matplotlib.afm
-@@ -843,7 +845,7 @@ def matplotlib_fname():
-                     home, '.matplotlib', 'matplotlibrc')
-             return fname
- 
--    path = get_data_path()  # guaranteed to exist or raise
+@@ -720,6 +722,46 @@ def matplotlib_fname():
+     - Lastly, it looks in `$MATPLOTLIBDATA/matplotlibrc` for a
+       system-defined copy.
+     """
++    if six.PY2:
++        cwd = os.getcwdu()
++    else:
++        cwd = os.getcwd()
++    fname = os.path.join(cwd, 'matplotlibrc')
++    if os.path.exists(fname):
++        return fname
++
++    if 'MATPLOTLIBRC' in os.environ:
++        path = os.environ['MATPLOTLIBRC']
++        if os.path.exists(path):
++            fname = os.path.join(path, 'matplotlibrc')
++            if os.path.exists(fname):
++                return fname
++
++    configdir = _get_configdir()
++    if configdir is not None:
++        fname = os.path.join(configdir, 'matplotlibrc')
++        if os.path.exists(fname):
++            home = get_home()
++            if (sys.platform.startswith('linux') and
++                home is not None and
++                os.path.exists(os.path.join(
++                    home, '.matplotlib', 'matplotlibrc'))):
++                warnings.warn(
++                    "Found matplotlib configuration in ~/.matplotlib/. "
++                    "To conform with the XDG base directory standard, "
++                    "this configuration location has been deprecated "
++                    "on Linux, and the new location is now %s/matplotlib/. "
++                    "Please move your configuration there to ensure that "
++                    "matplotlib will continue to find it in the future." %
++                    _get_xdg_config_dir())
++                return os.path.join(
++                    home, '.matplotlib', 'matplotlibrc')
++            return fname
++
 +    path = '/etc'  # guaranteed to exist or raise
-     fname = os.path.join(path, 'matplotlibrc')
-     if not os.path.exists(fname):
-         warnings.warn('Could not find matplotlibrc; using defaults')
++    fname = os.path.join(path, 'matplotlibrc')
++    if not os.path.exists(fname):
++        warnings.warn('Could not find matplotlibrc; using defaults')
+ 
+     def gen_candidates():
+         yield os.path.join(six.moves.getcwd(), 'matplotlibrc')

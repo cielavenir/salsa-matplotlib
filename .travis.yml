@@ -1,9 +1,12 @@
+language: python
+
+dist: trusty
 sudo: false
 
 cache:
+  pip: true
   directories:
-    - $HOME/.ccache
-    - $HOME/.cache/pip
+    - $HOME/.ccache  # https://github.com/travis-ci/travis-ci/issues/5853
     - $HOME/.cache/matplotlib
 
 addons:
@@ -25,9 +28,6 @@ addons:
       - graphviz
       - libgeos-dev
       - otf-freefont
-#     - fonts-humor-sans
-#    sources:
-#      - debian-sid
 
 env:
   global:
@@ -36,164 +36,140 @@ env:
     - secure: RgJI7BBL8aX5FTOQe7xiXqWHMxWokd6GNUWp1NUV2mRLXPb9dI0RXqZt3UJwKTAzf1z/OtlHDmEkBoTVK81E9iUxK5npwyyjhJ8yTJmwfQtQF2n51Q1Ww9p+XSLORrOzZc7kAo6Kw6FIXN1pfctgYq2bQkrwJPRx/oPR8f6hcbY=
     - secure: E7OCdqhZ+PlwJcn+Hd6ns9TDJgEUXiUNEI0wu7xjxB2vBRRIKtZMbuaZjd+iKDqCKuVOJKu0ClBUYxmgmpLicTwi34CfTUYt6D4uhrU+8hBBOn1iiK51cl/aBvlUUrqaRLVhukNEBGZcyqAjXSA/Qsnp2iELEmAfOUa92ZYo1sk=
     - secure: "dfjNqGKzQG5bu3FnDNwLG8H/C4QoieFo4PfFmZPdM2RY7WIzukwKFNT6kiDfOrpwt+2bR7FhzjOGlDECGtlGOtYPN8XuXGjhcP4a4IfakdbDfF+D3NPIpf5VlE6776k0VpvcZBTMYJKNFIMc7QPkOwjvNJ2aXyfe3hBuGlKJzQU="
-    - BUILD_DOCS=false
     - NUMPY=numpy
+    - OPENBLAS_NUM_THREADS=1
     - PANDAS=
     - NPROC=2
-    - TEST_ARGS=--no-pep8
+    - INSTALL_PEP8=
+    - RUN_PEP8=
+    - NOSE=
+    - PYTEST_ARGS="-rawR --maxfail=50 --timeout=300 --durations=25 --cov-report= --cov=lib -n $NPROC"
+    - PYTHON_ARGS=
     - DELETE_FONT_CACHE=
-
-language: python
 
 matrix:
   include:
     - python: 2.7
-      env: MOCK=mock NUMPY=numpy==1.7.1
+      env: MOCK=mock NUMPY=numpy==1.7.1 PANDAS=pandas NOSE=nose
     - python: 3.4
-    - python: 3.5
-      env: PANDAS=pandas DELETE_FONT_CACHE=1
-    - python: 3.6   
-    - python: 2.7
-      env: TEST_ARGS=--pep8
-    - python: 2.7
-      env: BUILD_DOCS=true MOCK=mock
+      env: PYTHON_ARGS=-OO
+    - python: 3.6
+      env: DELETE_FONT_CACHE=1 INSTALL_PEP8=pytest-pep8 RUN_PEP8=--pep8 PANDAS=pandas
     - python: "nightly"
       env: PRE=--pre
+    - os: osx
+      osx_image: xcode7.3
+      language: generic  # https://github.com/travis-ci/travis-ci/issues/2312
+      env: MOCK=mock
+      only: master
+      cache:
+        # As for now travis caches only "$HOME/.cache/pip"
+        # https://docs.travis-ci.com/user/caching/#pip-cache
+        pip: false
+        directories:
+          - $HOME/Library/Caches/pip
+          # `cache` does not support `env`-like `global` so copy-paste from top
+          - $HOME/.ccache  # https://github.com/travis-ci/travis-ci/issues/5853
+          - $HOME/.cache/matplotlib
   allow_failures:
     - python: "nightly"
 
 before_install:
-  - source tools/travis_tools.sh
-  # Install into our own pristine virtualenv
-  - pip install --upgrade virtualenv
-  - virtualenv --python=python venv
-  - source venv/bin/activate
-  # test with non-ascii in path
-  - mkdir /tmp/λ
-  - export PATH=$PATH:/tmp/λ
-  - export PATH=/usr/lib/ccache:$PATH
+  - |
+    if [[ $TRAVIS_OS_NAME != 'osx' ]]; then
+      # test with non-ascii in path
+      mkdir /tmp/λ
+      export PATH=$PATH:/tmp/λ
+      export PATH=/usr/lib/ccache:$PATH
+    else
+      brew update
+      brew tap homebrew/gui
+      brew install python libpng ffmpeg imagemagick mplayer ccache
+      # We could install ghostscript and inkscape here to test svg and pdf
+      # but this makes the test time really long.
+      # brew install ghostscript inkscape
+      export PATH=/usr/local/opt/ccache/libexec:$PATH
+    fi
 
 install:
-  - ccache -s
-  - git describe
   # Upgrade pip and setuptools. Mock has issues with the default version of
   # setuptools
   - |
-    pip install --upgrade pip
-    pip install --upgrade wheel
-    pip install --upgrade setuptools
+    # Setup environment
+    ccache -s
+    git describe
+    # Upgrade pip and setuptools and wheel to get as clean an install as possible
+    pip install --upgrade pip setuptools wheel
   - |
     # Install dependencies from pypi
-    pip install $PRE python-dateutil $NUMPY pyparsing!=2.1.6 $PANDAS pep8 cycler coveralls coverage $MOCK
-    pip install $PRE -r doc-requirements.txt
+    pip install --upgrade $PRE \
+        $MOCK \
+        $NOSE \
+        $NUMPY \
+        $PANDAS \
+        codecov \
+        coverage \
+        cycler \
+        pillow \
+        pyparsing!=2.1.6 \
+        python-dateutil \
+        sphinx
+    # GUI toolkits are pip-installable only for some versions of Python so
+    # don't fail if we can't install them.  Make it easier to check whether the
+    # install was successful by trying to import the toolkit (sometimes, the
+    # install appears to be successful but shared libraries cannot be loaded at
+    # runtime, so an actual import is a better check).
+    pip install pyqt5 &&
+      python -c 'import PyQt5.QtCore' &&
+      echo 'PyQt5 is available' ||
+      echo 'PyQt5 is not available'
+    pip install -U --pre \
+      -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-14.04 \
+      wxPython &&
+      python -c 'import wx' &&
+      echo 'wxPython is available' ||
+      echo 'wxPython is not available'
 
-    # Install nose from a build which has partial
-    # support for python36 and suport for coverage output suppressing
-    pip install git+https://github.com/jenshnielsen/nose.git@matplotlibnose
+    # pytest-cov>=2.3.1 due to https://github.com/pytest-dev/pytest-cov/issues/124
+    pip install $PRE \
+        pytest \
+        pytest-cov>=2.3.1 \
+        pytest-faulthandler \
+        pytest-rerunfailures \
+        pytest-timeout \
+        pytest-xdist \
+        $INSTALL_PEP8
 
-  # We manually install humor sans using the package from Ubuntu 14.10. Unfortunatly humor sans is not
-  # availible in the Ubuntu version used by Travis but we can manually install the deb from a later
-  # version since is it basically just a .ttf file
-  # The current Travis Ubuntu image is to old to search .local/share/fonts so we store fonts in .fonts
-
-  # We install ipython to use the console highlighting. From IPython 3 this depends on jsonschema and mistune.
-  # Neihter is installed as a dependency of IPython since they are not used by the IPython console.
+    # Use the special local version of freetype for testing
+    cp ci/travis/setup.cfg .
   - |
-    if [[ $BUILD_DOCS == true ]]; then
-      pip install $PRE numpydoc ipython jsonschema mistune colorspacious
-      # linkchecker is currently broken with requests 2.10.0 so force an earlier version
-      pip install $PRE requests==2.9.2 linkchecker
-      wget https://github.com/google/fonts/blob/master/ofl/felipa/Felipa-Regular.ttf?raw=true -O Felipa-Regular.ttf
-      wget http://mirrors.kernel.org/ubuntu/pool/universe/f/fonts-humor-sans/fonts-humor-sans_1.0-1_all.deb
-      mkdir -p tmp
-      mkdir -p ~/.fonts
-      dpkg -x fonts-humor-sans_1.0-1_all.deb tmp
-      cp tmp/usr/share/fonts/truetype/humor-sans/Humor-Sans.ttf ~/.fonts
-      cp Felipa-Regular.ttf ~/.fonts
-      fc-cache -f -v
-    else
-      # Use the special local version of freetype for testing
-      cp .travis/setup.cfg .
-    fi;
+    # Install matplotlib
+    pip install -ve .
 
-  - pip install -ve ./
+before_script:
   - |
-
-script:
-  # The number of processes is hardcoded, because using too many causes the
-  # Travis VM to run out of memory (since so many copies of inkscape and
-  # ghostscript are running at the same time).
-  - echo Testing using $NPROC processes
-  - |
-    echo Testing import of tkagg backend
-    MPLBACKEND="tkagg" python -c 'import matplotlib.pyplot as plt; print(plt.get_backend())'
-    echo Testing using $NPROC processes
-    echo The following args are passed to nose $NOSE_ARGS
-    if [[ $BUILD_DOCS == false ]]; then
-      if [[ $DELETE_FONT_CACHE == 1 ]]; then
-        rm -rf ~/.cache/matplotlib
-      fi
-      export MPL_REPO_DIR=$PWD  # needed for pep8-conformance test of the examples
-      gdb -return-child-result -batch -ex r -ex bt --args python tests.py -s --processes=$NPROC --process-timeout=300 $TEST_ARGS
-    else
-      cd doc
-      python make.py html -n 2
-      # We don't build the LaTeX docs here, so linkchecker will complain
-      touch build/html/Matplotlib.pdf
-      linkchecker build/html/index.html
+    if [[ $TRAVIS_OS_NAME != 'osx' ]]; then
+      export DISPLAY=:99.0
+      sh -e /etc/init.d/xvfb start
     fi
+
+script: ci/travis/test_script.sh
+
+before_cache:
   - rm -rf $HOME/.cache/matplotlib/tex.cache
   - rm -rf $HOME/.cache/matplotlib/test_cache
 
 after_failure:
-  |
-  if [[ $BUILD_DOCS == false && $TRAVIS_PULL_REQUEST == false && $TRAVIS_REPO_SLUG == 'matplotlib/matplotlib' ]]; then
-    gem install travis-artifacts
-    cd $TRAVIS_BUILD_DIR/../tmp_test_dir
-    tar cjf result_images.tar.bz2 result_images
-    travis-artifacts upload --path result_images.tar.bz2
-    echo https://s3.amazonaws.com/matplotlib-test-results/artifacts/${TRAVIS_BUILD_NUMBER}/${TRAVIS_JOB_NUMBER}/result_images.tar.bz2
-  else
-    echo "The result images will only be uploaded if they are on the matplotlib/matplotlib repo - this is for security reasons to prevent arbitrary PRs echoing security details."
-  fi
+  - |
+    if [[ $TRAVIS_PULL_REQUEST == false && $TRAVIS_REPO_SLUG == 'matplotlib/matplotlib' ]]; then
+      gem install travis-artifacts
+      cd $TRAVIS_BUILD_DIR/../tmp_test_dir
+      tar cjf result_images.tar.bz2 result_images
+      travis-artifacts upload --path result_images.tar.bz2
+      echo https://s3.amazonaws.com/matplotlib-test-results/artifacts/${TRAVIS_BUILD_NUMBER}/${TRAVIS_JOB_NUMBER}/result_images.tar.bz2
+    else
+      echo "The result images will only be uploaded if they are on the matplotlib/matplotlib repo - this is for security reasons to prevent arbitrary PRs echoing security details."
+    fi
 
 after_success:
-  |
-  if [[ $TRAVIS_PULL_REQUEST == false && $TRAVIS_REPO_SLUG == 'matplotlib/matplotlib' && $BUILD_DOCS == true && $TRAVIS_BRANCH == 'master' ]]; then
-    cd $TRAVIS_BUILD_DIR
-    echo "Uploading documentation"
-    openssl aes-256-cbc -K $encrypted_cc802e084cd0_key -iv $encrypted_cc802e084cd0_iv -in .travis/matplotlibDeployKey.enc -out .travis/matplotlibDeployKey -d
-    eval `ssh-agent -s`
-    chmod 600 .travis/matplotlibDeployKey
-    ssh-add .travis/matplotlibDeployKey
-    cd ..
-    git clone git@github.com:matplotlib/devdocs.git
-    cd devdocs
-    git checkout --orphan gh-pages
-    git reset --hard first_commit
-    cp -R ../matplotlib/doc/build/html/. .
-    touch .nojekyll
-    git config --global user.email "MatplotlibTravisBot@nomail"
-    git config --global user.name "MatplotlibTravisBot"
-    git config --global push.default simple
-    git add .
-    git commit -m "Docs build of $TRAVIS_COMMIT"
-    git push --set-upstream origin gh-pages --force
-  else
-    echo "Will only deploy docs build from matplotlib master branch"
-  fi
-  if [[ $TRAVIS_PULL_REQUEST == false ]] && \
-     [[ $TRAVIS_REPO_SLUG == 'matplotlib/matplotlib' ]] && \
-     [[ $TRAVIS_BRANCH == 'master' ]]; then
-      cd $TRAVIS_BUILD_DIR
-      python .travis/travis_after_all.py
-      export $(cat .to_export_back)
-      if [ "$BUILD_LEADER" = "YES" ]; then
-        if [ "$BUILD_AGGREGATE_STATUS" = "others_succeeded" ]; then
-          echo "All Succeeded! Triggering OSX build..."
-          ./.travis/build_children.sh
-        else
-          echo "Some Failed; no OSX build"
-        fi
-      fi
-  fi
+  - codecov -e TRAVIS_PYTHON_VERSION

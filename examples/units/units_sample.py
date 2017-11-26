@@ -8,12 +8,16 @@ inches and centimeters using the `xunits` and `yunits` parameters for the
 `plot` function. Note that conversions are applied to get numbers to correct
 units.
 
+.. only:: builder_html
+
+   This example requires :download:`basic_units.py <basic_units.py>`
+
 """
 from basic_units import cm, inch
 import matplotlib.pyplot as plt
-import numpy
+import numpy as np
 
-cms = cm * numpy.arange(0, 10, 2)
+cms = cm * np.arange(0, 10, 2)
 
 fig = plt.figure()
 

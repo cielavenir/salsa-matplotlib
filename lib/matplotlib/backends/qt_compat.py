@@ -13,10 +13,11 @@ from matplotlib import rcParams, verbose
 QT_API_PYQT = 'PyQt4'       # API is not set here; Python 2.x default is V 1
 QT_API_PYQTv2 = 'PyQt4v2'   # forced to Version 2 API
 QT_API_PYSIDE = 'PySide'    # only supports Version 2 API
-QT_API_PYQT5 = 'PyQt5'       # use PyQt5 API; Version 2 with module shim
+QT_API_PYQT5 = 'PyQt5'      # use PyQt5 API; Version 2 with module shim
+QT_API_PYSIDE2 = 'PySide2'  # Version 2 API with module shim
 
 ETS = dict(pyqt=(QT_API_PYQTv2, 4), pyside=(QT_API_PYSIDE, 4),
-           pyqt5=(QT_API_PYQT5, 5))
+           pyqt5=(QT_API_PYQT5, 5), pyside2=(QT_API_PYSIDE2, 5))
 # ETS is a dict of env variable to (QT_API, QT_MAJOR_VERSION)
 # If the ETS QT_API environment variable is set, use it, but only
 # if the varible if of the same major QT version.  Note that
@@ -48,6 +49,10 @@ if 'PySide' in sys.modules:
     # user has imported PySide before importing mpl
     QT_API = QT_API_PYSIDE
 
+if 'PySide2' in sys.modules:
+    # user has imported PySide before importing mpl
+    QT_API = QT_API_PYSIDE2
+
 if 'PyQt4' in sys.modules:
     # user has imported PyQt4 before importing mpl
     # this case also handles the PyQt4v2 case as once sip is imported
@@ -64,7 +69,8 @@ if (QT_API_ENV is not None) and QT_API is None:
     except KeyError:
         raise RuntimeError(
             ('Unrecognized environment variable %r, valid values are:'
-             ' %r, %r or %r' % (QT_API_ENV, 'pyqt', 'pyside', 'pyqt5')))
+             ' %r, %r, %r or %r'
+             % (QT_API_ENV, 'pyqt', 'pyside', 'pyqt5', 'pyside2')))
     if QT_ENV_MAJOR_VERSION == QT_RC_MAJOR_VERSION:
         # Only if backend and env qt major version are
         # compatible use the env variable.
@@ -99,7 +105,10 @@ if QT_API in (QT_API_PYQT, QT_API_PYQTv2, QT_API_PYQT5):
         _sip_imported = True
     except ImportError:
         # Try using PySide
-        QT_API = QT_API_PYSIDE
+        if QT_RC_MAJOR_VERSION == 5:
+            QT_API = QT_API_PYSIDE2
+        else:
+            QT_API = QT_API_PYSIDE
         cond = ("Could not import sip; falling back on PySide\n"
                 "in place of PyQt4 or PyQt5.\n")
         verbose.report(cond, 'helpful')
@@ -169,6 +178,19 @@ if _sip_imported:
         __version__ = QtCore.PYQT_VERSION_STR
     except NameError:
         # QtCore did not get imported, fall back to pyside
+        if QT_RC_MAJOR_VERSION == 5:
+            QT_API = QT_API_PYSIDE2
+        else:
+            QT_API = QT_API_PYSIDE
+
+
+if QT_API == QT_API_PYSIDE2:
+    try:
+        from PySide2 import QtCore, QtGui, QtWidgets, __version__
+        _getSaveFileName = QtWidgets.QFileDialog.getSaveFileName
+    except ImportError:
+        # tried PySide2, failed, fall back to PySide
+        QT_RC_MAJOR_VERSION = 4
         QT_API = QT_API_PYSIDE
 
 if QT_API == QT_API_PYSIDE:  # try importing pyside
@@ -177,7 +199,7 @@ if QT_API == QT_API_PYSIDE:  # try importing pyside
     except ImportError:
         raise ImportError(
             "Matplotlib qt-based backends require an external PyQt4, PyQt5,\n"
-            "or PySide package to be installed, but it was not found.")
+            "PySide or PySide2 package to be installed, but it was not found.")
 
     if __version_info__ < (1, 0, 3):
         raise ImportError(

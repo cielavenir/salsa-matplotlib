@@ -1,26 +1,24 @@
-From dfc6ae15ca2d808ec4944440160dcbccc8dcac38 Mon Sep 17 00:00:00 2001
+From f8bb209717a03f8eee4f54fa3f5fc86f6880ac76 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Sat, 9 Jan 2016 15:49:51 +0000
 Subject: bts800803 disable the GitHub Fork Me ribbon
 
 ---
- doc/_templates/layout.html | 6 ------
- 1 file changed, 6 deletions(-)
+ doc/_templates/layout.html | 4 ----
+ 1 file changed, 4 deletions(-)
 
 diff --git a/doc/_templates/layout.html b/doc/_templates/layout.html
-index aa1f278..b5735bf 100644
+index 093dd8cb..c8ee6a67 100644
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
-@@ -162,12 +162,6 @@ parents[-1].link|e }}" />
- 
- {% block relbar1 %}
+@@ -177,10 +177,6 @@ parents[-1].link|e }}" />
+ <a href="{{ pathto('index') }}"><img src="{{pathto("_static/logo2.svg", 1) }}" width="540px" border="0" alt="matplotlib"/></a>
+ {%- endif %}
  
 -<!-- The "Fork me on github" ribbon -->
--<img style="float: right; margin-bottom: -40px; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png" usemap="#ribbonmap"/>
--<map name="ribbonmap">
--    <area shape="poly" coords="15,0,148,-1,148,135" href="https://github.com/matplotlib/matplotlib" title="Fork me on GitHub" />
--</map>
+-<div id="forkongithub"><a href="https://github.com/matplotlib/matplotlib">Fork me on GitHub</a></div>
+-</div>
 -
- <div style="background-color: white; text-align: left; padding: 10px 10px 15px 15px">
- {%- if builder in ('htmlhelp', 'devhelp', 'latex') %}
- <a href="{{ pathto('index') }}"><img src="{{pathto("_static/logo2.png", 1) }}" width="540px" border="0" alt="matplotlib"/></a>
+ {% endblock %}
+ 
+ {%- block relbar2 %}

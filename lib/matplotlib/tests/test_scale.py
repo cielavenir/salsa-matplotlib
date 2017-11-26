@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-from matplotlib.testing.decorators import image_comparison, cleanup
+from matplotlib.testing.decorators import image_comparison
 import matplotlib.pyplot as plt
 import numpy as np
 import io
@@ -8,7 +8,7 @@ import io
 
 @image_comparison(baseline_images=['log_scales'], remove_text=True)
 def test_log_scales():
-    ax = plt.subplot(122, yscale='log', xscale='symlog')
+    ax = plt.figure().add_subplot(122, yscale='log', xscale='symlog')
 
     ax.axvline(24.1)
     ax.axhline(24.1)
@@ -17,7 +17,7 @@ def test_log_scales():
 @image_comparison(baseline_images=['logit_scales'], remove_text=True,
                   extensions=['png'])
 def test_logit_scales():
-    ax = plt.subplot(111, xscale='logit')
+    ax = plt.figure().add_subplot(111, xscale='logit')
 
     # Typical extinction curve for logit
     x = np.array([0.001, 0.003, 0.01, 0.03, 0.1, 0.2, 0.3, 0.4, 0.5,
@@ -28,7 +28,6 @@ def test_logit_scales():
     ax.grid(True)
 
 
-@cleanup
 def test_log_scatter():
     """Issue #1799"""
     fig, ax = plt.subplots(1)
@@ -48,7 +47,6 @@ def test_log_scatter():
     fig.savefig(buf, format='svg')
 
 
-@cleanup
 def test_logscale_subs():
     fig, ax = plt.subplots()
     ax.set_yscale('log', subsy=np.array([2, 3, 4]))
@@ -56,6 +54,14 @@ def test_logscale_subs():
     fig.canvas.draw()
 
 
-if __name__ == '__main__':
-    import nose
-    nose.runmodule(argv=['-s', '--with-doctest'], exit=False)
+@image_comparison(baseline_images=['logscale_mask'], remove_text=True,
+                  extensions=['png'])
+def test_logscale_mask():
+    # Check that zero values are masked correctly on log scales.
+    # See github issue 8045
+    xs = np.linspace(0, 50, 1001)
+
+    fig, ax = plt.subplots()
+    ax.plot(np.exp(-xs**2))
+    fig.canvas.draw()
+    ax.set(yscale="log")

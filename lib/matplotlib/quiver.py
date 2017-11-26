@@ -45,7 +45,7 @@ Call signatures::
   quiver(X, Y, U, V, **kw)
   quiver(X, Y, U, V, C, **kw)
 
-*U* and *V* are the arrow data, *X* and *Y* set the locaiton of the
+*U* and *V* are the arrow data, *X* and *Y* set the location of the
 arrows, and *C* sets the color of the arrows. These arguments may be 1-D or
 2-D arrays or sequences.
 
@@ -87,7 +87,7 @@ units : [ 'width' | 'height' | 'dots' | 'inches' | 'x' | 'y' | 'xy' ]
 
     'dots' or 'inches': pixels or inches, based on the figure dpi
 
-    'x', 'y', or 'xy': respectively *X*, *Y*, or :math:`\sqrt{X^2 + Y^2}`
+    'x', 'y', or 'xy': respectively *X*, *Y*, or :math:`\\sqrt{X^2 + Y^2}`
     in data units
 
     The arrows scale differently depending on the units.  For
@@ -165,10 +165,6 @@ keyword arguments:
 
 %(PolyCollection)s
 
-Examples
---------
-.. plot:: mpl_examples/pylab_examples/quiver_simple_demo.py
-
 See Also
 --------
 quiverkey : Add a key to a quiver plot
@@ -196,6 +192,10 @@ Arguments:
     A string with the length and units of the key
 
 Keyword arguments:
+
+  *angle* = 0
+    The angle of the key arrow. Measured in degrees anti-clockwise from the
+    x-axis.
 
   *coordinates* = [ 'axes' | 'figure' | 'data' | 'inches' ]
     Coordinate system and units for *X*, *Y*: 'axes' and 'figure' are
@@ -248,6 +248,7 @@ class QuiverKey(martist.Artist):
         self.X = X
         self.Y = Y
         self.U = U
+        self.angle = kw.pop('angle', 0)
         self.coord = kw.pop('coordinates', 'axes')
         self.color = kw.pop('color', None)
         self.label = label
@@ -308,7 +309,8 @@ class QuiverKey(martist.Artist):
             _mask = self.Q.Umask
             self.Q.Umask = ma.nomask
             self.verts = self.Q._make_verts(np.array([self.U]),
-                                            np.zeros((1,)))
+                                            np.zeros((1,)),
+                                            self.angle)
             self.Q.Umask = _mask
             self.Q.pivot = _pivot
             kw = self.Q.polykw
@@ -521,12 +523,12 @@ class Quiver(mcollections.PolyCollection):
                                             (ax.bbox.width, ax.bbox.height))
             self.span = sx
             if self.width is None:
-                sn = max(8, min(25, math.sqrt(self.N)))
+                sn = np.clip(math.sqrt(self.N), 8, 25)
                 self.width = 0.06 * self.span / sn
 
             # _make_verts sets self.scale if not already specified
             if not self._initialized and self.scale is None:
-                self._make_verts(self.U, self.V)
+                self._make_verts(self.U, self.V, self.angles)
 
             self._initialized = True
 
@@ -542,7 +544,7 @@ class Quiver(mcollections.PolyCollection):
     @allow_rasterization
     def draw(self, renderer):
         self._init()
-        verts = self._make_verts(self.U, self.V)
+        verts = self._make_verts(self.U, self.V, self.angles)
         self.set_verts(verts, closed=False)
         self._new_UV = False
         mcollections.PolyCollection.draw(self, renderer)
@@ -619,27 +621,27 @@ class Quiver(mcollections.PolyCollection):
         xyp = self.ax.transData.transform(self.XY + eps * uv)
         dxy = xyp - xy
         angles = np.arctan2(dxy[:, 1], dxy[:, 0])
-        lengths = np.absolute(dxy[:, 0] + dxy[:, 1] * 1j) / eps
+        lengths = np.hypot(*dxy.T) / eps
         return angles, lengths
 
-    def _make_verts(self, U, V):
+    def _make_verts(self, U, V, angles):
         uv = (U + V * 1j)
-        str_angles = isinstance(self.angles, six.string_types)
-        if str_angles and (self.angles == 'xy' and self.scale_units == 'xy'):
+        str_angles = angles if isinstance(angles, six.string_types) else ''
+        if str_angles == 'xy' and self.scale_units == 'xy':
             # Here eps is 1 so that if we get U, V by diffing
             # the X, Y arrays, the vectors will connect the
             # points, regardless of the axis scaling (including log).
             angles, lengths = self._angles_lengths(U, V, eps=1)
-        elif str_angles and (self.angles == 'xy' or self.scale_units == 'xy'):
+        elif str_angles == 'xy' or self.scale_units == 'xy':
             # Calculate eps based on the extents of the plot
             # so that we don't end up with roundoff error from
             # adding a small number to a large.
             eps = np.abs(self.ax.dataLim.extents).max() * 0.001
             angles, lengths = self._angles_lengths(U, V, eps=eps)
-        if self.scale_units == 'xy':
+        if str_angles and self.scale_units == 'xy':
             a = lengths
         else:
-            a = np.absolute(uv)
+            a = np.abs(uv)
         if self.scale is None:
             sn = max(10, math.sqrt(self.N))
             if self.Umask is not ma.nomask:
@@ -663,16 +665,13 @@ class Quiver(mcollections.PolyCollection):
                 self.scale = scale * widthu_per_lenu
         length = a * (widthu_per_lenu / (self.scale * self.width))
         X, Y = self._h_arrows(length)
-        if str_angles and (self.angles == 'xy'):
+        if str_angles == 'xy':
             theta = angles
-        elif str_angles and (self.angles == 'uv'):
+        elif str_angles == 'uv':
             theta = np.angle(uv)
         else:
-            # Make a copy to avoid changing the input array.
-            theta = ma.masked_invalid(self.angles, copy=True).filled(0)
-            theta = theta.ravel()
-            theta *= (np.pi / 180.0)
-        theta.shape = (theta.shape[0], 1)  # for broadcasting
+            theta = ma.masked_invalid(np.deg2rad(angles)).filled(0)
+        theta = theta.reshape((-1, 1))  # for broadcasting
         xy = (X + Y * 1j) * np.exp(1j * theta) * self.width
         xy = xy[:, :, np.newaxis]
         XY = np.concatenate((xy.real, xy.imag), axis=2)
@@ -719,8 +718,8 @@ class Quiver(mcollections.PolyCollection):
         Y0 = shrink * Y0[np.newaxis, :]
         short = np.repeat(length < minsh, 8, axis=1)
         # Now select X0, Y0 if short, otherwise X, Y
-        cbook._putmask(X, short, X0)
-        cbook._putmask(Y, short, Y0)
+        np.copyto(X, X0, where=short)
+        np.copyto(Y, Y0, where=short)
         if self.pivot == 'middle':
             X -= 0.5 * X[:, 3, np.newaxis]
         elif self.pivot == 'tip':
@@ -740,14 +739,15 @@ class Quiver(mcollections.PolyCollection):
             X1 = np.repeat(x1[np.newaxis, :], N, axis=0)
             Y1 = np.repeat(y1[np.newaxis, :], N, axis=0)
             tooshort = np.repeat(tooshort, 8, 1)
-            cbook._putmask(X, tooshort, X1)
-            cbook._putmask(Y, tooshort, Y1)
+            np.copyto(X, X1, where=tooshort)
+            np.copyto(Y, Y1, where=tooshort)
         # Mask handling is deferred to the caller, _make_verts.
         return X, Y
 
     quiver_doc = _quiver_doc
 
-_barbs_doc = """
+
+_barbs_doc = r"""
 Plot a 2-D field of barbs.
 
 Call signatures::
@@ -783,11 +783,13 @@ Keyword arguments:
   *length*:
     Length of the barb in points; the other parts of the barb
     are scaled against this.
-    Default is 9
+    Default is 7.
 
-  *pivot*: [ 'tip' | 'middle' ]
+  *pivot*: [ 'tip' | 'middle' | float ]
     The part of the arrow that is at the grid point; the arrow rotates
-    about this point, hence the name *pivot*.  Default is 'tip'
+    about this point, hence the name *pivot*.  Default is 'tip'. Can
+    also be a number, which shifts the start of the barb that many
+    points from the origin.
 
   *barbcolor*: [ color | color sequence ]
     Specifies the color all parts of the barb except any flags.  This
@@ -923,7 +925,7 @@ class Barbs(mcollections.PolyCollection):
         self.flip = kw.pop('flip_barb', False)
         transform = kw.pop('transform', ax.transData)
 
-        # Flagcolor and and barbcolor provide convenience parameters for
+        # Flagcolor and barbcolor provide convenience parameters for
         # setting the facecolor and edgecolor, respectively, of the barb
         # polygon.  We also work here to make the flag the same color as the
         # rest of the barb by default
@@ -980,12 +982,12 @@ class Barbs(mcollections.PolyCollection):
         # If rounding, round to the nearest multiple of half, the smallest
         # increment
         if rounding:
-            mag = half * (mag / half + 0.5).astype(np.int)
+            mag = half * (mag / half + 0.5).astype(int)
 
-        num_flags = np.floor(mag / flag).astype(np.int)
+        num_flags = np.floor(mag / flag).astype(int)
         mag = np.mod(mag, flag)
 
-        num_barb = np.floor(mag / full).astype(np.int)
+        num_barb = np.floor(mag / full).astype(int)
         mag = np.mod(mag, full)
 
         half_flag = mag >= half
@@ -1009,7 +1011,8 @@ class Barbs(mcollections.PolyCollection):
 
         *pivot* specifies the point on the barb around which the
         entire barb should be rotated.  Right now, valid options are
-        'head' and 'middle'.
+        'tip' and 'middle'. Can also be a number, which shifts the start
+        of the barb that many points from the origin.
 
         *sizes* is a dictionary of coefficients specifying the ratio
         of a given feature to the length of the barb. These features
@@ -1032,7 +1035,7 @@ class Barbs(mcollections.PolyCollection):
 
         *flip* is a flag indicating whether the features should be flipped to
         the other side of the barb (useful for winds in the southern
-        hemisphere.
+        hemisphere).
 
         This function returns list of arrays of vertices, defining a polygon
         for each of the wind barbs.  These polygons have been rotated to
@@ -1054,7 +1057,10 @@ class Barbs(mcollections.PolyCollection):
             full_height = -full_height
 
         endx = 0.0
-        endy = pivot_points[pivot.lower()]
+        try:
+            endy = float(pivot)
+        except ValueError:
+            endy = pivot_points[pivot.lower()]
 
         # Get the appropriate angle for the vector components.  The offset is
         # due to the way the barb is initially drawn, going down the y-axis.

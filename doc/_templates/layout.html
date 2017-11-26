@@ -38,8 +38,8 @@ endif %}>
         {%- endfor %}
 
         <li><a href="{{ pathto('index') }}">home</a>|&nbsp;</li>
-        <li><a href="{{ pathto('examples/index') }}">examples</a>|&nbsp;</li>
-        <li><a href="{{ pathto('gallery') }}">gallery</a>|&nbsp;</li>
+        <li><a href="{{ pathto('gallery/index') }}">examples</a>|&nbsp;</li>
+        <li><a href="{{ pathto('tutorials/index') }}">tutorials</a>|&nbsp;</li>
         <li><a href="{{ pathto('api/pyplot_summary') }}">pyplot</a>|&nbsp;</li>
         <li><a href="{{ pathto('contents') }}">docs</a> &raquo;</li>
 
@@ -161,13 +161,20 @@ parents[-1].link|e }}" />
 
 {% block relbar1 %}
 
-<div style="background-color: white; text-align: left; padding: 10px 10px 15px 15px">
+{%- if '+' in release %}
+<div id="unreleased-message">
+    You are reading documentation for the unreleased version of Matplotlib.
+    <a href="https://matplotlib.org/search.html?q={{ title | striptags | urlencode }}&amp;check_keywords=yes&amp;area=default">
+        Try searching for the released version of this page instead?
+    </a>
+</div>
+{%- endif %}
+<div style="background-color: white; text-align: left; padding: 10px 10px 15px 15px; position: relative;">
 {%- if builder in ('htmlhelp', 'devhelp', 'latex') %}
 <a href="{{ pathto('index') }}"><img src="{{pathto("_static/logo2.png", 1) }}" width="540px" border="0" alt="matplotlib"/></a>
 {%- else %}
 <a href="{{ pathto('index') }}"><img src="{{pathto("_static/logo2.svg", 1) }}" width="540px" border="0" alt="matplotlib"/></a>
 {%- endif %}
-</div>
 
 {% endblock %}
 
@@ -183,7 +190,6 @@ parents[-1].link|e }}" />
   {%- block sidebar1 %} {# possible location for sidebar #} {% endblock %}
 
   {%- block sidebar2 %}{{ sidebar() }}{% endblock %}
-
     <div class="document">
   {%- block document %}
       <div class="documentwrapper">

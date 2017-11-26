@@ -13,6 +13,8 @@ values is a single line of python
 
 .. code::
 
+  import matplotlib.style
+  import matplotlib as mpl
   mpl.style.use('classic')
 
 See :ref:`customizing-with-matplotlibrc-files` for details about how to
@@ -94,7 +96,7 @@ are only specified via hex values.  To access these colors outside of
 the property cycling the notation for colors ``'CN'``, where ``N``
 takes values 0-9, was added to
 denote the first 10 colors in ``mpl.rcParams['axes.prop_cycle']`` See
-:ref:`colors` for more details.
+:ref:`sphx_glr_tutorials_colors_colors.py` for more details.
 
 To restore the old color cycle use
 
@@ -143,7 +145,7 @@ watch Nathaniel Smith and Stéfan van der Walt's talk from SciPy2015.
 See `here for many more details <https://bids.github.io/colormap/>`__
 about the other alternatives and the tools used to create the color
 map.  For details on all of the color maps available in matplotlib see
-:ref:`colormaps`.
+:ref:`sphx_glr_tutorials_colors_colormaps.py`.
 
 .. raw:: html
 
@@ -416,6 +418,10 @@ By default, caps on the ends of errorbars are not present.
    demo(ax1, {'errorbar.capsize': 3}, 'classic')
    demo(ax2, {}, 'v2.0')
 
+This also changes the return value of
+:meth:`~matplotlib.axes.Axes.errorbar` as the list of 'caplines' will
+be empty by default.
+
 The previous defaults can be restored by setting::
 
     mpl.rcParams['errorbar.capsize'] = 3
@@ -588,6 +594,15 @@ or by setting::
 
 in your :file:`matplotlibrc` file.
 
+``hexbin``
+----------
+
+The default value of the ``linecolor`` kwarg for `~matplotlib.Axes.hexbin` has
+changed from ``'none'`` to ``'face'``. If 'none' is now supplied, no line edges
+are drawn around the hexagons.
+
+.. _barbarh_align:
+
 ``bar`` and ``barh``
 --------------------
 
@@ -674,7 +689,7 @@ The default font has changed from "Bitstream Vera Sans" to "DejaVu
 Sans".  DejaVu Sans has additional international and math characters,
 but otherwise has the same appearance as Bitstream Vera Sans.
 Latin, Greek, Cyrillic, Armenian, Georgian, Hebrew, and Arabic are
-`all supported <http://dejavu-fonts.org/wiki/Main_Page>`__
+`all supported <https://dejavu-fonts.github.io/>`__
 (but right-to-left rendering is still not handled by matplotlib).
 In addition, DejaVu contains a sub-set of emoji symbols.
 

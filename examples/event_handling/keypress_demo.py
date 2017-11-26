@@ -1,4 +1,8 @@
 """
+=============
+Keypress Demo
+=============
+
 Show how to connect to keypress events
 """
 from __future__ import print_function
@@ -14,6 +18,10 @@ def press(event):
         visible = xl.get_visible()
         xl.set_visible(not visible)
         fig.canvas.draw()
+
+# Fixing random state for reproducibility
+np.random.seed(19680801)
+
 
 fig, ax = plt.subplots()
 

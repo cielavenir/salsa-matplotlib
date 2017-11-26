@@ -28,20 +28,18 @@ import warnings
 import numpy as np
 
 import matplotlib
-from matplotlib.backend_bases import (RendererBase, GraphicsContextBase,
-    FigureCanvasBase, FigureManagerBase, NavigationToolbar2,
-    cursors, TimerBase)
-from matplotlib.backend_bases import ShowBase
+from matplotlib.backend_bases import (
+    _Backend, FigureCanvasBase, FigureManagerBase, GraphicsContextBase,
+    NavigationToolbar2, RendererBase, TimerBase, cursors)
 from matplotlib.backend_bases import _has_pil
 
 from matplotlib._pylab_helpers import Gcf
-from matplotlib.cbook import (is_string_like, is_writable_file_like,
-                              warn_deprecated)
+from matplotlib.cbook import is_writable_file_like, warn_deprecated
 from matplotlib.figure import Figure
 from matplotlib.path import Path
 from matplotlib.transforms import Affine2D
 from matplotlib.widgets import SubplotTool
-from matplotlib import rcParams
+from matplotlib import cbook, rcParams
 
 from . import wx_compat as wxc
 import wx
@@ -70,7 +68,7 @@ def DEBUG_MSG(string, lvl=3, o=None):
 
 def debug_on_error(type, value, tb):
     """Code due to Thomas Heller - published in Python Cookbook (O'Reilley)"""
-    traceback.print_exc(type, value, tb)
+    traceback.print_exception(type, value, tb)
     print()
     pdb.pm()  # jdh uncomment
 
@@ -115,7 +113,7 @@ def error_msg_wx(msg, parent=None):
 
 def raise_msg_to_str(msg):
     """msg is a return arg from a raise.  Join with new lines"""
-    if not is_string_like(msg):
+    if not isinstance(msg, six.string_types):
         msg = '\n'.join(map(str, msg))
     return msg
 
@@ -124,14 +122,18 @@ class TimerWx(TimerBase):
     '''
     Subclass of :class:`backend_bases.TimerBase` that uses WxTimer events.
 
-    Attributes:
-    * interval: The time between timer events in milliseconds. Default
-        is 1000 ms.
-    * single_shot: Boolean flag indicating whether this timer should
-        operate as single shot (run once and then stop). Defaults to False.
-    * callbacks: Stores list of (func, args) tuples that will be called
-        upon timer events. This list can be manipulated directly, or the
-        functions add_callback and remove_callback can be used.
+    Attributes
+    ----------
+    interval : int
+        The time between timer events in milliseconds. Default is 1000 ms.
+    single_shot : bool
+        Boolean flag indicating whether this timer should operate as single
+        shot (run once and then stop). Defaults to False.
+    callbacks : list
+        Stores list of (func, args) tuples that will be called upon timer
+        events. This list can be manipulated directly, or the functions
+        `add_callback` and `remove_callback` can be used.
+
     '''
 
     def __init__(self, parent, *args, **kwargs):
@@ -314,7 +316,7 @@ class RendererWx(RendererBase):
         if angle == 0.0:
             gfx_ctx.DrawText(s, x, y)
         else:
-            rads = angle / 180.0 * math.pi
+            rads = math.radians(angle)
             xo = h * math.sin(rads)
             yo = h * math.cos(rads)
             gfx_ctx.DrawRotatedText(s, x - xo, y - yo, rads)
@@ -405,8 +407,6 @@ class GraphicsContextWx(GraphicsContextBase):
               'miter': wx.JOIN_MITER,
               'round': wx.JOIN_ROUND}
 
-    _dashd_wx = wxc.dashd_wx
-
     _cache = weakref.WeakKeyDictionary()
 
     def __init__(self, bitmap, renderer):
@@ -467,19 +467,6 @@ class GraphicsContextWx(GraphicsContextBase):
         self.gfx_ctx.SetPen(self._pen)
         self.unselect()
 
-    def set_graylevel(self, frac):
-        """
-        Set the foreground color.  fg can be a matlab format string, a
-        html hex color string, an rgb unit tuple, or a float between 0
-        and 1.  In the latter case, grayscale is used.
-        """
-        DEBUG_MSG("set_graylevel()", 1, self)
-        self.select()
-        GraphicsContextBase.set_graylevel(self, frac)
-        self._pen.SetColour(self.get_wxcolour(self.get_rgb()))
-        self.gfx_ctx.SetPen(self._pen)
-        self.unselect()
-
     def set_linewidth(self, w):
         """
         Set the line width.
@@ -519,6 +506,7 @@ class GraphicsContextWx(GraphicsContextBase):
         self.gfx_ctx.SetPen(self._pen)
         self.unselect()
 
+    @cbook.deprecated("2.1")
     def set_linestyle(self, ls):
         """
         Set the line style to be one of
@@ -527,7 +515,7 @@ class GraphicsContextWx(GraphicsContextBase):
         self.select()
         GraphicsContextBase.set_linestyle(self, ls)
         try:
-            self._style = GraphicsContextWx._dashd_wx[ls]
+            self._style = wxc.dashd_wx[ls]
         except KeyError:
             self._style = wx.LONG_DASH  # Style not used elsewhere...
 
@@ -688,7 +676,6 @@ class FigureCanvasWx(FigureCanvasBase, wx.Panel):
         self.Bind(wx.EVT_MOTION, self._onMotion)
         self.Bind(wx.EVT_LEAVE_WINDOW, self._onLeave)
         self.Bind(wx.EVT_ENTER_WINDOW, self._onEnter)
-        self.Bind(wx.EVT_IDLE, self._onIdle)
         # Add middle button events
         self.Bind(wx.EVT_MIDDLE_DOWN, self._onMiddleButtonDown)
         self.Bind(wx.EVT_MIDDLE_DCLICK, self._onMiddleButtonDClick)
@@ -752,13 +739,14 @@ class FigureCanvasWx(FigureCanvasBase, wx.Panel):
         events through the backend's native event loop. Implemented only
         for backends with GUIs.
 
-        optional arguments:
+        Other Parameters
+        ----------------
+        interval : scalar
+            Timer interval in milliseconds
+        callbacks : list
+            Sequence of (func, args, kwargs) where ``func(*args, **kwargs)``
+            will be executed by the timer every *interval*.
 
-        *interval*
-          Timer interval in milliseconds
-        *callbacks*
-          Sequence of (func, args, kwargs) where func(*args, **kwargs) will
-          be executed by the timer every *interval*.
         """
         return TimerWx(self, *args, **kwargs)
 
@@ -918,7 +906,7 @@ class FigureCanvasWx(FigureCanvasBase, wx.Panel):
 
         # Now that we have rendered into the bitmap, save it
         # to the appropriate file type and clean up
-        if is_string_like(filename):
+        if isinstance(filename, six.string_types):
             if not image.SaveFile(filename, filetype):
                 DEBUG_MSG('print_figure() file save error', 4, self)
                 raise RuntimeError(
@@ -1015,11 +1003,6 @@ class FigureCanvasWx(FigureCanvasBase, wx.Panel):
                 key = '{0}+{1}'.format(prefix, key)
 
         return key
-
-    def _onIdle(self, evt):
-        'a GUI idle event'
-        evt.Skip()
-        FigureCanvasBase.idle_event(self, guiEvent=evt)
 
     def _onKeyDown(self, evt):
         """Capture key press."""
@@ -1181,72 +1164,6 @@ class FigureCanvasWx(FigureCanvasBase, wx.Panel):
 ########################################################################
 
 
-def _create_wx_app():
-    """
-    Creates a wx.App instance if it has not been created sofar.
-    """
-    wxapp = wx.GetApp()
-    if wxapp is None:
-        wxapp = wx.App(False)
-        wxapp.SetExitOnFrameDelete(True)
-        # retain a reference to the app object so it does not get garbage
-        # collected and cause segmentation faults
-        _create_wx_app.theWxApp = wxapp
-
-
-def draw_if_interactive():
-    """
-    This should be overriden in a windowing environment if drawing
-    should be done in interactive python mode
-    """
-    DEBUG_MSG("draw_if_interactive()", 1, None)
-
-    if matplotlib.is_interactive():
-
-        figManager = Gcf.get_active()
-        if figManager is not None:
-            figManager.canvas.draw_idle()
-
-
-class Show(ShowBase):
-    def mainloop(self):
-        needmain = not wx.App.IsMainLoopRunning()
-        if needmain:
-            wxapp = wx.GetApp()
-            if wxapp is not None:
-                wxapp.MainLoop()
-
-show = Show()
-
-
-def new_figure_manager(num, *args, **kwargs):
-    """
-    Create a new figure manager instance
-    """
-    # in order to expose the Figure constructor to the pylab
-    # interface we need to create the figure here
-    DEBUG_MSG("new_figure_manager()", 3, None)
-    _create_wx_app()
-
-    FigureClass = kwargs.pop('FigureClass', Figure)
-    fig = FigureClass(*args, **kwargs)
-    return new_figure_manager_given_figure(num, fig)
-
-
-def new_figure_manager_given_figure(num, figure):
-    """
-    Create a new figure manager instance for the given figure.
-    """
-    fig = figure
-    frame = FigureFrameWx(num, fig)
-    figmgr = frame.get_figure_manager()
-    if matplotlib.is_interactive():
-        figmgr.frame.Show()
-        figure.canvas.draw_idle()
-
-    return figmgr
-
-
 class FigureFrameWx(wx.Frame):
     def __init__(self, num, fig):
         # On non-Windows platform, explicitly set the position - fix
@@ -1355,10 +1272,13 @@ class FigureManagerWx(FigureManagerBase):
     It is instantiated by GcfWx whenever a new figure is created. GcfWx is
     responsible for managing multiple instances of FigureManagerWx.
 
-    public attrs
+    Attributes
+    ----------
+    canvas : `FigureCanvas`
+        a FigureCanvasWx(wx.Panel) instance
+    window : wxFrame
+        a wxFrame instance - wxpython.org/Phoenix/docs/html/Frame.html
 
-    canvas - a FigureCanvasWx(wx.Panel) instance
-    window - a wxFrame instance - wxpython.org/Phoenix/docs/html/Frame.html
     """
 
     def __init__(self, canvas, num, frame):
@@ -1554,6 +1474,7 @@ cursord = {
     cursors.HAND: wx.CURSOR_HAND,
     cursors.POINTER: wx.CURSOR_ARROW,
     cursors.SELECT_REGION: wx.CURSOR_CROSS,
+    cursors.WAIT: wx.CURSOR_WAIT,
 }
 
 
@@ -1666,7 +1587,7 @@ class NavigationToolbar2Wx(NavigationToolbar2, wx.ToolBar):
                     (ext, format, ext), stacklevel=0)
                 format = ext
             try:
-                self.canvas.print_figure(
+                self.canvas.figure.savefig(
                     os.path.join(dirname, filename), format=format)
             except Exception as e:
                 error_msg_wx(str(e))
@@ -1674,6 +1595,7 @@ class NavigationToolbar2Wx(NavigationToolbar2, wx.ToolBar):
     def set_cursor(self, cursor):
         cursor = wxc.Cursor(cursord[cursor])
         self.canvas.SetCursor(cursor)
+        self.canvas.Update()
 
     def release(self, event):
         try:
@@ -1681,6 +1603,7 @@ class NavigationToolbar2Wx(NavigationToolbar2, wx.ToolBar):
         except AttributeError:
             pass
 
+    @cbook.deprecated("2.1", alternative="canvas.draw_idle")
     def dynamic_update(self):
         d = self._idle
         self._idle = False
@@ -1693,10 +1616,12 @@ class NavigationToolbar2Wx(NavigationToolbar2, wx.ToolBar):
             if not self.retinaFix:
                 self.wxoverlay = wx.Overlay()
             else:
-                self.savedRetinaImage = self.canvas.copy_from_bbox(
-                    self.canvas.figure.gca().bbox)
-                self.zoomStartX = event.xdata
-                self.zoomStartY = event.ydata
+                if event.inaxes is not None:
+                    self.savedRetinaImage = self.canvas.copy_from_bbox(
+                        event.inaxes.bbox)
+                    self.zoomStartX = event.xdata
+                    self.zoomStartY = event.ydata
+                    self.zoomAxes = event.inaxes
 
     def release(self, event):
         if self._active == 'ZOOM':
@@ -1710,6 +1635,8 @@ class NavigationToolbar2Wx(NavigationToolbar2, wx.ToolBar):
                 if self.prevZoomRect:
                     self.prevZoomRect.pop(0).remove()
                     self.prevZoomRect = None
+                if self.zoomAxes:
+                    self.zoomAxes = None
 
     def draw_rubberband(self, event, x0, y0, x1, y1):
         if self.retinaFix:  # On Macs, use the following code
@@ -1722,10 +1649,10 @@ class NavigationToolbar2Wx(NavigationToolbar2, wx.ToolBar):
             Y0, Y1 = self.zoomStartY, event.ydata
             lineX = (X0, X0, X1, X1, X0)
             lineY = (Y0, Y1, Y1, Y0, Y0)
-            self.prevZoomRect = self.canvas.figure.gca().plot(
+            self.prevZoomRect = self.zoomAxes.plot(
                 lineX, lineY, '-', color=rubberBandColor)
-            self.canvas.figure.gca().draw_artist(self.prevZoomRect[0])
-            self.canvas.blit(self.canvas.figure.gca().bbox)
+            self.zoomAxes.draw_artist(self.prevZoomRect[0])
+            self.canvas.blit(self.zoomAxes.bbox)
             return
 
         # Use an Overlay to draw a rubberband-like bounding box.
@@ -1897,6 +1824,43 @@ class PrintoutWx(wx.Printout):
 #
 ########################################################################
 
-FigureCanvas = FigureCanvasWx
-FigureManager = FigureManagerWx
 Toolbar = NavigationToolbar2Wx
+
+
+@_Backend.export
+class _BackendWx(_Backend):
+    FigureCanvas = FigureCanvasWx
+    FigureManager = FigureManagerWx
+    _frame_class = FigureFrameWx
+
+    @staticmethod
+    def trigger_manager_draw(manager):
+        manager.canvas.draw_idle()
+
+    @classmethod
+    def new_figure_manager(cls, num, *args, **kwargs):
+        # Create a wx.App instance if it has not been created sofar.
+        wxapp = wx.GetApp()
+        if wxapp is None:
+            wxapp = wx.App(False)
+            wxapp.SetExitOnFrameDelete(True)
+            # Retain a reference to the app object so that it does not get
+            # garbage collected.
+            _BackendWx._theWxApp = wxapp
+        return super(_BackendWx, cls).new_figure_manager(num, *args, **kwargs)
+
+    @classmethod
+    def new_figure_manager_given_figure(cls, num, figure):
+        frame = cls._frame_class(num, figure)
+        figmgr = frame.get_figure_manager()
+        if matplotlib.is_interactive():
+            figmgr.frame.Show()
+            figure.canvas.draw_idle()
+        return figmgr
+
+    @staticmethod
+    def mainloop():
+        if not wx.App.IsMainLoopRunning():
+            wxapp = wx.GetApp()
+            if wxapp is not None:
+                wxapp.MainLoop()

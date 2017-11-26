@@ -9,6 +9,7 @@ from six.moves import zip
 
 import math
 import warnings
+import weakref
 
 import contextlib
 
@@ -18,7 +19,7 @@ from matplotlib import cbook
 from matplotlib import rcParams
 import matplotlib.artist as artist
 from matplotlib.artist import Artist
-from matplotlib.cbook import is_string_like, maxdict
+from matplotlib.cbook import maxdict
 from matplotlib import docstring
 from matplotlib.font_manager import FontProperties
 from matplotlib.patches import FancyBboxPatch
@@ -30,7 +31,6 @@ from matplotlib.lines import Line2D
 from matplotlib.path import Path
 from matplotlib.artist import allow_rasterization
 
-from matplotlib.backend_bases import RendererBase
 from matplotlib.textpath import TextPath
 
 
@@ -180,10 +180,9 @@ class Text(Artist):
     Handle storing and drawing of text in window or data coordinates.
     """
     zorder = 3
-
     _cached = maxdict(50)
 
-    def __str__(self):
+    def __repr__(self):
         return "Text(%g,%g,%s)" % (self._x, self._y, repr(self._text))
 
     def __init__(self,
@@ -215,7 +214,7 @@ class Text(Artist):
             color = rcParams['text.color']
         if fontproperties is None:
             fontproperties = FontProperties()
-        elif is_string_like(fontproperties):
+        elif isinstance(fontproperties, six.string_types):
             fontproperties = FontProperties(fontproperties)
 
         self.set_text(text)
@@ -239,10 +238,12 @@ class Text(Artist):
         """
         Update properties from a dictionary.
         """
-        bbox = kwargs.pop('bbox', None)
+        # Update bbox last, as it depends on font properties.
+        sentinel = object()  # bbox can be None, so use another sentinel.
+        bbox = kwargs.pop("bbox", sentinel)
         super(Text, self).update(kwargs)
-        if bbox:
-            self.set_bbox(bbox)  # depends on font properties
+        if bbox is not sentinel:
+            self.set_bbox(bbox)
 
     def __getstate__(self):
         d = super(Text, self).__getstate__()
@@ -258,7 +259,7 @@ class Text(Artist):
 
         Returns True or False.
         """
-        if six.callable(self._contains):
+        if callable(self._contains):
             return self._contains(self, mouseevent)
 
         if not self.get_visible() or self._renderer is None:
@@ -399,8 +400,7 @@ class Text(Artist):
 
         # the corners of the unrotated bounding box
         cornersHoriz = np.array(
-            [(xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin)],
-            np.float_)
+            [(xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin)], float)
         cornersHoriz[:, 1] -= descent
 
         # now rotate the bbox
@@ -507,7 +507,8 @@ class Text(Artist):
                     pad = 0.3
 
             # boxstyle could be a callable or a string
-            if is_string_like(boxstyle) and "pad" not in boxstyle:
+            if (isinstance(boxstyle, six.string_types)
+                    and "pad" not in boxstyle):
                 boxstyle += ",pad=%0.2f" % pad
 
             bbox_transmuter = props.pop("bbox_transmuter", None)
@@ -745,7 +746,7 @@ class Text(Artist):
             self._renderer = renderer
         if not self.get_visible():
             return
-        if self.get_text().strip() == '':
+        if self.get_text() == '':
             return
 
         renderer.open_group('text', self.get_gid())
@@ -907,11 +908,13 @@ class Text(Artist):
         need to know if the text has changed.
         """
         x, y = self.get_unitless_position()
+        renderer = renderer or self._renderer
         return (x, y, self.get_text(), self._color,
                 self._verticalalignment, self._horizontalalignment,
                 hash(self._fontproperties),
                 self._rotation, self._rotation_mode,
-                self.figure.dpi, id(renderer or self._renderer),
+                self.figure.dpi, weakref.ref(renderer),
+                self._linespacing
                 )
 
     def get_text(self):
@@ -955,7 +958,7 @@ class Text(Artist):
         if dpi is not None:
             dpi_orig = self.figure.dpi
             self.figure.dpi = dpi
-        if self.get_text().strip() == '':
+        if self.get_text() == '':
             tx, ty = self._get_xy_display()
             return Bbox.from_bounds(tx, ty, 0, 0)
 
@@ -1242,7 +1245,7 @@ class Text(Artist):
 
         ACCEPTS: a :class:`matplotlib.font_manager.FontProperties` instance
         """
-        if is_string_like(fp):
+        if isinstance(fp, six.string_types):
             fp = FontProperties(fp)
         self._fontproperties = fp.copy()
         self.stale = True
@@ -1784,8 +1787,7 @@ class _AnnotationBase(object):
             tr2 = self._get_xy_transform(renderer, s2)
             tr = blended_transform_factory(tr1, tr2)
             return tr
-
-        if six.callable(s):
+        elif callable(s):
             tr = s(renderer)
             if isinstance(tr, BboxBase):
                 return BboxTransformTo(tr)
@@ -1793,14 +1795,14 @@ class _AnnotationBase(object):
                 return tr
             else:
                 raise RuntimeError("unknown return type ...")
-        if isinstance(s, Artist):
+        elif isinstance(s, Artist):
             bbox = s.get_window_extent(renderer)
             return BboxTransformTo(bbox)
         elif isinstance(s, BboxBase):
             return BboxTransformTo(s)
         elif isinstance(s, Transform):
             return s
-        elif not is_string_like(s):
+        elif not isinstance(s, six.string_types):
             raise RuntimeError("unknown coordinate type : %s" % (s,))
 
         if s == 'data':
@@ -1847,8 +1849,7 @@ class _AnnotationBase(object):
             elif unit == "fontsize":
                 fontsize = self.get_size()
                 dpp = fontsize * self.figure.get_dpi() / 72.
-                tr = Affine2D().scale(dpp,
-                                      dpp)
+                tr = Affine2D().scale(dpp, dpp)
             elif unit == "fraction":
                 w, h = bbox0.bounds[2:]
                 tr = Affine2D().scale(w, h)
@@ -1868,14 +1869,16 @@ class _AnnotationBase(object):
 
         if isinstance(self.xycoords, tuple):
             s1, s2 = self.xycoords
-            if ((is_string_like(s1) and s1.split()[0] == "offset") or
-                  (is_string_like(s2) and s2.split()[0] == "offset")):
+            if ((isinstance(s1, six.string_types)
+                 and s1.split()[0] == "offset")
+                    or (isinstance(s2, six.string_types)
+                        and s2.split()[0] == "offset")):
                 raise ValueError("xycoords should not be an offset coordinate")
             x, y = self.xy
             x1, y1 = self._get_xy(renderer, x, y, s1)
             x2, y2 = self._get_xy(renderer, x, y, s2)
             return x1, y2
-        elif (is_string_like(self.xycoords) and
+        elif (isinstance(self.xycoords, six.string_types) and
               self.xycoords.split()[0] == "offset"):
             raise ValueError("xycoords should not be an offset coordinate")
         else:
@@ -2155,7 +2158,7 @@ class Annotation(Text, _AnnotationBase):
 
         self.arrow = None
 
-        if arrowprops:
+        if arrowprops is not None:
             if "arrowstyle" in arrowprops:
                 arrowprops = self.arrowprops.copy()
                 self._arrow_relpos = arrowprops.pop("relpos", (0.5, 0.5))
@@ -2224,7 +2227,7 @@ class Annotation(Text, _AnnotationBase):
         ox0, oy0 = self._get_xy_display()
         ox1, oy1 = xy_pixel
 
-        if self.arrowprops:
+        if self.arrowprops is not None:
             x0, y0 = xy_pixel
             l, b, w, h = Text.get_window_extent(self, renderer).bounds
             r = l + w
@@ -2263,13 +2266,8 @@ class Annotation(Text, _AnnotationBase):
                 xpos = ((l, 0), (xc, 0.5), (r, 1))
                 ypos = ((b, 0), (yc, 0.5), (t, 1))
 
-                dsu = [(abs(val[0] - x0), val) for val in xpos]
-                dsu.sort()
-                _, (x, relposx) = dsu[0]
-
-                dsu = [(abs(val[0] - y0), val) for val in ypos]
-                dsu.sort()
-                _, (y, relposy) = dsu[0]
+                _, (x, relposx) = min((abs(val[0] - x0), val) for val in xpos)
+                _, (y, relposy) = min((abs(val[0] - y0), val) for val in ypos)
 
                 self._arrow_relpos = (relposx, relposy)
 
@@ -2301,7 +2299,7 @@ class Annotation(Text, _AnnotationBase):
                     self.arrow_patch.set_patchA(self._bbox_patch)
                 else:
                     pad = renderer.points_to_pixels(4)
-                    if self.get_text().strip() == "":
+                    if self.get_text() == "":
                         self.arrow_patch.set_patchA(None)
                         return
 

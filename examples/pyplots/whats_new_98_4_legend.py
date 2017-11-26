@@ -1,6 +1,11 @@
+"""
+=======================
+Whats New 0.98.4 Legend
+=======================
+
+"""
 import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 ax = plt.subplot(111)
@@ -13,6 +18,3 @@ leg.get_frame().set_alpha(0.5)
 
 
 plt.show()
-
-
-

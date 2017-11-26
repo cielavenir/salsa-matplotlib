@@ -1,4 +1,4 @@
-From 90efb6d932f5e076d31e5c9f860e5db204d7dd9a Mon Sep 17 00:00:00 2001
+From 15e42f951ec091fac82fd15150a9c46f7c0ba832 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Wed, 18 Jan 2017 20:05:24 -0500
 Subject: Increase test tollerance
@@ -7,44 +7,60 @@ Patch taken from Fedora packaging:
 http://pkgs.fedoraproject.org/cgit/rpms/python-matplotlib.git/plain/python-matplotlib-increase-tests-tolerance.patch
 ---
  lib/matplotlib/testing/decorators.py     | 2 +-
- lib/matplotlib/tests/test_mathtext.py    | 2 +-
+ lib/matplotlib/tests/test_mathtext.py    | 5 ++---
  lib/matplotlib/tests/test_patheffects.py | 2 +-
- lib/matplotlib/tests/test_png.py         | 2 +-
  lib/matplotlib/tests/test_streamplot.py  | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+ 4 files changed, 5 insertions(+), 6 deletions(-)
 
 diff --git a/lib/matplotlib/testing/decorators.py b/lib/matplotlib/testing/decorators.py
-index 5e738ad..ef6393b 100644
+index c5e069b3..de5cbaf6 100644
 --- a/lib/matplotlib/testing/decorators.py
 +++ b/lib/matplotlib/testing/decorators.py
-@@ -266,7 +266,7 @@ class ImageComparisonTest(CleanupTest):
+@@ -406,7 +406,7 @@ def _pytest_image_comparison(baseline_images, extensions, tol,
+     return decorator
  
-                 yield do_test, fignum, actual_fname, expected_fname
  
--def image_comparison(baseline_images=None, extensions=None, tol=0,
-+def image_comparison(baseline_images=None, extensions=None, tol=0.306,
+-def image_comparison(baseline_images, extensions=None, tol=0,
++def image_comparison(baseline_images, extensions=None, tol=0.306,
                       freetype_version=None, remove_text=False,
-                      savefig_kwarg=None, style='_classic_test'):
-     """
+                      savefig_kwarg=None,
+                      # Default of mpl_test_settings fixture and cleanup too.
 diff --git a/lib/matplotlib/tests/test_mathtext.py b/lib/matplotlib/tests/test_mathtext.py
-index 39f5d7e..44251d1 100644
+index 7ef77ce6..3c2323c7 100644
 --- a/lib/matplotlib/tests/test_mathtext.py
 +++ b/lib/matplotlib/tests/test_mathtext.py
-@@ -159,7 +159,7 @@ for fonts, chars in font_test_specs:
+@@ -162,7 +162,6 @@ for fonts, chars in font_test_specs:
+     for set in chars:
+         font_tests.append(wrapper % set)
  
- def make_set(basename, fontset, tests, extensions=None):
-     def make_test(filename, test):
--        @image_comparison(baseline_images=[filename], extensions=extensions)
-+        @image_comparison(baseline_images=[filename], extensions=extensions, tol=0.310)
-         def single_test():
-             matplotlib.rcParams['mathtext.fontset'] = fontset
-             fig = plt.figure(figsize=(5.25, 0.75))
+-
+ @pytest.fixture
+ def baseline_images(request, fontset, index):
+     return ['%s_%s_%02d' % (request.param, fontset, index)]
+@@ -174,7 +173,7 @@ def baseline_images(request, fontset, index):
+                          ['cm', 'stix', 'stixsans', 'dejavusans',
+                           'dejavuserif'])
+ @pytest.mark.parametrize('baseline_images', ['mathtext'], indirect=True)
+-@image_comparison(baseline_images=None)
++@image_comparison(baseline_images=None, tol=0.310)
+ def test_mathtext_rendering(baseline_images, fontset, index, test):
+     matplotlib.rcParams['mathtext.fontset'] = fontset
+     fig = plt.figure(figsize=(5.25, 0.75))
+@@ -188,7 +187,7 @@ def test_mathtext_rendering(baseline_images, fontset, index, test):
+                          ['cm', 'stix', 'stixsans', 'dejavusans',
+                           'dejavuserif'])
+ @pytest.mark.parametrize('baseline_images', ['mathfont'], indirect=True)
+-@image_comparison(baseline_images=None, extensions=['png'])
++@image_comparison(baseline_images=None, extensions=['png'], tol=0.310)
+ def test_mathfont_rendering(baseline_images, fontset, index, test):
+     matplotlib.rcParams['mathtext.fontset'] = fontset
+     fig = plt.figure(figsize=(5.25, 0.75))
 diff --git a/lib/matplotlib/tests/test_patheffects.py b/lib/matplotlib/tests/test_patheffects.py
-index 3fb3703..cb1d754 100644
+index 9b8a4379..7c538bc7 100644
 --- a/lib/matplotlib/tests/test_patheffects.py
 +++ b/lib/matplotlib/tests/test_patheffects.py
-@@ -138,7 +138,7 @@ def test_SimplePatchShadow_offset():
-     assert_equal(pe._offset, (4, 5))
+@@ -125,7 +125,7 @@ def test_SimplePatchShadow_offset():
+     assert pe._offset == (4, 5)
  
  
 -@image_comparison(baseline_images=['collection'], tol=0.015)
@@ -52,24 +68,11 @@ index 3fb3703..cb1d754 100644
  def test_collection():
      x, y = np.meshgrid(np.linspace(0, 10, 150), np.linspace(-5, 5, 100))
      data = np.sin(x) + np.cos(y)
-diff --git a/lib/matplotlib/tests/test_png.py b/lib/matplotlib/tests/test_png.py
-index 590b395..dbf8779 100644
---- a/lib/matplotlib/tests/test_png.py
-+++ b/lib/matplotlib/tests/test_png.py
-@@ -17,7 +17,7 @@ on_win = (sys.platform == 'win32')
- 
- 
- @image_comparison(baseline_images=['pngsuite'], extensions=['png'],
--                  tol=0.01 if on_win else 0)
-+                  tol=0.014)
- def test_pngsuite():
-     dirname = os.path.join(
-         os.path.dirname(__file__),
 diff --git a/lib/matplotlib/tests/test_streamplot.py b/lib/matplotlib/tests/test_streamplot.py
-index af48aec..c7b7004 100644
+index ac997b2b..5e8a7f99 100644
 --- a/lib/matplotlib/tests/test_streamplot.py
 +++ b/lib/matplotlib/tests/test_streamplot.py
-@@ -18,7 +18,7 @@ def velocity_field():
+@@ -36,7 +36,7 @@ def test_startpoints():
  
  
  @image_comparison(baseline_images=['streamplot_colormap'],

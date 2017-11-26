@@ -13,9 +13,6 @@
 
 /* Proper way to check for the OS X version we are compiling for, from
    http://developer.apple.com/documentation/DeveloperTools/Conceptual/cross_development */
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1050
-#define COMPILING_FOR_10_5
-#endif
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
 #define COMPILING_FOR_10_6
 #endif
@@ -26,13 +23,6 @@
 #define COMPILING_FOR_10_10
 #endif
 
-/* Use Atsui for Mac OS X 10.4, CoreText for Mac OS X 10.5 */
-#ifndef COMPILING_FOR_10_5
-static int ngc = 0;    /* The number of graphics contexts in use */
-
-#include <Carbon/Carbon.h>
-
-#endif
 
 /* CGFloat was defined in Mac OS X 10.5 */
 #ifndef CGFLOAT_DEFINED
@@ -43,6 +33,11 @@ static int ngc = 0;    /* The number of graphics contexts in use */
 /* Various NSApplicationDefined event subtypes */
 #define STOP_EVENT_LOOP 2
 #define WINDOW_CLOSING 3
+
+
+/* Keep track of number of windows present
+   Needed to know when to stop the NSApp */
+static long FigureWindowCount = 0;
 
 /* -------------------------- Helper function ---------------------------- */
 
@@ -672,6 +667,7 @@ FigureManager_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
     }
     self->window = window;
+    ++FigureWindowCount;
     return (PyObject*)self;
 }
 
@@ -1299,7 +1295,7 @@ NavigationToolbar_get_active (NavigationToolbar* self)
     }
     NSMenu* menu = [button menu];
     NSArray* items = [menu itemArray];
-    unsigned int n = [items count];
+    size_t n = [items count];
     int* states = calloc(n, sizeof(int));
     if (!states)
     {
@@ -1321,14 +1317,13 @@ NavigationToolbar_get_active (NavigationToolbar* self)
             m++;
         }
     }
-    int j = 0;
+    Py_ssize_t list_index = 0;
     PyObject* list = PyList_New(m);
-    for (i = 0; i < n; i++)
+    for (size_t state_index = 0; state_index < n; state_index++)
     {
-        if(states[i]==1)
+        if(states[state_index]==1)
         {
-            PyList_SET_ITEM(list, j, PyLong_FromLong(i));
-            j++;
+            PyList_SET_ITEM(list, list_index++, PyLong_FromSize_t(state_index));
         }
     }
     free(states);
@@ -1907,6 +1902,8 @@ set_cursor(PyObject* unused, PyObject* args)
       case 1: [[NSCursor arrowCursor] set]; break;
       case 2: [[NSCursor crosshairCursor] set]; break;
       case 3: [[NSCursor openHandCursor] set]; break;
+      /* OSX handles busy state itself so no need to set a cursor here */
+      case 4: break;
       default: return NULL;
     }
     Py_INCREF(Py_None);
@@ -2023,8 +2020,8 @@ static WindowServerConnectionManager *sharedWindowServerConnectionManager = nil;
 - (void)close
 {
     [super close];
-    NSArray *windowsArray = [NSApp windows];
-    if([windowsArray count]==0) [NSApp stop: self];
+    --FigureWindowCount;
+    if (!FigureWindowCount) [NSApp stop: self];
     /* This is needed for show(), which should exit from [NSApp run]
      * after all windows are closed.
      */

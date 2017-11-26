@@ -1,4 +1,4 @@
-From 52ef4d2be9c0bb377f6ec81b00eb1278e037efb4 Mon Sep 17 00:00:00 2001
+From fad94135980dab23d8048ae95b46a0536616e38a Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Sat, 9 Jan 2016 16:03:45 +0000
 Subject: bts800803 dont use the Raleway font (from the Google Fonts API)
@@ -8,7 +8,7 @@ Subject: bts800803 dont use the Raleway font (from the Google Fonts API)
  1 file changed, 1 deletion(-)
 
 diff --git a/doc/_templates/layout.html b/doc/_templates/layout.html
-index b5735bf..668ca76 100644
+index c8ee6a67..ef27c566 100644
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
 @@ -155,7 +155,6 @@ parents[-1].link|e }}" />

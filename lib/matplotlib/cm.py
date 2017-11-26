@@ -35,7 +35,7 @@ def revcmap(data):
     """Can only handle specification *data* in dictionary format."""
     data_r = {}
     for key, val in six.iteritems(data):
-        if six.callable(val):
+        if callable(val):
             valnew = _reverser(val)
             # This doesn't work: lambda x: val(1-x)
             # The same "val" (the first one) is used
@@ -81,18 +81,14 @@ def _generate_cmap(name, lutsize):
 
 LUTSIZE = mpl.rcParams['image.lut']
 
-# Generate the reversed specifications ...
-for cmapname in list(six.iterkeys(datad)):
-    # Use superclass method to avoid deprecation warnings during initial load.
-    spec = dict.__getitem__(datad, cmapname)
-    spec_reversed = _reverse_cmap_spec(spec)
-    datad[cmapname + '_r'] = spec_reversed
+# Generate the reversed specifications (all at once, to avoid
+# modify-when-iterating).
+datad.update({cmapname + '_r': _reverse_cmap_spec(spec)
+              for cmapname, spec in six.iteritems(datad)})
 
-# Precache the cmaps with ``lutsize = LUTSIZE`` ...
-
-# Use datad.keys() to also add the reversed ones added in the section
-# above:
-for cmapname in six.iterkeys(datad):
+# Precache the cmaps with ``lutsize = LUTSIZE``.
+# Also add the reversed ones added in the section above:
+for cmapname in datad:
     cmap_d[cmapname] = _generate_cmap(cmapname, LUTSIZE)
 
 cmap_d.update(cmaps_listed)
@@ -128,7 +124,7 @@ def register_cmap(name=None, cmap=None, data=None, lut=None):
         except AttributeError:
             raise ValueError("Arguments must include a name or a Colormap")
 
-    if not cbook.is_string_like(name):
+    if not isinstance(name, six.string_types):
         raise ValueError("Colormap name must be a string")
 
     if isinstance(cmap, colors.Colormap):
@@ -170,7 +166,7 @@ def get_cmap(name=None, lut=None):
     else:
         raise ValueError(
             "Colormap %s is not recognized. Possible values are: %s"
-            % (name, ', '.join(sorted(cmap_d.keys()))))
+            % (name, ', '.join(sorted(cmap_d))))
 
 
 class ScalarMappable(object):
@@ -223,6 +219,9 @@ class ScalarMappable(object):
         If *x* is an ndarray with 3 dimensions,
         and the last dimension is either 3 or 4, then it will be
         treated as an rgb or rgba array, and no mapping will be done.
+        The array can be uint8, or it can be floating point with
+        values in the 0-1 range; otherwise a ValueError will be raised.
+        If it is a masked array, the mask will be ignored.
         If the last dimension is 3, the *alpha* kwarg (defaulting to 1)
         will be used to fill in the transparency.  If the last dimension
         is 4, the *alpha* kwarg is ignored; it does not
@@ -234,12 +233,8 @@ class ScalarMappable(object):
         the returned rgba array will be uint8 in the 0 to 255 range.
 
         If norm is False, no normalization of the input data is
-        performed, and it is assumed to already be in the range (0-1).
+        performed, and it is assumed to be in the range (0-1).
 
-        Note: this method assumes the input is well-behaved; it does
-        not check for anomalies such as *x* being a masked rgba
-        array, or being an integer type other than uint8, or being
-        a floating point rgba array with values outside the 0-1 range.
         """
         # First check for special case, image input:
         try:
@@ -257,10 +252,18 @@ class ScalarMappable(object):
                     xx = x
                 else:
                     raise ValueError("third dimension must be 3 or 4")
-                if bytes and xx.dtype != np.uint8:
-                    xx = (xx * 255).astype(np.uint8)
-                if not bytes and xx.dtype == np.uint8:
-                    xx = xx.astype(float) / 255
+                if xx.dtype.kind == 'f':
+                    if norm and xx.max() > 1 or xx.min() < 0:
+                        raise ValueError("Floating point image RGB values "
+                                         "must be in the 0..1 range.")
+                    if bytes:
+                        xx = (xx * 255).astype(np.uint8)
+                elif xx.dtype == np.uint8:
+                    if not bytes:
+                        xx = xx.astype(float) / 255
+                else:
+                    raise ValueError("Image RGB array must be uint8 or "
+                                     "floating point; found %s" % xx.dtype)
                 return xx
         except AttributeError:
             # e.g., x is not an ndarray; so try mapping it
@@ -298,10 +301,11 @@ class ScalarMappable(object):
 
         ACCEPTS: a length 2 sequence of floats
         """
-        if (vmin is not None and vmax is None and
-                cbook.iterable(vmin) and len(vmin) == 2):
-            vmin, vmax = vmin
-
+        if vmax is None:
+            try:
+                vmin, vmax = vmin
+            except (TypeError, ValueError):
+                pass
         if vmin is not None:
             self.norm.vmin = vmin
         if vmax is not None:
@@ -371,3 +375,4 @@ class ScalarMappable(object):
 
         for key in self.update_dict:
             self.update_dict[key] = True
+        self.stale = True
