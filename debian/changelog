@@ -7,11 +7,12 @@ matplotlib (2.1.0-1) UNRELEASED; urgency=medium
   * debian/rules
     - no longer install upstream CHANGELOG, it was removed from the tarball
     - install tutorials in the -doc pkg, and dont compress .py files
+    - pass the right arguments to tests.py, now that it changed
   * debian/copyright
     - update extern/libqhull copyright and license
     - drop delaunay copyright/licence notices, removed upstream
 
- -- Sandro Tosi <morph@debian.org>  Sun, 26 Nov 2017 19:14:49 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 26 Nov 2017 21:24:53 -0500
 
 matplotlib (2.0.0+dfsg1-2) unstable; urgency=medium
 
