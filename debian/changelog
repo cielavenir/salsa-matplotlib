@@ -3,7 +3,8 @@ matplotlib (2.1.0-1) UNRELEASED; urgency=medium
   * New upstream release
   * debian/control
     - replace python-imaging with python-pil; Closes: #866439
-    - add sphinx-gallery to b-d, needed by doc
+    - add pytest (tests) and sphinx-gallery, backports.functools-lru-cache,
+      scipy (doc) to b-d
   * debian/rules
     - no longer install upstream CHANGELOG, it was removed from the tarball
     - install tutorials in the -doc pkg, and dont compress .py files
@@ -12,7 +13,7 @@ matplotlib (2.1.0-1) UNRELEASED; urgency=medium
     - update extern/libqhull copyright and license
     - drop delaunay copyright/licence notices, removed upstream
 
- -- Sandro Tosi <morph@debian.org>  Sun, 26 Nov 2017 21:24:53 -0500
+ -- Sandro Tosi <morph@debian.org>  Tue, 16 Jan 2018 19:01:20 -0500
 
 matplotlib (2.0.0+dfsg1-2) unstable; urgency=medium
 
