@@ -92,11 +92,11 @@ autodoc_docstring_signature = True
 autodoc_default_flags = ['members', 'undoc-members']
 
 intersphinx_mapping = {
-  'python': ('https://docs.python.org/', None),
-  'numpy': ('https://docs.scipy.org/doc/numpy/', None),
-  'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
-  'pandas': ('http://pandas.pydata.org/pandas-docs/stable', None)
-  }
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://docs.scipy.org/doc/numpy/', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
+    'pandas': ('https://pandas.pydata.org/pandas-docs/stable', None)
+}
 
 explicit_order_folders = [
                           '../examples/api',
@@ -135,7 +135,7 @@ sphinx_gallery_conf = {
     'subsection_order': ExplicitOrder(explicit_order_folders)
 }
 
-plot_gallery = True
+plot_gallery = 'True'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

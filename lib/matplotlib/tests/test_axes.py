@@ -688,16 +688,19 @@ def test_polar_theta_limits():
     for i, start in enumerate(theta_mins):
         for j, end in enumerate(theta_maxs):
             ax = axes[i, j]
+            ax.plot(theta, r)
             if start < end:
-                ax.plot(theta, r)
                 ax.set_thetamin(start)
                 ax.set_thetamax(end)
-                ax.tick_params(tick1On=True, tick2On=True,
-                               direction=DIRECTIONS[i % len(DIRECTIONS)],
-                               rotation='auto')
-                ax.yaxis.set_tick_params(label2On=True, rotation='auto')
             else:
-                ax.set_visible(False)
+                # Plot with clockwise orientation instead.
+                ax.set_thetamin(end)
+                ax.set_thetamax(start)
+                ax.set_theta_direction('clockwise')
+            ax.tick_params(tick1On=True, tick2On=True,
+                           direction=DIRECTIONS[i % len(DIRECTIONS)],
+                           rotation='auto')
+            ax.yaxis.set_tick_params(label2On=True, rotation='auto')
 
 
 @image_comparison(baseline_images=['axvspan_epoch'])
@@ -1150,6 +1153,12 @@ def test_pcolorargs():
         ax.pcolormesh(x, y, Z[:-1, :-1], shading="gouraud")
     with pytest.raises(TypeError):
         ax.pcolormesh(X, Y, Z[:-1, :-1], shading="gouraud")
+    x[0] = np.NaN
+    with pytest.raises(ValueError):
+        ax.pcolormesh(x, y, Z[:-1, :-1])
+    x = np.ma.array(x, mask=(x < 0))
+    with pytest.raises(ValueError):
+        ax.pcolormesh(x, y, Z[:-1, :-1])
 
 
 @image_comparison(baseline_images=['canonical'])
@@ -1166,22 +1175,32 @@ def test_arc_angles():
     w = 2
     h = 1
     centre = (0.2, 0.5)
+    scale = 2
 
     fig, axs = plt.subplots(3, 3)
     for i, ax in enumerate(axs.flat):
         theta2 = i * 360 / 9
         theta1 = theta2 - 45
+
         ax.add_patch(patches.Ellipse(centre, w, h, alpha=0.3))
         ax.add_patch(patches.Arc(centre, w, h, theta1=theta1, theta2=theta2))
         # Straight lines intersecting start and end of arc
-        ax.plot([2 * np.cos(np.deg2rad(theta1)) + centre[0],
+        ax.plot([scale * np.cos(np.deg2rad(theta1)) + centre[0],
                  centre[0],
-                 2 * np.cos(np.deg2rad(theta2)) + centre[0]],
-                [2 * np.sin(np.deg2rad(theta1)) + centre[1],
+                 scale * np.cos(np.deg2rad(theta2)) + centre[0]],
+                [scale * np.sin(np.deg2rad(theta1)) + centre[1],
                  centre[1],
-                 2 * np.sin(np.deg2rad(theta2)) + centre[1]])
-        ax.set_xlim(-2, 2)
-        ax.set_ylim(-2, 2)
+                 scale * np.sin(np.deg2rad(theta2)) + centre[1]])
+
+        ax.set_xlim(-scale, scale)
+        ax.set_ylim(-scale, scale)
+
+        # This looks the same, but it triggers a different code path when it
+        # gets large enough.
+        w *= 10
+        h *= 10
+        centre = (centre[0] * 10, centre[1] * 10)
+        scale *= 10
 
 
 @image_comparison(baseline_images=['arc_ellipse'],
@@ -1493,6 +1512,14 @@ def test_hist_step_filled():
     assert all([p.get_facecolor() == p.get_edgecolor() for p in patches])
 
 
+@image_comparison(baseline_images=['hist_density'], extensions=['png'])
+def test_hist_density():
+    np.random.seed(19680801)
+    data = np.random.standard_normal(2000)
+    fig, ax = plt.subplots()
+    ax.hist(data, density=True)
+
+
 @image_comparison(baseline_images=['hist_step_log_bottom'],
                   remove_text=True, extensions=['png'])
 def test_hist_step_log_bottom():
@@ -1515,6 +1542,17 @@ def test_hist_step_log_bottom():
     ax.hist(data, bins=10, log=True, histtype='stepfilled',
             alpha=0.5, color='y', bottom=np.arange(10))
     ax.set_ylim(9e-3, 1e3)
+
+
+def test_hist_unequal_bins_density():
+    # Test correct behavior of normalized histogram with unequal bins
+    # https://github.com/matplotlib/matplotlib/issues/9557
+    rng = np.random.RandomState(57483)
+    t = rng.randn(100)
+    bins = [-3, -1, -0.5, 0, 1, 5]
+    mpl_heights, _, _ = plt.hist(t, bins=bins, density=True)
+    np_heights, _ = np.histogram(t, bins=bins, density=True)
+    assert_allclose(mpl_heights, np_heights)
 
 
 def contour_dat():
@@ -1677,13 +1715,19 @@ def test_as_mpl_axes_api():
     ax_via_gca = plt.gca(projection=prj)
     assert ax_via_gca is ax
     # try getting the axes given a different polar projection
-    ax_via_gca = plt.gca(projection=prj2)
+    with pytest.warns(UserWarning) as rec:
+        ax_via_gca = plt.gca(projection=prj2)
+        assert len(rec) == 1
+        assert 'Requested projection is different' in str(rec[0].message)
     assert ax_via_gca is not ax
     assert ax.get_theta_offset() == 0, ax.get_theta_offset()
     assert ax_via_gca.get_theta_offset() == np.pi, \
         ax_via_gca.get_theta_offset()
     # try getting the axes given an == (not is) polar projection
-    ax_via_gca = plt.gca(projection=prj3)
+    with pytest.warns(UserWarning):
+        ax_via_gca = plt.gca(projection=prj3)
+        assert len(rec) == 1
+        assert 'Requested projection is different' in str(rec[0].message)
     assert ax_via_gca is ax
     plt.close()
 
@@ -4960,6 +5004,8 @@ def test_broken_barh_empty():
 
 def test_pandas_pcolormesh():
     pd = pytest.importorskip('pandas')
+    from pandas.tseries import converter
+    converter.register()
 
     time = pd.date_range('2000-01-01', periods=10)
     depth = np.arange(20)
@@ -4971,6 +5017,8 @@ def test_pandas_pcolormesh():
 
 def test_pandas_indexing_dates():
     pd = pytest.importorskip('pandas')
+    from pandas.tseries import converter
+    converter.register()
 
     dates = np.arange('2005-02', '2005-03', dtype='datetime64[D]')
     values = np.sin(np.array(range(len(dates))))
@@ -4984,6 +5032,8 @@ def test_pandas_indexing_dates():
 
 def test_pandas_errorbar_indexing():
     pd = pytest.importorskip('pandas')
+    from pandas.tseries import converter
+    converter.register()
 
     df = pd.DataFrame(np.random.uniform(size=(5, 4)),
                       columns=['x', 'y', 'xe', 'ye'],
@@ -4994,6 +5044,8 @@ def test_pandas_errorbar_indexing():
 
 def test_pandas_indexing_hist():
     pd = pytest.importorskip('pandas')
+    from pandas.tseries import converter
+    converter.register()
 
     ser_1 = pd.Series(data=[1, 2, 2, 3, 3, 4, 4, 4, 4, 5])
     ser_2 = ser_1.iloc[1:]
@@ -5004,6 +5056,8 @@ def test_pandas_indexing_hist():
 def test_pandas_bar_align_center():
     # Tests fix for issue 8767
     pd = pytest.importorskip('pandas')
+    from pandas.tseries import converter
+    converter.register()
 
     df = pd.DataFrame({'a': range(2), 'b': range(2)})
 
@@ -5012,21 +5066,6 @@ def test_pandas_bar_align_center():
     rect = ax.bar(df.loc[df['a'] == 1, 'b'],
                   df.loc[df['a'] == 1, 'b'],
                   align='center')
-
-    fig.canvas.draw()
-
-
-def test_pandas_bar_align_center():
-    # Tests fix for issue 8767
-    pd = pytest.importorskip('pandas')
-
-    df = pd.DataFrame({'a': range(2), 'b': range(2)})
-
-    fig, ax = plt.subplots(1)
-
-    rect = ax.barh(df.loc[df['a'] == 1, 'b'],
-                   df.loc[df['a'] == 1, 'b'],
-                   align='center')
 
     fig.canvas.draw()
 
@@ -5176,14 +5215,22 @@ def test_bar_color_cycle():
 
 
 def test_tick_param_label_rotation():
-    fix, ax = plt.subplots()
-    plt.plot([0, 1], [0, 1])
+    fix, (ax, ax2) = plt.subplots(1, 2)
+    ax.plot([0, 1], [0, 1])
+    ax2.plot([0, 1], [0, 1])
     ax.xaxis.set_tick_params(which='both', rotation=75)
     ax.yaxis.set_tick_params(which='both', rotation=90)
     for text in ax.get_xticklabels(which='both'):
         assert text.get_rotation() == 75
     for text in ax.get_yticklabels(which='both'):
         assert text.get_rotation() == 90
+
+    ax2.tick_params(axis='x', labelrotation=53)
+    ax2.tick_params(axis='y', rotation=35)
+    for text in ax2.get_xticklabels(which='major'):
+        assert text.get_rotation() == 53
+    for text in ax2.get_yticklabels(which='major'):
+        assert text.get_rotation() == 35
 
 
 @pytest.mark.style('default')
@@ -5260,12 +5307,15 @@ def test_eventplot_legend():
     plt.legend()
 
 
-def test_bar_single_height():
+def test_bar_broadcast_args():
     fig, ax = plt.subplots()
-    # Check that a bar chart with a single height for all bars works
+    # Check that a bar chart with a single height for all bars works.
     ax.bar(range(4), 1)
-    # Check that a horizontal chart with one width works
+    # Check that a horizontal chart with one width works.
     ax.bar(0, 1, bottom=range(4), width=1, orientation='horizontal')
+    # Check that edgecolor gets broadcasted.
+    rect1, rect2 = ax.bar([0, 1], [0, 1], edgecolor=(.1, .2, .3, .4))
+    assert rect1.get_edgecolor() == rect2.get_edgecolor() == (.1, .2, .3, .4)
 
 
 def test_invalid_axis_limits():
@@ -5350,3 +5400,26 @@ def test_patch_deprecations():
         assert fig.patch == fig.figurePatch
 
     assert len(w) == 2
+
+
+def test_polar_gridlines():
+    fig = plt.figure()
+    ax = fig.add_subplot(111, polar=True)
+
+    # make all major grid lines lighter, only x grid lines set in 2.1.0
+    ax.grid(alpha=0.2)
+
+    # hide y tick labels, no effect in 2.1.0
+    plt.setp(ax.yaxis.get_ticklabels(), visible=False)
+
+    fig.canvas.draw()
+
+    assert ax.xaxis.majorTicks[0].gridline.get_alpha() == .2
+    assert ax.yaxis.majorTicks[0].gridline.get_alpha() == .2
+
+
+def test_empty_errorbar_legend():
+    fig, ax = plt.subplots()
+    ax.errorbar([], [], xerr=[], label='empty y')
+    ax.errorbar([], [], yerr=[], label='empty x')
+    ax.legend()

@@ -226,15 +226,17 @@ def win32InstalledFonts(directory=None, fontext='ttf'):
             local = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, fontdir)
         except OSError:
             continue
-
         if not local:
             return list_fonts(directory, fontext)
         try:
             for j in range(winreg.QueryInfoKey(local)[1]):
                 try:
-                    key, direc, any = winreg.EnumValue( local, j)
+                    key, direc, tp = winreg.EnumValue(local, j)
                     if not isinstance(direc, six.string_types):
                         continue
+                    # Work around for https://bugs.python.org/issue25778, which
+                    # is fixed in Py>=3.6.1.
+                    direc = direc.split("\0", 1)[0]
                     if not os.path.dirname(direc):
                         direc = os.path.join(directory, direc)
                     direc = os.path.abspath(direc).lower()
@@ -963,8 +965,10 @@ def json_dump(data, filename):
     Handles FontManager and its fields."""
 
     with open(filename, 'w') as fh:
-        json.dump(data, fh, cls=JSONEncoder, indent=2)
-
+        try:
+            json.dump(data, fh, cls=JSONEncoder, indent=2)
+        except IOError as e:
+            warnings.warn('Could not save font_manager cache ', e)
 
 def json_load(filename):
     """Loads a data structure as JSON from the named file.
