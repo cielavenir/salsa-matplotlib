@@ -1,0 +1,25 @@
+From 042adb9e04a09e8b84adfaaae4a56f6195e65a4c Mon Sep 17 00:00:00 2001
+From: Sandro Tosi <morph@debian.org>
+Date: Tue, 16 Jan 2018 22:58:57 -0500
+Subject: dont show badgesidebar.html
+
+---
+ doc/conf.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/doc/conf.py b/doc/conf.py
+index 2986fac2..6715fa3d 100644
+--- a/doc/conf.py
++++ b/doc/conf.py
+@@ -240,9 +240,9 @@ html_index = 'index.html'
+ 
+ # Custom sidebar templates, maps page names to templates.
+ html_sidebars = {
+-    'index': ['badgesidebar.html','donate_sidebar.html',
++    'index': ['donate_sidebar.html',
+               'indexsidebar.html', 'searchbox.html'],
+-    '**': ['badgesidebar.html', 'localtoc.html',
++    '**': ['localtoc.html',
+            'relations.html', 'sourcelink.html', 'searchbox.html']
+ }
+ 
