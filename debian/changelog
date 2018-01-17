@@ -17,8 +17,11 @@ matplotlib (2.1.1-1) UNRELEASED; urgency=medium
   * debian/patches/0009-dont-show-badgesidebar.html.patch
     - dont load badgesidebar.html into documentation webpages, so that we dont
       load external resources
+  * debian/{control, setup.cfg}
+    - stop building GTK/GTKAgg backends, and hence drop GTK2 dependencies;
+      Closes: #885511
 
- -- Sandro Tosi <morph@debian.org>  Tue, 16 Jan 2018 22:59:33 -0500
+ -- Sandro Tosi <morph@debian.org>  Wed, 17 Jan 2018 18:43:55 -0500
 
 matplotlib (2.0.0+dfsg1-2) unstable; urgency=medium
 
