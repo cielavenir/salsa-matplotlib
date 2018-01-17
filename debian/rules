@@ -74,14 +74,14 @@ clean:
 	-( cd doc ; ./make.py clean )
 
 	# workaround for cleaning the doc ("doc/make.py clean" only runs useless svn-clean)
-	rm -rf doc/build doc/examples
-	rm -f doc/mpl_examples/api/*.png
-	rm -f doc/mpl_examples/pylab_examples/*.png
-	rm -f doc/mpl_examples/pylab_examples/*.pdf
-	rm -f doc/mpl_examples/units/*.png
-	rm -f doc/pyplots/tex_demo.png
-	rm -f doc/_static/matplotlibrc
-	rm -f doc/_templates/gallery.html
+	#rm -rf doc/build doc/examples
+	#rm -f doc/mpl_examples/api/*.png
+	#rm -f doc/mpl_examples/pylab_examples/*.png
+	#rm -f doc/mpl_examples/pylab_examples/*.pdf
+	#rm -f doc/mpl_examples/units/*.png
+	#rm -f doc/pyplots/tex_demo.png
+	#rm -f doc/_static/matplotlibrc
+	#rm -f doc/_templates/gallery.html
 
 	find . -name '*.pyc' -exec rm {} \;
 
@@ -93,9 +93,9 @@ clean:
 	# restore "pristine" doc/matplotlibrc
 	sed -i '/^examples\./d' $(CURDIR)/doc/matplotlibrc
 
-	# remove doc symlinks to examples directory
-	rm -rf doc/mpl_examples
-	rm -rf doc/mpl_toolkits/axes_grid/examples
+	## remove doc symlinks to examples directory
+	#rm -rf doc/mpl_examples
+	#rm -rf doc/mpl_toolkits/axes_grid/examples
 
 	# build twice in a row
 	rm -rf doc/tex.cache/ fontList.py3k.cache result_images/ test_cache/ tex.cache/ examples/pylab_examples/test.xls

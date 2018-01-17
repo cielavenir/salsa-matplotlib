@@ -10,11 +10,12 @@ matplotlib (2.1.1-1) UNRELEASED; urgency=medium
     - install tutorials in the -doc pkg, and dont compress .py files
     - pass the right arguments to tests.py, now that it changed
     - dont compress HTML files
+    - now doc cleanup works upstream, so comment the manual cleanup commands
   * debian/copyright
     - update extern/libqhull copyright and license
     - drop delaunay copyright/licence notices, removed upstream
 
- -- Sandro Tosi <morph@debian.org>  Tue, 16 Jan 2018 20:42:14 -0500
+ -- Sandro Tosi <morph@debian.org>  Tue, 16 Jan 2018 22:35:47 -0500
 
 matplotlib (2.0.0+dfsg1-2) unstable; urgency=medium
 
