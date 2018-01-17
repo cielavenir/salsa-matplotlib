@@ -14,8 +14,11 @@ matplotlib (2.1.1-1) UNRELEASED; urgency=medium
   * debian/copyright
     - update extern/libqhull copyright and license
     - drop delaunay copyright/licence notices, removed upstream
+  * debian/patches/0009-dont-show-badgesidebar.html.patch
+    - dont load badgesidebar.html into documentation webpages, so that we dont
+      load external resources
 
- -- Sandro Tosi <morph@debian.org>  Tue, 16 Jan 2018 22:35:47 -0500
+ -- Sandro Tosi <morph@debian.org>  Tue, 16 Jan 2018 22:59:33 -0500
 
 matplotlib (2.0.0+dfsg1-2) unstable; urgency=medium
 
