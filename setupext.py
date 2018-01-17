@@ -744,6 +744,7 @@ class Matplotlib(SetupPackage):
                 'mpl-data/example/*.npy',
                 'mpl-data/matplotlibrc',
                 'backends/web_backend/*.*',
+                'backends/web_backend/js/*.*',
                 'backends/web_backend/jquery/js/*.min.js',
                 'backends/web_backend/jquery/css/themes/base/*.min.css',
                 'backends/web_backend/jquery/css/themes/base/images/*',
@@ -1187,7 +1188,10 @@ class FreeType(SetupPackage):
                         else:
                             break
                 else:
-                    raise IOError("Failed to download freetype")
+                    raise IOError("Failed to download freetype. "
+                                  "You can download the file by "
+                                  "alternative means and copy it "
+                                  " to '{0}'".format(tarball_path))
                 try:
                     os.makedirs(tarball_cache_dir)
                 except OSError:
