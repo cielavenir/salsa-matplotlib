@@ -1,4 +1,4 @@
-matplotlib (2.1.0-1) UNRELEASED; urgency=medium
+matplotlib (2.1.1-1) UNRELEASED; urgency=medium
 
   * New upstream release
   * debian/control
@@ -13,7 +13,7 @@ matplotlib (2.1.0-1) UNRELEASED; urgency=medium
     - update extern/libqhull copyright and license
     - drop delaunay copyright/licence notices, removed upstream
 
- -- Sandro Tosi <morph@debian.org>  Tue, 16 Jan 2018 19:01:20 -0500
+ -- Sandro Tosi <morph@debian.org>  Tue, 16 Jan 2018 19:21:11 -0500
 
 matplotlib (2.0.0+dfsg1-2) unstable; urgency=medium
 
