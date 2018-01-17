@@ -1,6 +1,6 @@
 matplotlib (2.1.1-1) UNRELEASED; urgency=medium
 
-  * New upstream release
+  * New upstream release; Closes: #827361, #872261
   * debian/control
     - replace python-imaging with python-pil; Closes: #866439
     - add pytest (tests) and sphinx-gallery, backports.functools-lru-cache,
