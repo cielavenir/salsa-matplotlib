@@ -14,6 +14,7 @@ matplotlib (2.1.1-1) UNRELEASED; urgency=medium
   * debian/copyright
     - update extern/libqhull copyright and license
     - drop delaunay copyright/licence notices, removed upstream
+    - update packaging copyright years
   * debian/patches/0009-dont-show-badgesidebar.html.patch
     - dont load badgesidebar.html into documentation webpages, so that we dont
       load external resources
@@ -23,7 +24,7 @@ matplotlib (2.1.1-1) UNRELEASED; urgency=medium
   * debian/patches/0010-disable-intersphinx.patch
     - disable intersphinx, so doc wont try to access the network during build
 
- -- Sandro Tosi <morph@debian.org>  Wed, 17 Jan 2018 20:21:26 -0500
+ -- Sandro Tosi <morph@debian.org>  Wed, 17 Jan 2018 20:22:26 -0500
 
 matplotlib (2.0.0+dfsg1-2) unstable; urgency=medium
 
