@@ -23,8 +23,11 @@ matplotlib (2.1.1-1) UNRELEASED; urgency=medium
       Closes: #885511
   * debian/patches/0010-disable-intersphinx.patch
     - disable intersphinx, so doc wont try to access the network during build
+  * debian/patches/0011-remove-numpy-scipy-from-reference_url.patch
+    - remove scipy and numpy from reference_url for sphinx_gallery, avoiding to
+      access the network during doc build
 
- -- Sandro Tosi <morph@debian.org>  Wed, 17 Jan 2018 20:22:26 -0500
+ -- Sandro Tosi <morph@debian.org>  Wed, 17 Jan 2018 22:35:01 -0500
 
 matplotlib (2.0.0+dfsg1-2) unstable; urgency=medium
 
