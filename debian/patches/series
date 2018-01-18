@@ -7,3 +7,4 @@ gtk3cairo_check_no-multiprocessing.patch
 0007-bts800803-remote-the-Google-Analytics-tracking.patch
 0008-Increase-test-tollerance.patch
 0009-dont-show-badgesidebar.html.patch
+0010-disable-intersphinx.patch
