@@ -1,4 +1,4 @@
-matplotlib (2.1.1-1) UNRELEASED; urgency=medium
+matplotlib (2.1.1-1) unstable; urgency=medium
 
   * New upstream release; Closes: #827361, #872261
   * debian/control
@@ -30,7 +30,7 @@ matplotlib (2.1.1-1) UNRELEASED; urgency=medium
     - update patch to still look at /etc/matplotlibrc with new upstream code;
       from https://github.com/QuLogic/matplotlib/commit/69b627b8
 
- -- Sandro Tosi <morph@debian.org>  Sat, 20 Jan 2018 21:03:18 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 21 Jan 2018 13:39:59 -0500
 
 matplotlib (2.0.0+dfsg1-2) unstable; urgency=medium
 
