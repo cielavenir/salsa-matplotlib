@@ -26,8 +26,11 @@ matplotlib (2.1.1-1) UNRELEASED; urgency=medium
   * debian/patches/0011-remove-numpy-scipy-from-reference_url.patch
     - remove scipy and numpy from reference_url for sphinx_gallery, avoiding to
       access the network during doc build
+  * debian/patches/20_matplotlibrc_path_search_fix.patch
+    - update patch to still look at /etc/matplotlibrc with new upstream code;
+      from https://github.com/QuLogic/matplotlib/commit/69b627b8
 
- -- Sandro Tosi <morph@debian.org>  Wed, 17 Jan 2018 22:35:01 -0500
+ -- Sandro Tosi <morph@debian.org>  Sat, 20 Jan 2018 21:03:18 -0500
 
 matplotlib (2.0.0+dfsg1-2) unstable; urgency=medium
 
