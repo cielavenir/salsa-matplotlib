@@ -1,4 +1,4 @@
-From 2cde3a2f4fc5cda3eb5b36a35aae9c4b4830904f Mon Sep 17 00:00:00 2001
+From 6756cfd50be69d2e22adf05620fa7ffc7b0c1ec0 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Wed, 17 Jan 2018 20:20:58 -0500
 Subject: disable intersphinx

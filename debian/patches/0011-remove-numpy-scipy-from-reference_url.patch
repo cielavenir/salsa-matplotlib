@@ -1,4 +1,4 @@
-From 12666d06e002c3c444a3f768dd2b2fd0727fdf05 Mon Sep 17 00:00:00 2001
+From e3927a2475cbebdd9925d1b61e6d9412321b9e18 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Wed, 17 Jan 2018 22:34:48 -0500
 Subject: remove numpy scipy from reference_url

@@ -722,46 +722,6 @@ def matplotlib_fname():
     - Lastly, it looks in `$MATPLOTLIBDATA/matplotlibrc` for a
       system-defined copy.
     """
-    if six.PY2:
-        cwd = os.getcwdu()
-    else:
-        cwd = os.getcwd()
-    fname = os.path.join(cwd, 'matplotlibrc')
-    if os.path.exists(fname):
-        return fname
-
-    if 'MATPLOTLIBRC' in os.environ:
-        path = os.environ['MATPLOTLIBRC']
-        if os.path.exists(path):
-            fname = os.path.join(path, 'matplotlibrc')
-            if os.path.exists(fname):
-                return fname
-
-    configdir = _get_configdir()
-    if configdir is not None:
-        fname = os.path.join(configdir, 'matplotlibrc')
-        if os.path.exists(fname):
-            home = get_home()
-            if (sys.platform.startswith('linux') and
-                home is not None and
-                os.path.exists(os.path.join(
-                    home, '.matplotlib', 'matplotlibrc'))):
-                warnings.warn(
-                    "Found matplotlib configuration in ~/.matplotlib/. "
-                    "To conform with the XDG base directory standard, "
-                    "this configuration location has been deprecated "
-                    "on Linux, and the new location is now %s/matplotlib/. "
-                    "Please move your configuration there to ensure that "
-                    "matplotlib will continue to find it in the future." %
-                    _get_xdg_config_dir())
-                return os.path.join(
-                    home, '.matplotlib', 'matplotlibrc')
-            return fname
-
-    path = '/etc'  # guaranteed to exist or raise
-    fname = os.path.join(path, 'matplotlibrc')
-    if not os.path.exists(fname):
-        warnings.warn('Could not find matplotlibrc; using defaults')
 
     def gen_candidates():
         yield os.path.join(six.moves.getcwd(), 'matplotlibrc')
@@ -773,7 +733,7 @@ def matplotlib_fname():
             yield matplotlibrc
             yield os.path.join(matplotlibrc, 'matplotlibrc')
         yield os.path.join(_get_configdir(), 'matplotlibrc')
-        yield os.path.join(get_data_path(), 'matplotlibrc')
+        yield '/etc/matplotlibrc'
 
     for fname in gen_candidates():
         if os.path.isfile(fname):

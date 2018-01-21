@@ -1,4 +1,4 @@
-From 4654559caa8009166ab73b78023168776ec29c1c Mon Sep 17 00:00:00 2001
+From 7f7a52ced208cbbc6d7f1f6d4b404037e9df8e71 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Wed, 18 Jan 2017 20:05:24 -0500
 Subject: Increase test tollerance

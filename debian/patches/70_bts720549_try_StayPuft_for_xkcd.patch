@@ -1,4 +1,4 @@
-From b482dabe486b265dc1d87327109a4d5b1bfd0bee Mon Sep 17 00:00:00 2001
+From 7e5b27773bc9f4699a76386cee39e38e1cb493b7 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Thu, 8 Oct 2015 09:47:14 -0700
 Subject: Try to use also StayPuft (a free font) for xkcd
