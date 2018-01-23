@@ -93,7 +93,8 @@ XS-Testsuite: autopkgtest
 
 Package: python-matplotlib
 Architecture: any
-Depends: python-dateutil,
+Depends: python-backports.functools-lru-cache,
+         python-dateutil,
          python-matplotlib-data (>= ${source:Version}),
          python-pyparsing (>= 1.5.6),
          python-tz,
