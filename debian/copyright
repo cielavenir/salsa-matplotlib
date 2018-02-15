@@ -1,4 +1,4 @@
-Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: matplotlib
 Upstream-Contact: John D. Hunter, Michael Droettboom <mdroe@stsci.edu>
 Source: http://matplotlib.org
