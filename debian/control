@@ -207,7 +207,6 @@ Description: Python based plotting system (documentation package)
 Package: python-matplotlib-dbg
 Architecture: any
 Section: debug
-Priority: extra
 Depends: python-all-dbg,
          python-matplotlib (= ${binary:Version}),
          ${misc:Depends},
@@ -224,7 +223,6 @@ Description: Python based plotting system (debug extension)
 Package: python3-matplotlib-dbg
 Architecture: any
 Section: debug
-Priority: extra
 Depends: python3-all-dbg,
          python3-matplotlib (= ${binary:Version}),
          ${misc:Depends},
