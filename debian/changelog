@@ -3,6 +3,7 @@ matplotlib (2.1.1-3) UNRELEASED; urgency=medium
   * d/control: Set Vcs-* to salsa.debian.org
   * d/copyright: Use https protocol in Format field
   * d/control: Deprecating priority extra as per policy 4.0.1
+  * d/changelog: Remove trailing whitespaces
 
  -- Ondřej Nový <onovy@debian.org>  Tue, 13 Feb 2018 10:15:22 +0100
 
@@ -410,7 +411,7 @@ matplotlib (1.3.1-1) unstable; urgency=low
 matplotlib (1.3.0-1.1) unstable; urgency=low
 
   * Non-maintainer upload.
-  * Fix error in font_manager.py: UnicodeDecodeError when starting 
+  * Fix error in font_manager.py: UnicodeDecodeError when starting
     ipython --pylab. (Closes: #719065)
   * Fix AttributeError error where there are no writable directories.
 
@@ -1012,7 +1013,7 @@ matplotlib (0.90.1-4) unstable; urgency=low
   * /usr/share/matplotlib/mpl-data/images/*.svg made chmod 644 (i.e. not
     executable)
   * debian/watch uncommented, as it seems to work (and last line removed)
-  * python2.3-matplotlib removed from Conflicts/Replaces 
+  * python2.3-matplotlib removed from Conflicts/Replaces
 
  -- Ondrej Certik <ondrej@certik.cz>  Sun, 09 Mar 2008 20:39:04 +0100
 
@@ -1035,15 +1036,15 @@ matplotlib (0.90.1-2) unstable; urgency=low
   * Changed dependency on dvipng to a recommendation (closes: #403198)
   * use texlive instead of tetex (closes:  #406176)
   * added suggests on texlive-latex-extra (closes: #410777)
-  * reworded the description bit about "publication quality" (closes: #421593) 
-  
+  * reworded the description bit about "publication quality" (closes: #421593)
+
  -- Alexandre Fayolle <afayolle@debian.org>  Thu, 19 Jul 2007 11:58:24 +0200
 
 matplotlib (0.90.1-1) experimental; urgency=low
 
   * New upstream release
   * updated debian/copyright file
-  
+
  -- Alexandre Fayolle <afayolle@debian.org>  Fri, 06 Jul 2007 17:49:05 +0200
 
 matplotlib (0.90.0-2) experimental; urgency=low
@@ -1147,15 +1148,15 @@ matplotlib (0.87.3-1) unstable; urgency=low
   * New upstream version. Closes: #361181
   * Added numpy support. Closes: #375558
   * Added depends on python-tz. Closes: #376715
-  
+
  -- Marco Presi (Zufus) <zufus@debian.org>  Thu,  6 Jul 2006 09:54:55 +0200
 
 matplotlib (0.86.2-6.1) unstable; urgency=low
-  
+
     * Depend on python-tz, remove the pytz files. Closes: #376715.
-  
+
  -- Matthias Klose <doko@debian.org>  Fri,  7 Jul 2006 18:38:43 +0000
-  
+
 matplotlib (0.86.2-6) unstable; urgency=low
 
   * Added a note about numeric/numarray deps in README.debian. Closes: #376198
@@ -1200,12 +1201,12 @@ matplotlib (0.86.2-1) unstable; urgency=low
 
   * New upstream release. Closes: #341730
   * Added ${shlibs:Depends}. Closes: #345366
-  * python-matplotlib-doc is suggested by python-matplotlib and enhances it. 
+  * python-matplotlib-doc is suggested by python-matplotlib and enhances it.
     Closes: #341610
   * Replaced latex dependency with tetex-extra. Closes: #337361
   * subplot() behavior fixed. Closes: #346285
   * Added users_guide in -doc package. Closes: #341399
-  
+
  -- Vittorio Palmisano <vpalmisano@gmail.com>  Sat, 28 Jan 2006 19:29:15 +0100
 
 matplotlib (0.85-1) unstable; urgency=low
@@ -1225,7 +1226,7 @@ matplotlib (0.82-5) unstable; urgency=low
 
 matplotlib (0.82-4) unstable; urgency=low
 
-  * Fixed FTBFS on hppa: added patch to build on systems without X server 
+  * Fixed FTBFS on hppa: added patch to build on systems without X server
     (autobuilders) also in the clean stage. Closes: 338423.
   * The same patch fix the build also on GNU/kFreeBSD. Closes: #336953
 
@@ -1240,7 +1241,7 @@ matplotlib (0.82-3) unstable; urgency=low
 matplotlib (0.82-2) unstable; urgency=low
 
   [Marco Presi]
-  
+
   * Included patch by Aurelien Jarno <aurel32@debian.org> to fix build on
     GNU/kFreeBSD. Closes: #336953
   * Added latex as Suggested dependency. Closes: #337361
@@ -1290,7 +1291,7 @@ python-matplotlib (0.72-4) unstable; urgency=low
 
   * Added support for different python versions
 
- -- Vittorio Palmisano <redclay@email.it>  Sat, 26 Feb 2005 22:05:40 +0100 
+ -- Vittorio Palmisano <redclay@email.it>  Sat, 26 Feb 2005 22:05:40 +0100
 
 python-matplotlib (0.72-3) unstable; urgency=low
 
@@ -1437,7 +1438,7 @@ python-matplotlib (0.53-1) unstable; urgency=low
 
 python-matplotlib (0.52-2) unstable; urgency=low
 
-  * Fixed python-gd dependency 
+  * Fixed python-gd dependency
 
  -- Vittorio Palmisano <redclay@email.it>  Fri, 26 Mar 2004 11:40:37 +0100
 
