@@ -89,7 +89,6 @@ Standards-Version: 3.9.8
 Homepage: http://matplotlib.org/
 Vcs-Git: https://salsa.debian.org/python-team/modules/matplotlib.git
 Vcs-Browser: https://salsa.debian.org/python-team/modules/matplotlib
-XS-Testsuite: autopkgtest
 
 Package: python-matplotlib
 Architecture: any
