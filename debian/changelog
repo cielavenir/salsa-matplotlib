@@ -9,8 +9,10 @@ matplotlib (2.2.2-1) UNRELEASED; urgency=medium
 
   [ Sandro Tosi ]
   * New upstream release
+  * debian/control
+    - add ipywidgets to b-d, needed by doc
 
- -- Sandro Tosi <morph@debian.org>  Tue, 10 Apr 2018 19:28:09 -0400
+ -- Sandro Tosi <morph@debian.org>  Tue, 10 Apr 2018 19:37:32 -0400
 
 matplotlib (2.1.1-2) unstable; urgency=medium
 
