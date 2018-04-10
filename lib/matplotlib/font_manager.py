@@ -19,11 +19,9 @@ the advantage that it is the standard way to look up fonts on X11
 platforms, so if a font is installed, it is much more likely to be
 found.
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+from __future__ import absolute_import, division, print_function
 
 import six
-from six.moves import cPickle as pickle
 
 """
 KNOWN ISSUES
@@ -32,7 +30,6 @@ KNOWN ISSUES
   - font variant is untested
   - font stretch is incomplete
   - font size is incomplete
-  - font size_adjust is incomplete
   - default font algorithm needs improvement and testing
   - setWeights function needs improvement
   - 'light' is an invalid weight value, remove it.
@@ -53,8 +50,8 @@ import os
 import sys
 from threading import Timer
 import warnings
+import logging
 
-import matplotlib
 from matplotlib import afm, cbook, ft2font, rcParams, get_cachedir
 from matplotlib.compat import subprocess
 from matplotlib.fontconfig_pattern import (
@@ -65,9 +62,9 @@ try:
 except ImportError:
     from backports.functools_lru_cache import lru_cache
 
+_log = logging.getLogger(__name__)
 
 USE_FONTCONFIG = False
-verbose = matplotlib.verbose
 
 font_scalings = {
     'xx-small' : 0.579,
@@ -220,7 +217,7 @@ def win32InstalledFonts(directory=None, fontext='ttf'):
 
     fontext = get_fontext_synonyms(fontext)
 
-    key, items = None, {}
+    key, items = None, set()
     for fontdir in MSFontDirectories:
         try:
             local = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, fontdir)
@@ -241,7 +238,7 @@ def win32InstalledFonts(directory=None, fontext='ttf'):
                         direc = os.path.join(directory, direc)
                     direc = os.path.abspath(direc).lower()
                     if os.path.splitext(direc)[1][1:] in fontext:
-                        items[direc] = 1
+                        items.add(direc)
                 except EnvironmentError:
                     continue
                 except WindowsError:
@@ -398,10 +395,18 @@ class FontEntry(object):
 
 def ttfFontProperty(font):
     """
-    A function for populating the :class:`FontKey` by extracting
-    information from the TrueType font file.
+    Extract information from a TrueType font file.
 
-    *font* is a :class:`FT2Font` instance.
+    Parameters
+    ----------
+    font : `.FT2Font`
+        The TrueType font file from which information will be extracted.
+
+    Returns
+    -------
+    `FontEntry`
+        The extracted font properties.
+
     """
     name = font.family_name
 
@@ -411,11 +416,11 @@ def ttfFontProperty(font):
     sfnt2 = sfnt.get((1,0,0,2))
     sfnt4 = sfnt.get((1,0,0,4))
     if sfnt2:
-        sfnt2 = sfnt2.decode('macroman').lower()
+        sfnt2 = sfnt2.decode('mac_roman').lower()
     else:
         sfnt2 = ''
     if sfnt4:
-        sfnt4 = sfnt4.decode('macroman').lower()
+        sfnt4 = sfnt4.decode('mac_roman').lower()
     else:
         sfnt4 = ''
     if sfnt4.find('oblique') >= 0:
@@ -468,24 +473,27 @@ def ttfFontProperty(font):
     #  Length value is an absolute font size, e.g., 12pt
     #  Percentage values are in 'em's.  Most robust specification.
 
-    #  !!!!  Incomplete
-    if font.scalable:
-        size = 'scalable'
-    else:
-        size = str(float(font.get_fontsize()))
-
-    #  !!!!  Incomplete
-    size_adjust = None
+    if not font.scalable:
+        raise NotImplementedError("Non-scalable fonts are not supported")
+    size = 'scalable'
 
     return FontEntry(font.fname, name, style, variant, weight, stretch, size)
 
 
 def afmFontProperty(fontpath, font):
     """
-    A function for populating a :class:`FontKey` instance by
-    extracting information from the AFM font file.
+    Extract information from an AFM font file.
 
-    *font* is a class:`AFM` instance.
+    Parameters
+    ----------
+    font : `.AFM`
+        The AFM font file from which information will be extracted.
+
+    Returns
+    -------
+    `FontEntry`
+        The extracted font properties.
+
     """
 
     name = font.get_familyname()
@@ -537,9 +545,6 @@ def afmFontProperty(fontpath, font):
 
     size = 'scalable'
 
-    # !!!!  Incomplete
-    size_adjust = None
-
     return FontEntry(fontpath, name, style, variant, weight, stretch, size)
 
 
@@ -552,24 +557,24 @@ def createFontList(fontfiles, fontext='ttf'):
 
     fontlist = []
     #  Add fonts from list of known font files.
-    seen = {}
+    seen = set()
     for fpath in fontfiles:
-        verbose.report('createFontDict: %s' % (fpath), 'debug')
+        _log.debug('createFontDict: %s', fpath)
         fname = os.path.split(fpath)[1]
         if fname in seen:
             continue
         else:
-            seen[fname] = 1
+            seen.add(fname)
         if fontext == 'afm':
             try:
                 fh = open(fpath, 'rb')
             except EnvironmentError:
-                verbose.report("Could not open font file %s" % fpath)
+                _log.info("Could not open font file %s", fpath)
                 continue
             try:
                 font = afm.AFM(fh)
             except RuntimeError:
-                verbose.report("Could not parse font file %s" % fpath)
+                _log.info("Could not parse font file %s", fpath)
                 continue
             finally:
                 fh.close()
@@ -581,18 +586,17 @@ def createFontList(fontfiles, fontext='ttf'):
             try:
                 font = ft2font.FT2Font(fpath)
             except RuntimeError:
-                verbose.report("Could not open font file %s" % fpath)
+                _log.info("Could not open font file %s", fpath)
                 continue
             except UnicodeError:
-                verbose.report("Cannot handle unicode filenames")
-                # print >> sys.stderr, 'Bad file is', fpath
+                _log.info("Cannot handle unicode filenames")
                 continue
             except IOError:
-                verbose.report("IO error - cannot open font file %s" % fpath)
+                _log.info("IO error - cannot open font file %s", fpath)
                 continue
             try:
                 prop = ttfFontProperty(font)
-            except (KeyError, RuntimeError, ValueError):
+            except (KeyError, RuntimeError, ValueError, NotImplementedError):
                 continue
 
         fontlist.append(prop)
@@ -887,6 +891,10 @@ class FontProperties(object):
                     + ", ".join(map(str, font_scalings)))
             else:
                 size = scale * FontManager.get_default_size()
+        if size < 1.0:
+            _log.info('Fontsize %1.2f < 1.0 pt not allowed by FreeType. '
+                      'Setting fontsize = 1 pt', size)
+            size = 1.0
         self._size = size
 
     def set_file(self, file):
@@ -1057,8 +1065,7 @@ class FontManager(object):
                     paths.extend(ttfpath.split(':'))
                 else:
                     paths.append(ttfpath)
-
-        verbose.report('font search path %s'%(str(paths)))
+        _log.info('font search path %s', str(paths))
         #  Load TrueType fonts and create font dictionary.
 
         self.ttffiles = findSystemFonts(paths) + findSystemFonts()
@@ -1068,7 +1075,7 @@ class FontManager(object):
         self.defaultFont = {}
 
         for fname in self.ttffiles:
-            verbose.report('trying fontname %s' % fname, 'debug')
+            _log.debug('trying fontname %s', fname)
             if fname.lower().find('DejaVuSans.ttf')>=0:
                 self.defaultFont['ttf'] = fname
                 break
@@ -1078,8 +1085,8 @@ class FontManager(object):
 
         self.ttflist = createFontList(self.ttffiles)
 
-        self.afmfiles = findSystemFonts(paths, fontext='afm') + \
-            findSystemFonts(fontext='afm')
+        self.afmfiles = (findSystemFonts(paths, fontext='afm')
+                         + findSystemFonts(fontext='afm'))
         self.afmlist = createFontList(self.afmfiles, fontext='afm')
         if len(self.afmfiles):
             self.defaultFont['afm'] = self.afmfiles[0]
@@ -1274,8 +1281,9 @@ class FontManager(object):
         if not isinstance(prop, FontProperties):
             prop = FontProperties(prop)
         fname = prop.get_file()
+
         if fname is not None:
-            verbose.report('findfont returning %s'%fname, 'debug')
+            _log.debug('findfont returning %s', fname)
             return fname
 
         if fontext == 'afm':
@@ -1330,14 +1338,14 @@ class FontManager(object):
                     UserWarning)
                 result = self.defaultFont[fontext]
         else:
-            verbose.report(
+            _log.debug(
                 'findfont: Matching %s to %s (%s) with score of %f' %
                 (prop, best_font.name, repr(best_font.fname), best_score))
             result = best_font.fname
 
         if not os.path.isfile(result):
             if rebuild_if_missing:
-                verbose.report(
+                _log.info(
                     'findfont: Found a missing font file.  Rebuilding cache.')
                 _rebuild()
                 return fontManager.findfont(
@@ -1370,12 +1378,16 @@ fontManager = None
 _fmcache = None
 
 
-get_font = lru_cache(64)(ft2font.FT2Font)
+_get_font = lru_cache(64)(ft2font.FT2Font)
+
+def get_font(filename, hinting_factor=None):
+    if hinting_factor is None:
+        hinting_factor = rcParams['text.hinting_factor']
+    return _get_font(filename, hinting_factor)
 
 
 # The experimental fontconfig-based backend.
 if USE_FONTCONFIG and sys.platform != 'win32':
-    import re
 
     def fc_match(pattern, fontext):
         fontexts = get_fontext_synonyms(fontext)
@@ -1440,8 +1452,7 @@ else:
         if _fmcache:
             with cbook.Locked(cachedir):
                 json_dump(fontManager, _fmcache)
-
-        verbose.report("generated new fontManager")
+        _log.info("generated new fontManager")
 
     if _fmcache:
         try:
@@ -1451,7 +1462,7 @@ else:
                 _rebuild()
             else:
                 fontManager.default_size = None
-                verbose.report("Using fontManager instance from %s" % _fmcache)
+                _log.debug("Using fontManager instance from %s", _fmcache)
         except cbook.Locked.TimeoutError:
             raise
         except:

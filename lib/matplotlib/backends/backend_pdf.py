@@ -8,8 +8,15 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import six
+from six import unichr
 
 import codecs
+import collections
+from datetime import datetime
+from functools import total_ordering
+from io import BytesIO
+import logging
+from math import ceil, cos, floor, pi, sin
 import os
 import re
 import struct
@@ -17,19 +24,10 @@ import sys
 import time
 import warnings
 import zlib
-import collections
-from io import BytesIO
-from functools import total_ordering
 
 import numpy as np
-from six import unichr
 
-
-from datetime import datetime, tzinfo, timedelta
-from math import ceil, cos, floor, pi, sin
-
-import matplotlib
-from matplotlib import __version__, rcParams
+from matplotlib import cbook, __version__, rcParams
 from matplotlib._pylab_helpers import Gcf
 from matplotlib.backend_bases import (
     _Backend, FigureCanvasBase, FigureManagerBase, GraphicsContextBase,
@@ -51,6 +49,8 @@ from matplotlib.dates import UTC
 from matplotlib import _path
 from matplotlib import _png
 from matplotlib import ttconv
+
+_log = logging.getLogger(__name__)
 
 # Overview
 #
@@ -226,8 +226,8 @@ def pdfRepr(obj):
         return fill([pdfRepr(val) for val in obj.bounds])
 
     else:
-        msg = "Don't know a PDF representation for %s objects." % type(obj)
-        raise TypeError(msg)
+        raise TypeError("Don't know a PDF representation for {} objects"
+                        .format(type(obj)))
 
 
 class Reference(object):
@@ -435,9 +435,8 @@ class PdfFile(object):
         self.passed_in_file_object = False
         self.original_file_like = None
         self.tell_base = 0
-        if isinstance(filename, six.string_types):
-            fh = open(filename, 'wb')
-        elif is_writable_file_like(filename):
+        fh, opened = cbook.to_filehandle(filename, "wb", return_opened=True)
+        if not opened:
             try:
                 self.tell_base = filename.tell()
             except IOError:
@@ -446,8 +445,6 @@ class PdfFile(object):
             else:
                 fh = filename
                 self.passed_in_file_object = True
-        else:
-            raise ValueError("filename must be a path or a file-like object")
 
         self._core14fontdir = os.path.join(
             rcParams['datapath'], 'fonts', 'pdfcorefonts')
@@ -658,9 +655,7 @@ class PdfFile(object):
             Fx = Name('F%d' % self.nextFont)
             self.fontNames[filename] = Fx
             self.nextFont += 1
-            matplotlib.verbose.report(
-                'Assigning font %s = %r' % (Fx, filename),
-                'debug')
+            _log.debug('Assigning font %s = %r', Fx, filename)
 
         return Fx
 
@@ -688,15 +683,13 @@ class PdfFile(object):
         psfont = self.texFontMap[dvifont.texname]
         if psfont.filename is None:
             raise ValueError(
-                ("No usable font file found for {0} (TeX: {1}). "
-                 "The font may lack a Type-1 version.")
+                "No usable font file found for {} (TeX: {}); "
+                "the font may lack a Type-1 version"
                 .format(psfont.psname, dvifont.texname))
 
         pdfname = Name('F%d' % self.nextFont)
         self.nextFont += 1
-        matplotlib.verbose.report(
-            'Assigning font {0} = {1} (dvi)'.format(pdfname, dvifont.texname),
-            'debug')
+        _log.debug('Assigning font %s = %s (dvi)', pdfname, dvifont.texname)
         self.dviFontInfo[dvifont.texname] = Bunch(
             dvifont=dvifont,
             pdfname=pdfname,
@@ -710,19 +703,18 @@ class PdfFile(object):
         fonts = {}
         for dviname, info in sorted(self.dviFontInfo.items()):
             Fx = info.pdfname
-            matplotlib.verbose.report('Embedding Type-1 font %s from dvi'
-                                      % dviname, 'debug')
+            _log.debug('Embedding Type-1 font %s from dvi.', dviname)
             fonts[Fx] = self._embedTeXFont(info)
         for filename in sorted(self.fontNames):
             Fx = self.fontNames[filename]
-            matplotlib.verbose.report('Embedding font %s' % filename, 'debug')
+            _log.debug('Embedding font %s.', filename)
             if filename.endswith('.afm'):
                 # from pdf.use14corefonts
-                matplotlib.verbose.report('Writing AFM font', 'debug')
+                _log.debug('Writing AFM font.')
                 fonts[Fx] = self._write_afm_font(filename)
             else:
                 # a normal TrueType font
-                matplotlib.verbose.report('Writing TrueType font', 'debug')
+                _log.debug('Writing TrueType font.')
                 realpath, stat_key = get_realpath_and_stat(filename)
                 chars = self.used_characters.get(stat_key)
                 if chars is not None and len(chars[1]):
@@ -742,9 +734,8 @@ class PdfFile(object):
         return fontdictObject
 
     def _embedTeXFont(self, fontinfo):
-        msg = ('Embedding TeX font {0} - fontinfo={1}'
-               .format(fontinfo.dvifont.texname, fontinfo.__dict__))
-        matplotlib.verbose.report(msg, 'debug')
+        _log.debug('Embedding TeX font %s - fontinfo=%s',
+                   fontinfo.dvifont.texname, fontinfo.__dict__)
 
         # Widths
         widthsObject = self.reserveObject('font widths')
@@ -771,12 +762,12 @@ class PdfFile(object):
 
         # If no file is specified, stop short
         if fontinfo.fontfile is None:
-            msg = ('Because of TeX configuration (pdftex.map, see updmap '
-                   'option pdftexDownloadBase14) the font {0} is not '
-                   'embedded. This is deprecated as of PDF 1.5 and it may '
-                   'cause the consumer application to show something that '
-                   'was not intended.').format(fontinfo.basefont)
-            warnings.warn(msg)
+            _log.warning(
+                "Because of TeX configuration (pdftex.map, see updmap option "
+                "pdftexDownloadBase14) the font %s is not embedded. This is "
+                "deprecated as of PDF 1.5 and it may cause the consumer "
+                "application to show something that was not intended.",
+                fontinfo.basefont)
             fontdict['BaseFont'] = Name(fontinfo.basefont)
             self.writeObject(fontdictObject, fontdict)
             return fontdictObject
@@ -1147,10 +1138,10 @@ end"""
         # You are lost in a maze of TrueType tables, all different...
         sfnt = font.get_sfnt()
         try:
-            ps_name = sfnt[(1, 0, 0, 6)].decode('macroman')  # Macintosh scheme
+            ps_name = sfnt[1, 0, 0, 6].decode('mac_roman')  # Macintosh scheme
         except KeyError:
             # Microsoft scheme:
-            ps_name = sfnt[(3, 1, 0x0409, 6)].decode('utf-16be')
+            ps_name = sfnt[3, 1, 0x0409, 6].decode('utf-16be')
             # (see freetype/ttnameid.h)
         ps_name = ps_name.encode('ascii', 'replace')
         ps_name = Name(ps_name)
@@ -1196,9 +1187,9 @@ end"""
         # save as a (non-subsetted) Type 42 font instead.
         if is_opentype_cff_font(filename):
             fonttype = 42
-            msg = ("'%s' can not be subsetted into a Type 3 font. "
-                   "The entire font will be embedded in the output.")
-            warnings.warn(msg % os.path.basename(filename))
+            _log.warning("%r can not be subsetted into a Type 3 font. The "
+                         "entire font will be embedded in the output.",
+                         os.path.basename(filename))
 
         if fonttype == 3:
             return embedTTFType3(font, characters, descriptor)
@@ -1206,7 +1197,7 @@ end"""
             return embedTTFType42(font, characters, descriptor)
 
     def alphaState(self, alpha):
-        """Return name of an ExtGState that sets alpha to the given value"""
+        """Return name of an ExtGState that sets alpha to the given value."""
 
         state = self.alphaStates.get(alpha, None)
         if state is not None:
@@ -1291,7 +1282,7 @@ end"""
             flat_colors = colors.reshape((shape[0] * shape[1], 4))
             points_min = np.min(flat_points, axis=0) - (1 << 8)
             points_max = np.max(flat_points, axis=0) + (1 << 8)
-            factor = float(0xffffffff) / (points_max - points_min)
+            factor = 0xffffffff / (points_max - points_min)
 
             self.beginStream(
                 ob.id, None,
@@ -2373,8 +2364,8 @@ class GraphicsContextPdf(GraphicsContextBase):
                 ours = getattr(self, p)
                 theirs = getattr(other, p)
                 try:
-                    if (ours is None or theirs is None):
-                        different = bool(not(ours is theirs))
+                    if ours is None or theirs is None:
+                        different = ours is not theirs
                     else:
                         different = bool(ours != theirs)
                 except ValueError:
@@ -2523,18 +2514,21 @@ class PdfPages(object):
             instance is provided, this figure is saved. If an int is specified,
             the figure instance to save is looked up by number.
         """
-        if isinstance(figure, Figure):
-            figure.savefig(self, format='pdf', **kwargs)
-        else:
+        if not isinstance(figure, Figure):
             if figure is None:
-                figureManager = Gcf.get_active()
+                manager = Gcf.get_active()
             else:
-                figureManager = Gcf.get_fig_manager(figure)
-            if figureManager is None:
-                raise ValueError("No such figure: " + repr(figure))
-            else:
-                figureManager.canvas.figure.savefig(self, format='pdf',
-                                                    **kwargs)
+                manager = Gcf.get_fig_manager(figure)
+            if manager is None:
+                raise ValueError("No figure {}".format(figure))
+            figure = manager.canvas.figure
+        # Force use of pdf backend, as PdfPages is tightly coupled with it.
+        try:
+            orig_canvas = figure.canvas
+            figure.canvas = FigureCanvasPdf(figure)
+            figure.savefig(self, format="pdf", **kwargs)
+        finally:
+            figure.canvas = orig_canvas
 
     def get_pagecount(self):
         """

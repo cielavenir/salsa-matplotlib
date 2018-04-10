@@ -23,9 +23,8 @@ from __future__ import (absolute_import, division, print_function,
 import six
 
 import sys
-import warnings
 import time
-import types
+import warnings
 
 from cycler import cycler
 import matplotlib
@@ -34,7 +33,7 @@ from matplotlib import style
 from matplotlib import _pylab_helpers, interactive
 from matplotlib.cbook import dedent, silent_list, is_numlike
 from matplotlib.cbook import _string_to_bool
-from matplotlib.cbook import deprecated
+from matplotlib.cbook import deprecated, warn_deprecated
 from matplotlib import docstring
 from matplotlib.backend_bases import FigureCanvasBase
 from matplotlib.figure import Figure, figaspect
@@ -283,8 +282,8 @@ def pause(interval):
     This can be used for crude animation.  For more complex animation, see
     :mod:`matplotlib.animation`.
 
-    Note
-    ----
+    Notes
+    -----
     This function is experimental; its behavior may be changed or extended in a
     future release.
     """
@@ -393,28 +392,38 @@ def xkcd(scale=1, length=100, randomness=2):
             "xkcd mode is not compatible with text.usetex = True")
 
     from matplotlib import patheffects
-    context = rc_context()
-    try:
-        rcParams['font.family'] = ['xkcd', 'Humor Sans', 'Comic Sans MS']
-        rcParams['font.size'] = 14.0
-        rcParams['path.sketch'] = (scale, length, randomness)
-        rcParams['path.effects'] = [
-            patheffects.withStroke(linewidth=4, foreground="w")]
-        rcParams['axes.linewidth'] = 1.5
-        rcParams['lines.linewidth'] = 2.0
-        rcParams['figure.facecolor'] = 'white'
-        rcParams['grid.linewidth'] = 0.0
-        rcParams['axes.grid'] = False
-        rcParams['axes.unicode_minus'] = False
-        rcParams['axes.edgecolor'] = 'black'
-        rcParams['xtick.major.size'] = 8
-        rcParams['xtick.major.width'] = 3
-        rcParams['ytick.major.size'] = 8
-        rcParams['ytick.major.width'] = 3
-    except:
-        context.__exit__(*sys.exc_info())
-        raise
-    return context
+    xkcd_ctx = rc_context({
+        'font.family': ['xkcd', 'Humor Sans', 'Comic Sans MS'],
+        'font.size': 14.0,
+        'path.sketch': (scale, length, randomness),
+        'path.effects': [patheffects.withStroke(linewidth=4, foreground="w")],
+        'axes.linewidth': 1.5,
+        'lines.linewidth': 2.0,
+        'figure.facecolor': 'white',
+        'grid.linewidth': 0.0,
+        'axes.grid': False,
+        'axes.unicode_minus': False,
+        'axes.edgecolor': 'black',
+        'xtick.major.size': 8,
+        'xtick.major.width': 3,
+        'ytick.major.size': 8,
+        'ytick.major.width': 3,
+    })
+    xkcd_ctx.__enter__()
+
+    # In order to make the call to `xkcd` that does not use a context manager
+    # (cm) work, we need to enter into the cm ourselves, and return a dummy
+    # cm that does nothing on entry and cleans up the xkcd context on exit.
+    # Additionally, we need to keep a reference to the dummy cm because it
+    # would otherwise be exited when GC'd.
+
+    class dummy_ctx(object):
+        def __enter__(self):
+            pass
+
+        __exit__ = xkcd_ctx.__exit__
+
+    return dummy_ctx()
 
 
 ## Figures ##
@@ -632,7 +641,7 @@ def close(*args):
 
     ``close()`` by itself closes the current figure
 
-    ``close(fig)`` closes the `~.Figure` instance *fig*
+    ``close(fig)`` closes the `.Figure` instance *fig*
 
     ``close(num)`` closes the figure number *num*
 
@@ -855,75 +864,88 @@ def over(func, *args, **kwargs):
 ## Axes ##
 
 
-def axes(*args, **kwargs):
+def axes(arg=None, **kwargs):
     """
-    Add an axes to the figure.
+    Add an axes to the current figure and make it the current axes.
 
-    The axes is added at position *rect* specified by:
+    Parameters
+    ----------
+    arg : None or 4-tuple or Axes
+        The exact behavior of this function depends on the type:
 
-    - ``axes()`` by itself creates a default full ``subplot(111)`` window axis.
+        - *None*: A new full window axes is added using
+          ``subplot(111, **kwargs)``
+        - 4-tuple of floats *rect* = ``[left, bottom, width, height]``.
+          A new axes is added with dimensions *rect* in normalized
+          (0, 1) units using `~.Figure.add_axes` on the current figure.
+        - `.Axes`: This is equivalent to `.pyplot.sca`. It sets the current
+          axes to *arg*. Note: This implicitly changes the current figure to
+          the parent of *arg*.
 
-    - ``axes(rect, facecolor='w')`` where *rect* = [left, bottom, width,
-      height] in normalized (0, 1) units.  *facecolor* is the background
-      color for the axis, default white.
+          .. note:: The use of an Axes as an argument is deprecated and will be
+                    removed in v3.0. Please use `.pyplot.sca` instead.
 
-    - ``axes(h)`` where *h* is an axes instance makes *h* the current
-      axis and the parent of *h* the current figure.
-      An :class:`~matplotlib.axes.Axes` instance is returned.
+    Other Parameters
+    ----------------
+    **kwargs :
+        For allowed keyword arguments see `.pyplot.subplot` and
+        `.Figure.add_axes` respectively. Some common keyword arguments are
+        listed below:
 
-    =========   ==============   ==============================================
-    kwarg       Accepts          Description
-    =========   ==============   ==============================================
-    facecolor   color            the axes background color
-    frameon     [True|False]     display the frame?
-    sharex      otherax          current axes shares xaxis attribute
-                                 with otherax
-    sharey      otherax          current axes shares yaxis attribute
-                                 with otherax
-    polar       [True|False]     use a polar axes?
-    aspect      [str | num]      ['equal', 'auto'] or a number.  If a number
-                                 the ratio of y-unit/x-unit in screen-space.
-                                 Also see
-                                 :meth:`~matplotlib.axes.Axes.set_aspect`.
-    =========   ==============   ==============================================
+        ========= =========== =================================================
+        kwarg     Accepts     Description
+        ========= =========== =================================================
+        facecolor color       the axes background color
+        frameon   bool        whether to display the frame
+        sharex    otherax     share x-axis with *otherax*
+        sharey    otherax     share y-axis with *otherax*
+        polar     bool        whether to use polar axes
+        aspect    [str | num] ['equal', 'auto'] or a number.  If a number, the
+                              ratio of y-unit/x-unit in screen-space.  See also
+                              `~.Axes.set_aspect`.
+        ========= =========== =================================================
 
-    Examples:
+    Returns
+    -------
+    axes : Axes
+        The created or activated axes.
 
-    * :file:`examples/pylab_examples/axes_demo.py` places custom axes.
-    * :file:`examples/pylab_examples/shared_axis_demo.py` uses
-      *sharex* and *sharey*.
+    Examples
+    --------
+    Creating a new full window axes::
+
+        >>> plt.axes()
+
+    Creating a new axes with specified dimensions and some kwargs::
+
+        >>> plt.axes((left, bottom, width, height), facecolor='w')
 
     """
 
-    nargs = len(args)
-    if len(args) == 0:
+    if arg is None:
         return subplot(111, **kwargs)
-    if nargs > 1:
-        raise TypeError('Only one non keyword arg to axes allowed')
-    arg = args[0]
 
     if isinstance(arg, Axes):
-        sca(arg)
-        a = arg
+        warn_deprecated("2.2",
+                        message="Using pyplot.axes(ax) with ax an Axes "
+                                "argument is deprecated. Please use "
+                                "pyplot.sca(ax) instead.")
+        ax = arg
+        sca(ax)
+        return ax
     else:
         rect = arg
-        a = gcf().add_axes(rect, **kwargs)
-    return a
+        return gcf().add_axes(rect, **kwargs)
 
 
-def delaxes(*args):
+def delaxes(ax=None):
     """
-    Remove an axes from the current figure.  If *ax*
-    doesn't exist, an error will be raised.
-
-    ``delaxes()``: delete the current axes
+    Remove the given `Axes` *ax* from the current figure. If *ax* is *None*,
+    the current axes is removed. A KeyError is raised if the axes doesn't exist.
     """
-    if not len(args):
+    if ax is None:
         ax = gca()
-    else:
-        ax = args[0]
-    ret = gcf().delaxes(ax)
-    return ret
+    gcf().delaxes(ax)
 
 
 def sca(ax):
@@ -972,7 +994,7 @@ def subplot(*args, **kwargs):
 
        subplot(nrows, ncols, index, **kwargs)
 
-    In the current figure, create and return an `~.Axes`, at position *index*
+    In the current figure, create and return an `.Axes`, at position *index*
     of a (virtual) grid of *nrows* by *ncols* axes.  Indexes go from 1 to
     ``nrows * ncols``, incrementing in row-major order.
 
@@ -980,7 +1002,7 @@ def subplot(*args, **kwargs):
     given as a single, concatenated, three-digit number.
 
     For example, ``subplot(2, 3, 3)`` and ``subplot(233)`` both create an
-    `~.Axes` at the top right corner of the current figure, occupying half of
+    `.Axes` at the top right corner of the current figure, occupying half of
     the figure height and a third of the figure width.
 
     .. note::
@@ -1287,9 +1309,9 @@ def subplots_adjust(*args, **kwargs):
       right = 0.9    # the right side of the subplots of the figure
       bottom = 0.1   # the bottom of the subplots of the figure
       top = 0.9      # the top of the subplots of the figure
-      wspace = 0.2   # the amount of width reserved for blank space between subplots,
+      wspace = 0.2   # the amount of width reserved for space between subplots,
                      # expressed as a fraction of the average axis width
-      hspace = 0.2   # the amount of height reserved for white space between subplots,
+      hspace = 0.2   # the amount of height reserved for space between subplots,
                      # expressed as a fraction of the average axis height
 
     The actual defaults are controlled by the rc file
@@ -1346,10 +1368,12 @@ def tight_layout(pad=1.08, h_pad=None, w_pad=None, rect=None):
 
 def box(on=None):
     """
-    Turn the axes box on or off.  *on* may be a boolean or a string,
-    'on' or 'off'.
+    Turn the axes box on or off.
 
-    If *on* is *None*, toggle state.
+    Parameters
+    ----------
+    on : bool or None
+        The new axes box state.  If ``None``, toggle the state.
     """
     ax = gca()
     on = _string_to_bool(on)
@@ -1476,65 +1500,60 @@ def axis(*v, **kwargs):
 
 def xlabel(s, *args, **kwargs):
     """
-    Set the *x* axis label of the current axis.
+    Set the x-axis label of the current axes.
 
-    Default override is::
+    Call signature::
 
-      override = {
-          'fontsize'            : 'small',
-          'verticalalignment'   : 'top',
-          'horizontalalignment' : 'center'
-          }
+        xlabel(label, fontdict=None, labelpad=None, **kwargs)
 
-    .. seealso::
-
-        :func:`~matplotlib.pyplot.text`
-            For information on how override and the optional args work
+    This is the pyplot equivalent of calling `.set_xlabel` on the current axes.
+    See there for a full parameter description.
     """
     return gca().set_xlabel(s, *args, **kwargs)
 
 
 def ylabel(s, *args, **kwargs):
     """
-    Set the *y* axis label of the current axis.
+    Set the y-axis label of the current axes.
 
-    Defaults override is::
+    Call signature::
 
-        override = {
-           'fontsize'            : 'small',
-           'verticalalignment'   : 'center',
-           'horizontalalignment' : 'right',
-           'rotation'='vertical' : }
+        ylabel(label, fontdict=None, labelpad=None, **kwargs)
 
-    .. seealso::
-
-        :func:`~matplotlib.pyplot.text`
-            For information on how override and the optional args
-            work.
+    This is the pyplot equivalent of calling `.set_ylabel` on the current axes.
+    See there for a full parameter description.
     """
     return gca().set_ylabel(s, *args, **kwargs)
 
 
 def xlim(*args, **kwargs):
     """
-    Get or set the *x* limits of the current axes.
+    Get or set the x limits of the current axes.
 
-    ::
+    Call signatures::
 
-      xmin, xmax = xlim()   # return the current xlim
-      xlim( (xmin, xmax) )  # set the xlim to xmin, xmax
-      xlim( xmin, xmax )    # set the xlim to xmin, xmax
+        xmin, xmax = xlim()  # return the current xlim
+        xlim((xmin, xmax))   # set the xlim to xmin, xmax
+        xlim(xmin, xmax)     # set the xlim to xmin, xmax
 
-    If you do not specify args, you can pass the xmin and xmax as
-    kwargs, e.g.::
+    If you do not specify args, you can pass *xmin* or *xmax* as kwargs, i.e.::
 
-      xlim(xmax=3) # adjust the max leaving min unchanged
-      xlim(xmin=1) # adjust the min leaving max unchanged
+        xlim(xmax=3)  # adjust the max leaving min unchanged
+        xlim(xmin=1)  # adjust the min leaving max unchanged
 
     Setting limits turns autoscaling off for the x-axis.
 
-    The new axis limits are returned as a length 2 tuple.
+    Returns
+    -------
+    xmin, xmax
+        A tuple of the new x-axis limits.
 
+    Notes
+    -----
+    Calling this function with no arguments (e.g. ``xlim()``) is the pyplot
+    equivalent of calling `~.Axes.get_xlim` on the current axes.
+    Calling this function with arguments is the pyplot equivalent of calling
+    `~.Axes.set_xlim` on the current axes. All arguments are passed though.
     """
     ax = gca()
     if not args and not kwargs:
@@ -1545,23 +1564,33 @@ def xlim(*args, **kwargs):
 
 def ylim(*args, **kwargs):
     """
-    Get or set the *y*-limits of the current axes.
+    Get or set the y-limits of the current axes.
 
-    ::
+    Call signatures::
 
-      ymin, ymax = ylim()   # return the current ylim
-      ylim( (ymin, ymax) )  # set the ylim to ymin, ymax
-      ylim( ymin, ymax )    # set the ylim to ymin, ymax
+        ymin, ymax = ylim()  # return the current ylim
+        ylim((ymin, ymax))   # set the ylim to ymin, ymax
+        ylim(ymin, ymax)     # set the ylim to ymin, ymax
 
-    If you do not specify args, you can pass the *ymin* and *ymax* as
-    kwargs, e.g.::
+    If you do not specify args, you can alternatively pass *ymin* or *ymax* as
+    kwargs, i.e.::
 
-      ylim(ymax=3) # adjust the max leaving min unchanged
-      ylim(ymin=1) # adjust the min leaving max unchanged
+        ylim(ymax=3)  # adjust the max leaving min unchanged
+        ylim(ymin=1)  # adjust the min leaving max unchanged
 
     Setting limits turns autoscaling off for the y-axis.
 
-    The new axis limits are returned as a length 2 tuple.
+    Returns
+    -------
+    ymin, ymax
+        A tuple of the new y-axis limits.
+
+    Notes
+    -----
+    Calling this function with no arguments (e.g. ``ylim()``) is the pyplot
+    equivalent of calling `~.Axes.get_ylim` on the current axes.
+    Calling this function with arguments is the pyplot equivalent of calling
+    `~.Axes.set_ylim` on the current axes. All arguments are passed though.
     """
     ax = gca()
     if not args and not kwargs:
@@ -1573,13 +1602,23 @@ def ylim(*args, **kwargs):
 @docstring.dedent_interpd
 def xscale(*args, **kwargs):
     """
-    Set the scaling of the *x*-axis.
+    Set the scaling of the x-axis.
 
-    call signature::
+    Call signature::
 
-      xscale(scale, **kwargs)
+        xscale(scale, **kwargs)
 
-    The available scales are: %(scale)s
+    Parameters
+    ----------
+    scale : [%(scale)s]
+        The scaling type.
+    **kwargs
+        Additional parameters depend on *scale*. See Notes.
+
+    Notes
+    -----
+    This is the pyplot equivalent of calling `~.Axes.set_xscale` on the
+    current axes.
 
     Different keywords may be accepted, depending on the scale:
 
@@ -1591,13 +1630,23 @@ def xscale(*args, **kwargs):
 @docstring.dedent_interpd
 def yscale(*args, **kwargs):
     """
-    Set the scaling of the *y*-axis.
+    Set the scaling of the y-axis.
 
-    call signature::
+    Call signature::
 
-      yscale(scale, **kwargs)
+        yscale(scale, **kwargs)
 
-    The available scales are: %(scale)s
+    Parameters
+    ----------
+    scale : [%(scale)s]
+        The scaling type.
+    **kwargs
+        Additional parameters depend on *scale*. See Notes.
+
+    Notes
+    -----
+    This is the pyplot equivalent of calling `~.Axes.set_yscale` on the
+    current axes.
 
     Different keywords may be accepted, depending on the scale:
 
@@ -1608,24 +1657,63 @@ def yscale(*args, **kwargs):
 
 def xticks(*args, **kwargs):
     """
-    Get or set the *x*-limits of the current tick locations and labels.
+    Get or set the current tick locations and labels of the x-axis.
 
-    ::
+    Call signatures::
 
-      # return locs, labels where locs is an array of tick locations and
-      # labels is an array of tick labels.
-      locs, labels = xticks()
+        locs, labels = xticks()           # Get locations and labels
 
-      # set the locations of the xticks
-      xticks( arange(6) )
+        xticks(locs, [labels], **kwargs)  # Set locations and labels
 
-      # set the locations and labels of the xticks
-      xticks( arange(5), ('Tom', 'Dick', 'Harry', 'Sally', 'Sue') )
+    Parameters
+    ----------
+    locs : array_like
+        A list of positions at which ticks should be placed. You can pass an
+        empty list to disable xticks.
 
-    The keyword args, if any, are :class:`~matplotlib.text.Text`
-    properties. For example, to rotate long labels::
+    labels : array_like, optional
+        A list of explicit labels to place at the given *locs*.
 
-      xticks( arange(12), calendar.month_name[1:13], rotation=17 )
+    **kwargs
+        :class:`.Text` properties can be used to control the appearance of
+        the labels.
+
+    Returns
+    -------
+    locs
+        An array of label locations.
+    labels
+        A list of `.Text` objects.
+
+    Notes
+    -----
+    Calling this function with no arguments (e.g. ``xticks()``) is the pyplot
+    equivalent of calling `~.Axes.get_xticks` and `~.Axes.get_xticklabels` on
+    the current axes.
+    Calling this function with arguments is the pyplot equivalent of calling
+    `~.Axes.set_xticks` and `~.Axes.set_xticklabels` on the current axes.
+
+    Examples
+    --------
+    Get the current locations and labels:
+
+        >>> locs, labels = xticks()
+
+    Set label locations:
+
+        >>> xticks(np.arange(0, 1, step=0.2))
+
+    Set text labels:
+
+        >>> xticks(np.arange(5), ('Tom', 'Dick', 'Harry', 'Sally', 'Sue'))
+
+    Set text labels and properties:
+
+        >>> xticks(np.arange(12), calendar.month_name[1:13], rotation=20)
+
+    Disable xticks:
+
+        >>> xticks([])
     """
     ax = gca()
 
@@ -1648,24 +1736,63 @@ def xticks(*args, **kwargs):
 
 def yticks(*args, **kwargs):
     """
-    Get or set the *y*-limits of the current tick locations and labels.
+    Get or set the current tick locations and labels of the y-axis.
 
-    ::
+    Call signatures::
 
-      # return locs, labels where locs is an array of tick locations and
-      # labels is an array of tick labels.
-      locs, labels = yticks()
+        locs, labels = yticks()           # Get locations and labels
 
-      # set the locations of the yticks
-      yticks( arange(6) )
+        yticks(locs, [labels], **kwargs)  # Set locations and labels
 
-      # set the locations and labels of the yticks
-      yticks( arange(5), ('Tom', 'Dick', 'Harry', 'Sally', 'Sue') )
+    Parameters
+    ----------
+    locs : array_like
+        A list of positions at which ticks should be placed. You can pass an
+        empty list to disable yticks.
 
-    The keyword args, if any, are :class:`~matplotlib.text.Text`
-    properties. For example, to rotate long labels::
+    labels : array_like, optional
+        A list of explicit labels to place at the given *locs*.
 
-      yticks( arange(12), calendar.month_name[1:13], rotation=45 )
+    **kwargs
+        :class:`.Text` properties can be used to control the appearance of
+        the labels.
+
+    Returns
+    -------
+    locs
+        An array of label locations.
+    labels
+        A list of `.Text` objects.
+
+    Notes
+    -----
+    Calling this function with no arguments (e.g. ``yticks()``) is the pyplot
+    equivalent of calling `~.Axes.get_yticks` and `~.Axes.get_yticklabels` on
+    the current axes.
+    Calling this function with arguments is the pyplot equivalent of calling
+    `~.Axes.set_yticks` and `~.Axes.set_yticklabels` on the current axes.
+
+    Examples
+    --------
+    Get the current locations and labels:
+
+        >>> locs, labels = yticks()
+
+    Set label locations:
+
+        >>> yticks(np.arange(0, 1, step=0.2))
+
+    Set text labels:
+
+        >>> yticks(np.arange(5), ('Tom', 'Dick', 'Harry', 'Sally', 'Sue'))
+
+    Set text labels and properties:
+
+        >>> yticks(np.arange(12), calendar.month_name[1:13], rotation=45)
+
+    Disable yticks:
+
+        >>> yticks([])
     """
     ax = gca()
 
@@ -2387,8 +2514,11 @@ def plotfile(fname, cols=(0,), plotfuncs=None,
 
     if plotfuncs is None:
         plotfuncs = dict()
-    r = mlab.csv2rec(fname, comments=comments, skiprows=skiprows,
-                     checkrows=checkrows, delimiter=delimiter, names=names)
+    from matplotlib.cbook import mplDeprecation
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', mplDeprecation)
+        r = mlab.csv2rec(fname, comments=comments, skiprows=skiprows,
+                         checkrows=checkrows, delimiter=delimiter, names=names)
 
     def getname_val(identifier):
         'return the name and column data for identifier'
@@ -2481,8 +2611,7 @@ install_repl_displayhook()
 ################# REMAINING CONTENT GENERATED BY boilerplate.py ##############
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.acorr)
 def acorr(x, hold=None, data=None, **kwargs):
     ax = gca()
@@ -2502,8 +2631,7 @@ def acorr(x, hold=None, data=None, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.angle_spectrum)
 def angle_spectrum(x, Fs=None, Fc=None, window=None, pad_to=None, sides=None,
                    hold=None, data=None, **kwargs):
@@ -2525,8 +2653,7 @@ def angle_spectrum(x, Fs=None, Fc=None, window=None, pad_to=None, sides=None,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.arrow)
 def arrow(x, y, dx, dy, hold=None, **kwargs):
     ax = gca()
@@ -2546,8 +2673,7 @@ def arrow(x, y, dx, dy, hold=None, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.axhline)
 def axhline(y=0, xmin=0, xmax=1, hold=None, **kwargs):
     ax = gca()
@@ -2567,8 +2693,7 @@ def axhline(y=0, xmin=0, xmax=1, hold=None, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.axhspan)
 def axhspan(ymin, ymax, xmin=0, xmax=1, hold=None, **kwargs):
     ax = gca()
@@ -2588,8 +2713,7 @@ def axhspan(ymin, ymax, xmin=0, xmax=1, hold=None, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.axvline)
 def axvline(x=0, ymin=0, ymax=1, hold=None, **kwargs):
     ax = gca()
@@ -2609,8 +2733,7 @@ def axvline(x=0, ymin=0, ymax=1, hold=None, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.axvspan)
 def axvspan(xmin, xmax, ymin=0, ymax=1, hold=None, **kwargs):
     ax = gca()
@@ -2630,8 +2753,7 @@ def axvspan(xmin, xmax, ymin=0, ymax=1, hold=None, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.bar)
 def bar(*args, **kwargs):
     ax = gca()
@@ -2651,8 +2773,7 @@ def bar(*args, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.barh)
 def barh(*args, **kwargs):
     ax = gca()
@@ -2672,8 +2793,7 @@ def barh(*args, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.broken_barh)
 def broken_barh(xranges, yrange, hold=None, data=None, **kwargs):
     ax = gca()
@@ -2693,8 +2813,7 @@ def broken_barh(xranges, yrange, hold=None, data=None, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.boxplot)
 def boxplot(x, notch=None, sym=None, vert=None, whis=None, positions=None,
             widths=None, patch_artist=None, bootstrap=None, usermedians=None,
@@ -2732,8 +2851,7 @@ def boxplot(x, notch=None, sym=None, vert=None, whis=None, positions=None,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.cohere)
 def cohere(x, y, NFFT=256, Fs=2, Fc=0, detrend=mlab.detrend_none,
            window=mlab.window_hanning, noverlap=0, pad_to=None, sides='default',
@@ -2758,8 +2876,7 @@ def cohere(x, y, NFFT=256, Fs=2, Fc=0, detrend=mlab.detrend_none,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.clabel)
 def clabel(CS, *args, **kwargs):
     ax = gca()
@@ -2779,8 +2896,7 @@ def clabel(CS, *args, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.contour)
 def contour(*args, **kwargs):
     ax = gca()
@@ -2800,8 +2916,7 @@ def contour(*args, **kwargs):
     if ret._A is not None: sci(ret)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.contourf)
 def contourf(*args, **kwargs):
     ax = gca()
@@ -2821,8 +2936,7 @@ def contourf(*args, **kwargs):
     if ret._A is not None: sci(ret)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.csd)
 def csd(x, y, NFFT=None, Fs=None, Fc=None, detrend=None, window=None,
         noverlap=None, pad_to=None, sides=None, scale_by_freq=None,
@@ -2847,8 +2961,7 @@ def csd(x, y, NFFT=None, Fs=None, Fc=None, detrend=None, window=None,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.errorbar)
 def errorbar(x, y, yerr=None, xerr=None, fmt='', ecolor=None, elinewidth=None,
              capsize=None, barsabove=False, lolims=False, uplims=False,
@@ -2876,8 +2989,7 @@ def errorbar(x, y, yerr=None, xerr=None, fmt='', ecolor=None, elinewidth=None,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.eventplot)
 def eventplot(positions, orientation='horizontal', lineoffsets=1, linelengths=1,
               linewidths=None, colors=None, linestyles='solid', hold=None,
@@ -2902,8 +3014,7 @@ def eventplot(positions, orientation='horizontal', lineoffsets=1, linelengths=1,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.fill)
 def fill(*args, **kwargs):
     ax = gca()
@@ -2923,8 +3034,7 @@ def fill(*args, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.fill_between)
 def fill_between(x, y1, y2=0, where=None, interpolate=False, step=None,
                  hold=None, data=None, **kwargs):
@@ -2947,8 +3057,7 @@ def fill_between(x, y1, y2=0, where=None, interpolate=False, step=None,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.fill_betweenx)
 def fill_betweenx(y, x1, x2=0, where=None, step=None, interpolate=False,
                   hold=None, data=None, **kwargs):
@@ -2970,8 +3079,7 @@ def fill_betweenx(y, x1, x2=0, where=None, step=None, interpolate=False,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.hexbin)
 def hexbin(x, y, C=None, gridsize=100, bins=None, xscale='linear',
            yscale='linear', extent=None, cmap=None, norm=None, vmin=None,
@@ -3000,8 +3108,7 @@ def hexbin(x, y, C=None, gridsize=100, bins=None, xscale='linear',
     sci(ret)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.hist)
 def hist(x, bins=None, range=None, density=None, weights=None, cumulative=False,
          bottom=None, histtype='bar', align='mid', orientation='vertical',
@@ -3028,8 +3135,7 @@ def hist(x, bins=None, range=None, density=None, weights=None, cumulative=False,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.hist2d)
 def hist2d(x, y, bins=10, range=None, normed=False, weights=None, cmin=None,
            cmax=None, hold=None, data=None, **kwargs):
@@ -3052,8 +3158,7 @@ def hist2d(x, y, bins=10, range=None, normed=False, weights=None, cmin=None,
     sci(ret[-1])
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.hlines)
 def hlines(y, xmin, xmax, colors='k', linestyles='solid', label='', hold=None,
            data=None, **kwargs):
@@ -3075,8 +3180,7 @@ def hlines(y, xmin, xmax, colors='k', linestyles='solid', label='', hold=None,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.imshow)
 def imshow(X, cmap=None, norm=None, aspect=None, interpolation=None, alpha=None,
            vmin=None, vmax=None, origin=None, extent=None, shape=None,
@@ -3104,8 +3208,7 @@ def imshow(X, cmap=None, norm=None, aspect=None, interpolation=None, alpha=None,
     sci(ret)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.loglog)
 def loglog(*args, **kwargs):
     ax = gca()
@@ -3125,8 +3228,7 @@ def loglog(*args, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.magnitude_spectrum)
 def magnitude_spectrum(x, Fs=None, Fc=None, window=None, pad_to=None,
                        sides=None, scale=None, hold=None, data=None, **kwargs):
@@ -3149,8 +3251,7 @@ def magnitude_spectrum(x, Fs=None, Fc=None, window=None, pad_to=None,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.pcolor)
 def pcolor(*args, **kwargs):
     ax = gca()
@@ -3170,8 +3271,7 @@ def pcolor(*args, **kwargs):
     sci(ret)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.pcolormesh)
 def pcolormesh(*args, **kwargs):
     ax = gca()
@@ -3191,8 +3291,7 @@ def pcolormesh(*args, **kwargs):
     sci(ret)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.phase_spectrum)
 def phase_spectrum(x, Fs=None, Fc=None, window=None, pad_to=None, sides=None,
                    hold=None, data=None, **kwargs):
@@ -3214,8 +3313,7 @@ def phase_spectrum(x, Fs=None, Fc=None, window=None, pad_to=None, sides=None,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.pie)
 def pie(x, explode=None, labels=None, colors=None, autopct=None,
         pctdistance=0.6, shadow=False, labeldistance=1.1, startangle=None,
@@ -3243,8 +3341,7 @@ def pie(x, explode=None, labels=None, colors=None, autopct=None,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.plot)
 def plot(*args, **kwargs):
     ax = gca()
@@ -3264,8 +3361,7 @@ def plot(*args, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.plot_date)
 def plot_date(x, y, fmt='o', tz=None, xdate=True, ydate=False, hold=None,
               data=None, **kwargs):
@@ -3287,8 +3383,7 @@ def plot_date(x, y, fmt='o', tz=None, xdate=True, ydate=False, hold=None,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.psd)
 def psd(x, NFFT=None, Fs=None, Fc=None, detrend=None, window=None,
         noverlap=None, pad_to=None, sides=None, scale_by_freq=None,
@@ -3313,8 +3408,7 @@ def psd(x, NFFT=None, Fs=None, Fc=None, detrend=None, window=None,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.quiver)
 def quiver(*args, **kw):
     ax = gca()
@@ -3334,8 +3428,7 @@ def quiver(*args, **kw):
     sci(ret)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.quiverkey)
 def quiverkey(*args, **kw):
     ax = gca()
@@ -3355,8 +3448,7 @@ def quiverkey(*args, **kw):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.scatter)
 def scatter(x, y, s=None, c=None, marker=None, cmap=None, norm=None, vmin=None,
             vmax=None, alpha=None, linewidths=None, verts=None, edgecolors=None,
@@ -3381,8 +3473,7 @@ def scatter(x, y, s=None, c=None, marker=None, cmap=None, norm=None, vmin=None,
     sci(ret)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.semilogx)
 def semilogx(*args, **kwargs):
     ax = gca()
@@ -3402,8 +3493,7 @@ def semilogx(*args, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.semilogy)
 def semilogy(*args, **kwargs):
     ax = gca()
@@ -3423,8 +3513,7 @@ def semilogy(*args, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.specgram)
 def specgram(x, NFFT=None, Fs=None, Fc=None, detrend=None, window=None,
              noverlap=None, cmap=None, xextent=None, pad_to=None, sides=None,
@@ -3451,8 +3540,7 @@ def specgram(x, NFFT=None, Fs=None, Fc=None, detrend=None, window=None,
     sci(ret[-1])
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.stackplot)
 def stackplot(x, *args, **kwargs):
     ax = gca()
@@ -3472,8 +3560,7 @@ def stackplot(x, *args, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.stem)
 def stem(*args, **kwargs):
     ax = gca()
@@ -3493,8 +3580,7 @@ def stem(*args, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.step)
 def step(x, y, *args, **kwargs):
     ax = gca()
@@ -3514,8 +3600,7 @@ def step(x, y, *args, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.streamplot)
 def streamplot(x, y, u, v, density=1, linewidth=None, color=None, cmap=None,
                norm=None, arrowsize=1, arrowstyle='-|>', minlength=0.1,
@@ -3545,8 +3630,7 @@ def streamplot(x, y, u, v, density=1, linewidth=None, color=None, cmap=None,
     sci(ret.lines)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.tricontour)
 def tricontour(*args, **kwargs):
     ax = gca()
@@ -3566,8 +3650,7 @@ def tricontour(*args, **kwargs):
     if ret._A is not None: sci(ret)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.tricontourf)
 def tricontourf(*args, **kwargs):
     ax = gca()
@@ -3587,8 +3670,7 @@ def tricontourf(*args, **kwargs):
     if ret._A is not None: sci(ret)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.tripcolor)
 def tripcolor(*args, **kwargs):
     ax = gca()
@@ -3608,8 +3690,7 @@ def tripcolor(*args, **kwargs):
     sci(ret)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.triplot)
 def triplot(*args, **kwargs):
     ax = gca()
@@ -3629,8 +3710,7 @@ def triplot(*args, **kwargs):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.violinplot)
 def violinplot(dataset, positions=None, vert=True, widths=0.5, showmeans=False,
                showextrema=True, showmedians=False, points=100, bw_method=None,
@@ -3655,8 +3735,7 @@ def violinplot(dataset, positions=None, vert=True, widths=0.5, showmeans=False,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.vlines)
 def vlines(x, ymin, ymax, colors='k', linestyles='solid', label='', hold=None,
            data=None, **kwargs):
@@ -3678,8 +3757,7 @@ def vlines(x, ymin, ymax, colors='k', linestyles='solid', label='', hold=None,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.xcorr)
 def xcorr(x, y, normed=True, detrend=mlab.detrend_none, usevlines=True,
           maxlags=10, hold=None, data=None, **kwargs):
@@ -3702,8 +3780,7 @@ def xcorr(x, y, normed=True, detrend=mlab.detrend_none, usevlines=True,
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @_autogen_docstring(Axes.barbs)
 def barbs(*args, **kw):
     ax = gca()
@@ -3723,367 +3800,295 @@ def barbs(*args, **kw):
 
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @docstring.copy_dedent(Axes.cla)
 def cla():
     ret = gca().cla()
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @docstring.copy_dedent(Axes.grid)
 def grid(b=None, which='major', axis='both', **kwargs):
     ret = gca().grid(b=b, which=which, axis=axis, **kwargs)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @docstring.copy_dedent(Axes.legend)
 def legend(*args, **kwargs):
     ret = gca().legend(*args, **kwargs)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @docstring.copy_dedent(Axes.table)
 def table(**kwargs):
     ret = gca().table(**kwargs)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @docstring.copy_dedent(Axes.text)
 def text(x, y, s, fontdict=None, withdash=False, **kwargs):
     ret = gca().text(x, y, s, fontdict=fontdict, withdash=withdash, **kwargs)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @docstring.copy_dedent(Axes.annotate)
 def annotate(*args, **kwargs):
     ret = gca().annotate(*args, **kwargs)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @docstring.copy_dedent(Axes.ticklabel_format)
 def ticklabel_format(**kwargs):
     ret = gca().ticklabel_format(**kwargs)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @docstring.copy_dedent(Axes.locator_params)
 def locator_params(axis='both', tight=None, **kwargs):
     ret = gca().locator_params(axis=axis, tight=tight, **kwargs)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @docstring.copy_dedent(Axes.tick_params)
 def tick_params(axis='both', **kwargs):
     ret = gca().tick_params(axis=axis, **kwargs)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @docstring.copy_dedent(Axes.margins)
 def margins(*args, **kw):
     ret = gca().margins(*args, **kw)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 @docstring.copy_dedent(Axes.autoscale)
 def autoscale(enable=True, axis='both', tight=None):
     ret = gca().autoscale(enable=enable, axis=axis, tight=tight)
     return ret
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def autumn():
-    '''
-    set the default colormap to autumn and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='autumn')
-    im = gci()
+    """
+    Set the colormap to "autumn".
 
-    if im is not None:
-        im.set_cmap(cm.autumn)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("autumn")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def bone():
-    '''
-    set the default colormap to bone and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='bone')
-    im = gci()
+    """
+    Set the colormap to "bone".
 
-    if im is not None:
-        im.set_cmap(cm.bone)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("bone")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def cool():
-    '''
-    set the default colormap to cool and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='cool')
-    im = gci()
+    """
+    Set the colormap to "cool".
 
-    if im is not None:
-        im.set_cmap(cm.cool)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("cool")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def copper():
-    '''
-    set the default colormap to copper and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='copper')
-    im = gci()
+    """
+    Set the colormap to "copper".
 
-    if im is not None:
-        im.set_cmap(cm.copper)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("copper")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def flag():
-    '''
-    set the default colormap to flag and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='flag')
-    im = gci()
+    """
+    Set the colormap to "flag".
 
-    if im is not None:
-        im.set_cmap(cm.flag)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("flag")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def gray():
-    '''
-    set the default colormap to gray and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='gray')
-    im = gci()
+    """
+    Set the colormap to "gray".
 
-    if im is not None:
-        im.set_cmap(cm.gray)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("gray")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def hot():
-    '''
-    set the default colormap to hot and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='hot')
-    im = gci()
+    """
+    Set the colormap to "hot".
 
-    if im is not None:
-        im.set_cmap(cm.hot)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("hot")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def hsv():
-    '''
-    set the default colormap to hsv and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='hsv')
-    im = gci()
+    """
+    Set the colormap to "hsv".
 
-    if im is not None:
-        im.set_cmap(cm.hsv)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("hsv")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def jet():
-    '''
-    set the default colormap to jet and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='jet')
-    im = gci()
+    """
+    Set the colormap to "jet".
 
-    if im is not None:
-        im.set_cmap(cm.jet)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("jet")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def pink():
-    '''
-    set the default colormap to pink and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='pink')
-    im = gci()
+    """
+    Set the colormap to "pink".
 
-    if im is not None:
-        im.set_cmap(cm.pink)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("pink")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def prism():
-    '''
-    set the default colormap to prism and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='prism')
-    im = gci()
+    """
+    Set the colormap to "prism".
 
-    if im is not None:
-        im.set_cmap(cm.prism)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("prism")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def spring():
-    '''
-    set the default colormap to spring and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='spring')
-    im = gci()
+    """
+    Set the colormap to "spring".
 
-    if im is not None:
-        im.set_cmap(cm.spring)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("spring")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def summer():
-    '''
-    set the default colormap to summer and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='summer')
-    im = gci()
+    """
+    Set the colormap to "summer".
 
-    if im is not None:
-        im.set_cmap(cm.summer)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("summer")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def winter():
-    '''
-    set the default colormap to winter and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='winter')
-    im = gci()
+    """
+    Set the colormap to "winter".
 
-    if im is not None:
-        im.set_cmap(cm.winter)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("winter")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def magma():
-    '''
-    set the default colormap to magma and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='magma')
-    im = gci()
+    """
+    Set the colormap to "magma".
 
-    if im is not None:
-        im.set_cmap(cm.magma)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("magma")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def inferno():
-    '''
-    set the default colormap to inferno and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='inferno')
-    im = gci()
+    """
+    Set the colormap to "inferno".
 
-    if im is not None:
-        im.set_cmap(cm.inferno)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("inferno")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def plasma():
-    '''
-    set the default colormap to plasma and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='plasma')
-    im = gci()
+    """
+    Set the colormap to "plasma".
 
-    if im is not None:
-        im.set_cmap(cm.plasma)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("plasma")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def viridis():
-    '''
-    set the default colormap to viridis and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='viridis')
-    im = gci()
+    """
+    Set the colormap to "viridis".
 
-    if im is not None:
-        im.set_cmap(cm.viridis)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("viridis")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def nipy_spectral():
-    '''
-    set the default colormap to nipy_spectral and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    rc('image', cmap='nipy_spectral')
-    im = gci()
+    """
+    Set the colormap to "nipy_spectral".
 
-    if im is not None:
-        im.set_cmap(cm.nipy_spectral)
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
+    set_cmap("nipy_spectral")
 
 
-# This function was autogenerated by boilerplate.py.  Do not edit as
-# changes will be lost
+# Autogenerated by boilerplate.py.  Do not edit as changes will be lost.
 def spectral():
-    '''
-    set the default colormap to spectral and apply to current image if any.
-    See help(colormaps) for more information
-    '''
+    """
+    Set the colormap to "spectral".
+
+    This changes the default colormap as well as the colormap of the current
+    image if there is one. See ``help(colormaps)`` for more information.
+    """
     from matplotlib.cbook import warn_deprecated
     warn_deprecated(
                     "2.0",
                     name="spectral",
                     obj_type="colormap"
                     )
-
-    rc('image', cmap='spectral')
-    im = gci()
-
-    if im is not None:
-        im.set_cmap(cm.spectral)
+    set_cmap("spectral")
 
 _setup_pyplot_info_docstrings()

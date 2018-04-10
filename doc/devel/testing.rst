@@ -9,7 +9,7 @@ Matplotlib's testing infrastructure depends on pytest_. The tests are in
 infrastructure are in :mod:`matplotlib.testing`.
 
 .. _pytest: http://doc.pytest.org/en/latest/
-.. _mock: https://docs.python.org/3/library/unittest.mock.html>
+.. _mock: https://docs.python.org/3/library/unittest.mock.html
 .. _Ghostscript: https://www.ghostscript.com/
 .. _Inkscape: https://inkscape.org
 .. _pytest-cov: https://pytest-cov.readthedocs.io/en/latest/
@@ -26,14 +26,14 @@ local FreeType build
 
 The following software is required to run the tests:
 
-  - pytest_, version 3.0.0 or later
-  - mock_, when running Python versions < 3.3
+  - pytest_ (>=3.1)
+  - mock_, when running Python 2
   - Ghostscript_ (to render PDF files)
   - Inkscape_ (to render SVG files)
 
 Optionally you can install:
 
-  - pytest-cov_ to collect coverage information
+  - pytest-cov_ (>=2.3.1) to collect coverage information
   - pytest-pep8_ to test coding standards
   - pytest-timeout_ to limit runtime in case of stuck tests
   - pytest-xdist_ to run tests in parallel

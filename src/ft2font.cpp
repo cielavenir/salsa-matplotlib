@@ -167,7 +167,7 @@ inline double conv(long v)
 
 int FT2Font::get_path_count()
 {
-    // get the glyph as a path, a list of (COMMAND, *args) as desribed in matplotlib.path
+    // get the glyph as a path, a list of (COMMAND, *args) as described in matplotlib.path
     // this code is from agg's decompose_ft_outline with minor modifications
 
     if (!face->glyph) {
@@ -515,7 +515,7 @@ FT2Font::FT2Font(FT_Open_Args &open_args, long hinting_factor_) : image(), face(
         face->face_flags |= FT_FACE_FLAG_EXTERNAL_STREAM;
     }
 
-    static FT_Matrix transform = { 65536 / hinting_factor, 0, 0, 65536 };
+    FT_Matrix transform = { 65536 / hinting_factor, 0, 0, 65536 };
     FT_Set_Transform(face, &transform, 0);
 }
 
@@ -548,7 +548,7 @@ void FT2Font::set_size(double ptsize, double dpi)
 {
     int error = FT_Set_Char_Size(
         face, (long)(ptsize * 64), 0, (unsigned int)(dpi * hinting_factor), (unsigned int)dpi);
-    static FT_Matrix transform = { 65536 / hinting_factor, 0, 0, 65536 };
+    FT_Matrix transform = { 65536 / hinting_factor, 0, 0, 65536 };
     FT_Set_Transform(face, &transform, 0);
 
     if (error) {

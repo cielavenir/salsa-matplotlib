@@ -5,9 +5,7 @@ setup.cfg.template for more information.
 
 from __future__ import print_function, absolute_import
 from string import Template
-# This needs to be the very first thing to use distribute
-from distribute_setup import use_setuptools
-use_setuptools()
+from setuptools import setup
 from setuptools.command.test import test as TestCommand
 from setuptools.command.build_ext import build_ext as BuildExtCommand
 
@@ -29,14 +27,6 @@ if __name__ == '__main__':
     # update it when the contents of directories change.
     if os.path.exists('MANIFEST'):
         os.remove('MANIFEST')
-
-try:
-    from setuptools import setup
-except ImportError:
-    try:
-        from setuptools.core import setup
-    except ImportError:
-        from distutils.core import setup
 
 # The setuptools version of sdist adds a setup.cfg file to the tree.
 # We don't want that, so we simply remove it, and it will fall back to
@@ -67,14 +57,7 @@ mpl_packages = [
     setupext.Platform(),
     'Required dependencies and extensions',
     setupext.Numpy(),
-    setupext.Six(),
-    setupext.Dateutil(),
-    setupext.BackportsFuncToolsLRUCache(),
-    setupext.Subprocess32(),
-    setupext.Pytz(),
-    setupext.Cycler(),
-    setupext.Tornado(),
-    setupext.Pyparsing(),
+    setupext.InstallRequires(),
     setupext.LibAgg(),
     setupext.FreeType(),
     setupext.FT2Font(),
@@ -83,7 +66,6 @@ mpl_packages = [
     setupext.Image(),
     setupext.TTConv(),
     setupext.Path(),
-    setupext.ContourLegacy(),
     setupext.Contour(),
     setupext.QhullWrap(),
     setupext.Tri(),
@@ -200,23 +182,21 @@ if __name__ == '__main__':
                         required_failed.append(package)
                 else:
                     good_packages.append(package)
-                    if (isinstance(package, setupext.OptionalBackendPackage) and
-                            package.runtime_check() and
-                            default_backend is None):
+                    if (isinstance(package, setupext.OptionalBackendPackage)
+                            and package.runtime_check()
+                            and default_backend is None):
                         default_backend = package.name
         print_raw('')
 
         # Abort if any of the required packages can not be built.
         if required_failed:
             print_line()
-            message = ("The following required packages can not "
-                       "be built: %s" %
-                       ", ".join(x.name for x in required_failed))
+            print_message("The following required packages can not be built: "
+                          "%s" % ", ".join(x.name for x in required_failed))
             for pkg in required_failed:
-                pkg_help = pkg.install_help_msg()
-                if pkg_help:
-                    message += "\n* " + pkg_help
-            print_message(message)
+                msg = pkg.install_help_msg()
+                if msg:
+                    print_message(msg)
             sys.exit(1)
 
         # Now collect all of the information we need to build all of the
@@ -244,7 +224,8 @@ if __name__ == '__main__':
             template = fd.read()
         template = Template(template)
         with open('lib/matplotlib/mpl-data/matplotlibrc', 'w') as fd:
-            fd.write(template.safe_substitute(TEMPLATE_BACKEND=default_backend))
+            fd.write(
+                template.safe_substitute(TEMPLATE_BACKEND=default_backend))
 
         # Build in verbose mode if requested
         if setupext.options['verbose']:

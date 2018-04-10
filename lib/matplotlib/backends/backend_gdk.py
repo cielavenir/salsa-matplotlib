@@ -3,9 +3,6 @@ from __future__ import (absolute_import, division, print_function,
 
 import six
 
-import math
-import os
-import sys
 import warnings
 
 import gobject
@@ -27,7 +24,6 @@ from matplotlib.backend_bases import (
     _Backend, FigureCanvasBase, FigureManagerBase, GraphicsContextBase,
     RendererBase)
 from matplotlib.cbook import warn_deprecated
-from matplotlib.figure import Figure
 from matplotlib.mathtext import MathTextParser
 from matplotlib.transforms import Affine2D
 from matplotlib.backends._backend_gdk import pixbuf_get_pixels_array
@@ -388,7 +384,7 @@ class FigureCanvasGDK (FigureCanvasBase):
         if self.__class__ == matplotlib.backends.backend_gdk.FigureCanvasGDK:
             warn_deprecated('2.0', message="The GDK backend is "
                             "deprecated. It is untested, known to be "
-                            "broken and will be removed in Matplotlib 2.2. "
+                            "broken and will be removed in Matplotlib 3.0. "
                             "Use the Agg backend instead. "
                             "See Matplotlib usage FAQ for"
                             " more info on backends.",

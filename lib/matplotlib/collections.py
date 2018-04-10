@@ -11,6 +11,8 @@ line segemnts)
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+import warnings
+
 import six
 from six.moves import zip
 try:
@@ -21,17 +23,8 @@ except ImportError:
 
 import numpy as np
 import matplotlib as mpl
-import matplotlib.cbook as cbook
-import matplotlib.colors as mcolors
-import matplotlib.cm as cm
-from matplotlib import docstring
-import matplotlib.transforms as transforms
-import matplotlib.artist as artist
-from matplotlib.artist import allow_rasterization
-import matplotlib.path as mpath
-from matplotlib import _path
-import matplotlib.mlab as mlab
-import matplotlib.lines as mlines
+from . import (_path, artist, cbook, cm, colors as mcolors, docstring,
+               lines as mlines, path as mpath, transforms)
 
 CIRCLE_AREA_FACTOR = 1.0 / np.sqrt(np.pi)
 
@@ -50,11 +43,16 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
       prop[i % len(props)]
 
+    Exceptions are *capstyle* and *joinstyle* properties, these can
+    only be set globally for the whole collection.
+
     Keyword arguments and default values:
 
         * *edgecolors*: None
         * *facecolors*: None
         * *linewidths*: None
+        * *capstyle*:   None
+        * *joinstyle*:  None
         * *antialiaseds*: None
         * *offsets*: None
         * *transOffset*: transforms.IdentityTransform()
@@ -102,6 +100,8 @@ class Collection(artist.Artist, cm.ScalarMappable):
                  facecolors=None,
                  linewidths=None,
                  linestyles='solid',
+                 capstyle=None,
+                 joinstyle=None,
                  antialiaseds=None,
                  offsets=None,
                  transOffset=None,
@@ -142,6 +142,16 @@ class Collection(artist.Artist, cm.ScalarMappable):
         self.set_hatch(hatch)
         self.set_offset_position(offset_position)
         self.set_zorder(zorder)
+
+        if capstyle:
+            self.set_capstyle(capstyle)
+        else:
+            self._capstyle = None
+
+        if joinstyle:
+            self.set_joinstyle(joinstyle)
+        else:
+            self._joinstyle = None
 
         self._offsets = np.zeros((1, 2))
         self._uniform_offsets = None
@@ -245,7 +255,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
         return transform, transOffset, offsets, paths
 
-    @allow_rasterization
+    @artist.allow_rasterization
     def draw(self, renderer):
         if not self.get_visible():
             return
@@ -302,6 +312,12 @@ class Collection(artist.Artist, cm.ScalarMappable):
                 extents.height < height):
                 do_single_path_optimization = True
 
+        if self._joinstyle:
+            gc.set_joinstyle(self._joinstyle)
+
+        if self._capstyle:
+            gc.set_capstyle(self._capstyle)
+
         if do_single_path_optimization:
             gc.set_foreground(tuple(edgecolors[0]))
             gc.set_linewidth(self._linewidths[0])
@@ -327,8 +343,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
     def set_pickradius(self, pr):
         """Set the pick radius used for containment tests.
 
-        ..
-            ACCEPTS: float distance in points
+        .. ACCEPTS: float distance in points
 
         Parameters
         ----------
@@ -374,8 +389,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         Parameters
         ----------
         urls : List[str] or None
-            ..
-                ACCEPTS: List[str] or None
+            .. ACCEPTS: List[str] or None
         """
         self._urls = urls if urls is not None else [None]
         self.stale = True
@@ -453,8 +467,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         If offset_position is 'data', the offset is applied before the
         master transform, i.e., the offsets are in data coordinates.
 
-        ..
-            ACCEPTS: [ 'screen' | 'data' ]
+        .. ACCEPTS: [ 'screen' | 'data' ]
         """
         if offset_position not in ('screen', 'data'):
             raise ValueError("offset_position must be 'screen' or 'data'")
@@ -550,6 +563,42 @@ class Collection(artist.Artist, cm.ScalarMappable):
         # broadcast and scale the lw and dash patterns
         self._linewidths, self._linestyles = self._bcast_lwls(
             self._us_lw, self._us_linestyles)
+
+    def set_capstyle(self, cs):
+        """
+        Set the capstyle for the collection. The capstyle can
+        only be set globally for all elements in the collection
+
+        Parameters
+        ----------
+        cs : ['butt' | 'round' | 'projecting']
+            The capstyle
+        """
+        if cs in ('butt', 'round', 'projecting'):
+            self._capstyle = cs
+        else:
+            raise ValueError('Unrecognized cap style.  Found %s' % cs)
+
+    def get_capstyle(self):
+        return self._capstyle
+
+    def set_joinstyle(self, js):
+        """
+        Set the joinstyle for the collection. The joinstyle can only be
+        set globally for all elements in the collection.
+
+        Parameters
+        ----------
+        js : ['miter' | 'round' | 'bevel']
+            The joinstyle
+        """
+        if js in ('miter', 'round', 'bevel'):
+            self._joinstyle = js
+        else:
+            raise ValueError('Unrecognized join style.  Found %s' % js)
+
+    def get_joinstyle(self):
+        return self._joinstyle
 
     @staticmethod
     def _bcast_lwls(linewidths, dashes):
@@ -856,7 +905,7 @@ class _CollectionWithSizes(Collection):
             self._transforms[:, 2, 2] = 1.0
         self.stale = True
 
-    @allow_rasterization
+    @artist.allow_rasterization
     def draw(self, renderer):
         self.set_sizes(self._sizes, self.figure.dpi)
         Collection.draw(self, renderer)
@@ -991,7 +1040,7 @@ class BrokenBarHCollection(PolyCollection):
         passed on to the collection.
         """
         xranges = []
-        for ind0, ind1 in mlab.contiguous_regions(where):
+        for ind0, ind1 in cbook.contiguous_regions(where):
             xslice = x[ind0:ind1]
             if not len(xslice):
                 continue
@@ -1057,7 +1106,7 @@ class RegularPolyCollection(_CollectionWithSizes):
     def get_rotation(self):
         return self._rotation
 
-    @allow_rasterization
+    @artist.allow_rasterization
     def draw(self, renderer):
         self.set_sizes(self._sizes, self.figure.dpi)
         self._transforms = [
@@ -1110,29 +1159,52 @@ class LineCollection(Collection):
                  **kwargs
                  ):
         """
-        *segments*
-            a sequence of (*line0*, *line1*, *line2*), where::
+        Parameters
+        ----------
+        segments :
+            A sequence of (*line0*, *line1*, *line2*), where::
 
                 linen = (x0, y0), (x1, y1), ... (xm, ym)
 
             or the equivalent numpy array with two columns. Each line
             can be a different length.
 
-        *colors*
-            must be a sequence of RGBA tuples (e.g., arbitrary color
+        colors : sequence, optional
+            A sequence of RGBA tuples (e.g., arbitrary color
             strings, etc, not allowed).
 
-        *antialiaseds*
-            must be a sequence of ones or zeros
+        antialiaseds : sequence, optional
+            A sequence of ones or zeros.
 
-        *linestyles* [ 'solid' | 'dashed' | 'dashdot' | 'dotted' ]
-            a string or dash tuple. The dash tuple is::
+        linestyles : string, tuple, optional
+            Either one of [ 'solid' | 'dashed' | 'dashdot' | 'dotted' ], or
+            a dash tuple. The dash tuple is::
 
-                (offset, onoffseq),
+                (offset, onoffseq)
 
-            where *onoffseq* is an even length tuple of on and off ink
+            where ``onoffseq`` is an even length tuple of on and off ink
             in points.
 
+        norm : Normalize, optional
+            `~.colors.Normalize` instance.
+
+        cmap : string or Colormap, optional
+            Colormap name or `~.colors.Colormap` instance.
+
+        pickradius : float, optional
+            The tolerance in points for mouse clicks picking a line.
+            Default is 5 pt.
+
+        zorder : int, optional
+           zorder of the LineCollection. Default is 2.
+
+        facecolors : optional
+           The facecolors of the LineCollection. Default is 'none'.
+           Setting to a value other than 'none' will lead to a filled
+           polygon being drawn between points on each line.
+
+        Notes
+        -----
         If *linewidths*, *colors*, or *antialiaseds* is None, they
         default to their rcParams setting, in sequence form.
 
@@ -1148,22 +1220,6 @@ class LineCollection(Collection):
 
         and this value will be added cumulatively to each successive
         segment, so as to produce a set of successively offset curves.
-
-        *norm*
-            None (optional for :class:`matplotlib.cm.ScalarMappable`)
-        *cmap*
-            None (optional for :class:`matplotlib.cm.ScalarMappable`)
-
-        *pickradius* is the tolerance for mouse clicks picking a line.
-        The default is 5 pt.
-
-        *zorder*
-           The zorder of the LineCollection.  Default is 2
-
-        *facecolors*
-           The facecolors of the LineCollection. Default is 'none'
-           Setting to a value other than 'none' will lead to a filled
-           polygon being drawn between points on each line.
 
         The use of :class:`~matplotlib.cm.ScalarMappable` is optional.
         If the :class:`~matplotlib.cm.ScalarMappable` array
@@ -1217,6 +1273,13 @@ class LineCollection(Collection):
     set_paths = set_segments
 
     def get_segments(self):
+        """
+        Returns
+        -------
+        segments : list
+            List of segments in the LineCollection. Each list item contains an
+            array of vertices.
+        """
         segments = []
 
         for path in self._paths:
@@ -1241,12 +1304,14 @@ class LineCollection(Collection):
 
     def set_color(self, c):
         """
-        Set the color(s) of the line collection.  *c* can be a
-        matplotlib color arg (all patches have same color), or a
-        sequence or rgba tuples; if it is a sequence the patches will
-        cycle through the sequence.
+        Set the color(s) of the LineCollection.
 
-        ACCEPTS: matplotlib color arg or sequence of rgba tuples
+        Parameters
+        ----------
+        c :
+            Matplotlib color argument (all patches have same color), or a
+            sequence or rgba tuples; if it is a sequence the patches will
+            cycle through the sequence.
         """
         self.set_edgecolor(c)
         self.stale = True
@@ -1324,7 +1389,7 @@ class EventCollection(LineCollection):
         Examples
         --------
 
-        .. plot:: mpl_examples/lines_bars_and_markers/eventcollection_demo.py
+        .. plot:: gallery/lines_bars_and_markers/eventcollection_demo.py
         """
 
         segment = (lineoffset + linelength / 2.,
@@ -1614,7 +1679,7 @@ class EllipseCollection(Collection):
             m[:2, 2:] = 0
             self.set_transform(_affine(m))
 
-    @allow_rasterization
+    @artist.allow_rasterization
     def draw(self, renderer):
         self._set_transforms()
         Collection.draw(self, renderer)
@@ -1720,7 +1785,7 @@ class TriMesh(Collection):
                                 tri.y[triangles][..., np.newaxis]), axis=2)
         return [Path(x) for x in verts]
 
-    @allow_rasterization
+    @artist.allow_rasterization
     def draw(self, renderer):
         if not self.get_visible():
             return
@@ -1872,7 +1937,7 @@ class QuadMesh(Collection):
 
         return triangles, colors
 
-    @allow_rasterization
+    @artist.allow_rasterization
     def draw(self, renderer):
         if not self.get_visible():
             return

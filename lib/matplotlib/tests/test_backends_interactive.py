@@ -17,17 +17,23 @@ import pytest
 
 
 def _get_testable_interactive_backends():
-    return [
-        pytest.mark.skipif(
-            not os.environ.get("DISPLAY")
-            or sys.version_info < (3,)
-            or importlib.util.find_spec(module_name) is None,
-            reason="No $DISPLAY or could not import {!r}".format(module_name))(
-                backend)
-        for module_name, backend in [
-                ("PyQt5", "qt5agg"),
-                ("tkinter", "tkagg"),
-                ("wx", "wxagg")]]
+    backends = []
+    for deps, backend in [(["cairocffi", "pgi"], "gtk3agg"),
+                          (["cairocffi", "pgi"], "gtk3cairo"),
+                          (["PyQt5"], "qt5agg"),
+                          (["cairocffi", "PyQt5"], "qt5cairo"),
+                          (["tkinter"], "tkagg"),
+                          (["wx"], "wxagg")]:
+        reason = None
+        if sys.version_info < (3,):
+            reason = "Py3-only test"
+        elif not os.environ.get("DISPLAY"):
+            reason = "No $DISPLAY"
+        elif any(importlib.util.find_spec(dep) is None for dep in deps):
+            reason = "Missing dependency"
+        backends.append(pytest.mark.skip(reason=reason)(backend) if reason
+                        else backend)
+    return backends
 
 
 _test_script = """\
@@ -35,15 +41,18 @@ import sys
 from matplotlib import pyplot as plt
 
 fig = plt.figure()
+ax = fig.add_subplot(111)
+ax.plot([1,2,3], [1,3,1])
 fig.canvas.mpl_connect("draw_event", lambda event: sys.exit())
 plt.show()
 """
 
 
 @pytest.mark.parametrize("backend", _get_testable_interactive_backends())
+@pytest.mark.flaky(reruns=3)
 def test_backend(backend):
     environ = os.environ.copy()
     environ["MPLBACKEND"] = backend
     proc = Popen([sys.executable, "-c", _test_script], env=environ)
     # Empirically, 1s is not enough on Travis.
-    assert proc.wait(timeout=5) == 0
+    assert proc.wait(timeout=10) == 0

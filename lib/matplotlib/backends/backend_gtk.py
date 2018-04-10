@@ -3,7 +3,10 @@ from __future__ import (absolute_import, division, print_function,
 
 import six
 
-import os, sys, warnings
+import logging
+import os
+import sys
+import warnings
 
 if six.PY3:
     warnings.warn(
@@ -38,7 +41,9 @@ from matplotlib.figure import Figure
 from matplotlib.widgets import SubplotTool
 
 from matplotlib import (
-    cbook, colors as mcolors, lines, markers, rcParams, verbose)
+    cbook, colors as mcolors, lines, markers, rcParams)
+
+_log = logging.getLogger(__name__)
 
 backend_version = "%d.%d.%d" % gtk.pygtk_version
 
@@ -181,7 +186,7 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         if self.__class__ == matplotlib.backends.backend_gtk.FigureCanvasGTK:
             warn_deprecated('2.0', message="The GTK backend is "
                             "deprecated. It is untested, known to be "
-                            "broken and will be removed in Matplotlib 2.2. "
+                            "broken and will be removed in Matplotlib 3.0. "
                             "Use the GTKAgg backend instead. "
                             "See Matplotlib usage FAQ for"
                             " more info on backends.",
@@ -388,8 +393,8 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         """Expose_event for all GTK backends. Should not be overridden.
         """
         toolbar = self.toolbar
-        if toolbar:
-            toolbar.set_cursor(cursors.WAIT)
+        # if toolbar:
+        #     toolbar.set_cursor(cursors.WAIT)
         if GTK_WIDGET_DRAWABLE(self):
             if self._need_redraw:
                 x, y, w, h = self.allocation
@@ -399,8 +404,8 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
             x, y, w, h = event.area
             self.window.draw_drawable (self.style.fg_gc[self.state],
                                        self._pixmap, x, y, x, y, w, h)
-        if toolbar:
-            toolbar.set_cursor(toolbar._lastCursor)
+        # if toolbar:
+        #     toolbar.set_cursor(toolbar._lastCursor)
         return False  # finish event propagation?
 
     filetypes = FigureCanvasBase.filetypes.copy()
@@ -481,7 +486,6 @@ class FigureCanvasGTK (gtk.DrawingArea, FigureCanvasBase):
         gtk.gdk.threads_leave()
 
 
-
 class FigureManagerGTK(FigureManagerBase):
     """
     Attributes
@@ -512,7 +516,8 @@ class FigureManagerGTK(FigureManagerBase):
                 # all, so I am not sure how to catch it.  I am unhappy
                 # diong a blanket catch here, but an not sure what a
                 # better way is - JDH
-                verbose.report('Could not load matplotlib icon: %s' % sys.exc_info()[1])
+                _log.info('Could not load matplotlib '
+                         'icon: %s', sys.exc_info()[1])
 
         self.vbox = gtk.VBox()
         self.window.add(self.vbox)
@@ -570,7 +575,7 @@ class FigureManagerGTK(FigureManagerBase):
     def show(self):
         # show the figure window
         self.window.show()
-        # raise the window above others and relase the "above lock"
+        # raise the window above others and release the "above lock"
         self.window.set_keep_above(True)
         self.window.set_keep_above(False)
 
@@ -997,7 +1002,7 @@ try:
     window_icon = os.path.join(rcParams['datapath'], 'images', icon_filename)
 except:
     window_icon = None
-    verbose.report('Could not load matplotlib icon: %s' % sys.exc_info()[1])
+    _log.info('Could not load matplotlib icon: %s', sys.exc_info()[1])
 
 def error_msg_gtk(msg, parent=None):
     if parent is not None: # find the toplevel gtk.Window
@@ -1006,7 +1011,7 @@ def error_msg_gtk(msg, parent=None):
             parent = None
 
     if not isinstance(msg, six.string_types):
-        msg = ','.join(map(str,msg))
+        msg = ','.join(map(str, msg))
 
     dialog = gtk.MessageDialog(
         parent         = parent,

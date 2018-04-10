@@ -1,5 +1,4 @@
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+from __future__ import absolute_import, division, print_function
 
 import six
 
@@ -21,7 +20,6 @@ import contextlib
 import warnings
 
 import matplotlib as mpl
-from matplotlib import cbook
 from matplotlib import rc_params_from_file, rcParamsDefault
 
 
@@ -37,7 +35,7 @@ STYLE_FILE_PATTERN = re.compile(r'([\S]+).%s$' % STYLE_EXTENSION)
 
 # A list of rcParams that should not be applied from styles
 STYLE_BLACKLIST = {
-    'interactive', 'backend', 'backend.qt4', 'webagg.port',
+    'interactive', 'backend', 'backend.qt4', 'webagg.port', 'webagg.address',
     'webagg.port_retries', 'webagg.open_in_browser', 'backend_fallback',
     'toolbar', 'timezone', 'datapath', 'figure.max_open_warning',
     'savefig.directory', 'tk.window_focus', 'docstring.hardcopy'}
@@ -113,10 +111,10 @@ def use(style):
                 rc = rc_params_from_file(style, use_default_template=False)
                 _apply_style(rc)
             except IOError:
-                msg = ("'%s' not found in the style library and input is "
-                       "not a valid URL or path. See `style.available` for "
-                       "list of available styles.")
-                raise IOError(msg % style)
+                raise IOError(
+                    "{!r} not found in the style library and input is not a "
+                    "valid URL or path; see `style.available` for list of "
+                    "available styles".format(style))
 
 
 @contextlib.contextmanager

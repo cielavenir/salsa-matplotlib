@@ -1,9 +1,7 @@
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+from __future__ import absolute_import, division, print_function
 
 import six
 
-import io
 import os
 import warnings
 from collections import OrderedDict
@@ -75,8 +73,7 @@ def test_RcParams_class():
                        'font.weight': 'normal',
                        'font.size': 12})
 
-    if six.PY3:
-        expected_repr = """
+    expected_repr = """
 RcParams({'font.cursive': ['Apple Chancery',
                            'Textile',
                            'Zapf Chancery',
@@ -84,28 +81,12 @@ RcParams({'font.cursive': ['Apple Chancery',
           'font.family': ['sans-serif'],
           'font.size': 12.0,
           'font.weight': 'normal'})""".lstrip()
-    else:
-        expected_repr = """
-RcParams({u'font.cursive': [u'Apple Chancery',
-                            u'Textile',
-                            u'Zapf Chancery',
-                            u'cursive'],
-          u'font.family': [u'sans-serif'],
-          u'font.size': 12.0,
-          u'font.weight': u'normal'})""".lstrip()
 
     assert expected_repr == repr(rc)
 
-    if six.PY3:
-        expected_str = """
+    expected_str = """
 font.cursive: ['Apple Chancery', 'Textile', 'Zapf Chancery', 'cursive']
 font.family: ['sans-serif']
-font.size: 12.0
-font.weight: normal""".lstrip()
-    else:
-        expected_str = """
-font.cursive: [u'Apple Chancery', u'Textile', u'Zapf Chancery', u'cursive']
-font.family: [u'sans-serif']
 font.size: 12.0
 font.weight: normal""".lstrip()
 
@@ -144,7 +125,7 @@ def test_Bug_2543():
     # accept None as an argument.
     # https://github.com/matplotlib/matplotlib/issues/2543
     # We filter warnings at this stage since a number of them are raised
-    # for deprecated rcparams as they should. We dont want these in the
+    # for deprecated rcparams as they should. We don't want these in the
     # printed in the test suite.
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore',
@@ -161,11 +142,6 @@ def test_Bug_2543():
         # real test is that this does not raise
         assert validate_bool_maybe_none(None) is None
         assert validate_bool_maybe_none("none") is None
-        _fonttype = mpl.rcParams['svg.fonttype']
-        assert _fonttype == mpl.rcParams['svg.embed_char_paths']
-        with mpl.rc_context():
-            mpl.rcParams['svg.embed_char_paths'] = False
-            assert mpl.rcParams['svg.fonttype'] == "none"
 
     with pytest.raises(ValueError):
         validate_bool_maybe_none("blah")
@@ -441,7 +417,69 @@ def test_rcparams_reset_after_fail():
         assert mpl.rcParams['text.usetex'] is False
 
         with pytest.raises(KeyError):
-            with mpl.rc_context(rc=OrderedDict([('text.usetex', True),('test.blah', True)])):
+            with mpl.rc_context(rc=OrderedDict([('text.usetex', True),
+                                                ('test.blah', True)])):
                 pass
 
         assert mpl.rcParams['text.usetex'] is False
+
+
+def test_if_rctemplate_is_up_to_date():
+    # This tests if the matplotlibrc.template file
+    # contains all valid rcParams.
+    dep1 = mpl._all_deprecated
+    dep2 = mpl._deprecated_set
+    deprecated = list(dep1.union(dep2))
+    #print(deprecated)
+    path_to_rc = mpl.matplotlib_fname()
+    with open(path_to_rc, "r") as f:
+        rclines = f.readlines()
+    missing = {}
+    for k,v in mpl.defaultParams.items():
+        if k[0] == "_":
+            continue
+        if k in deprecated:
+            continue
+        if "verbose" in k:
+            continue
+        found = False
+        for line in rclines:
+            if k in line:
+                found = True
+        if not found:
+            missing.update({k:v})
+    if missing:
+        raise ValueError("The following params are missing " +
+                         "in the matplotlibrc.template file: {}"
+                         .format(missing.items()))
+
+
+def test_if_rctemplate_would_be_valid(tmpdir):
+    # This tests if the matplotlibrc.template file would result in a valid
+    # rc file if all lines are uncommented.
+    path_to_rc = mpl.matplotlib_fname()
+    with open(path_to_rc, "r") as f:
+        rclines = f.readlines()
+    newlines = []
+    for line in rclines:
+        if line[0] == "#":
+            newline = line[1:]
+        else:
+            newline = line
+        if "$TEMPLATE_BACKEND" in newline:
+            newline = "backend : Agg"
+        if "datapath" in newline:
+            newline = ""
+        newlines.append(newline)
+    d = tmpdir.mkdir('test1')
+    fname = str(d.join('testrcvalid.temp'))
+    with open(fname, "w") as f:
+        f.writelines(newlines)
+    with pytest.warns(None) as record:
+        dic = mpl.rc_params_from_file(fname,
+                                      fail_on_error=True,
+                                      use_default_template=False)
+        assert len(record) == 0
+    #d1 = set(dic.keys())
+    #d2 = set(matplotlib.defaultParams.keys())
+    #print(d2-d1)

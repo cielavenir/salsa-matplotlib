@@ -13,7 +13,7 @@ import warnings
 
 import numpy as np
 
-from . import artist, colors as mcolors, docstring, rcParams
+from . import artist, cbook, colors as mcolors, docstring, rcParams
 from .artist import Artist, allow_rasterization
 from .cbook import (
     _to_unmasked_float_array, iterable, is_numlike, ls_mapper, ls_mapper_r,
@@ -24,7 +24,6 @@ from .transforms import Bbox, TransformedPath, IdentityTransform
 
 # Imported here for backward compatibility, even though they don't
 # really belong.
-from numpy import ma
 from . import _path
 from .markers import (
     CARETLEFT, CARETRIGHT, CARETUP, CARETDOWN,
@@ -94,25 +93,21 @@ def segment_hits(cx, cy, x, y, radius):
     Lnorm_sq = dx ** 2 + dy ** 2  # Possibly want to eliminate Lnorm==0
     u = ((cx - xr) * dx + (cy - yr) * dy) / Lnorm_sq
     candidates = (u >= 0) & (u <= 1)
-    #if any(candidates): print "candidates",xr[candidates]
 
     # Note that there is a little area near one side of each point
     # which will be near neither segment, and another which will
     # be near both, depending on the angle of the lines.  The
     # following radius test eliminates these ambiguities.
     point_hits = (cx - x) ** 2 + (cy - y) ** 2 <= radius ** 2
-    #if any(point_hits): print "points",xr[candidates]
     candidates = candidates & ~(point_hits[:-1] | point_hits[1:])
 
     # For those candidates which remain, determine how far they lie away
     # from the line.
     px, py = xr + u * dx, yr + u * dy
     line_hits = (cx - px) ** 2 + (cy - py) ** 2 <= radius ** 2
-    #if any(line_hits): print "lines",xr[candidates]
     line_hits = line_hits & candidates
     points, = point_hits.ravel().nonzero()
     lines, = line_hits.ravel().nonzero()
-    #print points,lines
     return np.concatenate((points, lines))
 
 
@@ -514,8 +509,7 @@ class Line2D(Artist):
     def set_pickradius(self, d):
         """Set the pick radius used for containment tests.
 
-        ..
-            ACCEPTS: float distance in points
+        .. ACCEPTS: float distance in points
 
         Parameters
         ----------
@@ -793,16 +787,16 @@ class Line2D(Artist):
             rgbaFace = self._get_rgba_face()
             rgbaFaceAlt = self._get_rgba_face(alt=True)
             edgecolor = self.get_markeredgecolor()
-            if (isinstance(edgecolor, six.string_types)
-                    and edgecolor.lower() == 'none'):
+            if cbook._str_lower_equal(edgecolor, "none"):
                 gc.set_linewidth(0)
                 gc.set_foreground(rgbaFace, isRGBA=True)
             else:
                 gc.set_foreground(edgecolor)
                 gc.set_linewidth(self._markeredgewidth)
                 mec = self._markeredgecolor
-                if (isinstance(mec, six.string_types) and mec == 'auto' and
-                        rgbaFace is not None):
+                if (cbook._str_equal(mec, "auto")
+                        and not cbook._str_lower_equal(
+                            self.get_markerfacecolor(), "none")):
                     gc.set_alpha(rgbaFace[3])
                 else:
                     gc.set_alpha(self.get_alpha())
@@ -828,8 +822,7 @@ class Line2D(Artist):
                 marker_trans = marker.get_transform()
                 w = renderer.points_to_pixels(self._markersize)
 
-                if (isinstance(marker.get_marker(), six.string_types) and
-                        marker.get_marker() == ','):
+                if cbook._str_equal(marker.get_marker(), ","):
                     gc.set_linewidth(0)
                 else:
                     # Don't scale for pixels, and don't stroke them
@@ -843,8 +836,9 @@ class Line2D(Artist):
                 if alt_marker_path:
                     alt_marker_trans = marker.get_alt_transform()
                     alt_marker_trans = alt_marker_trans.scale(w)
-                    if (isinstance(mec, six.string_types) and mec == 'auto' and
-                            rgbaFaceAlt is not None):
+                    if (cbook._str_equal(mec, "auto")
+                            and not cbook._str_lower_equal(
+                                self.get_markerfacecoloralt(), "none")):
                         gc.set_alpha(rgbaFaceAlt[3])
                     else:
                         gc.set_alpha(self.get_alpha())
@@ -883,7 +877,7 @@ class Line2D(Artist):
                 if self._marker.get_marker() in ('.', ','):
                     return self._color
                 if self._marker.is_filled() and self.get_fillstyle() != 'none':
-                     return 'k'  # Bad hard-wired default...
+                    return 'k'  # Bad hard-wired default...
             return self._color
         else:
             return mec
@@ -967,9 +961,12 @@ class Line2D(Artist):
 
     def set_antialiased(self, b):
         """
-        True if line should be drawin with antialiased rendering
+        Set whether to use antialiased rendering.
 
-        ACCEPTS: [True | False]
+        Parameters
+        ----------
+        b : bool
+            .. ACCEPTS: bool
         """
         if self._antialiased != b:
             self.stale = True
@@ -1001,6 +998,8 @@ class Line2D(Artist):
             raise ValueError('Unrecognized drawstyle {!r}'.format(drawstyle))
         if self._drawstyle != drawstyle:
             self.stale = True
+            # invalidate to trigger a recache of the path
+            self._invalidx = True
         self._drawstyle = drawstyle
 
     def set_linewidth(self, w):
@@ -1257,13 +1256,7 @@ class Line2D(Artist):
         self._drawstyle = other._drawstyle
 
     def _get_rgba_face(self, alt=False):
-        facecolor = self._get_markerfacecolor(alt=alt)
-        if (isinstance(facecolor, six.string_types)
-                and facecolor.lower() == 'none'):
-            rgbaFace = None
-        else:
-            rgbaFace = mcolors.to_rgba(facecolor, self._alpha)
-        return rgbaFace
+        return mcolors.to_rgba(self._get_markerfacecolor(alt=alt), self._alpha)
 
     def _get_rgba_ln_color(self, alt=False):
         return mcolors.to_rgba(self._color, self._alpha)
@@ -1489,7 +1482,7 @@ class VertexSelector(object):
         pass
 
     def onpick(self, event):
-        """When the line is picked, update the set of selected indicies."""
+        """When the line is picked, update the set of selected indices."""
         if event.artist is not self.line:
             return
         self.ind ^= set(event.ind)

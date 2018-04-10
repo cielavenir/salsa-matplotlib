@@ -159,15 +159,7 @@ sphinx_version = sphinx.__version__.split(".")
 sphinx_version = tuple([int(re.split('[^0-9]', x)[0])
                         for x in sphinx_version[:2]])
 
-try:
-    # Sphinx depends on either Jinja or Jinja2
-    import jinja2
-    def format_template(template, **kw):
-        return jinja2.Template(template).render(**kw)
-except ImportError:
-    import jinja
-    def format_template(template, **kw):
-        return jinja.from_string(template, **kw)
+import jinja2  # Sphinx dependency.
 
 import matplotlib
 import matplotlib.cbook as cbook
@@ -190,8 +182,11 @@ __version__ = 2
 
 def plot_directive(name, arguments, options, content, lineno,
                    content_offset, block_text, state, state_machine):
+    """Implementation of the ``.. plot::`` directive.
+
+    See the module docstring for details.
+    """
     return run(arguments, content, options, state_machine, state, lineno)
-plot_directive.__doc__ = __doc__
 
 
 def _option_boolean(arg):
@@ -603,7 +598,8 @@ def render_figures(code, code_path, output_dir, output_base, context,
         images = []
         for j in xrange(1000):
             if len(code_pieces) > 1:
-                img = ImageFile('%s_%02d_%02d' % (output_base, i, j), output_dir)
+                img = ImageFile('%s_%02d_%02d' % (output_base, i, j),
+                                output_dir)
             else:
                 img = ImageFile('%s_%02d' % (output_base, j), output_dir)
             for format, dpi in formats:
@@ -785,8 +781,8 @@ def run(arguments, content, options, state_machine, state, lineno):
     except PlotError as err:
         reporter = state.memo.reporter
         sm = reporter.system_message(
-            2, "Exception occurred in plotting %s\n from %s:\n%s" % (output_base,
-                                                source_file_name, err),
+            2, "Exception occurred in plotting {}\n from {}:\n{}".format(
+                output_base, source_file_name, err),
             line=lineno)
         results = [(code, [])]
         errors = [sm]
@@ -813,8 +809,9 @@ def run(arguments, content, options, state_machine, state, lineno):
         if nofigs:
             images = []
 
-        opts = [':%s: %s' % (key, val) for key, val in six.iteritems(options)
-                if key in ('alt', 'height', 'width', 'scale', 'align', 'class')]
+        opts = [
+            ':%s: %s' % (key, val) for key, val in six.iteritems(options)
+            if key in ('alt', 'height', 'width', 'scale', 'align', 'class')]
 
         only_html = ".. only:: html"
         only_latex = ".. only:: latex"
@@ -827,8 +824,7 @@ def run(arguments, content, options, state_machine, state, lineno):
         else:
             src_link = None
 
-        result = format_template(
-            config.plot_template or TEMPLATE,
+        result = jinja2.Template(config.plot_template or TEMPLATE).render(
             default_fmt=default_fmt,
             dest_dir=dest_dir_link,
             build_dir=build_dir_link,
