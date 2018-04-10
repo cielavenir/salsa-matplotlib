@@ -283,7 +283,7 @@ static PyObject *Py_get_path_collection_extents(PyObject *self, PyObject *args, 
                  (get_path_collection_extents(
                      master_transform, paths, transforms, offsets, offset_trans, e)));
     }
-    catch (py::exception &e)
+    catch (const py::exception &)
     {
         return NULL;
     }
@@ -351,7 +351,7 @@ static PyObject *Py_point_in_path_collection(PyObject *self, PyObject *args, PyO
                                            offset_position,
                                            result)));
     }
-    catch (py::exception &e)
+    catch (const py::exception &)
     {
         return NULL;
     }
@@ -441,7 +441,7 @@ static PyObject *Py_affine_transform(PyObject *self, PyObject *args, PyObject *k
         numpy::array_view<double, 2> result(dims);
         CALL_CPP("affine_transform", (affine_transform_2d(vertices, trans, result)));
         return result.pyobj();
-    } catch (py::exception) {
+    } catch (py::exception &) {
         PyErr_Clear();
         try {
             numpy::array_view<double, 1> vertices(vertices_obj);
@@ -449,7 +449,7 @@ static PyObject *Py_affine_transform(PyObject *self, PyObject *args, PyObject *k
             numpy::array_view<double, 1> result(dims);
             CALL_CPP("affine_transform", (affine_transform_1d(vertices, trans, result)));
             return result.pyobj();
-        } catch (py::exception) {
+        } catch (py::exception &) {
             return NULL;
         }
     }

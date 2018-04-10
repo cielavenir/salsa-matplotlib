@@ -23,14 +23,14 @@ class exception : public std::exception
     {                                                                        \
         a;                                                                   \
     }                                                                        \
-    catch (const py::exception &e)                                           \
+    catch (const py::exception &)                                            \
     {                                                                        \
         {                                                                    \
             cleanup;                                                         \
         }                                                                    \
         return (errorcode);                                                  \
     }                                                                        \
-    catch (const std::bad_alloc)                                             \
+    catch (const std::bad_alloc &)                                           \
     {                                                                        \
         PyErr_Format(PyExc_MemoryError, "In %s: Out of memory", (name));     \
         {                                                                    \

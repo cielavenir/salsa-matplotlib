@@ -15,6 +15,7 @@ from __future__ import (absolute_import, division, print_function,
 
 import six
 
+from contextlib import contextmanager
 import errno
 import json
 import os
@@ -23,7 +24,6 @@ import sys
 import signal
 import socket
 import threading
-from contextlib import contextmanager
 
 try:
     import tornado
@@ -34,11 +34,8 @@ import tornado.web
 import tornado.ioloop
 import tornado.websocket
 
-import matplotlib
 from matplotlib import rcParams
-from matplotlib import backend_bases
 from matplotlib.backend_bases import _Backend
-from matplotlib.figure import Figure
 from matplotlib._pylab_helpers import Gcf
 from . import backend_webagg_core as core
 from .backend_webagg_core import TimerTornado
@@ -78,8 +75,8 @@ class WebAggApplication(tornado.web.Application):
     class SingleFigurePage(tornado.web.RequestHandler):
         def __init__(self, application, request, **kwargs):
             self.url_prefix = kwargs.pop('url_prefix', '')
-            return tornado.web.RequestHandler.__init__(self, application,
-                                                       request, **kwargs)
+            tornado.web.RequestHandler.__init__(self, application,
+                                                request, **kwargs)
 
         def get(self, fignum):
             fignum = int(fignum)
@@ -98,8 +95,8 @@ class WebAggApplication(tornado.web.Application):
     class AllFiguresPage(tornado.web.RequestHandler):
         def __init__(self, application, request, **kwargs):
             self.url_prefix = kwargs.pop('url_prefix', '')
-            return tornado.web.RequestHandler.__init__(self, application,
-                                                       request, **kwargs)
+            tornado.web.RequestHandler.__init__(self, application,
+                                                request, **kwargs)
 
         def get(self):
             ws_uri = 'ws://{req.host}{prefix}/'.format(req=self.request,
@@ -217,7 +214,7 @@ class WebAggApplication(tornado.web.Application):
             template_path=core.FigureManagerWebAgg.get_static_file_path())
 
     @classmethod
-    def initialize(cls, url_prefix='', port=None):
+    def initialize(cls, url_prefix='', port=None, address=None):
         if cls.initialized:
             return
 
@@ -241,10 +238,15 @@ class WebAggApplication(tornado.web.Application):
                 yield port + random.randint(-2 * n, 2 * n)
 
         success = None
+
+        if address is None:
+            cls.address = rcParams['webagg.address']
+        else:
+            cls.address = address
         cls.port = rcParams['webagg.port']
         for port in random_ports(cls.port, rcParams['webagg.port_retries']):
             try:
-                app.listen(port)
+                app.listen(port, cls.address)
             except socket.error as e:
                 if e.errno != errno.EADDRINUSE:
                     raise

@@ -6,13 +6,12 @@ import six
 import numpy as np
 from numpy import ma
 
-from matplotlib.cbook import dedent
-from matplotlib.ticker import (NullFormatter, ScalarFormatter,
-                               LogFormatterSciNotation, LogitFormatter)
-from matplotlib.ticker import (NullLocator, LogLocator, AutoLocator,
-                               SymmetricalLogLocator, LogitLocator)
+from matplotlib import cbook, docstring, rcParams
+from matplotlib.ticker import (
+    NullFormatter, ScalarFormatter, LogFormatterSciNotation, LogitFormatter,
+    NullLocator, LogLocator, AutoLocator, AutoMinorLocator,
+    SymmetricalLogLocator, LogitLocator)
 from matplotlib.transforms import Transform, IdentityTransform
-from matplotlib import docstring
 
 
 class ScaleBase(object):
@@ -73,8 +72,12 @@ class LinearScale(ScaleBase):
         """
         axis.set_major_locator(AutoLocator())
         axis.set_major_formatter(ScalarFormatter())
-        axis.set_minor_locator(NullLocator())
         axis.set_minor_formatter(NullFormatter())
+        # update the minor locator for x and y axis based on rcParams
+        if rcParams['xtick.minor.visible']:
+            axis.set_minor_locator(AutoMinorLocator())
+        else:
+            axis.set_minor_locator(NullLocator())
 
     def get_transform(self):
         """
@@ -90,26 +93,31 @@ class LogTransformBase(Transform):
     is_separable = True
     has_inverse = True
 
-    def __init__(self, nonpos):
+    def __init__(self, nonpos='clip'):
         Transform.__init__(self)
         self._clip = {"clip": True, "mask": False}[nonpos]
 
     def transform_non_affine(self, a):
+        # Ignore invalid values due to nans being passed to the transform
         with np.errstate(divide="ignore", invalid="ignore"):
             out = np.log(a)
-        out /= np.log(self.base)
-        if self._clip:
-            # SVG spec says that conforming viewers must support values up
-            # to 3.4e38 (C float); however experiments suggest that Inkscape
-            # (which uses cairo for rendering) runs into cairo's 24-bit limit
-            # (which is apparently shared by Agg).
-            # Ghostscript (used for pdf rendering appears to overflow even
-            # earlier, with the max value around 2 ** 15 for the tests to pass.
-            # On the other hand, in practice, we want to clip beyond
-            #     np.log10(np.nextafter(0, 1)) ~ -323
-            # so 1000 seems safe.
-            out[a <= 0] = -1000
+            out /= np.log(self.base)
+            if self._clip:
+                # SVG spec says that conforming viewers must support values up
+                # to 3.4e38 (C float); however experiments suggest that
+                # Inkscape (which uses cairo for rendering) runs into cairo's
+                # 24-bit limit (which is apparently shared by Agg).
+                # Ghostscript (used for pdf rendering appears to overflow even
+                # earlier, with the max value around 2 ** 15 for the tests to
+                # pass. On the other hand, in practice, we want to clip beyond
+                #     np.log10(np.nextafter(0, 1)) ~ -323
+                # so 1000 seems safe.
+                    out[a <= 0] = -1000
         return out
+
+    def __str__(self):
+        return "{}({!r})".format(
+            type(self).__name__, "clip" if self._clip else "mask")
 
 
 class InvertedLogTransformBase(Transform):
@@ -120,6 +128,9 @@ class InvertedLogTransformBase(Transform):
 
     def transform_non_affine(self, a):
         return ma.power(self.base, a)
+
+    def __str__(self):
+        return "{}()".format(type(self).__name__)
 
 
 class Log10Transform(LogTransformBase):
@@ -165,7 +176,7 @@ class InvertedNaturalLogTransform(InvertedLogTransformBase):
 
 
 class LogTransform(LogTransformBase):
-    def __init__(self, base, nonpos):
+    def __init__(self, base, nonpos='clip'):
         LogTransformBase.__init__(self, nonpos)
         self.base = base
 
@@ -243,6 +254,8 @@ class LogScale(ScaleBase):
 
         if nonpos not in ['mask', 'clip']:
             raise ValueError("nonposx, nonposy kwarg must be 'mask' or 'clip'")
+        if base <= 0 or base == 1:
+            raise ValueError('The log base cannot be <= 0 or == 1')
 
         if base == 10.0:
             self._transform = self.Log10Transform(nonpos)
@@ -445,7 +458,7 @@ class LogitTransform(Transform):
     is_separable = True
     has_inverse = True
 
-    def __init__(self, nonpos):
+    def __init__(self, nonpos='mask'):
         Transform.__init__(self)
         self._nonpos = nonpos
         self._clip = {"clip": True, "mask": False}[nonpos]
@@ -461,6 +474,10 @@ class LogitTransform(Transform):
 
     def inverted(self):
         return LogisticTransform(self._nonpos)
+
+    def __str__(self):
+        return "{}({!r})".format(type(self).__name__,
+            "clip" if self._clip else "mask")
 
 
 class LogisticTransform(Transform):
@@ -479,6 +496,9 @@ class LogisticTransform(Transform):
 
     def inverted(self):
         return LogitTransform(self._nonpos)
+
+    def __str__(self):
+        return "{}({!r})".format(type(self).__name__, self._nonpos)
 
 
 class LogitScale(ScaleBase):
@@ -551,7 +571,7 @@ def scale_factory(scale, axis, **kwargs):
         raise ValueError("Unknown scale type '%s'" % scale)
 
     return _scale_mapping[scale](axis, **kwargs)
-scale_factory.__doc__ = dedent(scale_factory.__doc__) % \
+scale_factory.__doc__ = cbook.dedent(scale_factory.__doc__) % \
     {'names': " | ".join(get_scale_names())}
 
 
@@ -573,7 +593,7 @@ def get_scale_docs():
         scale_class = _scale_mapping[name]
         docs.append("    '%s'" % name)
         docs.append("")
-        class_docs = dedent(scale_class.__init__.__doc__)
+        class_docs = cbook.dedent(scale_class.__init__.__doc__)
         class_docs = "".join(["        %s\n" %
                               x for x in class_docs.split("\n")])
         docs.append(class_docs)

@@ -3,33 +3,23 @@ from __future__ import (absolute_import, division, print_function,
 
 import six
 
-import matplotlib
-from matplotlib.figure import Figure
-
-from .backend_agg import FigureCanvasAgg
-
-from . import wx_compat as wxc
-from . import backend_wx
-from .backend_wx import (_BackendWx, FigureManagerWx, FigureCanvasWx,
-    FigureFrameWx, DEBUG_MSG, NavigationToolbar2Wx, Toolbar)
-
 import wx
+
+import matplotlib
+from matplotlib import cbook
+from . import wx_compat as wxc
+from .backend_agg import FigureCanvasAgg
+from .backend_wx import (
+    _BackendWx, _FigureCanvasWxBase, FigureFrameWx,
+    NavigationToolbar2Wx as NavigationToolbar2WxAgg)
 
 
 class FigureFrameWxAgg(FigureFrameWx):
     def get_canvas(self, fig):
         return FigureCanvasWxAgg(self, -1, fig)
 
-    def _get_toolbar(self, statbar):
-        if matplotlib.rcParams['toolbar'] == 'toolbar2':
-            toolbar = NavigationToolbar2WxAgg(self.canvas)
-            toolbar.set_status_bar(statbar)
-        else:
-            toolbar = None
-        return toolbar
 
-
-class FigureCanvasWxAgg(FigureCanvasAgg, FigureCanvasWx):
+class FigureCanvasWxAgg(FigureCanvasAgg, _FigureCanvasWxBase):
     """
     The FigureCanvas contains the figure and does event handling.
 
@@ -44,7 +34,6 @@ class FigureCanvasWxAgg(FigureCanvasAgg, FigureCanvasWx):
         """
         Render the figure using agg.
         """
-        DEBUG_MSG("draw()", 1, self)
         FigureCanvasAgg.draw(self)
 
         self.bitmap = _convert_agg_to_wx_bitmap(self.get_renderer(), None)
@@ -82,24 +71,13 @@ class FigureCanvasWxAgg(FigureCanvasAgg, FigureCanvasWx):
 
     filetypes = FigureCanvasAgg.filetypes
 
-    def print_figure(self, filename, *args, **kwargs):
-        # Use pure Agg renderer to draw
-        FigureCanvasAgg.print_figure(self, filename, *args, **kwargs)
-        # Restore the current view; this is needed because the
-        # artist contains methods rely on particular attributes
-        # of the rendered figure for determining things like
-        # bounding boxes.
-        if self._isDrawn:
-            self.draw()
 
-
-class NavigationToolbar2WxAgg(NavigationToolbar2Wx):
-    def get_canvas(self, frame, fig):
-        return FigureCanvasWxAgg(frame, -1, fig)
+@cbook.deprecated("2.2", alternative="NavigationToolbar2WxAgg")
+class Toolbar(NavigationToolbar2WxAgg):
+    pass
 
 
 # agg/wxPython image conversion functions (wxPython >= 2.8)
-
 
 def _convert_agg_to_wx_image(agg, bbox):
     """

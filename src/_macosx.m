@@ -1307,7 +1307,9 @@ NavigationToolbar_get_active (NavigationToolbar* self)
     }
     Py_ssize_t list_index = 0;
     PyObject* list = PyList_New(m);
-    for (size_t state_index = 0; state_index < n; state_index++)
+
+    size_t state_index;
+    for (state_index = 0; state_index < n; state_index++)
     {
         if(states[state_index]==1)
         {
@@ -2608,8 +2610,11 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
 
     unichar uc = [[event charactersIgnoringModifiers] characterAtIndex:0];
     NSString* specialchar = [specialkeymappings objectForKey:[NSNumber numberWithUnsignedLong:uc]];
-    if (specialchar)
+    if (specialchar){
+        if ([event modifierFlags] & NSShiftKeyMask)
+            [returnkey appendString:@"shift+" ];
         [returnkey appendString:specialchar];
+    }
     else
         [returnkey appendString:[event charactersIgnoringModifiers]];
 

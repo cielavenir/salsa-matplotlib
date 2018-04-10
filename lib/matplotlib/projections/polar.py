@@ -7,7 +7,6 @@ from collections import OrderedDict
 
 import numpy as np
 
-import matplotlib.artist as martist
 from matplotlib.axes import Axes
 import matplotlib.axis as maxis
 from matplotlib import cbook
@@ -38,6 +37,16 @@ class PolarTransform(mtransforms.Transform):
         self._axis = axis
         self._use_rmin = use_rmin
         self._apply_theta_transforms = _apply_theta_transforms
+
+    def __str__(self):
+        return ("{}(\n"
+                    "{},\n"
+                "    use_rmin={},\n"
+                "    _apply_theta_transforms={})"
+                .format(type(self).__name__,
+                        mtransforms._indent_str(self._axis),
+                        self._use_rmin,
+                        self._apply_theta_transforms))
 
     def transform_non_affine(self, tr):
         xy = np.empty(tr.shape, float)
@@ -95,6 +104,14 @@ class PolarAffine(mtransforms.Affine2DBase):
         self.set_children(scale_transform, limits)
         self._mtx = None
 
+    def __str__(self):
+        return ("{}(\n"
+                    "{},\n"
+                    "{})"
+                .format(type(self).__name__,
+                        mtransforms._indent_str(self._scale_transform),
+                        mtransforms._indent_str(self._limits)))
+
     def get_matrix(self):
         if self._invalid:
             limits_scaled = self._limits.transformed(self._scale_transform)
@@ -124,6 +141,16 @@ class InvertedPolarTransform(mtransforms.Transform):
         self._axis = axis
         self._use_rmin = use_rmin
         self._apply_theta_transforms = _apply_theta_transforms
+
+    def __str__(self):
+        return ("{}(\n"
+                    "{},\n"
+                "    use_rmin={},\n"
+                "    _apply_theta_transforms={})"
+                .format(type(self).__name__,
+                        mtransforms._indent_str(self._axis),
+                        self._use_rmin,
+                        self._apply_theta_transforms))
 
     def transform_non_affine(self, xy):
         x = xy[:, 0:1]
@@ -460,6 +487,16 @@ class _ThetaShift(mtransforms.ScaledTranslation):
         self.mode = mode
         self.pad = pad
 
+    def __str__(self):
+        return ("{}(\n"
+                    "{},\n"
+                    "{},\n"
+                    "{})"
+                .format(type(self).__name__,
+                        mtransforms._indent_str(self.axes),
+                        mtransforms._indent_str(self.pad),
+                        mtransforms._indent_str(repr(self.mode))))
+
     def get_matrix(self):
         if self._invalid:
             if self.mode == 'rlabel':
@@ -679,6 +716,10 @@ class RadialAxis(maxis.YAxis):
     __name__ = 'radialaxis'
     axis_name = 'radius'
 
+    def __init__(self, *args, **kwargs):
+        super(RadialAxis, self).__init__(*args, **kwargs)
+        self.sticky_edges.y.append(0)
+
     def _get_tick(self, major):
         if major:
             tick_kw = self._major_tick_kw
@@ -741,9 +782,15 @@ class _WedgeBbox(mtransforms.Bbox):
         self._originLim = originLim
         self.set_children(viewLim, originLim)
 
-    def __repr__(self):
-        return "_WedgeBbox(%r, %r, %r)" % (self._center, self._viewLim,
-                                           self._originLim)
+    def __str__(self):
+        return ("{}(\n"
+                    "{},\n"
+                    "{},\n"
+                    "{})"
+                .format(type(self).__name__,
+                        mtransforms._indent_str(self._center),
+                        mtransforms._indent_str(self._viewLim),
+                        mtransforms._indent_str(self._originLim)))
 
     def get_points(self):
         if self._invalid:
@@ -805,6 +852,7 @@ class PolarAxes(Axes):
             kwargs.pop('rlabel_position', 22.5))
 
         Axes.__init__(self, *args, **kwargs)
+        self.use_sticky_edges = True
         self.set_aspect('equal', adjustable='box', anchor='C')
         self.cla()
     __init__.__doc__ = Axes.__init__.__doc__
@@ -927,8 +975,8 @@ class PolarAxes(Axes):
 
     def get_xaxis_transform(self, which='grid'):
         if which not in ['tick1', 'tick2', 'grid']:
-            msg = "'which' must be one of [ 'tick1' | 'tick2' | 'grid' ]"
-            raise ValueError(msg)
+            raise ValueError(
+                "'which' must be one of 'tick1', 'tick2', or 'grid'")
         return self._xaxis_transform
 
     def get_xaxis_text1_transform(self, pad):
@@ -943,8 +991,8 @@ class PolarAxes(Axes):
         elif which == 'grid':
             return self._yaxis_transform
         else:
-            msg = "'which' must be on of [ 'tick1' | 'tick2' | 'grid' ]"
-            raise ValueError(msg)
+            raise ValueError(
+                "'which' must be one of 'tick1', 'tick2', or 'grid'")
 
     def get_yaxis_text1_transform(self, pad):
         thetamin, thetamax = self._realViewLim.intervalx
@@ -968,9 +1016,7 @@ class PolarAxes(Axes):
         return self._yaxis_text_transform + pad_shift, 'center', halign
 
     def draw(self, *args, **kwargs):
-        thetamin, thetamax = self._realViewLim.intervalx
-        thetamin *= 180 / np.pi
-        thetamax *= 180 / np.pi
+        thetamin, thetamax = np.rad2deg(self._realViewLim.intervalx)
         if thetamin > thetamax:
             thetamin, thetamax = thetamax, thetamin
         rmin, rmax = self._realViewLim.intervaly - self.get_rorigin()
@@ -1212,8 +1258,8 @@ class PolarAxes(Axes):
 
         # Make sure we take into account unitized data
         angles = self.convert_yunits(angles)
-        angles = np.asarray(angles, float)
-        self.set_xticks(angles * (np.pi / 180.0))
+        angles = np.deg2rad(angles)
+        self.set_xticks(angles)
         if labels is not None:
             self.set_xticklabels(labels)
         elif fmt is not None:

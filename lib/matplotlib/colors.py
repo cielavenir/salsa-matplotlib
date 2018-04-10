@@ -90,20 +90,27 @@ _colors_full_map = _ColorMapping(_colors_full_map)
 
 
 def get_named_colors_mapping():
-    """Return the global mapping of names to named colors.
-    """
+    """Return the global mapping of names to named colors."""
     return _colors_full_map
 
 
+def _sanitize_extrema(ex):
+    if ex is None:
+        return ex
+    try:
+        ret = np.asscalar(ex)
+    except AttributeError:
+        ret = float(ex)
+    return ret
+
+
 def _is_nth_color(c):
-    """Return whether `c` can be interpreted as an item in the color cycle.
-    """
+    """Return whether *c* can be interpreted as an item in the color cycle."""
     return isinstance(c, six.string_types) and re.match(r"\AC[0-9]\Z", c)
 
 
 def is_color_like(c):
-    """Return whether `c` can be interpreted as an RGB(A) color.
-    """
+    """Return whether *c* can be interpreted as an RGB(A) color."""
     # Special-case nth color syntax because it cannot be parsed during
     # setup.
     if _is_nth_color(c):
@@ -116,11 +123,38 @@ def is_color_like(c):
         return True
 
 
-def to_rgba(c, alpha=None):
-    """Convert `c` to an RGBA color.
+def same_color(c1, c2):
+    """
+    Compare two colors to see if they are the same.
 
-    If `alpha` is not `None`, it forces the alpha value, except if `c` is
-    "none" (case-insensitive), which always maps to `(0, 0, 0, 0)`.
+    Parameters
+    ----------
+    c1, c2 : Matplotlib colors
+
+    Returns
+    -------
+    bool
+        ``True`` if *c1* and *c2* are the same color, otherwise ``False``.
+    """
+    return (to_rgba_array(c1) == to_rgba_array(c2)).all()
+
+
+def to_rgba(c, alpha=None):
+    """
+    Convert *c* to an RGBA color.
+
+    Parameters
+    ----------
+    c : Matplotlib color
+
+    alpha : scalar, optional
+        If *alpha* is not ``None``, it forces the alpha value, except if *c* is
+        ``"none"`` (case-insensitive), which always maps to ``(0, 0, 0, 0)``.
+
+    Returns
+    -------
+    tuple
+        Tuple of ``(r, g, b, a)`` scalars.
     """
     # Special-case nth color syntax because it should not be cached.
     if _is_nth_color(c):
@@ -140,10 +174,10 @@ def to_rgba(c, alpha=None):
 
 
 def _to_rgba_no_colorcycle(c, alpha=None):
-    """Convert `c` to an RGBA color, with no support for color-cycle syntax.
+    """Convert *c* to an RGBA color, with no support for color-cycle syntax.
 
-    If `alpha` is not `None`, it forces the alpha value, except if `c` is
-    "none" (case-insensitive), which always maps to `(0, 0, 0, 0)`.
+    If *alpha* is not ``None``, it forces the alpha value, except if *c* is
+    ``"none"`` (case-insensitive), which always maps to ``(0, 0, 0, 0)``.
     """
     orig_c = c
     if isinstance(c, six.string_types):
@@ -197,10 +231,10 @@ def _to_rgba_no_colorcycle(c, alpha=None):
 
 
 def to_rgba_array(c, alpha=None):
-    """Convert `c` to a (n, 4) array of RGBA colors.
+    """Convert *c* to a (n, 4) array of RGBA colors.
 
-    If `alpha` is not `None`, it forces the alpha value.  If `c` is "none"
-    (case-insensitive) or an empty list, an empty array is returned.
+    If *alpha* is not ``None``, it forces the alpha value.  If *c* is
+    ``"none"`` (case-insensitive) or an empty list, an empty array is returned.
     """
     # Special-case inputs that are already arrays, for performance.  (If the
     # array has the wrong kind or shape, raise the error during one-at-a-time
@@ -235,16 +269,15 @@ def to_rgba_array(c, alpha=None):
 
 
 def to_rgb(c):
-    """Convert `c` to an RGB color, silently dropping the alpha channel.
-    """
+    """Convert *c* to an RGB color, silently dropping the alpha channel."""
     return to_rgba(c)[:3]
 
 
 def to_hex(c, keep_alpha=False):
-    """Convert `c` to a hex color.
+    """Convert *c* to a hex color.
 
-    Uses the #rrggbb format if `keep_alpha` is False (the default), `#rrggbbaa`
-    otherwise.
+    Uses the ``#rrggbb`` format if *keep_alpha* is False (the default),
+    ``#rrggbbaa`` otherwise.
     """
     c = to_rgba(c)
     if not keep_alpha:
@@ -255,21 +288,11 @@ def to_hex(c, keep_alpha=False):
 
 ### Backwards-compatible color-conversion API
 
+
 cnames = CSS4_COLORS
 hexColorPattern = re.compile(r"\A#[a-fA-F0-9]{6}\Z")
-
-
-def rgb2hex(c):
-    'Given an rgb or rgba sequence of 0-1 floats, return the hex string'
-    return to_hex(c)
-
-
-def hex2color(c):
-    """
-    Take a hex string *s* and return the corresponding rgb 3-tuple
-    Example: #efefef -> (0.93725, 0.93725, 0.93725)
-    """
-    return ColorConverter.to_rgb(c)
+rgb2hex = to_hex
+hex2color = to_rgb
 
 
 class ColorConverter(object):
@@ -332,6 +355,7 @@ class ColorConverter(object):
 
 colorConverter = ColorConverter()
 
+
 ### End of backwards-compatible color-conversion API
 
 
@@ -364,7 +388,7 @@ def makeMappingArray(N, data, gamma=1.0):
     try:
         adata = np.array(data)
     except Exception:
-        raise TypeError("data must be convertable to an array")
+        raise TypeError("data must be convertible to an array")
     shape = adata.shape
     if len(shape) != 2 or shape[1] != 3:
         raise ValueError("data must be nx3 format")
@@ -449,7 +473,7 @@ class Colormap(object):
 
         Returns
         -------
-        Tuple of RGBA values if X is scalar, othewise an array of
+        Tuple of RGBA values if X is scalar, otherwise an array of
         RGBA values with a shape of ``X.shape + (4, )``.
 
         """
@@ -474,24 +498,19 @@ class Colormap(object):
             xa = xa.byteswap().newbyteorder()
 
         if xa.dtype.kind == "f":
-            # Treat 1.0 as slightly less than 1.
-            vals = np.array([1, 0], dtype=xa.dtype)
-            almost_one = np.nextafter(*vals)
-            np.copyto(xa, almost_one, where=xa == 1.0)
-            # The following clip is fast, and prevents possible
-            # conversion of large positive values to negative integers.
-
             xa *= self.N
+            # Negative values are out of range, but astype(int) would truncate
+            # them towards zero.
+            xa[xa < 0] = -1
+            # xa == 1 (== N after multiplication) is not out of range.
+            xa[xa == self.N] = self.N - 1
+            # Avoid converting large positive values to negative integers.
             np.clip(xa, -1, self.N, out=xa)
-
-            # ensure that all 'under' values will still have negative
-            # value after casting to int
-            np.copyto(xa, -1, where=xa < 0.0)
             xa = xa.astype(int)
         # Set the over-range indices before the under-range;
         # otherwise the under-range values get converted to over-range.
-        np.copyto(xa, self._i_over, where=xa > self.N - 1)
-        np.copyto(xa, self._i_under, where=xa < 0)
+        xa[xa > self.N - 1] = self._i_over
+        xa[xa < 0] = self._i_under
         if mask_bad is not None:
             if mask_bad.shape == xa.shape:
                 np.copyto(xa, self._i_bad, where=mask_bad)
@@ -870,8 +889,8 @@ class Normalize(object):
         likely to lead to surprises; therefore the default is
         *clip* = *False*.
         """
-        self.vmin = vmin
-        self.vmax = vmax
+        self.vmin = _sanitize_extrema(vmin)
+        self.vmax = _sanitize_extrema(vmax)
         self.clip = clip
 
     @staticmethod
@@ -1307,7 +1326,7 @@ class BoundaryNorm(Normalize):
         for i, b in enumerate(self.boundaries):
             iret[xx >= b] = i
         if self._interp:
-            scalefac = float(self.Ncmap - 1) / (self.N - 2)
+            scalefac = (self.Ncmap - 1) / (self.N - 2)
             iret = (iret * scalefac).astype(np.int16)
         iret[xx < self.vmin] = -1
         iret[xx >= self.vmax] = max_col
@@ -1419,7 +1438,7 @@ def hsv_to_rgb(hsv):
         raise ValueError("Last dimension of input array must be 3; "
                          "shape {shp} was found.".format(shp=hsv.shape))
 
-    # if we got pased a 1D array, try to treat as
+    # if we got passed a 1D array, try to treat as
     # a single color and reshape as needed
     in_ndim = hsv.ndim
     if in_ndim == 1:
@@ -1807,8 +1826,8 @@ class LightSource(object):
             try:
                 blend = blend_mode(rgb, intensity, **kwargs)
             except TypeError:
-                msg = '"blend_mode" must be callable or one of {0}'
-                raise ValueError(msg.format(lookup.keys))
+                raise ValueError('"blend_mode" must be callable or one of {}'
+                                 .format(lookup.keys))
 
         # Only apply result where hillshade intensity isn't masked
         if hasattr(intensity, 'mask'):

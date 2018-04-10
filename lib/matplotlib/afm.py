@@ -19,7 +19,7 @@ It is pretty easy to use, and requires only built-in python libs:
     ...                         'fonts', 'afm', 'ptmr8a.afm')
     >>>
     >>> from matplotlib.afm import AFM
-    >>> with open(afm_fname) as fh:
+    >>> with open(afm_fname, 'rb') as fh:
     ...     afm = AFM(fh)
     >>> afm.string_width_height('What the heck?')
     (6220.0, 694)
@@ -41,7 +41,6 @@ import six
 from six.moves import map
 
 import sys
-import os
 import re
 from ._mathtext_data import uni2type1
 

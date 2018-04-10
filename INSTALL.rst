@@ -1,7 +1,3 @@
-.. The source of this document is INSTALL.rst. During the doc build process,
-.. this file is copied over to doc/users/installing.rst.
-.. Therefore, you must edit INSTALL.rst, *not* doc/users/installing.rst!
-
 .. _pip: https://pypi.python.org/pypi/pip/
 
 ==========
@@ -12,7 +8,6 @@ Installing
 
     If you wish to contribute to the project, it's recommended you
     :ref:`install the latest development version<install_from_source>`.
-
 
 .. contents::
 
@@ -89,8 +84,7 @@ To run the test suite:
    :file:`lib\\mpl_toolkits\\tests` directories from the source distribution;
  * install test dependencies: `pytest <https://pypi.python.org/pypi/pytest>`_,
    `mock <https://pypi.python.org/pypi/mock>`_, Pillow, MiKTeX, GhostScript,
-   ffmpeg, avconv, mencoder, ImageMagick, and `Inkscape
-   <https://inkscape.org/>`_;
+   ffmpeg, avconv, ImageMagick, and `Inkscape <https://inkscape.org/>`_;
  * run ``py.test path\to\tests\directory``.
 
 
@@ -102,12 +96,13 @@ Third-party distributions of Matplotlib
 Scientific Python Distributions
 -------------------------------
 
-Both `Anaconda <https://www.continuum.io/downloads/>`_ and `Canopy
-<https://www.enthought.com/products/canopy/>`_ are both excellent
+`Anaconda <https://www.continuum.io/downloads/>`_ and `Canopy
+<https://www.enthought.com/products/canopy/>`_ and `ActiveState
+<https://www.activestate.com/activepython/downloads>`_ are excellent
 choices that "just work" out of the box for Windows, macOS and common
 Linux platforms. `WinPython <https://winpython.github.io/>`__ is an
 option for windows users.  All of these distributions include
-Matplotlib and *lots* of other useful tools.
+Matplotlib and *lots* of other useful (data) science tools.
 
 
 Linux : using your package manager
@@ -176,7 +171,7 @@ Matplotlib requires a large number of dependencies:
   * `Python <https://www.python.org/downloads/>`_ (>= 2.7 or >= 3.4)
   * `NumPy <http://www.numpy.org>`_ (>= |minimum_numpy_version|)
   * `setuptools <https://setuptools.readthedocs.io/en/latest/>`__
-  * `dateutil <https://pypi.python.org/pypi/python-dateutil>`_ (>= 2.0)
+  * `dateutil <https://pypi.python.org/pypi/python-dateutil>`_ (>= 2.1)
   * `pyparsing <https://pyparsing.wikispaces.com/>`__
   * `libpng <http://www.libpng.org>`__ (>= 1.2)
   * `pytz <http://pytz.sourceforge.net/>`__
@@ -187,7 +182,7 @@ Matplotlib requires a large number of dependencies:
     (for Python 2.7 only)
   * `subprocess32 <https://pypi.python.org/pypi/subprocess32/>`_ (for Python
     2.7 only, on Linux and macOS only)
-
+  * `kiwisolver <https://github.com/nucleic/kiwi>`__ (>= 1.0.0)
 
 Optionally, you can also install a number of packages to enable better user
 interface toolkits. See :ref:`what-is-a-backend` for more details on the
@@ -198,9 +193,11 @@ optional Matplotlib backends and the capabilities they provide.
     `PySide <https://pypi.python.org/pypi/PySide>`_: for the Qt4Agg backend;
   * `PyQt5 <https://pypi.python.org/pypi/PyQt5>`_: for the Qt5Agg backend;
   * :term:`pygtk` (>= 2.4): for the GTK and the GTKAgg backend;
-  * :term:`wxpython` (>= 2.8 or later): for the WX or WXAgg backend;
+  * :term:`wxpython` (>= 2.9 or later): for the WX or WXAgg backend;
+  * `cairocffi <https://cairocffi.readthedocs.io/en/latest/>`__ (>=
+    v0.8): for cairo based backends;
   * `pycairo <https://pypi.python.org/pypi/pycairo>`_: for GTK3Cairo;
-  * `Tornado <https://pypi.python.org/pypi/tornado>`_: for the WebAgg backend.
+  * `Tornado <https://pypi.python.org/pypi/tornado>`_: for the WebAgg backend;
 
 For better support of animation output format and image file formats, LaTeX,
 etc., you can install the following:
@@ -209,7 +206,7 @@ etc., you can install the following:
     <https://libav.org/avconv.html>`_: for saving movies;
   * `ImageMagick <https://www.imagemagick.org/script/index.php>`_: for saving
     animated gifs;
-  * `Pillow <https://python-pillow.org/>`_ (>=2.0): for a larger selection of
+  * `Pillow <https://pillow.readthedocs.io/en/latest/>`_ (>=2.0): for a larger selection of
     image file formats: JPEG, BMP, and TIFF image files;
   * `LaTeX <https://miktex.org/>`_ and `GhostScript
     <https://ghostscript.com/download/>`_ (for rendering text with LaTeX).
