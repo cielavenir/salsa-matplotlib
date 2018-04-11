@@ -1,4 +1,3 @@
-From e3927a2475cbebdd9925d1b61e6d9412321b9e18 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Wed, 17 Jan 2018 22:34:48 -0500
 Subject: remove numpy scipy from reference_url
@@ -7,6 +6,8 @@ Subject: remove numpy scipy from reference_url
  doc/conf.py | 2 --
  1 file changed, 2 deletions(-)
 
+diff --git a/doc/conf.py b/doc/conf.py
+index b5d74f9..c4404fd 100644
 --- a/doc/conf.py
 +++ b/doc/conf.py
 @@ -125,8 +125,6 @@ sphinx_gallery_conf = {

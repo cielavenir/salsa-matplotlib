@@ -8,3 +8,4 @@ gtk3cairo_check_no-multiprocessing.patch
 0008-Increase-test-tollerance.patch
 0010-disable-intersphinx.patch
 0011-remove-numpy-scipy-from-reference_url.patch
+0011-remove-distutils.sysconfig.patch

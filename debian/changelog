@@ -12,8 +12,11 @@ matplotlib (2.2.2-1) UNRELEASED; urgency=medium
   * debian/control
     - add ipywidgets to b-d, needed by doc
   * refresh patches
+  * debian/patches/0011-remove-distutils.sysconfig.patch
+    - dont import distutils.sysconfig in matplotlib, as it's meant to be used
+      for building packages, not in a top-level module; Closes: #894502
 
- -- Sandro Tosi <morph@debian.org>  Tue, 10 Apr 2018 20:32:06 -0400
+ -- Sandro Tosi <morph@debian.org>  Tue, 10 Apr 2018 20:34:03 -0400
 
 matplotlib (2.1.1-2) unstable; urgency=medium
 

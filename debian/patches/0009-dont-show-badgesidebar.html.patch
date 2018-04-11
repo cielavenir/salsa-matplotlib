@@ -1,9 +1,0 @@
-From 192024e4b7ea3818462af0be752085b42541d142 Mon Sep 17 00:00:00 2001
-From: Sandro Tosi <morph@debian.org>
-Date: Tue, 16 Jan 2018 22:58:57 -0500
-Subject: dont show badgesidebar.html
-
----
- doc/conf.py | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-

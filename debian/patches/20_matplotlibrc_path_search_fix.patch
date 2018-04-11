@@ -1,4 +1,3 @@
-From 1afcc9eb80fba30f00683365ba3b78d119cd9f96 Mon Sep 17 00:00:00 2001
 From: Sandro Tosi <morph@debian.org>
 Date: Thu, 8 Oct 2015 09:47:11 -0700
 Subject: Fixes the path to search for matplotlibrc file
@@ -10,6 +9,8 @@ Patch-Name: 20_matplotlibrc_path_search_fix.patch
  lib/matplotlib/__init__.py | 6 ++++--
  1 file changed, 4 insertions(+), 2 deletions(-)
 
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index 9339707..563b0a8 100644
 --- a/lib/matplotlib/__init__.py
 +++ b/lib/matplotlib/__init__.py
 @@ -738,10 +738,12 @@ def _get_data_path():

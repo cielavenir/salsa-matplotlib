@@ -1,4 +1,3 @@
-From 56fe215a102f4589e72fc3ff3672074de6c0d7cd Mon Sep 17 00:00:00 2001
 From: Julian Taylor <jtaylor@ubuntu.com>
 Date: Thu, 8 Oct 2015 09:47:15 -0700
 Subject: adapt setup to find multiarched tk/tcl
@@ -11,9 +10,11 @@ Patch-Name: multiarch-tktcl.patch
  setupext.py | 4 ++++
  1 file changed, 4 insertions(+)
 
+diff --git a/setupext.py b/setupext.py
+index d2ff239..031b5b4 100644
 --- a/setupext.py
 +++ b/setupext.py
-@@ -1727,6 +1727,10 @@ class BackendGtk3Cairo(OptionalBackendPa
+@@ -1727,6 +1727,10 @@ class BackendGtk3Cairo(OptionalBackendPackage):
          if 'TRAVIS' in os.environ:
              raise CheckFailed("Can't build with Travis")
  
