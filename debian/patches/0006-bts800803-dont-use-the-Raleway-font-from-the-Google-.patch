@@ -7,13 +7,11 @@ Subject: bts800803 dont use the Raleway font (from the Google Fonts API)
  doc/_templates/layout.html | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/doc/_templates/layout.html b/doc/_templates/layout.html
-index c8ee6a67..ef27c566 100644
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
-@@ -155,7 +155,6 @@ parents[-1].link|e }}" />
- {%- endblock %}
- {%- block extrahead %} {% endblock %}
+@@ -157,7 +157,6 @@ parents[-1].link|e }}" />
+   <link rel="canonical" href="https://matplotlib.org/{{pagename}}.html" />
+ {% endblock %}
  
 -
    </head>

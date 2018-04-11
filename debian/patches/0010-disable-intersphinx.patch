@@ -7,11 +7,9 @@ Subject: disable intersphinx
  doc/conf.py | 4 ----
  1 file changed, 4 deletions(-)
 
-diff --git a/doc/conf.py b/doc/conf.py
-index 6715fa3d..17b9c5c1 100644
 --- a/doc/conf.py
 +++ b/doc/conf.py
-@@ -92,10 +92,6 @@ autodoc_docstring_signature = True
+@@ -93,10 +93,6 @@ autodoc_docstring_signature = True
  autodoc_default_flags = ['members', 'undoc-members']
  
  intersphinx_mapping = {

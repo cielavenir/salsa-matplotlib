@@ -7,11 +7,9 @@ Subject: bts800803 remote the Google Analytics tracking
  doc/_templates/layout.html | 10 ----------
  1 file changed, 10 deletions(-)
 
-diff --git a/doc/_templates/layout.html b/doc/_templates/layout.html
-index ef27c566..759f6e50 100644
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
-@@ -231,16 +231,6 @@ href="http://sphinx-doc.org/">Sphinx</a> {{ sphinx_version }}.{% endtrans %}
+@@ -237,16 +237,6 @@ href="http://sphinx-doc.org/">Sphinx</a>
      </div>
   {%- endblock %}
  

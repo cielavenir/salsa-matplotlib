@@ -12,11 +12,9 @@ http://pkgs.fedoraproject.org/cgit/rpms/python-matplotlib.git/plain/python-matpl
  lib/matplotlib/tests/test_streamplot.py  | 2 +-
  4 files changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/lib/matplotlib/testing/decorators.py b/lib/matplotlib/testing/decorators.py
-index c5e069b3..de5cbaf6 100644
 --- a/lib/matplotlib/testing/decorators.py
 +++ b/lib/matplotlib/testing/decorators.py
-@@ -406,7 +406,7 @@ def _pytest_image_comparison(baseline_images, extensions, tol,
+@@ -408,7 +408,7 @@ def _pytest_image_comparison(baseline_im
      return decorator
  
  
@@ -25,11 +23,9 @@ index c5e069b3..de5cbaf6 100644
                       freetype_version=None, remove_text=False,
                       savefig_kwarg=None,
                       # Default of mpl_test_settings fixture and cleanup too.
-diff --git a/lib/matplotlib/tests/test_mathtext.py b/lib/matplotlib/tests/test_mathtext.py
-index 7ef77ce6..3c2323c7 100644
 --- a/lib/matplotlib/tests/test_mathtext.py
 +++ b/lib/matplotlib/tests/test_mathtext.py
-@@ -162,7 +162,6 @@ for fonts, chars in font_test_specs:
+@@ -161,7 +161,6 @@ for fonts, chars in font_test_specs:
      for set in chars:
          font_tests.append(wrapper % set)
  
@@ -37,7 +33,7 @@ index 7ef77ce6..3c2323c7 100644
  @pytest.fixture
  def baseline_images(request, fontset, index):
      return ['%s_%s_%02d' % (request.param, fontset, index)]
-@@ -174,7 +173,7 @@ def baseline_images(request, fontset, index):
+@@ -173,7 +172,7 @@ def baseline_images(request, fontset, in
                           ['cm', 'stix', 'stixsans', 'dejavusans',
                            'dejavuserif'])
  @pytest.mark.parametrize('baseline_images', ['mathtext'], indirect=True)
@@ -46,7 +42,7 @@ index 7ef77ce6..3c2323c7 100644
  def test_mathtext_rendering(baseline_images, fontset, index, test):
      matplotlib.rcParams['mathtext.fontset'] = fontset
      fig = plt.figure(figsize=(5.25, 0.75))
-@@ -188,7 +187,7 @@ def test_mathtext_rendering(baseline_images, fontset, index, test):
+@@ -187,7 +186,7 @@ def test_mathtext_rendering(baseline_ima
                           ['cm', 'stix', 'stixsans', 'dejavusans',
                            'dejavuserif'])
  @pytest.mark.parametrize('baseline_images', ['mathfont'], indirect=True)
@@ -55,29 +51,14 @@ index 7ef77ce6..3c2323c7 100644
  def test_mathfont_rendering(baseline_images, fontset, index, test):
      matplotlib.rcParams['mathtext.fontset'] = fontset
      fig = plt.figure(figsize=(5.25, 0.75))
-diff --git a/lib/matplotlib/tests/test_patheffects.py b/lib/matplotlib/tests/test_patheffects.py
-index 9b8a4379..7c538bc7 100644
 --- a/lib/matplotlib/tests/test_patheffects.py
 +++ b/lib/matplotlib/tests/test_patheffects.py
-@@ -125,7 +125,7 @@ def test_SimplePatchShadow_offset():
+@@ -121,7 +121,7 @@ def test_SimplePatchShadow_offset():
      assert pe._offset == (4, 5)
  
  
--@image_comparison(baseline_images=['collection'], tol=0.015)
+-@image_comparison(baseline_images=['collection'], tol=0.02)
 +@image_comparison(baseline_images=['collection'], tol=0.083)
  def test_collection():
      x, y = np.meshgrid(np.linspace(0, 10, 150), np.linspace(-5, 5, 100))
      data = np.sin(x) + np.cos(y)
-diff --git a/lib/matplotlib/tests/test_streamplot.py b/lib/matplotlib/tests/test_streamplot.py
-index ac997b2b..5e8a7f99 100644
---- a/lib/matplotlib/tests/test_streamplot.py
-+++ b/lib/matplotlib/tests/test_streamplot.py
-@@ -36,7 +36,7 @@ def test_startpoints():
- 
- 
- @image_comparison(baseline_images=['streamplot_colormap'],
--                  tol=0.002)
-+                  tol=0.009)
- def test_colormap():
-     X, Y, U, V = velocity_field()
-     plt.streamplot(X, Y, U, V, color=U, density=0.6, linewidth=2,

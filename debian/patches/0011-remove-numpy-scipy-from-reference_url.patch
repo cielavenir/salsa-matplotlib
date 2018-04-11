@@ -7,11 +7,9 @@ Subject: remove numpy scipy from reference_url
  doc/conf.py | 2 --
  1 file changed, 2 deletions(-)
 
-diff --git a/doc/conf.py b/doc/conf.py
-index 17b9c5c1..f400223d 100644
 --- a/doc/conf.py
 +++ b/doc/conf.py
-@@ -124,8 +124,6 @@ sphinx_gallery_conf = {
+@@ -125,8 +125,6 @@ sphinx_gallery_conf = {
      'doc_module': ('matplotlib', 'mpl_toolkits'),
      'reference_url': {
          'matplotlib': None,
@@ -19,4 +17,4 @@ index 17b9c5c1..f400223d 100644
 -        'scipy': 'https://docs.scipy.org/doc/scipy/reference',
      },
      'backreferences_dir': 'api/_as_gen',
-     'subsection_order': ExplicitOrder(explicit_order_folders)
+     'subsection_order': ExplicitOrder(explicit_order_folders),

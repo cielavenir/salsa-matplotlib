@@ -7,12 +7,10 @@ Subject: bts800803 disable the GitHub Fork Me ribbon
  doc/_templates/layout.html | 4 ----
  1 file changed, 4 deletions(-)
 
-diff --git a/doc/_templates/layout.html b/doc/_templates/layout.html
-index 093dd8cb..c8ee6a67 100644
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
-@@ -177,10 +177,6 @@ parents[-1].link|e }}" />
- <a href="{{ pathto('index') }}"><img src="{{pathto("_static/logo2.svg", 1) }}" width="540px" border="0" alt="matplotlib"/></a>
+@@ -183,10 +183,6 @@ parents[-1].link|e }}" />
+     <img src="{{pathto("_static/logo2.png", 1) }}" height="125px" border="0" alt="matplotlib"/></a>
  {%- endif %}
  
 -<!-- The "Fork me on github" ribbon -->

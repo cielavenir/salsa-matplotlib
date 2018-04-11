@@ -8,11 +8,9 @@ Patch-Name: gtk3cairo_check_no-multiprocessing.patch
  setupext.py | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/setupext.py b/setupext.py
-index 3fe51ada..bf6d7507 100644
 --- a/setupext.py
 +++ b/setupext.py
-@@ -1817,7 +1817,6 @@ class BackendGtk3Agg(OptionalBackendPackage):
+@@ -1726,7 +1726,6 @@ class BackendGtk3Cairo(OptionalBackendPa
      def check_requirements(self):
          if 'TRAVIS' in os.environ:
              raise CheckFailed("Can't build with Travis")
