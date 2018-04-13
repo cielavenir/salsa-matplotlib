@@ -15,8 +15,10 @@ matplotlib (2.2.2-1) UNRELEASED; urgency=medium
   * debian/patches/0011-remove-distutils.sysconfig.patch
     - dont import distutils.sysconfig in matplotlib, as it's meant to be used
       for building packages, not in a top-level module; Closes: #894502
+  * debian/rules
+    - make doc via Makefile
 
- -- Sandro Tosi <morph@debian.org>  Tue, 10 Apr 2018 20:34:03 -0400
+ -- Sandro Tosi <morph@debian.org>  Fri, 13 Apr 2018 17:28:37 -0400
 
 matplotlib (2.1.1-2) unstable; urgency=medium
 

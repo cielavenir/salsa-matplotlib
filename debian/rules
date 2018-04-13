@@ -21,8 +21,7 @@ build-indep-stamp: $(DEFPY:%=build-%-stamp)
 	dh_testdir
 
 	# build the doc
-	( cd doc ; MPLCONFIGDIR=. MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ \
-		PYTHONPATH=$(CURDIR)/build/lib.$(PY_PLATFORM)-$(DEFPY) ./make.py --small html )
+	MPLCONFIGDIR=. MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ PYTHONPATH=$(CURDIR)/build/lib.$(PY_PLATFORM)-$(DEFPY) $(MAKE) -C doc html
 
 	touch $@
 
@@ -71,9 +70,9 @@ clean:
 	done
 
 	# clean the doc
-	-( cd doc ; ./make.py clean )
 
 	# workaround for cleaning the doc ("doc/make.py clean" only runs useless svn-clean)
+	rm -f doc/api/_as_gen/*
 	#rm -rf doc/build doc/examples
 	#rm -f doc/mpl_examples/api/*.png
 	#rm -f doc/mpl_examples/pylab_examples/*.png
