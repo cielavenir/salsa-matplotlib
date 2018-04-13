@@ -8,7 +8,7 @@ matplotlib (2.2.2-1) UNRELEASED; urgency=medium
   * d/control: Remove XS-Testsuite field, not needed anymore
 
   [ Sandro Tosi ]
-  * New upstream release
+  * New upstream release; Closes: #889151
   * debian/control
     - add ipywidgets to b-d, needed by doc
   * refresh patches
@@ -18,7 +18,7 @@ matplotlib (2.2.2-1) UNRELEASED; urgency=medium
   * debian/rules
     - make doc via Makefile
 
- -- Sandro Tosi <morph@debian.org>  Fri, 13 Apr 2018 17:28:37 -0400
+ -- Sandro Tosi <morph@debian.org>  Fri, 13 Apr 2018 17:29:44 -0400
 
 matplotlib (2.1.1-2) unstable; urgency=medium
 
