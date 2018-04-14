@@ -11,6 +11,7 @@ matplotlib (2.2.2-1) UNRELEASED; urgency=medium
   * New upstream release; Closes: #889151
   * debian/control
     - add ipywidgets to b-d, needed by doc
+    - bump Standards-Version to 4.1.4 (no changes needed)
   * refresh patches
   * debian/patches/0011-remove-distutils.sysconfig.patch
     - dont import distutils.sysconfig in matplotlib, as it's meant to be used
@@ -20,7 +21,7 @@ matplotlib (2.2.2-1) UNRELEASED; urgency=medium
   * debian/README.debian
     - update to mention GTK backend is no longer available; Closes: #889137
 
- -- Sandro Tosi <morph@debian.org>  Fri, 13 Apr 2018 20:12:21 -0400
+ -- Sandro Tosi <morph@debian.org>  Sat, 14 Apr 2018 13:35:38 -0400
 
 matplotlib (2.1.1-2) unstable; urgency=medium
 
