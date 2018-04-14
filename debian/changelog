@@ -14,6 +14,7 @@ matplotlib (2.2.2-1) UNRELEASED; urgency=medium
     - add ipywidgets to b-d, needed by doc
     - add kiwisolver to b-d, new dependency
     - bump Standards-Version to 4.1.4 (no changes needed)
+    - re-enable pandas b-d
   * refresh patches
   * debian/patches/0011-remove-distutils.sysconfig.patch
     - dont import distutils.sysconfig in matplotlib, as it's meant to be used
@@ -24,7 +25,7 @@ matplotlib (2.2.2-1) UNRELEASED; urgency=medium
   * debian/README.debian
     - update to mention GTK backend is no longer available; Closes: #889137
 
- -- Sandro Tosi <morph@debian.org>  Sat, 14 Apr 2018 16:34:31 -0400
+ -- Sandro Tosi <morph@debian.org>  Sat, 14 Apr 2018 17:02:49 -0400
 
 matplotlib (2.1.1-2) unstable; urgency=medium
 
