@@ -1,4 +1,4 @@
-matplotlib (2.2.2-1) UNRELEASED; urgency=medium
+matplotlib (2.2.2-1) unstable; urgency=medium
 
   [ Ondřej Nový ]
   * d/control: Set Vcs-* to salsa.debian.org
@@ -25,7 +25,7 @@ matplotlib (2.2.2-1) UNRELEASED; urgency=medium
   * debian/README.debian
     - update to mention GTK backend is no longer available; Closes: #889137
 
- -- Sandro Tosi <morph@debian.org>  Sat, 14 Apr 2018 17:02:49 -0400
+ -- Sandro Tosi <morph@debian.org>  Sat, 14 Apr 2018 17:11:41 -0400
 
 matplotlib (2.1.1-2) unstable; urgency=medium
 
