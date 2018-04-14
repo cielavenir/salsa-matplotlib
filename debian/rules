@@ -12,6 +12,7 @@ p3 := python3-matplotlib
 pdata := python-matplotlib-data
 pdbg := python-matplotlib-dbg
 p3dbg := python3-matplotlib-dbg
+DEB_BUILD_OPTIONS += --no-parallel
 
 # build
 build: build-arch build-indep

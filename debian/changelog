@@ -19,10 +19,11 @@ matplotlib (2.2.2-1) UNRELEASED; urgency=medium
       for building packages, not in a top-level module; Closes: #894502
   * debian/rules
     - make doc via Makefile
+    - set --no-parallel
   * debian/README.debian
     - update to mention GTK backend is no longer available; Closes: #889137
 
- -- Sandro Tosi <morph@debian.org>  Sat, 14 Apr 2018 13:36:32 -0400
+ -- Sandro Tosi <morph@debian.org>  Sat, 14 Apr 2018 16:34:31 -0400
 
 matplotlib (2.1.1-2) unstable; urgency=medium
 
