@@ -1,9 +1,9 @@
-matplotlib (2.2.2-2) UNRELEASED; urgency=medium
+matplotlib (2.2.2-2) unstable; urgency=medium
 
   * debian/control
     - make -dbg packages depend on kiwisolver -dbg packages; Closes: #895763
 
- -- Sandro Tosi <morph@debian.org>  Sun, 22 Apr 2018 18:33:47 -0400
+ -- Sandro Tosi <morph@debian.org>  Sun, 22 Apr 2018 18:34:49 -0400
 
 matplotlib (2.2.2-1) unstable; urgency=medium
 
