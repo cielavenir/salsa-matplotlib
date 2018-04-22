@@ -3,8 +3,8 @@ set -efu
 
 DEBUG=${DEBUG:-yes}
 
-export HOME=$ADTTMP
-cd $ADTTMP
+export HOME=$AUTOPKGTEST_TMP
+cd $AUTOPKGTEST_TMP
 
 echo "=== $BACKEND ==="
 
