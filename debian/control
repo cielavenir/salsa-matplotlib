@@ -212,6 +212,7 @@ Architecture: any
 Section: debug
 Depends: python-all-dbg,
          python-matplotlib (= ${binary:Version}),
+         python-kiwisolver-dbg,
          ${misc:Depends},
          ${shlibs:Depends}
 Description: Python based plotting system (debug extension)
@@ -228,6 +229,7 @@ Architecture: any
 Section: debug
 Depends: python3-all-dbg,
          python3-matplotlib (= ${binary:Version}),
+         python3-kiwisolver-dbg,
          ${misc:Depends},
          ${shlibs:Depends}
 Description: Python based plotting system (debug extension, Python 3)
