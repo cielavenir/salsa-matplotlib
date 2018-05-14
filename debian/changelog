@@ -2,9 +2,7 @@ matplotlib (2.2.2-3) UNRELEASED; urgency=medium
 
   [ Ondřej Nový ]
   * d/tests: Use AUTOPKGTEST_TMP instead of ADTTMP
-
- -- Ondřej Nový <onovy@debian.org>  Tue, 17 Apr 2018 13:24:17 +0200
-
+  * d/control: Remove ancient X-Python3-Version field
 
  -- Sandro Tosi <morph@debian.org>  Sun, 22 Apr 2018 18:56:32 -0400
 
