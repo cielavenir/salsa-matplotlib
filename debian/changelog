@@ -7,8 +7,9 @@ matplotlib (2.2.2-3) UNRELEASED; urgency=medium
   [ Sandro Tosi ]
   * debian/control
     - add kiwisolver -dbg packages to b-d, needed by tests
+    - dont install pandas as b-d in armhf; Closes: #898873
 
- -- Sandro Tosi <morph@debian.org>  Sun, 22 Apr 2018 19:06:02 -0400
+ -- Sandro Tosi <morph@debian.org>  Thu, 17 May 2018 19:40:57 -0400
 
 matplotlib (2.2.2-2) unstable; urgency=medium
 
