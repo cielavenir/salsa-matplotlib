@@ -2,6 +2,7 @@ matplotlib (2.2.2-3) UNRELEASED; urgency=medium
 
   [ Ondřej Nový ]
   * d/tests: Use AUTOPKGTEST_TMP instead of ADTTMP
+  * d/control: Remove ancient X-Python3-Version field
 
   [ Sandro Tosi ]
   * debian/control

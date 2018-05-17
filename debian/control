@@ -90,7 +90,6 @@ Build-Depends: debhelper (>= 7),
                xvfb,
                zlib1g-dev
 XS-Python-Version: all
-X-Python3-Version: >= 3.2
 Standards-Version: 4.1.4
 Homepage: http://matplotlib.org/
 Vcs-Git: https://salsa.debian.org/python-team/modules/matplotlib.git
