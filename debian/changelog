@@ -8,8 +8,11 @@ matplotlib (2.2.2-3) UNRELEASED; urgency=medium
   * debian/control
     - add kiwisolver -dbg packages to b-d, needed by tests
     - dont install pandas as b-d in armhf; Closes: #898873
+  * debian/patches/0012-dont-generate-a-test-failure-if-images-are-not-close.patch
+    - print a warning and not fail the test if the image is not close to the
+      matplotlib baseline
 
- -- Sandro Tosi <morph@debian.org>  Thu, 17 May 2018 19:40:57 -0400
+ -- Sandro Tosi <morph@debian.org>  Thu, 17 May 2018 20:00:32 -0400
 
 matplotlib (2.2.2-2) unstable; urgency=medium
 
