@@ -1,4 +1,4 @@
-matplotlib (2.2.2-3) UNRELEASED; urgency=medium
+matplotlib (2.2.2-3) unstable; urgency=medium
 
   [ Ondřej Nový ]
   * d/tests: Use AUTOPKGTEST_TMP instead of ADTTMP
@@ -12,7 +12,7 @@ matplotlib (2.2.2-3) UNRELEASED; urgency=medium
     - print a warning and not fail the test if the image is not close to the
       matplotlib baseline
 
- -- Sandro Tosi <morph@debian.org>  Thu, 17 May 2018 20:00:32 -0400
+ -- Sandro Tosi <morph@debian.org>  Thu, 17 May 2018 20:44:51 -0400
 
 matplotlib (2.2.2-2) unstable; urgency=medium
 
