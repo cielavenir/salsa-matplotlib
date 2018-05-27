@@ -1,10 +1,10 @@
-matplotlib (2.2.2-4) UNRELEASED; urgency=medium
+matplotlib (2.2.2-4) unstable; urgency=medium
 
   * debian/control
     - exclude some of the b-d on archs where they are not available; thanks to
       Graham Inggs
 
- -- Sandro Tosi <morph@debian.org>  Wed, 23 May 2018 19:46:29 -0400
+ -- Sandro Tosi <morph@debian.org>  Sun, 27 May 2018 18:20:55 -0400
 
 matplotlib (2.2.2-3) unstable; urgency=medium
 
