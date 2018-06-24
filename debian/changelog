@@ -1,3 +1,10 @@
+matplotlib (2.2.2-5) UNRELEASED; urgency=medium
+
+  * debian/control
+    - remove armhf and riscv64 from pandas restrictions in b-d; Closes: #902244
+
+ -- Sandro Tosi <morph@debian.org>  Sat, 23 Jun 2018 20:10:25 -0400
+
 matplotlib (2.2.2-4) unstable; urgency=medium
 
   * debian/control
