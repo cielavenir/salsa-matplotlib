@@ -1,7 +1,11 @@
 matplotlib (2.2.2-5) UNRELEASED; urgency=medium
 
+  [ Sandro Tosi ]
   * debian/control
     - remove armhf and riscv64 from pandas restrictions in b-d; Closes: #902244
+
+  [ Ondřej Nový ]
+  * Convert git repository from git-dpm to gbp layout
 
  -- Sandro Tosi <morph@debian.org>  Sat, 23 Jun 2018 20:10:25 -0400
 
