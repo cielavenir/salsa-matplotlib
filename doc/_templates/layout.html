@@ -172,6 +172,7 @@ parents[-1].link|e }}" />
     </a>
 </div>
 {%- endif %}
+
 <div style="background-color: white; text-align: left; padding: 10px 10px 15px 15px; position: relative;">
 {%- if builder in ('htmlhelp', 'devhelp', 'latex') %}
 <a href="{{ pathto('index') }}">
@@ -231,13 +232,16 @@ href="{{ path }}">Copyright</a> {{ copyright }}.{% endtrans %}
 endtrans %}
       {%- endif %}
     {%- endif %}
+        <br />
     {%- if last_updated %}
-      {% trans last_updated=last_updated|e %}Last updated on {{ last_updated
-}}.{% endtrans %}
+      {% trans last_updated=last_updated|e %}Last updated on {{ last_updated }}.{% endtrans %}
     {%- endif %}
     {%- if show_sphinx %}
-      {% trans sphinx_version=sphinx_version|e %}Created using <a
-href="http://sphinx-doc.org/">Sphinx</a> {{ sphinx_version }}.{% endtrans %}
+	{% trans sphinx_version=sphinx_version|e %}Created using
+	<ahref="http://sphinx-doc.org/">Sphinx</a> {{ sphinx_version }}.{% endtrans %}
+    {%- endif %}
+    {%- if sha %}
+	Doc version {{ sha }}.
     {%- endif %}
     </div>
  {%- endblock %}
