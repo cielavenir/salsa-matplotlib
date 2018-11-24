@@ -295,12 +295,11 @@ Issues for New Contributors
 ---------------------------
 
 New contributors should look for the following tags when looking for issues.
-We strongly recommend that new contributors tackle
-`new-contributor-friendly <https://github.com/matplotlib/matplotlib/labels/new-contributor-friendly>`_
-issues (easy, well documented issues, that do not require an understanding of
-the different submodules of Matplotlib) and
-`Easy-fix <https://github.com/matplotlib/matplotlib/labels/Difficulty%3A%20Easy>`_
-issues. This helps the contributor become familiar with the contribution
+We strongly recommend that new contributors tackle issues labeled
+`good first issue <https://github.com/matplotlib/matplotlib/labels/good%20first%20issue>`_
+as they are easy, well documented issues, that do not require an understanding of
+the different submodules of Matplotlib.
+This helps the contributor become familiar with the contribution
 workflow, and for the core devs to become acquainted with the contributor;
 besides which, we frequently underestimate how easy an issue is to solve!
 
@@ -502,7 +501,7 @@ Developing a new backend
 ------------------------
 
 If you are working on a custom backend, the *backend* setting in
-:file:`matplotlibrc` (:ref:`sphx_glr_tutorials_introductory_customizing.py`) supports an
+:file:`matplotlibrc` (:doc:`/tutorials/introductory/customizing`) supports an
 external backend via the ``module`` directive.  If
 :file:`my_backend.py` is a Matplotlib backend in your
 :envvar:`PYTHONPATH`, you can set it on one of several ways

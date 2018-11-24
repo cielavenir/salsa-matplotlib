@@ -232,9 +232,6 @@ div.sphinxsidebar {
     text-align: left;
 /*    margin-left: -100%; */
 }
-div.sphinxsidebarwrapper {
-    padding-top: 28px
-}
 
 div.sphinxsidebar h4, div.sphinxsidebar h3 {
     margin: 1em 0 0.5em 0;
@@ -243,6 +240,11 @@ div.sphinxsidebar h4, div.sphinxsidebar h3 {
     color: white;
     border: 1px solid #86989B;
     background-color: #AFC1C4;
+}
+
+div.sphinxsidebar h3 a {
+    /* workaround for table of contents heading, which is a link */
+    color: white !important;
 }
 
 div.sphinxsidebar ul {
@@ -256,6 +258,36 @@ div.sphinxsidebar ul {
 div.sphinxsidebar ul ul {
     list-style: square;
     margin-left: 20px;
+}
+
+div.sphinxsidebar #searchbox input {
+    border: 1px solid #aaa;
+    padding: 0.25em;
+    box-sizing: border-box;
+}
+
+div.sphinxsidebar #searchbox form {
+    display: inline-block;
+    width: 100%
+}
+
+div.sphinxsidebar #searchbox input[type="text"] {
+    float: left;
+    width: 80%;
+}
+
+div.sphinxsidebar #searchbox input[type="submit"] {
+    float: left;
+    width: 20%;
+    border-left: none;
+}
+
+div.sphinxsidebar #searchbox input[type="submit"]:hover {
+    background: #ddd;
+}
+
+div.sphinxsidebar .searchformwrapper {
+    display: block;
 }
 
 p {
@@ -277,11 +309,11 @@ h2 {
     margin: 0.5em 0 0.2em 0;
     padding-top: 0.5em;
     font-size: 1.7em;
-    padding: 0;
 }
 
 h3 {
     margin: 0.2em 0 0.1em 0;
+    padding-top: 0.5em;
     font-size: 1.2em;
 }
 
@@ -384,7 +416,7 @@ div.deprecated span.versionmodified {
     font-weight: bold;
 }
 
-div.green {
+div.green, div.hint {
     color: #468847;
     background-color: #dff0d8;
     border: 1px solid #d6e9c6;
@@ -670,7 +702,7 @@ table.docutils.field-list {
     padding: 10px;
     text-align: left;
     vertical-align: top;
-    width: 120px;
+    width: 125px;
 }
 .docutils.field-list td {
     padding: 10px 10px 10px 20px;
@@ -680,6 +712,9 @@ table.docutils.field-list {
 .docutils.field-list td blockquote p {
     font-size: 13px;
     line-height: 18px;
+}
+.docutils.field-list td blockquote p ul li{
+    font-size: 13px;
 }
 p.rubric {
     font-weight: bold;
@@ -735,6 +770,8 @@ figure img {
 figcaption {
   text-align: center;
 }
+
+
 
 /* "Go to released version" message. */
 #unreleased-message {
@@ -813,11 +850,13 @@ figcaption {
   }
 }
 
+#sidebar-donations {
+    margin-top: 40px;
+}
+
 .donate_button {
     background:#11557C;
     font-weight:normal;
-    border:solid 1px #fff;
-    outline: solid 1px #11557C;
     clear: both;
     display: block;
     width:200px;
@@ -828,6 +867,7 @@ figcaption {
     color:#fff;
     text-decoration: none;
     margin: 30px auto 0;
+    border-radius: 6px;
     z-index:1;
     transition: background .25s ease;
 }
@@ -928,7 +968,7 @@ div.sphx-glr-download a {
    background-image: none !important;
 }
 
-p.sphx-glr-signature a.reference.external {
+p.sphx-glr-signature {
    display: none !important;
 }
 
@@ -936,3 +976,31 @@ p.sphx-glr-signature a.reference.external {
     font-weight: 400;
 }
 
+.viewcode-link {
+    float: right;
+}
+
+.viewcode-back {
+    float: right;
+    font-family: "Helvetica Neue", Helvetica, 'Lucida Grande', 'Lucida Sans Unicode', 'Geneva', 'Verdana', sans-serif;
+}
+
+div.viewcode-block:target {
+    margin: -1px -13px;
+    padding: 0 10px;
+    border-top: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+    background-color: #f4debf;
+
+}
+
+.sidebar-announcement {
+    border: 1px solid #11557C;
+    background: #eff9ff;
+    padding: 2px;
+    margin-top: 40px;
+}
+
+.sidebar-announcement p {
+    margin: 0.4em 0.4em 0.6em 0.4em;
+}

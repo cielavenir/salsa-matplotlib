@@ -188,10 +188,10 @@ Optionally, you can also install a number of packages to enable better user
 interface toolkits. See :ref:`what-is-a-backend` for more details on the
 optional Matplotlib backends and the capabilities they provide.
 
-  * :term:`tk` (>= 8.3, != 8.6.0 or 8.6.1): for the TkAgg backend;
-  * `PyQt4 <https://pypi.python.org/pypi/PyQt4>`_ (>= 4.4) or
-    `PySide <https://pypi.python.org/pypi/PySide>`_: for the Qt4Agg backend;
-  * `PyQt5 <https://pypi.python.org/pypi/PyQt5>`_: for the Qt5Agg backend;
+  * :term:`tk` (>= 8.3, != 8.6.0 or 8.6.1): for the Tk-based backends;
+  * `PyQt4 <https://pypi.python.org/pypi/PyQt4>`_ (>= 4.6) or
+    `PySide <https://pypi.python.org/pypi/PySide>`_: for the Qt4-based backend;
+  * `PyQt5 <https://pypi.python.org/pypi/PyQt5>`_: for the Qt5-based backend;
   * :term:`pygtk` (>= 2.4): for the GTK and the GTKAgg backend;
   * :term:`wxpython` (>= 2.9 or later): for the WX or WXAgg backend;
   * `cairocffi <https://cairocffi.readthedocs.io/en/latest/>`__ (>=
@@ -330,14 +330,14 @@ without fiddling with environment variables::
   conda install -c conda-forge backports.functools_lru_cache
 
   # copy the libs which have "wrong" names
-  set LIBRARY_LIB=%CONDA_DEFAULT_ENV%\Library\lib
+  set LIBRARY_LIB=%CONDA_PREFIX%\Library\lib
   mkdir lib || cmd /c "exit /b 0"
   copy %LIBRARY_LIB%\zlibstatic.lib lib\z.lib
   copy %LIBRARY_LIB%\libpng_static.lib lib\png.lib
 
   # Make the header files and the rest of the static libs available during the build
   # CONDA_DEFAULT_ENV is a env variable which is set to the currently active environment path
-  set MPLBASEDIRLIST=%CONDA_DEFAULT_ENV%\Library\;.
+  set MPLBASEDIRLIST=%CONDA_PREFIX%\Library\;.
 
   # build the wheel
   python setup.py bdist_wheel
