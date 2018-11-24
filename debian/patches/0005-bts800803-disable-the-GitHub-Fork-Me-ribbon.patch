@@ -6,11 +6,9 @@ Subject: bts800803 disable the GitHub Fork Me ribbon
  doc/_templates/layout.html | 4 ----
  1 file changed, 4 deletions(-)
 
-diff --git a/doc/_templates/layout.html b/doc/_templates/layout.html
-index f0d0ec7..bbf18be 100644
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
-@@ -183,10 +183,6 @@ parents[-1].link|e }}" />
+@@ -184,10 +184,6 @@ parents[-1].link|e }}" />
      <img src="{{pathto("_static/logo2.png", 1) }}" height="125px" border="0" alt="matplotlib"/></a>
  {%- endif %}
  

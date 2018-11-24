@@ -5,11 +5,13 @@ matplotlib (2.2.3-1) UNRELEASED; urgency=medium
   * debian/control
     - remove armhf and riscv64 from pandas restrictions in b-d; Closes: #902244
     - bump Standards-Version to 4.2.1 (no changes needed)
+  * debian/patches/*
+    - refresh, drop
 
   [ Ondřej Nový ]
   * Convert git repository from git-dpm to gbp layout
 
- -- Sandro Tosi <morph@debian.org>  Sat, 24 Nov 2018 16:11:41 -0500
+ -- Sandro Tosi <morph@debian.org>  Sat, 24 Nov 2018 16:19:17 -0500
 
 matplotlib (2.2.2-4) unstable; urgency=medium
 

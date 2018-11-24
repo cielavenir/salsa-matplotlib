@@ -9,11 +9,9 @@ Patch-Name: 20_matplotlibrc_path_search_fix.patch
  lib/matplotlib/__init__.py | 6 ++++--
  1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
-index 9339707..563b0a8 100644
 --- a/lib/matplotlib/__init__.py
 +++ b/lib/matplotlib/__init__.py
-@@ -738,10 +738,12 @@ def _get_data_path():
+@@ -737,10 +737,12 @@ def _get_data_path():
          return path
  
      _file = _decode_filesystem_path(__file__)
@@ -27,7 +25,7 @@ index 9339707..563b0a8 100644
      # setuptools' namespace_packages may highjack this init file
      # so need to try something known to be in matplotlib, not basemap
      import matplotlib.afm
-@@ -836,7 +838,7 @@ def matplotlib_fname():
+@@ -835,7 +837,7 @@ def matplotlib_fname():
              yield matplotlibrc
              yield os.path.join(matplotlibrc, 'matplotlibrc')
          yield os.path.join(_get_configdir(), 'matplotlibrc')
