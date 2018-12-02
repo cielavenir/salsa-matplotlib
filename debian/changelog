@@ -10,11 +10,14 @@ matplotlib (2.2.3-1) UNRELEASED; urgency=medium
   * debian/patches/0013-static-SHA.patch
     - define a static (None) SHA value, so not to require git and and actual git
       repository during build
+  * debian/rules
+    - partial rewrite to avoid implicit parallelism and FTBFS due to multiple
+      targets overwriting/removing files in parallel
 
   [ Ondřej Nový ]
   * Convert git repository from git-dpm to gbp layout
 
- -- Sandro Tosi <morph@debian.org>  Sat, 24 Nov 2018 17:04:29 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 02 Dec 2018 16:08:47 -0500
 
 matplotlib (2.2.2-4) unstable; urgency=medium
 
