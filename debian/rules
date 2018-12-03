@@ -124,6 +124,9 @@ install-arch-stamp: build-arch-stamp
 	find debian/$(p3dbg) ! -type d ! -name '*.so' | xargs rm -f
 	find debian/$(p3dbg) -depth -empty -exec rmdir {} \;
 
+	find debian/ -name '*.pyc' | xargs rm -rf
+	find debian/ -name '__pycache__' | xargs rm -rf
+
 	# don't install baseline_images, needed for tests only, but huge
 	# leave the dir tho, as matplotlib/tests/__init__.py checks for it
 	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/*-packages/matplotlib/tests/baseline_images/*
