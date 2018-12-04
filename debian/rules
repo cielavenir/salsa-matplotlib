@@ -108,15 +108,15 @@ install-arch-stamp: build-arch-stamp
 	dh_testroot
 
 	for v in $(PY2VERS) ; do \
-		python$$v ./setup.py install_lib -d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/ --no-compile ; \
-		python$$v ./setup.py install_egg_info -d $(CURDIR)/debian/$(p)/usr/lib/python$*/site-packages/ ; \
-		python$$v-dbg ./setup.py install_lib -d $(CURDIR)/debian/$(pdbg)/usr/lib/python$*/site-packages/ --no-compile ; \
+		python$$v ./setup.py install_lib --install-dir $(CURDIR)/debian/$(p)/usr/lib/python$$v/dist-packages/ ; \
+		python$$v ./setup.py install_egg_info --install-dir $(CURDIR)/debian/$(p)/usr/lib/python$$v/dist-packages/ ; \
+		python$$v-dbg ./setup.py install --root=$(CURDIR)/debian/$(pdbg) --install-layout=deb ; \
 	done
 
 	for v in $(PY3VERS) ; do \
-		python$$v ./setup.py install_lib -d $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/ --no-compile ; \
-		python$$v ./setup.py install_egg_info -d $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/ ; \
-		python$$v-dbg ./setup.py install_lib -d $(CURDIR)/debian/$(p3dbg)/usr/lib/python3/dist-packages/ --no-compile ; \
+		python$$v ./setup.py install_lib --install-dir $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/ ; \
+		python$$v ./setup.py install_egg_info --install-dir $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/ ; \
+		python$$v-dbg ./setup.py install --root=$(CURDIR)/debian/$(p3dbg) --install-layout=deb ; \
 	done
 
 	find debian/$(pdbg) ! -type d ! -name '*.so' | xargs rm -f
@@ -129,22 +129,23 @@ install-arch-stamp: build-arch-stamp
 
 	# don't install baseline_images, needed for tests only, but huge
 	# leave the dir tho, as matplotlib/tests/__init__.py checks for it
-	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$*/*-packages/matplotlib/tests/baseline_images/*
-	for d in $(CURDIR)/debian/$(p)/usr/lib/python$*/dist-packages/matplotlib/tests/baseline_images/; do \
-	    mkdir -p $$d; \
-	    touch $$d/.keep; \
-	done
-	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/*-packages/matplotlib/tests/baseline_images/*
-	for d in $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/tests/baseline_images/; do \
-	    mkdir -p $$d; \
-	    touch $$d/.keep; \
+	for v in $(PY2VERS) ; do \
+		rm -rf $(CURDIR)/debian/$(p)/usr/lib/python$$v/dist-packages/matplotlib/tests/baseline_images/* ; \
+		mkdir -p $(CURDIR)/debian/$(p)/usr/lib/python$$v/dist-packages/matplotlib/tests/baseline_images/ ; \
+		touch $(CURDIR)/debian/$(p)/usr/lib/python$$v/dist-packages/matplotlib/tests/baseline_images/.keep ; \
 	done
 
-	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python/site-packages/matplotlib/mpl-data/
-	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python/site-packages/matplotlib/backends/Matplotlib.nib/
+	for v in $(PY3VERS) ; do \
+		rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/tests/baseline_images/* ; \
+		mkdir -p $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/tests/baseline_images/ ; \
+		touch $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/tests/baseline_images/.keep ; \
+	done
 
-	rm -rf $(CURDIR)/debian/$(pdbg)/usr/lib/python/site-packages/matplotlib/mpl-data/
-	rm -rf $(CURDIR)/debian/$(pdbg)/usr/lib/python/site-packages/matplotlib/backends/Matplotlib.nib/
+	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python*/dist-packages/matplotlib/mpl-data/
+	rm -rf $(CURDIR)/debian/$(p)/usr/lib/python*/dist-packages/matplotlib/backends/Matplotlib.nib/
+
+	rm -rf $(CURDIR)/debian/$(pdbg)/usr/lib/python*/dist-packages/matplotlib/mpl-data/
+	rm -rf $(CURDIR)/debian/$(pdbg)/usr/lib/python*/dist-packages/matplotlib/backends/Matplotlib.nib/
 
 	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/mpl-data/
 	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/backends/Matplotlib.nib/
@@ -155,12 +156,16 @@ install-arch-stamp: build-arch-stamp
 	# replace minified jquery with packaged version and hope it works
 	for i in $(PY2VERS); do \
 	    dh_link -ppython-matplotlib usr/share/javascript/jquery/jquery.min.js \
-	      usr/lib/python$$i/site-packages/matplotlib/backends/web_backend/jquery/js/jquery-1.7.1.min.js; \
+	      usr/lib/python$$i/dist-packages/matplotlib/backends/web_backend/jquery/js/jquery-1.7.1.min.js; \
 	    dh_link -ppython-matplotlib usr/share/javascript/jquery-ui/jquery-ui.min.js \
-	      usr/lib/python$$i/site-packages/matplotlib/backends/web_backend/jquery/js/jquery-ui.min.js; \
+	      usr/lib/python$$i/dist-packages/matplotlib/backends/web_backend/jquery/js/jquery-ui.min.js; \
 	    dh_link -ppython-matplotlib usr/share/javascript/jquery-ui/css/smoothness/jquery-ui.min.css \
-	      usr/lib/python$$i/site-packages/matplotlib/backends/web_backend/jquery/css/themes/base/jquery-ui.min.css; \
+	      usr/lib/python$$i/dist-packages/matplotlib/backends/web_backend/jquery/css/themes/base/jquery-ui.min.css; \
 	done
+
+	-rm $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/backends/web_backend/jquery/js/jquery-1.7.1.min.js
+	-rm $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/backends/web_backend/jquery/js/jquery-ui.min.js
+	-rm $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/backends/web_backend/jquery/css/themes/base/jquery-ui.min.css
 
 	# replace minified jquery with packaged version and hope it works
 	for i in $(PY3VERS); do \
@@ -171,10 +176,6 @@ install-arch-stamp: build-arch-stamp
 	    dh_link  -ppython3-matplotlib usr/share/javascript/jquery-ui/css/smoothness/jquery-ui.min.css \
 	      usr/lib/python3/dist-packages/matplotlib/backends/web_backend/jquery/css/themes/base/jquery-ui.min.css; \
 	done
-
-	-rm $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/backends/web_backend/jquery/js/jquery-1.7.1.min.js
-	-rm $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/backends/web_backend/jquery/js/jquery-ui.min.js
-	-rm $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/backends/web_backend/jquery/css/themes/base/jquery-ui.min.css
 
 	touch $@
 
