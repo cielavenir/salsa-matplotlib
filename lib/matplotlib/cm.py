@@ -1,16 +1,28 @@
 """
 Builtin colormaps, colormap handling utilities, and the `ScalarMappable` mixin.
 
-See :doc:`/gallery/color/colormap_reference` for a list of builtin colormaps.
-See :doc:`/tutorials/colors/colormaps` for an in-depth discussion of colormaps.
-"""
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+.. seealso::
 
-import six
+  :doc:`/gallery/color/colormap_reference` for a list of builtin
+  colormaps.
+
+  :doc:`/tutorials/colors/colormap-manipulation` for examples of how to
+  make colormaps and
+
+  :doc:`/tutorials/colors/colormaps` an in-depth discussion of
+  choosing colormaps.
+
+  :doc:`/tutorials/colors/colormapnorms` for more details about data
+  normalization
+
+
+"""
+
+import functools
 
 import numpy as np
 from numpy import ma
+
 import matplotlib as mpl
 import matplotlib.colors as colors
 import matplotlib.cbook as cbook
@@ -25,16 +37,18 @@ cmap_d = {}
 # reversed colormaps have '_r' appended to the name.
 
 
-def _reverser(f):
-    def freversed(x):
-        return f(1 - x)
-    return freversed
+def _reverser(f, x=None):
+    """Helper such that ``_reverser(f)(x) == f(1 - x)``."""
+    if x is None:
+        # Returning a partial object keeps it picklable.
+        return functools.partial(_reverser, f)
+    return f(1 - x)
 
 
 def revcmap(data):
     """Can only handle specification *data* in dictionary format."""
     data_r = {}
-    for key, val in six.iteritems(data):
+    for key, val in data.items():
         if callable(val):
             valnew = _reverser(val)
             # This doesn't work: lambda x: val(1-x)
@@ -83,7 +97,7 @@ LUTSIZE = mpl.rcParams['image.lut']
 # Generate the reversed specifications (all at once, to avoid
 # modify-when-iterating).
 datad.update({cmapname + '_r': _reverse_cmap_spec(spec)
-              for cmapname, spec in six.iteritems(datad)})
+              for cmapname, spec in datad.items()})
 
 # Precache the cmaps with ``lutsize = LUTSIZE``.
 # Also add the reversed ones added in the section above:
@@ -123,7 +137,7 @@ def register_cmap(name=None, cmap=None, data=None, lut=None):
         except AttributeError:
             raise ValueError("Arguments must include a name or a Colormap")
 
-    if not isinstance(name, six.string_types):
+    if not isinstance(name, str):
         raise ValueError("Colormap name must be a string")
 
     if isinstance(cmap, colors.Colormap):
@@ -278,8 +292,6 @@ class ScalarMappable(object):
     def set_array(self, A):
         """Set the image array from numpy array *A*.
 
-        .. ACCEPTS: ndarray
-
         Parameters
         ----------
         A : ndarray
@@ -323,7 +335,9 @@ class ScalarMappable(object):
         """
         set the colormap for luminance data
 
-        ACCEPTS: a colormap or registered colormap name
+        Parameters
+        ----------
+        cmap : colormap or registered colormap name
         """
         cmap = get_cmap(cmap)
         self.cmap = cmap
@@ -331,8 +345,6 @@ class ScalarMappable(object):
 
     def set_norm(self, norm):
         """Set the normalization instance.
-
-        .. ACCEPTS: `.Normalize`
 
         Parameters
         ----------
