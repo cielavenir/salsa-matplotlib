@@ -5,8 +5,10 @@ matplotlib (3.0.2-1) UNRELEASED; urgency=medium
     which are only py3k-compatibles
   * debian/watch
     - only track 3.x releases
+  * debian/control
+    - remove dep on python-tz, no longer required upstream
 
- -- Sandro Tosi <morph@debian.org>  Sat, 08 Dec 2018 17:46:57 -0500
+ -- Sandro Tosi <morph@debian.org>  Sat, 08 Dec 2018 18:51:17 -0500
 
 matplotlib (2.2.3-2) unstable; urgency=medium
 
