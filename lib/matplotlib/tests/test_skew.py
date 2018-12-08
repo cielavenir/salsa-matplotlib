@@ -1,8 +1,6 @@
 """
 Testing that skewed axes properly work
 """
-from __future__ import absolute_import, division, print_function
-
 import itertools
 
 import matplotlib.pyplot as plt
@@ -23,7 +21,7 @@ class SkewXTick(maxis.XTick):
         # This ensures that the new value of the location is set before
         # any other updates take place
         self._loc = loc
-        super(SkewXTick, self).update_position(loc)
+        super().update_position(loc)
 
     def _has_default_loc(self):
         return self.get_loc() is None

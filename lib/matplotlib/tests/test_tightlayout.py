@@ -1,6 +1,3 @@
-from __future__ import absolute_import, division, print_function
-
-import six
 import warnings
 
 import numpy as np
@@ -211,7 +208,7 @@ def add_offsetboxes(ax, size=10, margin=.1, color='black'):
         da.add_artist(background)
 
         anchored_box = AnchoredOffsetbox(
-            loc=10,
+            loc='center',
             child=da,
             pad=0.,
             frameon=False,
@@ -307,4 +304,31 @@ def test_big_decorators_vertical():
     axs[1].set_ylabel('b' * 20)
     with warnings.catch_warnings(record=True) as w:
         fig.tight_layout()
+        assert len(w) == 1
+
+
+def test_badsubplotgrid():
+    # test that we get warning for mismatched subplot grids rather
+    # than an error
+    ax1 = plt.subplot2grid((4, 5), (0, 0))
+    # this is the bad entry:
+    ax5 = plt.subplot2grid((5, 5), (0, 3), colspan=3, rowspan=5)
+    with warnings.catch_warnings(record=True) as w:
+        plt.tight_layout()
+        assert len(w) == 1
+
+
+def test_collapsed():
+    # test that if a call to tight_layout will collapes the axes that
+    # it does not get applied:
+    fig, ax = plt.subplots(tight_layout=True)
+    ax.set_xlim([0, 1])
+    ax.set_ylim([0, 1])
+
+    ax.annotate('BIG LONG STRING', xy=(1.25, 2), xytext=(10.5, 1.75),)
+    p1 = ax.get_position()
+    with warnings.catch_warnings(record=True) as w:
+        plt.tight_layout()
+        p2 = ax.get_position()
+        assert p1.width == p2.width
         assert len(w) == 1

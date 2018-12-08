@@ -1,7 +1,3 @@
-from __future__ import absolute_import, division, print_function
-
-import six
-
 import numpy as np
 from io import BytesIO
 import os
@@ -16,7 +12,7 @@ import matplotlib
 from matplotlib import dviread
 
 
-needs_usetex = pytest.mark.xfail(
+needs_usetex = pytest.mark.skipif(
     not matplotlib.checkdep_usetex(True),
     reason="This test needs a TeX installation")
 
@@ -130,7 +126,7 @@ def _test_determinism_save(filename, usetex):
     "filename, usetex",
     # unique filenames to allow for parallel testing
     [("determinism_notex.svg", False),
-     needs_usetex(("determinism_tex.svg", True))])
+     pytest.param("determinism_tex.svg", True, marks=needs_usetex)])
 def test_determinism(filename, usetex):
     import sys
     from subprocess import check_output, STDOUT, CalledProcessError
@@ -143,7 +139,7 @@ def test_determinism(filename, usetex):
                 [sys.executable, '-R', '-c',
                  'import matplotlib; '
                  'matplotlib._called_from_pytest = True; '
-                 'matplotlib.use("svg"); '
+                 'matplotlib.use("svg", force=True); '
                  'from matplotlib.tests.test_backend_svg '
                  'import _test_determinism_save;'
                  '_test_determinism_save(%r, %r)' % (filename, usetex)],
