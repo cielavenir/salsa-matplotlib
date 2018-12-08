@@ -13,74 +13,37 @@ Build-Depends: debhelper (>= 7),
                libfreetype6-dev,
                libpng-dev,
                locales-all,
-               python-all-dbg (>= 2.4.4-6),
-               python-all-dev (>= 2.3.5-7),
                python3-all-dbg,
                python3-all-dev,
-               python-backports.functools-lru-cache,
-               python-cycler (>= 0.10.0),
                python3-cycler (>= 0.10.0),
-               python-dateutil,
                python3-dateutil,
-               python-colorspacious,
                python3-colorspacious,
-               python-cairocffi [!ia64],
                python3-cairocffi [!ia64],
-               python-cxx-dev,
                python3-cxx-dev,
-               python-functools32,
-               python-gi,
                python3-gi,
-               python-ipywidgets,
                python3-ipywidgets,
-               python-kiwisolver,
-               python-kiwisolver-dbg,
                python3-kiwisolver,
                python3-kiwisolver-dbg,
-               python-mock,
                python3-mock,
-               python-mpltoolkits.basemap <!stage1>,
                python3-mpltoolkits.basemap <!stage1>,
-               python-nose,
                python3-nose,
-               python-numpy,
-               python-numpy-dbg,
-               python-numpydoc,
                python3-numpy,
                python3-numpy-dbg,
-               python-pandas [!hppa !m68k !powerpcspe !sparc64 !sh4 !x32],
                python3-pandas [!hppa !m68k !powerpcspe !sparc64 !sh4 !x32],
-               python-pil,
                python3-pil,
-               python-pkg-resources,
                python3-pkg-resources,
-               python-pyparsing (>= 1.5.6),
                python3-pyparsing (>= 1.5.6),
-               python-pytest,
                python3-pytest,
-               python-qt4,
                python3-pyqt4,
-               python-pyqt5 [!hurd-i386],
                python3-pyqt5 [!hurd-i386],
-               python-scipy,
-               python-setuptools,
                python3-setuptools,
-               python-six (>= 1.4),
                python3-six (>= 1.4),
-               python-sphinx (>= 1.0.7+dfsg),
-               python-sphinx-gallery,
+               python3-sphinx (>= 1.0.7+dfsg),
                python3-sphinx-gallery,
-               python-subprocess32,
-               python-tk (>= 2.5.2-1.1),
-               python-tk-dbg (>= 2.5.2-1.1),
                python3-tk,
                python3-tk-dbg,
-               python-tornado,
                python3-tornado,
-               python-tz,
                python3-tz,
-               python-wxgtk3.0,
-               python-xlwt,
                tcl8.6-dev,
                texlive-fonts-recommended,
                texlive-latex-extra,
@@ -94,50 +57,6 @@ Standards-Version: 4.2.1
 Homepage: http://matplotlib.org/
 Vcs-Git: https://salsa.debian.org/python-team/modules/matplotlib.git
 Vcs-Browser: https://salsa.debian.org/python-team/modules/matplotlib
-
-Package: python-matplotlib
-Architecture: any
-Depends: python-backports.functools-lru-cache,
-         python-dateutil,
-         python-matplotlib-data (>= ${source:Version}),
-         python-pyparsing (>= 1.5.6),
-         python-tz,
-         libjs-jquery,
-         libjs-jquery-ui,
-         ${misc:Depends},
-         ${python:Depends},
-         ${shlibs:Depends}
-Recommends: python-pil,
-            python-tk (>= 2.5.2-1.1)
-Enhances: ipython
-Suggests: dvipng,
-          ffmpeg,
-          gir1.2-gtk-3.0,
-          ghostscript,
-          inkscape,
-          ipython (>= 0.6.3),
-          librsvg2-common,
-          python-cairocffi,
-          python-configobj,
-          python-excelerator,
-          python-gobject,
-          python-matplotlib-doc,
-          python-nose,
-          python-qt4,
-          python-scipy,
-          python-sip,
-          python-tornado,
-          python-traits (>= 2.0),
-          python-wxgtk3.0,
-          texlive-extra-utils,
-          texlive-latex-extra,
-          ttf-staypuft
-Description: Python based plotting system in a style similar to Matlab
- Matplotlib is a pure Python plotting library designed to bring
- publication quality plotting to Python with a syntax familiar to
- Matlab users. All of the plotting commands in the pylab interface can
- be accessed either via a functional interface familiar to Matlab
- users or an object oriented interface familiar to Python users.
 
 Package: python3-matplotlib
 Architecture: any
@@ -207,23 +126,6 @@ Description: Python based plotting system (documentation package)
  users or an object oriented interface familiar to Python users.
  .
  This package contains documentation for python-matplotlib.
-
-Package: python-matplotlib-dbg
-Architecture: any
-Section: debug
-Depends: python-all-dbg,
-         python-matplotlib (= ${binary:Version}),
-         python-kiwisolver-dbg,
-         ${misc:Depends},
-         ${shlibs:Depends}
-Description: Python based plotting system (debug extension)
- Matplotlib is a pure Python plotting library designed to bring
- publication quality plotting to Python with a syntax familiar to
- Matlab users. All of the plotting commands in the pylab interface can
- be accessed either via a functional interface familiar to Matlab
- users or an object oriented interface familiar to Python users.
- .
- This package contains the debug extension for python-matplotlib.
 
 Package: python3-matplotlib-dbg
 Architecture: any
