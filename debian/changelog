@@ -1,9 +1,10 @@
-matplotlib (2.2.3-3) UNRELEASED; urgency=medium
+matplotlib (3.0.2-1) UNRELEASED; urgency=medium
 
+  * New upstream release
   * debian/watch
     - only track 3.x releases
 
- -- Sandro Tosi <morph@debian.org>  Sat, 08 Dec 2018 17:14:43 -0500
+ -- Sandro Tosi <morph@debian.org>  Sat, 08 Dec 2018 17:28:55 -0500
 
 matplotlib (2.2.3-2) unstable; urgency=medium
 
