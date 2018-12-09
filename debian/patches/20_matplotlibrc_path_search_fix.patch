@@ -11,24 +11,19 @@ Patch-Name: 20_matplotlibrc_path_search_fix.patch
 
 --- a/lib/matplotlib/__init__.py
 +++ b/lib/matplotlib/__init__.py
-@@ -737,10 +737,12 @@ def _get_data_path():
+@@ -663,6 +663,8 @@ def _get_data_path():
+                                'directory')
          return path
  
-     _file = _decode_filesystem_path(__file__)
--    path = os.sep.join([os.path.dirname(_file), 'mpl-data'])
-+    path = '/usr/share/matplotlib/mpl-data'
-     if os.path.isdir(path):
-         return path
- 
-+    raise RuntimeError('Could not find the matplotlib data files')
++    return '/usr/share/matplotlib/mpl-data'
 +
-     # setuptools' namespace_packages may highjack this init file
-     # so need to try something known to be in matplotlib, not basemap
-     import matplotlib.afm
-@@ -835,7 +837,7 @@ def matplotlib_fname():
+     def get_candidate_paths():
+         yield Path(__file__).with_name('mpl-data')
+         # setuptools' namespace_packages may highjack this init file
+@@ -741,7 +743,7 @@ def matplotlib_fname():
              yield matplotlibrc
              yield os.path.join(matplotlibrc, 'matplotlibrc')
-         yield os.path.join(_get_configdir(), 'matplotlibrc')
+         yield os.path.join(get_configdir(), 'matplotlibrc')
 -        yield os.path.join(get_data_path(), 'matplotlibrc')
 +        yield '/etc/matplotlibrc'
  

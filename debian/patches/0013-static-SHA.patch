@@ -1,10 +1,10 @@
 --- a/doc/conf.py
 +++ b/doc/conf.py
-@@ -159,8 +159,7 @@ source_encoding = "utf-8"
+@@ -134,8 +134,7 @@ source_encoding = "utf-8"
  master_doc = 'contents'
  
  # General substitutions.
--from matplotlib.compat.subprocess import check_output
+-from subprocess import check_output
 -SHA = check_output(['git', 'describe', '--dirty']).decode('utf-8').strip()
 +SHA = None
  

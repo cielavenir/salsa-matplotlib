@@ -8,7 +8,7 @@ Subject: bts800803 remote the Google Analytics tracking
 
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
-@@ -241,16 +241,6 @@ endtrans %}
+@@ -249,16 +249,6 @@ endtrans %}
      </div>
   {%- endblock %}
  
@@ -24,4 +24,4 @@ Subject: bts800803 remote the Google Analytics tracking
 -</script>
  </body>
  <footer>
-   <!--Flipcause Integration v3.0// Flipcause Integration Instructions:
+ </footer>

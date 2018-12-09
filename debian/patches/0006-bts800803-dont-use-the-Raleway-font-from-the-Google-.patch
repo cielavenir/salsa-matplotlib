@@ -6,11 +6,9 @@ Subject: bts800803 dont use the Raleway font (from the Google Fonts API)
  doc/_templates/layout.html | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/doc/_templates/layout.html b/doc/_templates/layout.html
-index bbf18be..2b99b20 100644
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
-@@ -157,7 +157,6 @@ parents[-1].link|e }}" />
+@@ -165,7 +165,6 @@ parents[-1].link|e }}" />
    <link rel="canonical" href="https://matplotlib.org/{{pagename}}.html" />
  {% endblock %}
  
