@@ -8,3 +8,4 @@
 0011-remove-numpy-scipy-from-reference_url.patch
 0012-dont-generate-a-test-failure-if-images-are-not-close.patch
 0013-static-SHA.patch
+0014-py3k-sphinx.patch

@@ -1,0 +1,11 @@
+--- a/doc/Makefile
++++ b/doc/Makefile
+@@ -3,7 +3,7 @@
+ 
+ # You can set these variables from the command line.
+ SPHINXOPTS    = -W
+-SPHINXBUILD   = python -msphinx
++SPHINXBUILD   = python3 -msphinx
+ SPHINXPROJ    = matplotlib
+ SOURCEDIR     = .
+ BUILDDIR      = build

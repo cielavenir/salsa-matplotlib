@@ -11,8 +11,10 @@ matplotlib (3.0.2-1) UNRELEASED; urgency=medium
     - use right variable to loop over py3k interpreters in clean target
   * debian/patches
     - remove merged upstream, refresh patches
+  * debian/patches/0014-py3k-sphinx.patch
+    - build doc with py3k sphinx
 
- -- Sandro Tosi <morph@debian.org>  Sat, 08 Dec 2018 19:49:21 -0500
+ -- Sandro Tosi <morph@debian.org>  Sat, 08 Dec 2018 22:35:04 -0500
 
 matplotlib (2.2.3-2) unstable; urgency=medium
 
