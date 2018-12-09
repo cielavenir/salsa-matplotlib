@@ -55,8 +55,8 @@ clean:
 	dh_testroot
 	
 	for i in $(PY3VERS); do \
-		python$(i) ./setup.py clean --all; \
-		python$(i)-dbg ./setup.py clean --all; \
+		python$$i ./setup.py clean --all; \
+		python$$i-dbg ./setup.py clean --all; \
 	done
 
 	# clean the doc
