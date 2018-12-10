@@ -10,6 +10,7 @@ matplotlib (3.0.2-1) UNRELEASED; urgency=medium
   * debian/rules
     - use right variable to loop over py3k interpreters in clean target
     - select py3k default version
+    - dont run dh_numpy, this is a py3k-only package now
   * debian/patches
     - remove merged upstream, refresh patches
   * debian/patches/0014-py3k-sphinx.patch
@@ -21,7 +22,7 @@ matplotlib (3.0.2-1) UNRELEASED; urgency=medium
   * debian/python-matplotlib-data.install
     - remove lineprops.glade, delete upstream
 
- -- Sandro Tosi <morph@debian.org>  Sun, 09 Dec 2018 20:03:41 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 09 Dec 2018 20:31:43 -0500
 
 matplotlib (2.2.3-2) unstable; urgency=medium
 

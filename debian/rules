@@ -97,7 +97,6 @@ clean:
 install-arch: build-arch install-arch-stamp
 	dh_testdir
 	dh_testroot
-	dh_numpy
 	dh_numpy3
 
 install-arch-stamp: build-arch-stamp
