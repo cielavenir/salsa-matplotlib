@@ -1,4 +1,4 @@
-matplotlib (3.0.2-1) UNRELEASED; urgency=medium
+matplotlib (3.0.2-1) experimental; urgency=medium
 
   * New upstream release
   * drop python2 packages; src:matplotlib will track upstream 3.x releases,
@@ -22,7 +22,7 @@ matplotlib (3.0.2-1) UNRELEASED; urgency=medium
   * debian/python-matplotlib-data.install
     - remove lineprops.glade, delete upstream
 
- -- Sandro Tosi <morph@debian.org>  Sun, 09 Dec 2018 20:31:43 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 09 Dec 2018 23:11:16 -0500
 
 matplotlib (2.2.3-2) unstable; urgency=medium
 
