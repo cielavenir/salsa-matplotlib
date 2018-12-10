@@ -9,6 +9,7 @@ matplotlib (3.0.2-1) UNRELEASED; urgency=medium
     - remove dep on python-tz, no longer required upstream
   * debian/rules
     - use right variable to loop over py3k interpreters in clean target
+    - select py3k default version
   * debian/patches
     - remove merged upstream, refresh patches
   * debian/patches/0014-py3k-sphinx.patch
@@ -16,7 +17,7 @@ matplotlib (3.0.2-1) UNRELEASED; urgency=medium
   * debian/control
     - add numpydoc to b-d, needed by doc
 
- -- Sandro Tosi <morph@debian.org>  Sat, 08 Dec 2018 22:35:53 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 09 Dec 2018 19:13:53 -0500
 
 matplotlib (2.2.3-2) unstable; urgency=medium
 
