@@ -18,8 +18,10 @@ matplotlib (3.0.2-1) UNRELEASED; urgency=medium
     - add numpydoc to b-d, needed by doc
   * debian/patches/0015-disable-sphinx--W.patch
     - disable -W option when running sphinx
+  * debian/python-matplotlib-data.install
+    - remove lineprops.glade, delete upstream
 
- -- Sandro Tosi <morph@debian.org>  Sun, 09 Dec 2018 19:15:37 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 09 Dec 2018 20:03:41 -0500
 
 matplotlib (2.2.3-2) unstable; urgency=medium
 
