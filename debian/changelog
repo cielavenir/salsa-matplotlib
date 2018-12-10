@@ -16,8 +16,10 @@ matplotlib (3.0.2-1) UNRELEASED; urgency=medium
     - build doc with py3k sphinx
   * debian/control
     - add numpydoc to b-d, needed by doc
+  * debian/patches/0015-disable-sphinx--W.patch
+    - disable -W option when running sphinx
 
- -- Sandro Tosi <morph@debian.org>  Sun, 09 Dec 2018 19:13:53 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 09 Dec 2018 19:15:37 -0500
 
 matplotlib (2.2.3-2) unstable; urgency=medium
 
