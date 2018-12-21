@@ -134,6 +134,8 @@ Depends: python3-all-dbg,
          python3-kiwisolver-dbg,
          ${misc:Depends},
          ${shlibs:Depends}
+Breaks: python-matplotlib-dbg (<< 2.2.3-3)
+Replaces: python-matplotlib-dbg (<< 2.2.3-3)
 Description: Python based plotting system (debug extension, Python 3)
  Matplotlib is a pure Python plotting library designed to bring
  publication quality plotting to Python with a syntax familiar to
