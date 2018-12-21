@@ -1,9 +1,10 @@
-matplotlib (3.0.2-2) UNRELEASED; urgency=medium
+matplotlib (3.0.2-2) unstable; urgency=medium
 
+  * upload to unstable
   * debian/control
     - add Breaks+Replaces on python-matplotlib-dbg; Closes: #916140
 
- -- Sandro Tosi <morph@debian.org>  Thu, 20 Dec 2018 18:49:49 -0500
+ -- Sandro Tosi <morph@debian.org>  Thu, 20 Dec 2018 19:00:46 -0500
 
 matplotlib (3.0.2-1) experimental; urgency=medium
 
