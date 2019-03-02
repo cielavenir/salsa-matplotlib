@@ -106,7 +106,7 @@ artist at a global scope and let Python sort things out.  For example ::
 
    fig, ax = plt.subplots()
    xdata, ydata = [], []
-   ln, = plt.plot([], [], 'ro', animated=True)
+   ln, = plt.plot([], [], 'ro')
 
    def init():
        ax.set_xlim(0, 2*np.pi)
@@ -123,7 +123,7 @@ artist at a global scope and let Python sort things out.  For example ::
                        init_func=init, blit=True)
    plt.show()
 
-The second method is to us `functools.partial` to 'bind' artists to
+The second method is to use `functools.partial` to 'bind' artists to
 function.  A third method is to use closures to build up the required
 artists and functions.  A fourth method is to create a class.
 

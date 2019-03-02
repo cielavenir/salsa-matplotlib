@@ -69,7 +69,8 @@ class LinearScale(ScaleBase):
         axis.set_major_formatter(ScalarFormatter())
         axis.set_minor_formatter(NullFormatter())
         # update the minor locator for x and y axis based on rcParams
-        if rcParams['xtick.minor.visible']:
+        if (axis.axis_name == 'x' and rcParams['xtick.minor.visible']
+            or axis.axis_name == 'y' and rcParams['ytick.minor.visible']):
             axis.set_minor_locator(AutoMinorLocator())
         else:
             axis.set_minor_locator(NullLocator())
@@ -107,7 +108,7 @@ class LogTransformBase(Transform):
                 # pass. On the other hand, in practice, we want to clip beyond
                 #     np.log10(np.nextafter(0, 1)) ~ -323
                 # so 1000 seems safe.
-                    out[a <= 0] = -1000
+                out[a <= 0] = -1000
         return out
 
     def __str__(self):

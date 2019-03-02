@@ -24,17 +24,36 @@ This pages lists API changes for the most recent version of Matplotlib.
      The list below is a table of contents of individual files from the 'next_api_changes' folder.
      When a release is made
 
-       - The full text list below should be moved into its own file in 'prev_api_changes'
+       - The full text list below should be moved into its own file in
+         'prev_api_changes' for minor and major versions, add sections at
+         the top for bug-fix releases.
        - All the files in 'next_api_changes' should be moved to the bottom of this page
        - This note, and the toctree below should be commented out
 
 
-   .. toctree::
-      :glob:
-      :maxdepth: 1
+      .. toctree::
+         :glob:
+         :maxdepth: 1
 
-      next_api_changes/*
+         next_api_changes/*
 
+API Changes for 3.0.3
+=====================
+
+matplotlib.font_manager.win32InstalledFonts return value
+--------------------------------------------------------
+
+`matplotlib.font_manager.win32InstalledFonts` returns an empty list instead
+of None if no fonts are found.
+
+
+Matplotlib.use now has an ImportError for interactive backend
+-------------------------------------------------------------
+
+Switching backends via `matplotlib.use` is now allowed by default,
+regardless of whether `matplotlib.pyplot` has been imported. If the user
+tries to switch from an already-started interactive backend to a different
+interactive backend, an ImportError will be raised.
 
 API Changes for 3.0.1
 =====================
@@ -42,7 +61,7 @@ API Changes for 3.0.1
 `.tight_layout.auto_adjust_subplotpars` can return ``None`` now if the new
 subplotparams will collapse axes to zero width or height.  This prevents
 ``tight_layout`` from being executed.  Similarly
-`.tight_layout.get_tight_layout_figure` will return None.  
+`.tight_layout.get_tight_layout_figure` will return None.
 
 API Changes for 3.0.0
 =====================
@@ -514,7 +533,7 @@ Removals
 Hold machinery
 ``````````````
 
-Setting or unsetting ``hold`` (deprecated in version 2.1) has now
+Setting or unsetting ``hold`` (:ref:`deprecated in version 2.0<v200_deprecate_hold>`) has now
 been completely removed. Matplotlib now always behaves as if ``hold=True``.
 To clear an axes you can manually use :meth:`~.axes.Axes.cla()`,
 or to clear an entire figure use :meth:`~.figure.Figure.clf()`.
