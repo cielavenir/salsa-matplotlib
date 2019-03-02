@@ -383,7 +383,7 @@ def xkcd(scale=1, length=100, randomness=2):
 
     from matplotlib import patheffects
     return rc_context({
-        'font.family': ['xkcd', 'Humor Sans', 'Comic Sans MS'],
+        'font.family': ['xkcd', 'xkcd Script', 'Humor Sans', 'Comic Sans MS'],
         'font.size': 14.0,
         'path.sketch': (scale, length, randomness),
         'path.effects': [patheffects.withStroke(linewidth=4, foreground="w")],
@@ -429,7 +429,7 @@ def figure(num=None,  # autoincrement if None, else integer from 1-N
         If num is a string, the window title will be set to this figure's
         `num`.
 
-    figsize : tuple of integers, optional, default: None
+    figsize : (float, float), optional, default: None
         width, height in inches. If not provided, defaults to
         :rc:`figure.figsize` = ``[6.4, 4.8]``.
 
@@ -2176,11 +2176,10 @@ def matshow(A, fignum=None, **kwargs):
     fignum : None or int or False
         If *None*, create a new figure window with automatic numbering.
 
-        If *fignum* is an integer, draw into the figure with the given number
+        If a nonzero integer, draw into the figure with the given number
         (create it if it does not exist).
 
-        If 0 or *False*, use the current axes if it exists instead of creating
-        a new figure.
+        If 0, use the current axes (or create one if it does not exist).
 
         .. note::
 
@@ -2198,7 +2197,7 @@ def matshow(A, fignum=None, **kwargs):
 
     """
     A = np.asanyarray(A)
-    if fignum is False or fignum is 0:
+    if fignum == 0:
         ax = gca()
     else:
         # Extract actual aspect ratio of array and make appropriately sized figure
@@ -2207,7 +2206,6 @@ def matshow(A, fignum=None, **kwargs):
 
     im = ax.matshow(A, **kwargs)
     sci(im)
-
     return im
 
 

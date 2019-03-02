@@ -20,8 +20,8 @@ def get_keywords():
     # setup.py/versioneer.py will grep for the variable names, so they must
     # each be defined on a line of their own. _version.py will just call
     # get_keywords().
-    git_refnames = " (tag: v3.0.2)"
-    git_full = "8858a0d1bdd149a0897789e8503ac586be14676d"
+    git_refnames = " (tag: v3.0.3)"
+    git_full = "93990abc5c6917a6a82d966ce1a4380d30370b00"
     keywords = {"refnames": git_refnames, "full": git_full}
     return keywords
 
