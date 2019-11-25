@@ -1,6 +1,6 @@
-====
-axes
-====
+*******************
+``matplotlib.axes``
+*******************
 
 .. currentmodule:: matplotlib.axes
 
@@ -188,6 +188,8 @@ Text and Annotations
    Axes.inset_axes
    Axes.indicate_inset
    Axes.indicate_inset_zoom
+   Axes.secondary_xaxis
+   Axes.secondary_yaxis
 
 
 Fields
@@ -672,7 +674,6 @@ Other
    :nosignatures:
 
    Axes.zorder
-   Axes.aname
    Axes.get_default_bbox_extra_artists
    Axes.get_transformed_clip_path_and_affine
    Axes.has_data

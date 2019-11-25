@@ -20,7 +20,7 @@ def mandelbrot_set(xmin, xmax, ymin, ymax, xn, yn, maxiter, horizon=2.0):
     N = np.zeros_like(C, dtype=int)
     Z = np.zeros_like(C)
     for n in range(maxiter):
-        I = np.less(abs(Z), horizon)
+        I = abs(Z) < horizon
         N[I] = n
         Z[I] = Z[I]**2 + C[I]
     N[N == maxiter-1] = 0
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     light = colors.LightSource(azdeg=315, altdeg=10)
     M = light.shade(M, cmap=plt.cm.hot, vert_exag=1.5,
                     norm=colors.PowerNorm(0.3), blend_mode='hsv')
-    plt.imshow(M, extent=[xmin, xmax, ymin, ymax], interpolation="bicubic")
+    ax.imshow(M, extent=[xmin, xmax, ymin, ymax], interpolation="bicubic")
     ax.set_xticks([])
     ax.set_yticks([])
 

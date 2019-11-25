@@ -1,6 +1,6 @@
-The top level :mod:`matplotlib` module
-======================================
-
+**************
+``matplotlib``
+**************
 
 .. py:currentmodule:: matplotlib
 
@@ -33,3 +33,5 @@ The top level :mod:`matplotlib` module
 .. autofunction:: interactive
 
 .. autofunction:: is_interactive
+
+.. autofunction:: set_loglevel

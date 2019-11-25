@@ -47,15 +47,10 @@ Installing dependencies
 The documentation for Matplotlib is generated from reStructuredText (ReST_)
 using the Sphinx_ documentation generation tool. There are several extra
 requirements that are needed to build the documentation. They are listed in
-:file:`doc-requirements.txt` and listed below:
+:file:`doc-requirements.txt`, which is shown below:
 
-* Sphinx>=1.3, !=1.5.0, !=1.6.4, !=1.7.3
-* colorspacious
-* IPython
-* numpydoc>=0.8
-* Pillow>=3.4
-* sphinx-gallery>=0.2
-* graphviz
+.. include:: ../../requirements/doc/doc-requirements.txt
+   :literal:
 
 .. note::
 
@@ -480,7 +475,9 @@ also`` sections. No need to use backticks there::
 Wrapping parameter lists
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Long parameter lists should be wrapped using a ``\`` for continuation and
-starting on the new line without any indent:
+starting on the new line without any indent (no indent because pydoc will
+parse the docstring and strip the line continuation so that indent would
+result in a lot of whitespace within the line):
 
 .. code-block:: python
 
@@ -490,8 +487,7 @@ starting on the new line without any indent:
 
       Parameters
       ----------
-      projection :
-          {'aitoff', 'hammer', 'lambert', 'mollweide', 'polar', \
+      projection : {'aitoff', 'hammer', 'lambert', 'mollweide', 'polar', \
   'rectilinear'}, optional
           The projection type of the axes.
 
@@ -504,15 +500,8 @@ section of the docstring.
 rcParams
 ~~~~~~~~
 rcParams can be referenced with the custom ``:rc:`` role:
-:literal:`:rc:\`foo\`` yields ``rcParams["foo"]``. Use `= [default-val]`
-to indicate the default value of the parameter. The default value should be
-literal, i.e. enclosed in double backticks. For simplicity these may be
-omitted for string default values.
-
-.. code-block:: rst
-
-  If not provided, defaults to :rc:`figure.figsize` = ``[6.4, 4.8]``.
-  If not provided, defaults to :rc:`figure.facecolor` = 'w'.
+:literal:`:rc:\`foo\`` yields ``rcParams["foo"] = 'default'``, which is a link
+to the :file:`matplotlibrc` file description.
 
 Deprecated formatting conventions
 ---------------------------------
@@ -616,7 +605,7 @@ Then in any function accepting `~.Line2D` pass-through ``kwargs``, e.g.,
       Some stuff omitted
 
       The kwargs are Line2D properties:
-      %(Line2D)s
+      %(_Line2D_docstr)s
 
       kwargs scalex and scaley, if defined, are passed on
       to autoscale_view to determine whether the x and y axes are
@@ -904,9 +893,8 @@ Some helpful functions::
 
 .. _ReST: http://docutils.sourceforge.net/rst.html
 .. _Sphinx: http://www.sphinx-doc.org
-.. _documentation: http://www.sphinx-doc.org/contents.html
-.. _`inline markup`: http://www.sphinx-doc.org/markup/inline.html
+.. _documentation: https://www.sphinx-doc.org/en/master/contents.html
 .. _index: http://www.sphinx-doc.org/markup/para.html#index-generating-markup
 .. _`Sphinx Gallery`: https://sphinx-gallery.readthedocs.io/en/latest/
-.. _references: http://www.sphinx-doc.org/en/stable/markup/inline.html
+.. _references: https://www.sphinx-doc.org/en/stable/usage/restructuredtext/roles.html
 .. _`numpydoc docstring guide`: https://numpydoc.readthedocs.io/en/latest/format.html

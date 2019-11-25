@@ -54,6 +54,8 @@ Thumbs.db
 ###################################
 lib/matplotlib/mpl-data/matplotlib.conf
 lib/matplotlib/mpl-data/matplotlibrc
+tutorials/intermediate/CL01.png
+tutorials/intermediate/CL02.png
 
 # Documentation generated files #
 #################################
@@ -67,13 +69,13 @@ doc/tutorials
 doc/modules
 doc/pyplots/tex_demo.png
 lib/dateutil
+examples/*/*.eps
 examples/*/*.pdf
 examples/*/*.png
 examples/*/*.svg
-examples/*/*.eps
 examples/*/*.svgz
 examples/tests/*
-!examples/tests/backend_driver.py
+!examples/tests/backend_driver_sgskip.py
 result_images
 
 # Nose/Pytest generated files #

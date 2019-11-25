@@ -145,17 +145,13 @@ class GrowFilter(BaseFilter):
             self.color = color
 
     def __call__(self, im, dpi):
-        pad = self.pixels
         ny, nx, depth = im.shape
-        new_im = np.empty([pad*2 + ny, pad*2 + nx, depth], dtype="d")
-        alpha = new_im[:, :, 3]
-        alpha.fill(0)
-        alpha[pad:-pad, pad:-pad] = im[:, :, -1]
+        alpha = np.pad(im[..., -1], self.pixels, "constant")
         alpha2 = np.clip(smooth2d(alpha, self.pixels/72.*dpi) * 5, 0, 1)
+        new_im = np.empty((*alpha2.shape, 4))
         new_im[:, :, -1] = alpha2
         new_im[:, :, :-1] = self.color
-        offsetx, offsety = -pad, -pad
-
+        offsetx, offsety = -self.pixels, -self.pixels
         return new_im, offsetx, offsety
 
 
@@ -207,7 +203,7 @@ def filtered_text(ax):
                    fmt='%1.1f',
                    fontsize=11)
 
-    # change clable color to black
+    # change clabel color to black
     from matplotlib.patheffects import Normal
     for t in cl:
         t.set_color("k")
@@ -265,15 +261,15 @@ def drop_shadow_line(ax):
 def drop_shadow_patches(ax):
     # Copied from barchart_demo.py
     N = 5
-    menMeans = (20, 35, 30, 35, 27)
+    men_means = [20, 35, 30, 35, 27]
 
     ind = np.arange(N)  # the x locations for the groups
     width = 0.35       # the width of the bars
 
-    rects1 = ax.bar(ind, menMeans, width, color='r', ec="w", lw=2)
+    rects1 = ax.bar(ind, men_means, width, color='r', ec="w", lw=2)
 
-    womenMeans = (25, 32, 34, 20, 25)
-    rects2 = ax.bar(ind + width + 0.1, womenMeans, width,
+    women_means = [25, 32, 34, 20, 25]
+    rects2 = ax.bar(ind + width + 0.1, women_means, width,
                     color='y', ec="w", lw=2)
 
     # gauss = GaussianFilter(1.5, offsets=(1,1), )
@@ -307,9 +303,9 @@ def light_filter_pie(ax):
     shadow.set_zorder(pies[0][0].get_zorder() - 0.1)
 
 
-if 1:
+if __name__ == "__main__":
 
-    plt.figure(1, figsize=(6, 6))
+    plt.figure(figsize=(6, 6))
     plt.subplots_adjust(left=0.05, right=0.95)
 
     ax = plt.subplot(221)

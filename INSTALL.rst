@@ -1,5 +1,3 @@
-.. _pip: https://pypi.python.org/pypi/pip/
-
 ==========
 Installing
 ==========
@@ -32,17 +30,11 @@ Although not required, we suggest also installing ``IPython`` for
 interactive use.  To easily install a complete Scientific Python
 stack, see :ref:`install_scipy_dists` below.
 
-macOS
------
-
-To use the native OSX backend you will need :ref:`a framework build
-<osxframework-faq>` build of Python.
-
 Test data
 ---------
 
 The wheels (:file:`*.whl`) on the `PyPI download page
-<https://pypi.python.org/pypi/matplotlib/>`_ do not contain test data
+<https://pypi.org/project/matplotlib/>`_ do not contain test data
 or example code.
 
 If you want to try the many demos that come in the Matplotlib source
@@ -53,7 +45,7 @@ To run the test suite:
 
 * extract the :file:`lib/matplotlib/tests` or :file:`lib/mpl_toolkits/tests`
   directories from the source distribution;
-* install test dependencies: `pytest <https://pypi.python.org/pypi/pytest>`_,
+* install test dependencies: `pytest <https://pypi.org/project/pytest>`_,
   Pillow, MiKTeX, GhostScript, ffmpeg, avconv, ImageMagick, and `Inkscape
   <https://inkscape.org/>`_;
 * run ``python -mpytest``.
@@ -66,7 +58,7 @@ Third-party distributions of Matplotlib
 Scientific Python Distributions
 -------------------------------
 
-`Anaconda <https://www.continuum.io/downloads/>`_ and `Canopy
+`Anaconda <https://www.anaconda.com/>`_ and `Canopy
 <https://www.enthought.com/products/canopy/>`_ and `ActiveState
 <https://www.activestate.com/activepython/downloads>`_ are excellent
 choices that "just work" out of the box for Windows, macOS and common
@@ -94,14 +86,13 @@ If you are interested in contributing to Matplotlib development,
 running the latest source code, or just like to build everything
 yourself, it is not difficult to build Matplotlib from source.  Grab
 the latest *tar.gz* release file from `the PyPI files page
-<https://pypi.python.org/pypi/matplotlib/>`_, or if you want to
+<https://pypi.org/project/matplotlib/>`_, or if you want to
 develop Matplotlib or just need the latest bugfixed version, grab the
-latest git version :ref:`install-from-git`.
+latest git version, and see :ref:`install-from-git`.
 
-The standard environment variables `CC`, `CXX`, `PKG_CONFIG` are respected.
-This means you can set them if your toolchain is prefixed. This may be used for
-cross compiling.
-::
+The standard environment variables :envvar:`CC`, :envvar:`CXX`,
+:envvar:`PKG_CONFIG` are respected.  This means you can set them if your
+toolchain is prefixed. This may be used for cross compiling. ::
 
   export CC=x86_64-pc-linux-gnu-gcc
   export CXX=x86_64-pc-linux-gnu-g++
@@ -121,13 +112,6 @@ file will be particularly useful to those packaging Matplotlib.
 
 .. _setup.cfg: https://raw.githubusercontent.com/matplotlib/matplotlib/master/setup.cfg.template
 
-If you have installed prerequisites to nonstandard places and need to
-inform Matplotlib where they are, edit ``setupext.py`` and add the base
-dirs to the ``basedir`` dictionary entry for your ``sys.platform``;
-e.g., if the header of some required library is in
-``/some/path/include/someheader.h``, put ``/some/path`` in the
-``basedir`` list for your platform.
-
 .. _install_requirements:
 
 Dependencies
@@ -135,13 +119,13 @@ Dependencies
 
 Matplotlib requires the following dependencies:
 
-* `Python <https://www.python.org/downloads/>`_ (>= 3.5)
+* `Python <https://www.python.org/downloads/>`_ (>= 3.6)
 * `FreeType <https://www.freetype.org/>`_ (>= 2.3)
 * `libpng <http://www.libpng.org>`_ (>= 1.2)
-* `NumPy <http://www.numpy.org>`_ (>= |minimum_numpy_version|)
+* `NumPy <http://www.numpy.org>`_ (>= 1.11)
 * `setuptools <https://setuptools.readthedocs.io/en/latest/>`_
 * `cycler <http://matplotlib.org/cycler/>`_ (>= 0.10.0)
-* `dateutil <https://pypi.python.org/pypi/python-dateutil>`_ (>= 2.1)
+* `dateutil <https://pypi.org/project/python-dateutil>`_ (>= 2.1)
 * `kiwisolver <https://github.com/nucleic/kiwi>`_ (>= 1.0.0)
 * `pyparsing <https://pyparsing.wikispaces.com/>`_
 
@@ -150,18 +134,17 @@ interface toolkits. See :ref:`what-is-a-backend` for more details on the
 optional Matplotlib backends and the capabilities they provide.
 
 * :term:`tk` (>= 8.3, != 8.6.0 or 8.6.1): for the Tk-based backends;
-* `PyQt4 <https://pypi.python.org/pypi/PyQt4>`_ (>= 4.6) or
-  `PySide <https://pypi.python.org/pypi/PySide>`_ (>= 1.0.3): for the Qt4-based
+* `PyQt4 <https://pypi.org/project/PyQt4>`_ (>= 4.6) or
+  `PySide <https://pypi.org/project/PySide>`_ (>= 1.0.3): for the Qt4-based
   backends;
-* `PyQt5 <https://pypi.python.org/pypi/PyQt5>`_: for the Qt5-based backends;
-* `PyGObject <https://pypi.org/project/PyGObject/>`_ or
-  `pgi <https://pypi.org/project/pgi/>`_ (>= 0.0.11.2): for the GTK3-based
+* `PyQt5 <https://pypi.org/project/PyQt5>`_: for the Qt5-based backends;
+* `PyGObject <https://pypi.org/project/PyGObject/>`_: for the GTK3-based
   backends;
 * :term:`wxpython` (>= 4): for the WX-based backends;
 * `cairocffi <https://cairocffi.readthedocs.io/en/latest/>`_ (>= 0.8) or
-  `pycairo <https://pypi.python.org/pypi/pycairo>`_: for the cairo-based
+  `pycairo <https://pypi.org/project/pycairo>`_: for the cairo-based
   backends;
-* `Tornado <https://pypi.python.org/pypi/tornado>`_: for the WebAgg backend;
+* `Tornado <https://pypi.org/project/tornado>`_: for the WebAgg backend;
 
 For better support of animation output format and image file formats, LaTeX,
 etc., you can install the following:
@@ -177,18 +160,43 @@ etc., you can install the following:
 
 .. note::
 
-   Matplotlib depends on non-Python libraries. `pkg-config
-   <https://www.freedesktop.org/wiki/Software/pkg-config/>`_ can be used
-   to find required non-Python libraries and thus make the install go more
-   smoothly if the libraries and headers are not in the expected locations.
+   Matplotlib depends on non-Python libraries.
+
+   On Linux and OSX, pkg-config_ can be used to find required non-Python
+   libraries and thus make the install go more smoothly if the libraries and
+   headers are not in the expected locations.
+
+   .. _pkg-config: https://www.freedesktop.org/wiki/Software/pkg-config/
+
+   If not using pkg-config (in particular on Windows), you may need to set the
+   include path (to the FreeType, libpng, and zlib headers) and link path (to
+   the FreeType, libpng, and zlib libraries) explicitly, if they are not in
+   standard locations.  This can be done using standard environment variables
+   -- on Linux and OSX:
+
+   .. code-block:: sh
+
+      export CFLAGS='-I/directory/containing/ft2build.h ...'
+      export LDFLAGS='-L/directory/containing/libfreetype.so ...'
+
+   and on Windows:
+
+   .. code-block:: bat
+
+      set CL=/IC:\directory\containing\ft2build.h ...
+      set LINK=/LIBPATH:C:\directory\containing\freetype.lib ...
+
+   where ``...`` means "also give, in the same format, the directories
+   containing ``png.h`` and ``zlib.h`` for the include path, and for
+   ``libpng.so``/``png.lib`` and ``libz.so``/``z.lib`` for the link path."
 
 .. note::
 
   The following libraries are shipped with Matplotlib:
 
-  - `Agg`: the Anti-Grain Geometry C++ rendering engine;
-  - `qhull`: to compute Delaunay triangulation;
-  - `ttconv`: a TrueType font utility.
+  - ``Agg``: the Anti-Grain Geometry C++ rendering engine;
+  - ``qhull``: to compute Delaunay triangulation;
+  - ``ttconv``: a TrueType font utility.
 
 .. _build_linux:
 
@@ -292,4 +300,4 @@ Conda packages
 ^^^^^^^^^^^^^^
 
 The conda packaging scripts for Matplotlib are available at
-https://github.com/conda-forge/python-feedstock.
+https://github.com/conda-forge/matplotlib-feedstock.

@@ -98,7 +98,7 @@ fig, ax_lst = plt.subplots(2, 2)  # a figure with a 2x2 grid of Axes
 # :meth:`~matplotlib.axes.Axes.set_xlabel`), and a y-label set via
 # :meth:`~matplotlib.axes.Axes.set_ylabel`).
 #
-# The :class:`Axes` class and it's member functions are the primary entry
+# The :class:`Axes` class and its member functions are the primary entry
 # point to working with the OO interface.
 #
 # :class:`~matplotlib.axis.Axis`
@@ -137,9 +137,9 @@ fig, ax_lst = plt.subplots(2, 2)  # a figure with a 2x2 grid of Axes
 # For example, to convert a `pandas.DataFrame` ::
 #
 #   a = pandas.DataFrame(np.random.rand(4,5), columns = list('abcde'))
-#   a_asndarray = a.values
+#   a_asarray = a.values
 #
-# and to covert a `np.matrix` ::
+# and to convert a `np.matrix` ::
 #
 #   b = np.matrix([[1,2],[3,4]])
 #   b_asarray = np.asarray(b)
@@ -149,14 +149,15 @@ fig, ax_lst = plt.subplots(2, 2)  # a figure with a 2x2 grid of Axes
 # Matplotlib, pyplot and pylab: how are they related?
 # ====================================================
 #
-# Matplotlib is the whole package; :mod:`matplotlib.pyplot`
-# is a module in matplotlib; and :mod:`pylab` is a module
-# that gets installed alongside :mod:`matplotlib`.
+# Matplotlib is the whole package and :mod:`matplotlib.pyplot` is a module in
+# Matplotlib.
 #
-# Pyplot provides the state-machine interface to the underlying
-# object-oriented plotting library.  The state-machine implicitly and
-# automatically creates figures and axes to achieve the desired
-# plot. For example:
+# For functions in the pyplot module, there is always a "current" figure and
+# axes (which is created automatically on request).  For example, in the
+# following example, the first call to ``plt.plot`` creates the axes, then
+# subsequent calls to ``plt.plot`` add additional lines on the same axes, and
+# ``plt.xlabel``, ``plt.ylabel``, ``plt.title`` and ``plt.legend`` set the
+# axes labels and title and add a legend.
 
 x = np.linspace(0, 2, 100)
 
@@ -174,16 +175,9 @@ plt.legend()
 plt.show()
 
 ###############################################################################
-# The first call to ``plt.plot`` will automatically create the necessary
-# figure and axes to achieve the desired plot.  Subsequent calls to
-# ``plt.plot`` re-use the current axes and each add another line.
-# Setting the title, legend, and axis labels also automatically use the
-# current axes and set the title, create the legend, and label the axis
-# respectively.
-#
 # :mod:`pylab` is a convenience module that bulk imports
 # :mod:`matplotlib.pyplot` (for plotting) and :mod:`numpy`
-# (for mathematics and working with arrays) in a single name space.
+# (for mathematics and working with arrays) in a single namespace.
 # pylab is deprecated and its use is strongly discouraged because
 # of namespace pollution. Use pyplot instead.
 #
@@ -392,7 +386,7 @@ my_plotter(ax2, data3, data4, {'marker': 'o'})
 # DPI setting.
 #
 # Here is a summary of the matplotlib renderers (there is an eponymous
-# backed for each; these are *non-interactive backends*, capable of
+# backend for each; these are *non-interactive backends*, capable of
 # writing to a file):
 #
 # =============   ============   ================================================
@@ -411,6 +405,9 @@ my_plotter(ax2, data3, data4, {'marker': 'o'})
 #                 :term:`pdf`    `Cairo graphics`_ library
 #                 :term:`svg`
 # =============   ============   ================================================
+#
+# To save plots using the non-interactive backends, use the
+# ``matplotlib.pyplot.savefig('filename')`` method.
 #
 # And here are the user interfaces and renderer combinations supported;
 # these are *interactive backends*, capable of displaying to the screen
@@ -712,7 +709,7 @@ my_plotter(ax2, data3, data4, {'marker': 'o'})
 # line segments. Marker simplification is only available
 # to :class:`~matplotlib.lines.Line2D` objects (through the
 # ``markevery`` property). Wherever
-# :class:`~matplotlib.lines.Line2D` construction parameter
+# :class:`~matplotlib.lines.Line2D` construction parameters
 # are passed through, such as
 # :func:`matplotlib.pyplot.plot` and
 # :meth:`matplotlib.axes.Axes.plot`, the ``markevery``
@@ -732,7 +729,7 @@ my_plotter(ax2, data3, data4, {'marker': 'o'})
 # then you can make use of the ``agg.path.chunksize`` rc parameter.
 # This allows you to specify a chunk size, and any lines with
 # greater than that many vertices will be split into multiple
-# lines, each of which have no more than ``agg.path.chunksize``
+# lines, each of which has no more than ``agg.path.chunksize``
 # many vertices. (Unless ``agg.path.chunksize`` is zero, in
 # which case there is no chunking.) For some kind of data,
 # chunking the line up into reasonable sizes can greatly

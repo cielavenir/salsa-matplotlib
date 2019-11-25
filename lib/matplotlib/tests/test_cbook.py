@@ -13,7 +13,8 @@ import pytest
 
 import matplotlib.cbook as cbook
 import matplotlib.colors as mcolors
-from matplotlib.cbook import delete_masked_points as dmp
+from matplotlib.cbook import (
+    MatplotlibDeprecationWarning, delete_masked_points as dmp)
 
 
 def test_is_hashable():
@@ -47,23 +48,21 @@ class Test_delete_masked_points(object):
     def test_string_seq(self):
         actual = dmp(self.arr_s, self.arr1)
         ind = [0, 1, 2, 5]
-        expected = (self.arr_s2.take(ind), self.arr2.take(ind))
+        expected = (self.arr_s2[ind], self.arr2[ind])
         assert_array_equal(actual[0], expected[0])
         assert_array_equal(actual[1], expected[1])
 
     def test_datetime(self):
         actual = dmp(self.arr_dt, self.arr3)
-        ind = [0, 1,  5]
-        expected = (self.arr_dt2.take(ind),
-                    self.arr3.take(ind).compressed())
+        ind = [0, 1, 5]
+        expected = (self.arr_dt2[ind], self.arr3[ind].compressed())
         assert_array_equal(actual[0], expected[0])
         assert_array_equal(actual[1], expected[1])
 
     def test_rgba(self):
         actual = dmp(self.arr3, self.arr_rgba)
         ind = [0, 1, 5]
-        expected = (self.arr3.take(ind).compressed(),
-                    self.arr_rgba.take(ind, axis=0))
+        expected = (self.arr3[ind].compressed(), self.arr_rgba[ind])
         assert_array_equal(actual[0], expected[0])
         assert_array_equal(actual[1], expected[1])
 
@@ -494,8 +493,107 @@ def test_flatiter():
     assert 1 == next(it)
 
 
+def test_reshape2d():
+
+    class dummy():
+        pass
+
+    xnew = cbook._reshape_2D([], 'x')
+    assert np.shape(xnew) == (1, 0)
+
+    x = [dummy() for j in range(5)]
+
+    xnew = cbook._reshape_2D(x, 'x')
+    assert np.shape(xnew) == (1, 5)
+
+    x = np.arange(5)
+    xnew = cbook._reshape_2D(x, 'x')
+    assert np.shape(xnew) == (1, 5)
+
+    x = [[dummy() for j in range(5)] for i in range(3)]
+    xnew = cbook._reshape_2D(x, 'x')
+    assert np.shape(xnew) == (3, 5)
+
+    # this is strange behaviour, but...
+    x = np.random.rand(3, 5)
+    xnew = cbook._reshape_2D(x, 'x')
+    assert np.shape(xnew) == (5, 3)
+
+    # Now test with a list of lists with different lengths, which means the
+    # array will internally be converted to a 1D object array of lists
+    x = [[1, 2, 3], [3, 4], [2]]
+    xnew = cbook._reshape_2D(x, 'x')
+    assert isinstance(xnew, list)
+    assert isinstance(xnew[0], np.ndarray) and xnew[0].shape == (3,)
+    assert isinstance(xnew[1], np.ndarray) and xnew[1].shape == (2,)
+    assert isinstance(xnew[2], np.ndarray) and xnew[2].shape == (1,)
+
+    # We now need to make sure that this works correctly for Numpy subclasses
+    # where iterating over items can return subclasses too, which may be
+    # iterable even if they are scalars. To emulate this, we make a Numpy
+    # array subclass that returns Numpy 'scalars' when iterating or accessing
+    # values, and these are technically iterable if checking for example
+    # isinstance(x, collections.abc.Iterable).
+
+    class ArraySubclass(np.ndarray):
+
+        def __iter__(self):
+            for value in super().__iter__():
+                yield np.array(value)
+
+        def __getitem__(self, item):
+            return np.array(super().__getitem__(item))
+
+    v = np.arange(10, dtype=float)
+    x = ArraySubclass((10,), dtype=float, buffer=v.data)
+
+    xnew = cbook._reshape_2D(x, 'x')
+
+    # We check here that the array wasn't split up into many individual
+    # ArraySubclass, which is what used to happen due to a bug in _reshape_2D
+    assert len(xnew) == 1
+    assert isinstance(xnew[0], ArraySubclass)
+
+
+def test_contiguous_regions():
+    a, b, c = 3, 4, 5
+    # Starts and ends with True
+    mask = [True]*a + [False]*b + [True]*c
+    expected = [(0, a), (a+b, a+b+c)]
+    assert cbook.contiguous_regions(mask) == expected
+    d, e = 6, 7
+    # Starts with True ends with False
+    mask = mask + [False]*e
+    assert cbook.contiguous_regions(mask) == expected
+    # Starts with False ends with True
+    mask = [False]*d + mask[:-e]
+    expected = [(d, d+a), (d+a+b, d+a+b+c)]
+    assert cbook.contiguous_regions(mask) == expected
+    # Starts and ends with False
+    mask = mask + [False]*e
+    assert cbook.contiguous_regions(mask) == expected
+    # No True in mask
+    assert cbook.contiguous_regions([False]*5) == []
+    # Empty mask
+    assert cbook.contiguous_regions([]) == []
+
+
 def test_safe_first_element_pandas_series(pd):
-    # delibrately create a pandas series with index not starting from 0
+    # deliberately create a pandas series with index not starting from 0
     s = pd.Series(range(5), index=range(10, 15))
     actual = cbook.safe_first_element(s)
     assert actual == 0
+
+
+def test_make_keyword_only(recwarn):
+    @cbook._make_keyword_only("3.0", "arg")
+    def func(pre, arg, post=None):
+        pass
+
+    func(1, arg=2)
+    assert len(recwarn) == 0
+
+    with pytest.warns(MatplotlibDeprecationWarning):
+        func(1, 2)
+    with pytest.warns(MatplotlibDeprecationWarning):
+        func(1, 2, 3)

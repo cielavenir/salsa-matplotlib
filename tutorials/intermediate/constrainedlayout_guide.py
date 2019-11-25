@@ -49,17 +49,12 @@ clipped.
 
 # sphinx_gallery_thumbnail_number = 18
 
-#import matplotlib
-#matplotlib.use('Qt5Agg')
-
-import warnings
 
 import matplotlib.pyplot as plt
-import numpy as np
 import matplotlib.colors as mcolors
 import matplotlib.gridspec as gridspec
+import numpy as np
 
-import matplotlib._layoutbox as layoutbox
 
 plt.rcParams['savefig.facecolor'] = "0.8"
 plt.rcParams['figure.figsize'] = 4.5, 4.
@@ -95,7 +90,7 @@ example_plot(ax, fontsize=24)
 # axes overlapping each other.
 
 fig, axs = plt.subplots(2, 2, constrained_layout=False)
-for ax in axs.flatten():
+for ax in axs.flat:
     example_plot(ax)
 
 ###############################################################################
@@ -103,7 +98,7 @@ for ax in axs.flatten():
 # causes the layout to be properly constrained.
 
 fig, axs = plt.subplots(2, 2, constrained_layout=True)
-for ax in axs.flatten():
+for ax in axs.flat:
     example_plot(ax)
 
 ###############################################################################
@@ -137,7 +132,7 @@ fig.colorbar(im, ax=ax, shrink=0.6)
 # the specified axes.
 
 fig, axs = plt.subplots(2, 2, figsize=(4, 4), constrained_layout=True)
-for ax in axs.flatten():
+for ax in axs.flat:
     im = ax.pcolormesh(arr, **pc_kwargs)
 fig.colorbar(im, ax=axs, shrink=0.6)
 
@@ -147,7 +142,7 @@ fig.colorbar(im, ax=axs, shrink=0.6)
 # still be the same size.
 
 fig, axs = plt.subplots(3, 3, figsize=(4, 4), constrained_layout=True)
-for ax in axs.flatten():
+for ax in axs.flat:
     im = ax.pcolormesh(arr, **pc_kwargs)
 fig.colorbar(im, ax=axs[1:, ][:, 1], shrink=0.8)
 fig.colorbar(im, ax=axs[:, -1], shrink=0.6)
@@ -184,7 +179,7 @@ fig.colorbar(im, ax=[axs[2]], shrink=0.6)
 # ``constrained_layout`` can also make room for `~.figure.Figure.suptitle`.
 
 fig, axs = plt.subplots(2, 2, figsize=(4, 4), constrained_layout=True)
-for ax in axs.flatten():
+for ax in axs.flat:
     im = ax.pcolormesh(arr, **pc_kwargs)
 fig.colorbar(im, ax=axs, shrink=0.6)
 fig.suptitle('Big Suptitle')
@@ -270,7 +265,7 @@ fig.savefig('CL02.png', bbox_inches='tight', dpi=100)
 # `~.figure.Figure.set_constrained_layout_pads`:
 
 fig, axs = plt.subplots(2, 2, constrained_layout=True)
-for ax in axs.flatten():
+for ax in axs.flat:
     example_plot(ax, nodec=True)
     ax.set_xticklabels('')
     ax.set_yticklabels('')
@@ -278,7 +273,7 @@ fig.set_constrained_layout_pads(w_pad=4./72., h_pad=4./72.,
         hspace=0., wspace=0.)
 
 fig, axs = plt.subplots(2, 2, constrained_layout=True)
-for ax in axs.flatten():
+for ax in axs.flat:
     example_plot(ax, nodec=True)
     ax.set_xticklabels('')
     ax.set_yticklabels('')
@@ -289,11 +284,11 @@ fig.set_constrained_layout_pads(w_pad=2./72., h_pad=2./72.,
 # Spacing between subplots is set by ``wspace`` and ``hspace``. There are
 # specified as a fraction of the size of the subplot group as a whole.
 # If the size of the figure is changed, then these spaces change in
-# proportion.  Note in the blow how the space at the edges doesn't change from
+# proportion.  Note in the below how the space at the edges doesn't change from
 # the above, but the space between subplots does.
 
 fig, axs = plt.subplots(2, 2, constrained_layout=True)
-for ax in axs.flatten():
+for ax in axs.flat:
     example_plot(ax, nodec=True)
     ax.set_xticklabels('')
     ax.set_yticklabels('')
@@ -313,7 +308,7 @@ fig.set_constrained_layout_pads(w_pad=2./72., h_pad=2./72.,
 # of the axis it is attached to.
 
 fig, axs = plt.subplots(2, 2, constrained_layout=True)
-for ax in axs.flatten():
+for ax in axs.flat:
     pc = ax.pcolormesh(arr, **pc_kwargs)
     fig.colorbar(pc, ax=ax, shrink=0.6, pad=0)
     ax.set_xticklabels('')
@@ -327,7 +322,7 @@ fig.set_constrained_layout_pads(w_pad=2./72., h_pad=2./72.,
 # for ``pad`` to be non-zero.
 
 fig, axs = plt.subplots(2, 2, constrained_layout=True)
-for ax in axs.flatten():
+for ax in axs.flat:
     pc = ax.pcolormesh(arr, **pc_kwargs)
     fig.colorbar(im, ax=ax, shrink=0.6, pad=0.05)
     ax.set_xticklabels('')
@@ -352,7 +347,7 @@ fig.set_constrained_layout_pads(w_pad=2./72., h_pad=2./72.,
 
 plt.rcParams['figure.constrained_layout.use'] = True
 fig, axs = plt.subplots(2, 2, figsize=(3, 3))
-for ax in axs.flatten():
+for ax in axs.flat:
     example_plot(ax)
 
 #############################
@@ -377,7 +372,7 @@ example_plot(ax2)
 
 ###############################################################################
 # More complicated gridspec layouts are possible.  Note here we use the
-# convenenience functions ``add_gridspec`` and ``subgridspec``
+# convenience functions ``add_gridspec`` and ``subgridspec``.
 
 fig = plt.figure()
 
@@ -744,10 +739,10 @@ plot_children(fig, fig._layoutbox, printit=False)
 # layoutboxes in the gridspec, and it is made to be centered between
 # those two points.
 
-fig, ax = plt.subplots(2, 2, constrained_layout=True)
-for a in ax.flatten():
-    im = a.pcolormesh(arr, **pc_kwargs)
-fig.colorbar(im, ax=ax, shrink=0.6)
+fig, axs = plt.subplots(2, 2, constrained_layout=True)
+for ax in axs.flat:
+    im = ax.pcolormesh(arr, **pc_kwargs)
+fig.colorbar(im, ax=axs, shrink=0.6)
 plot_children(fig, fig._layoutbox, printit=False)
 
 #######################################################################

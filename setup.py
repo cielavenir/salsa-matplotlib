@@ -6,13 +6,11 @@ setup.cfg.template for more information.
 # NOTE: This file must remain Python 2 compatible for the foreseeable future,
 # to ensure that we error out properly for people with outdated setuptools
 # and/or pip.
-from string import Template
 import sys
 
-if sys.version_info < (3, 5):
+if sys.version_info < (3, 6):
     error = """
-Matplotlib 3.0+ does not support Python 2.x, 3.0, 3.1, 3.2, 3.3, or 3.4.
-Beginning with Matplotlib 3.0, Python 3.5 and above is required.
+Beginning with Matplotlib 3.1, Python 3.6 or above is required.
 
 This may be due to an out of date pip.
 
@@ -24,9 +22,10 @@ from io import BytesIO
 import os
 from string import Template
 import urllib.request
+import shutil
 from zipfile import ZipFile
 
-from setuptools import setup
+from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext as BuildExtCommand
 from setuptools.command.develop import develop as DevelopCommand
 from setuptools.command.install_lib import install_lib as InstallLibCommand
@@ -46,7 +45,7 @@ from distutils.dist import Distribution
 
 import setupext
 from setupext import (print_line, print_raw, print_message, print_status,
-                      download_or_cache, makedirs as _makedirs)
+                      download_or_cache)
 
 # Get the version from versioneer
 import versioneer
@@ -60,9 +59,7 @@ mpl_packages = [
     setupext.Matplotlib(),
     setupext.Python(),
     setupext.Platform(),
-    'Required dependencies and extensions',
     setupext.Numpy(),
-    setupext.InstallRequires(),
     setupext.LibAgg(),
     setupext.FreeType(),
     setupext.FT2Font(),
@@ -76,14 +73,11 @@ mpl_packages = [
     setupext.Tri(),
     'Optional subpackages',
     setupext.SampleData(),
-    setupext.Toolkits(),
     setupext.Tests(),
-    setupext.Toolkits_Tests(),
     'Optional backend extensions',
     setupext.BackendAgg(),
     setupext.BackendTkAgg(),
     setupext.BackendMacOSX(),
-    setupext.Windowing(),
     'Optional package data',
     setupext.Dlls(),
     ]
@@ -95,7 +89,6 @@ classifiers = [
     'License :: OSI Approved :: Python Software Foundation License',
     'Programming Language :: Python',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
     'Topic :: Scientific/Engineering :: Visualization',
@@ -109,11 +102,21 @@ class NoopTestCommand(TestCommand):
 
 
 class BuildExtraLibraries(BuildExtCommand):
-    def run(self):
+    def finalize_options(self):
+        self.distribution.ext_modules[:] = filter(
+            None, (package.get_extension() for package in good_packages))
+        super().finalize_options()
+
+    def build_extensions(self):
+        # Remove the -Wstrict-prototypes option, it's not valid for C++.  Fixed
+        # in Py3.7 as bpo-5755.
+        try:
+            self.compiler.compiler_so.remove('-Wstrict-prototypes')
+        except (ValueError, AttributeError):
+            pass
         for package in good_packages:
             package.do_custom_build()
-
-        return BuildExtCommand.run(self)
+        return super().build_extensions()
 
 
 cmdclass = versioneer.get_cmdclass()
@@ -122,12 +125,22 @@ cmdclass['build_ext'] = BuildExtraLibraries
 
 
 def _download_jquery_to(dest):
+    if os.path.exists(os.path.join(dest, "jquery-ui-1.12.1")):
+        return
+
+    # If we are installing from an sdist, use the already downloaded jquery-ui
+    sdist_src = os.path.join(
+        "lib/matplotlib/backends/web_backend", "jquery-ui-1.12.1")
+    if os.path.exists(sdist_src):
+        shutil.copytree(sdist_src, os.path.join(dest, "jquery-ui-1.12.1"))
+        return
+
     # Note: When bumping the jquery-ui version, also update the versions in
     # single_figure.html and all_figures.html.
     url = "https://jqueryui.com/resources/download/jquery-ui-1.12.1.zip"
     sha = 'f8233674366ab36b2c34c577ec77a3d70cac75d2e387d8587f3836345c0f624d'
     if not os.path.exists(os.path.join(dest, "jquery-ui-1.12.1")):
-        _makedirs(dest, exist_ok=True)
+        os.makedirs(dest, exist_ok=True)
         try:
             buff = download_or_cache(url, sha)
         except Exception:
@@ -174,7 +187,9 @@ if __name__ == '__main__':
     packages = []
     namespace_packages = []
     py_modules = []
-    ext_modules = []
+    # Dummy extension to trigger build_ext, which will swap it out with real
+    # extensions that can depend on numpy for the build.
+    ext_modules = [Extension('', [])]
     package_data = {}
     package_dir = {'': 'lib'}
     install_requires = []
@@ -233,9 +248,8 @@ if __name__ == '__main__':
             packages.extend(package.get_packages())
             namespace_packages.extend(package.get_namespace_packages())
             py_modules.extend(package.get_py_modules())
-            ext = package.get_extension()
-            if ext is not None:
-                ext_modules.append(ext)
+            # Extension modules only get added in build_ext, as numpy will have
+            # been installed (as setup_requires) at that point.
             data = package.get_package_data()
             for key, val in data.items():
                 package_data.setdefault(key, [])
@@ -255,11 +269,6 @@ if __name__ == '__main__':
         with open('lib/matplotlib/mpl-data/matplotlibrc', 'w') as fd:
             fd.write(''.join(template_lines))
 
-        # Finalize the extension modules so they can get the Numpy include
-        # dirs
-        for mod in ext_modules:
-            mod.finalize()
-
     # Finally, pass this all along to distutils to do the heavy lifting.
     setup(
         name="matplotlib",
@@ -267,7 +276,7 @@ if __name__ == '__main__':
         description="Python plotting package",
         author="John D. Hunter, Michael Droettboom",
         author_email="matplotlib-users@python.org",
-        url="http://matplotlib.org",
+        url="https://matplotlib.org",
         long_description="""
         Matplotlib strives to produce publication quality 2D graphics
         for interactive graphing, scientific publishing, user interface
@@ -283,9 +292,14 @@ if __name__ == '__main__':
         package_dir=package_dir,
         package_data=package_data,
         classifiers=classifiers,
-        download_url="http://matplotlib.org/users/installing.html",
+        download_url="https://matplotlib.org/users/installing.html",
+        project_urls={
+            'Bug Tracker': 'https://github.com/matplotlib/matplotlib/issues',
+            'Documentation': 'https://matplotlib.org/contents.html',
+            'Source Code': 'https://github.com/matplotlib/matplotlib'
+        },
 
-        python_requires='>=3.5',
+        python_requires='>=3.6',
         # List third-party Python packages that we require
         install_requires=install_requires,
         setup_requires=setup_requires,
