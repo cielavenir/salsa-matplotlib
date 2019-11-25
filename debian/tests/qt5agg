@@ -3,4 +3,4 @@ set -efu
 
 pys="$(py3versions -r 2>/dev/null)"
 
-BACKEND="TkAgg" pys=$pys debian/tests/backend-base
+BACKEND="Qt5Agg" pys=$pys debian/tests/backend-base

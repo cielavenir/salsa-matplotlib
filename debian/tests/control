@@ -1,8 +1,8 @@
 Tests: tkagg
-Depends: xauth, xvfb, python-matplotlib, python-matplotlib-dbg, python-tk, python-tk-dbg, python-numpy, python-numpy-dbg, python3-matplotlib, python3-matplotlib-dbg, python3-tk, python3-tk-dbg, python3-numpy, python3-numpy-dbg
+Depends: xauth, xvfb, python3-matplotlib, python3-matplotlib-dbg, python3-tk, python3-tk-dbg, python3-numpy, python3-numpy-dbg
 
-Tests: qt4agg
-Depends: xauth, xvfb, python-matplotlib, python-matplotlib-dbg, python-qt4, python-qt4-dbg, python-numpy, python-numpy-dbg, python3-matplotlib, python3-matplotlib-dbg, python3-pyqt4, python3-pyqt4-dbg, python3-numpy, python3-numpy-dbg
+Tests: qt5agg
+Depends: xauth, xvfb, python3-matplotlib, python3-matplotlib-dbg, python3-pyqt5, python3-pyqt5-dbg, python3-numpy, python3-numpy-dbg
 
 Tests: wxagg
-Depends: xauth, xvfb, python-matplotlib, python-wxgtk3.0, python-numpy
+Depends: xauth, xvfb, python3-matplotlib, python3-wxgtk3.0, python3-numpy
