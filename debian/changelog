@@ -3,8 +3,9 @@ matplotlib (3.1.2-1) UNRELEASED; urgency=medium
   * New upstream release
   * debian/control
     - update copyright for new upstream release
+    - extend packaging copyright years
 
- -- Sandro Tosi <morph@debian.org>  Sun, 24 Nov 2019 19:44:14 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 24 Nov 2019 19:44:34 -0500
 
 matplotlib (3.0.2-2) unstable; urgency=medium
 
