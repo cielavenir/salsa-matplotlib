@@ -28,11 +28,9 @@ use a modest value of 12 so there are not a lot of values to look at.
 """
 
 import numpy as np
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
-from collections import OrderedDict
 
 viridis = cm.get_cmap('viridis', 12)
 print(viridis)
@@ -46,7 +44,7 @@ print(viridis(0.56))
 ##############################################################################
 # The list of colors that comprise the colormap can be directly accessed using
 # the ``colors`` property,
-# or it can be acccessed indirectly by calling  ``viridis`` with an array
+# or it can be accessed indirectly by calling  ``viridis`` with an array
 # of values matching the length of the colormap.  Note that the returned list
 # is in the form of an RGBA Nx4 array, where N is the length of the colormap.
 
@@ -183,7 +181,7 @@ plot_linearmap(cdict)
 # and for values passed to the colormap between ``x[i]`` and ``x[i+1]``,
 # the interpolation is between ``yright[i]`` and ``yleft[i+1]``.
 #
-# In the example below there is a discontiuity in red at 0.5.  The
+# In the example below there is a discontinuity in red at 0.5.  The
 # interpolation between 0 and 0.5 goes from 0.3 to 1, and between 0.5 and 1
 # it goes from 0.9 to 1.  Note that red[0, 1], and red[2, 2] are both
 # superfluous to the interpolation because red[0, 1] is the value to the

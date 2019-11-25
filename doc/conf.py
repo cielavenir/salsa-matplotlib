@@ -26,14 +26,15 @@ sys.path.append('.')
 # General configuration
 # ---------------------
 
-# Add any Sphinx extension module names here, as strings. They can be extensions
-# coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
+# Add any Sphinx extension module names here, as strings. They can be
+# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.doctest',
     'sphinx.ext.inheritance_diagram',
     'sphinx.ext.intersphinx',
+    'sphinx.ext.ifconfig',
     'sphinx.ext.viewcode',
     'IPython.sphinxext.ipython_console_highlighting',
     'IPython.sphinxext.ipython_directive',
@@ -46,18 +47,22 @@ extensions = [
     'sphinxext.math_symbol_table',
     'sphinxext.mock_gui_toolkits',
     'sphinxext.skip_deprecated',
+    'sphinx_copybutton',
 ]
 
 exclude_patterns = ['api/api_changes/*', 'users/whats_new/*']
 
 
-def _check_deps():
-    names = {"colorspacious": 'colorspacious',
-             "IPython.sphinxext.ipython_console_highlighting": 'ipython',
-             "matplotlib": 'matplotlib',
-             "numpydoc": 'numpydoc',
-             "PIL.Image": 'pillow',
-             "sphinx_gallery": 'sphinx_gallery'}
+def _check_dependencies():
+    names = {
+        "colorspacious": 'colorspacious',
+        "IPython.sphinxext.ipython_console_highlighting": 'ipython',
+        "matplotlib": 'matplotlib',
+        "numpydoc": 'numpydoc',
+        "PIL.Image": 'pillow',
+        "sphinx_copybutton": 'sphinx_copybutton',
+        "sphinx_gallery": 'sphinx_gallery',
+    }
     missing = []
     for name in names:
         try:
@@ -68,8 +73,13 @@ def _check_deps():
         raise ImportError(
             "The following dependencies are missing to build the "
             "documentation: {}".format(", ".join(missing)))
+    if shutil.which('dot') is None:
+        raise OSError(
+            "No binary named dot - graphviz must be installed to build the "
+            "documentation")
 
-_check_deps()
+_check_dependencies()
+
 
 # Import only after checking for dependencies.
 # gallery_order.py from the sphinxext folder provides the classes that
@@ -78,10 +88,8 @@ import sphinxext.gallery_order as gallery_order
 # The following import is only necessary to monkey patch the signature later on
 from sphinx_gallery import gen_rst
 
-if shutil.which('dot') is None:
-    raise OSError(
-        "No binary named dot - you need to install the Graph Visualization "
-        "software (usually packaged as 'graphviz') to build the documentation")
+# On Linux, prevent plt.show() from emitting a non-GUI backend warning.
+os.environ.pop("DISPLAY", None)
 
 autosummary_generate = True
 
@@ -95,8 +103,10 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
     'numpy': ('https://docs.scipy.org/doc/numpy/', None),
     'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
-    'pandas': ('https://pandas.pydata.org/pandas-docs/stable', None),
+    'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+    'Pillow': ('https://pillow.readthedocs.io/en/stable/', None),
     'cycler': ('https://matplotlib.org/cycler', None),
+    'dateutil': ('https://dateutil.readthedocs.io/en/stable/', None),
 }
 
 
@@ -208,7 +218,7 @@ github_project_url = "https://github.com/matplotlib/matplotlib/"
 # must exist either in Sphinx' static/ path, or in one of the custom paths
 # given in html_static_path.
 #html_style = 'matplotlib.css'
-html_style = 'mpl.css'
+html_style = f'mpl.css?{SHA}'
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
@@ -324,10 +334,6 @@ else:
 # documentation
 autoclass_content = 'both'
 
-rst_epilog = """
-.. |minimum_numpy_version| replace:: %s
-""" % matplotlib.__version__numpy__
-
 texinfo_documents = [
     ("contents", 'matplotlib', 'Matplotlib Documentation',
      'John Hunter@*Darren Dale@*Eric Firing@*Michael Droettboom@*'
@@ -346,3 +352,11 @@ latex_elements = {
     'babel': r'\usepackage{babel}',
     'fontpkg': r'\setmainfont{DejaVu Serif}',
 }
+
+
+def setup(app):
+    if any(st in version for st in ('post', 'alpha', 'beta')):
+        bld_type = 'dev'
+    else:
+        bld_type = 'rel'
+    app.add_config_value('releaselevel', bld_type, 'env')

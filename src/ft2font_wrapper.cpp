@@ -998,8 +998,8 @@ static PyObject *PyFT2Font_get_char_index(PyFT2Font *self, PyObject *args, PyObj
 const char *PyFT2Font_get_sfnt__doc__ =
     "get_sfnt(name)\n"
     "\n"
-    "Get all values from the SFNT names table.  Result is a dictionary whose"
-    "key is the platform-ID, ISO-encoding-scheme, language-code, and"
+    "Get all values from the SFNT names table.  Result is a dictionary whose "
+    "key is the platform-ID, ISO-encoding-scheme, language-code, and "
     "description.\n";
 
 static PyObject *PyFT2Font_get_sfnt(PyFT2Font *self, PyObject *args, PyObject *kwds)
@@ -1260,7 +1260,7 @@ static PyObject *PyFT2Font_get_sfnt_table(PyFT2Font *self, PyObject *args, PyObj
                              t->sFamilyClass,
                              "panose",
                              t->panose,
-                             10,
+                             Py_ssize_t(10),
                              "ulCharRange",
                              t->ulUnicodeRange1,
                              t->ulUnicodeRange2,
@@ -1268,7 +1268,7 @@ static PyObject *PyFT2Font_get_sfnt_table(PyFT2Font *self, PyObject *args, PyObj
                              t->ulUnicodeRange4,
                              "achVendID",
                              t->achVendID,
-                             4,
+                             Py_ssize_t(4),
                              "fsSelection",
                              t->fsSelection,
                              "fsFirstCharIndex",
@@ -1394,10 +1394,10 @@ static PyObject *PyFT2Font_get_sfnt_table(PyFT2Font *self, PyObject *args, PyObj
                              t->SymbolSet,
                              "typeFace",
                              t->TypeFace,
-                             16,
+                             Py_ssize_t(16),
                              "characterComplement",
                              t->CharacterComplement,
-                             8,
+                             Py_ssize_t(8),
                              "strokeWeight",
                              t->StrokeWeight,
                              "widthType",

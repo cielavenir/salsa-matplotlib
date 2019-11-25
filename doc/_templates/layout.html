@@ -38,10 +38,7 @@ endif %}>
         {%- endfor %}
 
         <li><a href="{{ pathto('index') }}">home</a>|&nbsp;</li>
-        <li><a href="{{ pathto('gallery/index') }}">examples</a>|&nbsp;</li>
-        <li><a href="{{ pathto('tutorials/index') }}">tutorials</a>|&nbsp;</li>
-        <li><a href="{{ pathto('api/api_overview') }}">API</a>|&nbsp;</li>
-        <li><a href="{{ pathto('contents') }}">docs</a> &raquo;</li>
+        <li><a href="{{ pathto('contents') }}">contents</a> &raquo;</li>
 
         {%- for parent in parents %}
           <li><a href="{{ parent.link|e }}" {% if loop.last %}{{
@@ -162,7 +159,11 @@ parents[-1].link|e }}" />
     {%- endif %}
 {%- endblock %}
 {%- block extrahead %}
-  <link rel="canonical" href="https://matplotlib.org/{{pagename}}.html" />
+{%- if '+' in release %}
+    <link rel="canonical" href="https://matplotlib.org/devdocs/{{pagename}}.html" />
+{%- else %}
+    <link rel="canonical" href="https://matplotlib.org/{{version}}/{{pagename}}.html" />
+{%- endif %}
 {% endblock %}
 
 
@@ -227,6 +228,16 @@ parents[-1].link|e }}" />
 
       <div class="clearer"></div>
     </div>
+
+    <nav class="main-nav">
+        <ul>
+            <li><a href="{{ pathto('users/installing') }}">Installation</a></li>
+            <li><a href="{{ pathto('contents') }}">Documentation</a></li>
+            <li><a href="{{ pathto('gallery/index') }}">Examples</a></li>
+            <li><a href="{{ pathto('tutorials/index') }}">Tutorials</a></li>
+            <li><a href="{{ pathto('devel/index') }}">Contributing</a></li>
+        </ul>
+     </nav>
 {%- endblock %}
 
 {%- block footer %}

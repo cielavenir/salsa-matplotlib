@@ -20,8 +20,8 @@ def get_keywords():
     # setup.py/versioneer.py will grep for the variable names, so they must
     # each be defined on a line of their own. _version.py will just call
     # get_keywords().
-    git_refnames = " (tag: v3.0.3)"
-    git_full = "93990abc5c6917a6a82d966ce1a4380d30370b00"
+    git_refnames = " (tag: v3.1.2)"
+    git_full = "5d950e22d7e163769950146784d003b48e478cb8"
     keywords = {"refnames": git_refnames, "full": git_full}
     return keywords
 
@@ -436,7 +436,7 @@ def get_versions():
         # versionfile_source is the relative path from the top of the source
         # tree (where the .git directory might live) to this file. Invert
         # this to find the root from __file__.
-        for i in cfg.versionfile_source.split('/'):
+        for _ in cfg.versionfile_source.split('/'):
             root = os.path.dirname(root)
     except NameError:
         return {"version": "0+unknown", "full-revisionid": None,

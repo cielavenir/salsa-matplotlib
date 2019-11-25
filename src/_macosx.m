@@ -1,10 +1,13 @@
+#define PY_SSIZE_T_CLEAN
 #include <Cocoa/Cocoa.h>
 #include <ApplicationServices/ApplicationServices.h>
 #include <sys/socket.h>
 #include <Python.h>
 
+#ifndef PYPY
 /* Remove this once Python is fixed: https://bugs.python.org/issue23237 */
 #define PYOSINPUTHOOK_REPETITIVE 1
+#endif
 
 /* Proper way to check for the OS X version we are compiling for, from
    http://developer.apple.com/documentation/DeveloperTools/Conceptual/cross_development */
@@ -276,8 +279,13 @@ static void lazy_init(void) {
     backend_inited = true;
 
     NSApp = [NSApplication sharedApplication];
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 
+#ifndef PYPY
+    /* TODO: remove ifndef after the new PyPy with the PyOS_InputHook implementation
+    get released: https://bitbucket.org/pypy/pypy/commits/caaf91a */
     PyOS_InputHook = wait_for_stdin;
+#endif
 
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     WindowServerConnectionManager* connectionManager = [WindowServerConnectionManager sharedManager];
@@ -2575,26 +2583,13 @@ static PyTypeObject TimerType = {
     Timer_new,                 /* tp_new */
 };
 
+#ifndef COMPILING_FOR_10_6
 static bool verify_framework(void)
 {
     ProcessSerialNumber psn;
-    /* These methods are deprecated, but they don't require the app to
-       have started  */
-#ifdef COMPILING_FOR_10_6
-         NSApp = [NSApplication sharedApplication];
-         NSApplicationActivationPolicy activationPolicy = [NSApp activationPolicy];
-         switch (activationPolicy) {
-             case NSApplicationActivationPolicyRegular:
-             case NSApplicationActivationPolicyAccessory:
-                 return true;
-             case NSApplicationActivationPolicyProhibited:
-                 break;
-         }
-#else
     if (CGMainDisplayID()!=0
      && GetCurrentProcess(&psn)==noErr
      && SetFrontProcess(&psn)==noErr) return true;
-#endif
     PyErr_SetString(PyExc_ImportError,
         "Python is not installed as a framework. The Mac OS X backend will "
         "not be able to function correctly if Python is not installed as a "
@@ -2606,6 +2601,7 @@ static bool verify_framework(void)
         "Matplotlib FAQ for more information.");
     return false;
 }
+#endif
 
 static struct PyMethodDef methods[] = {
    {"event_loop_is_running",
@@ -2656,8 +2652,11 @@ PyObject* PyInit__macosx(void)
      || PyType_Ready(&TimerType) < 0)
         return NULL;
 
+#ifndef COMPILING_FOR_10_6
+    /* if >=10.6 invoke setActivationPolicy in lazy_init */
     if (!verify_framework())
         return NULL;
+#endif
 
     module = PyModule_Create(&moduledef);
     if (!module)

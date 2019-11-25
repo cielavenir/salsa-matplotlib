@@ -1,7 +1,7 @@
 """
-================
-Embedding In Wx3
-================
+==================
+Embedding in wx #3
+==================
 
 Copyright (C) 2003-2004 Andrew Straw, Jeremy O'Donoghue and others
 
@@ -131,7 +131,6 @@ class MyApp(wx.App):
         bang_button.Bind(wx.EVT_BUTTON, self.OnBang)
 
         # final setup ------------------
-        sizer = self.panel.GetSizer()
         self.frame.Show(1)
 
         self.SetTopWindow(self.frame)

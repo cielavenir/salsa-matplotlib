@@ -2,45 +2,27 @@ import builtins
 import configparser
 from distutils import sysconfig, version
 from distutils.core import Extension
-import distutils.command.build_ext
 from io import BytesIO
 import glob
 import hashlib
 import importlib
-import multiprocessing
+import logging
 import os
 import pathlib
 import platform
-import re
 import setuptools
+import shlex
 import shutil
 import subprocess
 import sys
 import tarfile
 import textwrap
 import urllib.request
+from urllib.request import Request
 import versioneer
 import warnings
 
-if sys.version_info < (3, ):
-    from urllib2 import urlopen, Request
-
-    class FileExistsError(OSError):
-        pass
-
-    def makedirs(path, exist_ok=True):
-        if not exist_ok:
-            raise ValueError("this backport only supports exist_ok is True")
-        if not path or os.path.exists(path):
-            return
-        head, tail = os.path.split(path)
-
-        makedirs(head, exist_ok=True)
-        os.makedirs(path)
-
-else:
-    from urllib.request import urlopen, Request
-    from os import makedirs
+_log = logging.getLogger(__name__)
 
 
 def _get_xdg_cache_dir():
@@ -95,11 +77,8 @@ def download_or_cache(url, sha):
     def get_from_cache(local_fn):
         if cache_dir is None:
             raise Exception("no cache dir")
-        cache_filename = os.path.join(cache_dir, local_fn)
-        with open(cache_filename, 'rb') as fin:
-            buf = BytesIO(fin.read())
-        file_sha = get_fd_hash(buf)
-        if file_sha != sha:
+        buf = BytesIO(pathlib.Path(cache_dir, local_fn).read_bytes())
+        if get_fd_hash(buf) != sha:
             return None
         buf.seek(0)
         return buf
@@ -107,18 +86,11 @@ def download_or_cache(url, sha):
     def write_cache(local_fn, data):
         if cache_dir is None:
             raise Exception("no cache dir")
-
         cache_filename = os.path.join(cache_dir, local_fn)
-        makedirs(cache_dir, exist_ok=True)
-        if sys.version_info < (3, ):
-            if os.path.exists(cache_filename):
-                raise FileExistsError
-            mode = 'wb'
-        else:
-            mode = 'xb'
+        os.makedirs(cache_dir, exist_ok=True)
         old_pos = data.tell()
         data.seek(0)
-        with open(cache_filename, mode=mode) as fout:
+        with open(cache_filename, "xb") as fout:
             fout.write(data.read())
         data.seek(old_pos)
 
@@ -130,7 +102,7 @@ def download_or_cache(url, sha):
     # jQueryUI's website blocks direct downloads from urllib.request's
     # default User-Agent, but not (for example) wget; so I don't feel too
     # bad passing in an empty User-Agent.
-    with urlopen(
+    with urllib.request.urlopen(
             Request(url, headers={"User-Agent": ""})) as req:
         file_contents = BytesIO(req.read())
         file_contents.seek(0)
@@ -176,7 +148,6 @@ LOCAL_FREETYPE_HASH = _freetype_hashes.get(LOCAL_FREETYPE_VERSION, 'unknown')
 options = {
     'display_status': True,
     'backend': None,
-    'basedirlist': None
     }
 
 
@@ -191,11 +162,6 @@ if os.path.exists(setup_cfg):
     if config.has_option('rc_options', 'backend'):
         options['backend'] = config.get("rc_options", "backend")
 
-    if config.has_option('directories', 'basedirlist'):
-        options['basedirlist'] = [
-            x.strip() for x in
-            config.get("directories", "basedirlist").split(',')]
-
     if config.has_option('test', 'local_freetype'):
         options['local_freetype'] = config.getboolean("test", "local_freetype")
 else:
@@ -203,86 +169,6 @@ else:
 
 lft = bool(os.environ.get('MPLLOCALFREETYPE', False))
 options['local_freetype'] = lft or options.get('local_freetype', False)
-
-
-def extract_versions():
-    """
-    Extracts version values from the main matplotlib __init__.py and
-    returns them as a dictionary.
-    """
-    with open('lib/matplotlib/__init__.py') as fd:
-        for line in fd.readlines():
-            if line.startswith('__version__numpy__'):
-                exec(line.strip())
-    return locals()
-
-
-def has_include_file(include_dirs, filename):
-    """
-    Returns `True` if *filename* can be found in one of the
-    directories in *include_dirs*.
-    """
-    if sys.platform == 'win32':
-        include_dirs = [*include_dirs,  # Don't modify it in-place.
-                        *os.environ.get('INCLUDE', '.').split(os.pathsep)]
-    return any(pathlib.Path(dir, filename).exists() for dir in include_dirs)
-
-
-def check_include_file(include_dirs, filename, package):
-    """
-    Raises an exception if the given include file can not be found.
-    """
-    if not has_include_file(include_dirs, filename):
-        raise CheckFailed(
-            "The C/C++ header for %s (%s) could not be found.  You "
-            "may need to install the development package." %
-            (package, filename))
-
-
-def get_base_dirs():
-    """
-    Returns a list of standard base directories on this platform.
-    """
-    if options['basedirlist']:
-        return options['basedirlist']
-
-    if os.environ.get('MPLBASEDIRLIST'):
-        return os.environ.get('MPLBASEDIRLIST').split(os.pathsep)
-
-    win_bases = ['win32_static']
-    # on conda windows, we also add the <conda_env_dir>\Library,
-    # as conda installs libs/includes there
-    # env var names mess: https://github.com/conda/conda/issues/2312
-    conda_env_path = os.getenv('CONDA_PREFIX')  # conda >= 4.1
-    if not conda_env_path:
-        conda_env_path = os.getenv('CONDA_DEFAULT_ENV')  # conda < 4.1
-    if conda_env_path and os.path.isdir(conda_env_path):
-        win_bases.append(os.path.join(conda_env_path, "Library"))
-
-    basedir_map = {
-        'win32': win_bases,
-        'darwin': ['/usr/local/', '/usr', '/usr/X11',
-                   '/opt/X11', '/opt/local'],
-        'sunos5': [os.getenv('MPLIB_BASE') or '/usr/local', ],
-        'gnu0': ['/usr'],
-        'aix5': ['/usr/local'],
-        }
-    return basedir_map.get(sys.platform, ['/usr/local', '/usr'])
-
-
-def get_include_dirs():
-    """
-    Returns a list of standard include directories on this platform.
-    """
-    include_dirs = [os.path.join(d, 'include') for d in get_base_dirs()]
-    if sys.platform != 'win32':
-        # gcc includes these dirs automatically, so also look for headers in
-        # these dirs
-        include_dirs.extend(
-            os.environ.get('CPATH', '').split(os.pathsep))
-        include_dirs.extend(
-            os.environ.get('CPLUS_INCLUDE_PATH', '').split(os.pathsep))
-    return include_dirs
 
 
 def is_min_version(found, minversion):
@@ -295,18 +181,18 @@ def is_min_version(found, minversion):
 # Define the display functions only if display_status is True.
 if options['display_status']:
     def print_line(char='='):
-        print(char * 76)
+        print(char * 80)
 
     def print_status(package, status):
-        initial_indent = "%22s: " % package
-        indent = ' ' * 24
-        print(textwrap.fill(str(status), width=76,
+        initial_indent = "%12s: " % package
+        indent = ' ' * 18
+        print(textwrap.fill(str(status), width=80,
                             initial_indent=initial_indent,
                             subsequent_indent=indent))
 
     def print_message(message):
-        indent = ' ' * 24 + "* "
-        print(textwrap.fill(str(message), width=76,
+        indent = ' ' * 18 + "* "
+        print(textwrap.fill(str(message), width=80,
                             initial_indent=indent,
                             subsequent_indent=indent))
 
@@ -316,48 +202,6 @@ else:
     def print_line(*args, **kwargs):
         pass
     print_status = print_message = print_raw = print_line
-
-
-# Remove the -Wstrict-prototypes option, is it's not valid for C++
-customize_compiler = distutils.command.build_ext.customize_compiler
-
-
-def my_customize_compiler(compiler):
-    retval = customize_compiler(compiler)
-    try:
-        compiler.compiler_so.remove('-Wstrict-prototypes')
-    except (ValueError, AttributeError):
-        pass
-    return retval
-
-distutils.command.build_ext.customize_compiler = my_customize_compiler
-
-
-def make_extension(name, files, *args, **kwargs):
-    """
-    Make a new extension.  Automatically sets include_dirs and
-    library_dirs to the base directories appropriate for this
-    platform.
-
-    `name` is the name of the extension.
-
-    `files` is a list of source files.
-
-    Any additional arguments are passed to the
-    `distutils.core.Extension` constructor.
-    """
-    ext = DelayedExtension(name, files, *args, **kwargs)
-    for dir in get_base_dirs():
-        include_dir = os.path.join(dir, 'include')
-        if os.path.exists(include_dir):
-            ext.include_dirs.append(include_dir)
-        for lib in ('lib', 'lib64'):
-            lib_dir = os.path.join(dir, lib)
-            if os.path.exists(lib_dir):
-                ext.library_dirs.append(lib_dir)
-    ext.include_dirs.append('.')
-
-    return ext
 
 
 def get_buffer_hash(fd):
@@ -371,20 +215,17 @@ def get_buffer_hash(fd):
 
 
 class PkgConfig(object):
-    """
-    This is a class for communicating with pkg-config.
-    """
+    """This is a class for communicating with pkg-config."""
+
     def __init__(self):
-        """
-        Determines whether pkg-config exists on this machine.
-        """
-        if sys.platform == 'win32':
-            self.has_pkgconfig = False
-        else:
-            self.pkg_config = os.environ.get('PKG_CONFIG', 'pkg-config')
-            self.set_pkgconfig_path()
-            self.has_pkgconfig = shutil.which(self.pkg_config) is not None
-            if not self.has_pkgconfig:
+        """Determines whether pkg-config exists on this machine."""
+        self.pkg_config = None
+        if sys.platform != 'win32':
+            pkg_config = os.environ.get('PKG_CONFIG', 'pkg-config')
+            if shutil.which(pkg_config) is not None:
+                self.pkg_config = pkg_config
+                self.set_pkgconfig_path()
+            else:
                 print("IMPORTANT WARNING:\n"
                       "    pkg-config is not installed.\n"
                       "    matplotlib may not be able to find some of its dependencies")
@@ -403,65 +244,49 @@ class PkgConfig(object):
         except KeyError:
             os.environ['PKG_CONFIG_PATH'] = pkgconfig_path
 
-    def setup_extension(self, ext, package, default_include_dirs=[],
-                        default_library_dirs=[], default_libraries=[],
-                        alt_exec=None):
-        """
-        Add parameters to the given `ext` for the given `package`.
-        """
-        flag_map = {
-            '-I': 'include_dirs', '-L': 'library_dirs', '-l': 'libraries'}
+    def setup_extension(
+            self, ext, package,
+            atleast_version=None, alt_exec=None, default_libraries=()):
+        """Add parameters to the given *ext* for the given *package*."""
 
-        executable = alt_exec
-        if self.has_pkgconfig:
-            executable = (self.pkg_config + ' {0}').format(package)
+        # First, try to get the flags from pkg-config.
 
-        use_defaults = True
-
-        if executable is not None:
-            command = "{0} --libs --cflags ".format(executable)
-
+        cmd = ([self.pkg_config, package] if self.pkg_config else alt_exec)
+        if cmd is not None:
             try:
-                output = subprocess.check_output(
-                    command, shell=True, stderr=subprocess.STDOUT)
-            except subprocess.CalledProcessError:
+                if self.pkg_config and atleast_version:
+                    subprocess.check_call(
+                        [*cmd, f"--atleast-version={atleast_version}"])
+                # Use sys.getfilesystemencoding() to allow round-tripping
+                # when passed back to later subprocess calls; do not use
+                # locale.getpreferredencoding() which universal_newlines=True
+                # would do.
+                cflags = shlex.split(
+                    os.fsdecode(subprocess.check_output([*cmd, "--cflags"])))
+                libs = shlex.split(
+                    os.fsdecode(subprocess.check_output([*cmd, "--libs"])))
+            except (OSError, subprocess.CalledProcessError):
                 pass
             else:
-                output = output.decode(sys.getfilesystemencoding())
-                use_defaults = False
-                for token in output.split():
-                    attr = flag_map.get(token[:2])
-                    if attr is not None:
-                        getattr(ext, attr).insert(0, token[2:])
+                ext.extra_compile_args.extend(cflags)
+                ext.extra_link_args.extend(libs)
+                return
 
-        if use_defaults:
-            basedirs = get_base_dirs()
-            for base in basedirs:
-                for include in default_include_dirs:
-                    dir = os.path.join(base, include)
-                    if os.path.exists(dir):
-                        ext.include_dirs.append(dir)
-                for lib in default_library_dirs:
-                    dir = os.path.join(base, lib)
-                    if os.path.exists(dir):
-                        ext.library_dirs.append(dir)
-            ext.libraries.extend(default_libraries)
-            return True
+        # If that fails, fall back on the defaults.
 
-        return False
+        # conda Windows header and library paths.
+        # https://github.com/conda/conda/issues/2312 re: getting the env dir.
+        if sys.platform == 'win32':
+            conda_env_path = (os.getenv('CONDA_PREFIX')  # conda >= 4.1
+                              or os.getenv('CONDA_DEFAULT_ENV'))  # conda < 4.1
+            if conda_env_path and os.path.isdir(conda_env_path):
+                ext.include_dirs.append(os.fspath(
+                    pathlib.Path(conda_env_path, "Library/include")))
+                ext.library_dirs.append(os.fspath(
+                    pathlib.Path(conda_env_path, "Library/lib")))
 
-    def get_version(self, package):
-        """
-        Get the version of the package from pkg-config.
-        """
-        if not self.has_pkgconfig:
-            return None
-
-        status, output = subprocess.getstatusoutput(
-            self.pkg_config + " %s --modversion" % (package))
-        if status == 0:
-            return output
-        return None
+        # Default linked libs.
+        ext.libraries.extend(default_libraries)
 
 
 # The PkgConfig class should be used through this singleton
@@ -550,51 +375,6 @@ class SetupPackage(object):
         package if it is not installed.
         """
         return []
-
-    def _check_for_pkg_config(self, package, include_file, min_version=None,
-                              version=None):
-        """
-        A convenience function for writing checks for a
-        pkg_config-defined dependency.
-
-        `package` is the pkg_config package name.
-
-        `include_file` is a top-level include file we expect to find.
-
-        `min_version` is the minimum version required.
-
-        `version` will override the found version if this package
-        requires an alternate method for that. Set version='unknown'
-        if the version is not known but you still want to disabled
-        pkg_config version check.
-        """
-        if version is None:
-            version = pkg_config.get_version(package)
-
-            if version is None:
-                raise CheckFailed(
-                    "pkg-config information for '%s' could not be found." %
-                    package)
-
-        if min_version == 'PATCH':
-            raise CheckFailed(
-                "Requires patches that have not been merged upstream.")
-
-        if min_version and version != 'unknown':
-            if not is_min_version(version, min_version):
-                raise CheckFailed(
-                    "Requires %s %s or later.  Found %s." %
-                    (package, min_version, version))
-
-        ext = self.get_extension()
-        if ext is None:
-            ext = make_extension('test', [])
-            pkg_config.setup_extension(ext, package)
-
-        check_include_file(
-            ext.include_dirs + get_include_dirs(), include_file, package)
-
-        return 'version %s' % version
 
     def do_custom_build(self):
         """
@@ -736,17 +516,13 @@ class Python(SetupPackage):
     name = "python"
 
     def check(self):
-        if sys.version_info < (3, 5):
-            error = """
-Matplotlib 3.0+ does not support Python 2.x, 3.0, 3.1, 3.2, 3.3, or 3.4.
-Beginning with Matplotlib 3.0, Python 3.5 and above is required.
-
-This may be due to an out of date pip.
-
-Make sure you have pip >= 9.0.1.
-"""
-            raise CheckFailed(error)
         return sys.version
+
+
+def _pkg_data_helper(pkg, subdir):
+    """Glob "lib/$pkg/$subdir/**/*", returning paths relative to "lib/$pkg"."""
+    base = pathlib.Path("lib", pkg)
+    return [str(path.relative_to(base)) for path in (base / subdir).rglob("*")]
 
 
 class Matplotlib(SetupPackage):
@@ -756,30 +532,32 @@ class Matplotlib(SetupPackage):
         return versioneer.get_version()
 
     def get_packages(self):
-        return setuptools.find_packages(
-            "lib",
-            include=["matplotlib", "matplotlib.*"],
-            exclude=["matplotlib.tests", "matplotlib.*.tests"])
+        return setuptools.find_packages("lib", exclude=["*.tests"])
+
+    def get_namespace_packages(self):
+        return ['mpl_toolkits']
 
     def get_py_modules(self):
         return ['pylab']
 
     def get_package_data(self):
-
-        def iter_dir(base):
-            return [
-                str(path.relative_to('lib/matplotlib'))
-                for path in pathlib.Path('lib/matplotlib', base).rglob('*')]
-
         return {
-            'matplotlib':
-            [
+            'matplotlib': [
                 'mpl-data/matplotlibrc',
-                *iter_dir('mpl-data/fonts'),
-                *iter_dir('mpl-data/images'),
-                *iter_dir('mpl-data/stylelib'),
-                *iter_dir('backends/web_backend'),
-            ]}
+                *_pkg_data_helper('matplotlib', 'mpl-data/fonts'),
+                *_pkg_data_helper('matplotlib', 'mpl-data/images'),
+                *_pkg_data_helper('matplotlib', 'mpl-data/stylelib'),
+                *_pkg_data_helper('matplotlib', 'backends/web_backend'),
+            ],
+        }
+
+    def get_install_requires(self):
+        return [
+            "cycler>=0.10",
+            "kiwisolver>=1.0.1",
+            "pyparsing>=2.0.1,!=2.0.4,!=2.1.2,!=2.1.6",
+            "python-dateutil>=2.1",
+        ]
 
 
 class SampleData(OptionalPackage):
@@ -790,77 +568,24 @@ class SampleData(OptionalPackage):
     name = "sample_data"
 
     def get_package_data(self):
-
-        def iter_dir(base):
-            return [
-                str(path.relative_to('lib/matplotlib'))
-                for path in pathlib.Path('lib/matplotlib', base).rglob('*')]
-
         return {
-            'matplotlib':
-            [
-                *iter_dir('mpl-data/sample_data'),
-            ]}
-
-
-class Toolkits(OptionalPackage):
-    name = "toolkits"
-
-    def get_packages(self):
-        return [
-            'mpl_toolkits',
-            'mpl_toolkits.mplot3d',
-            'mpl_toolkits.axes_grid',
-            'mpl_toolkits.axes_grid1',
-            'mpl_toolkits.axisartist',
-            ]
-
-    def get_namespace_packages(self):
-        return ['mpl_toolkits']
+            'matplotlib': [
+                *_pkg_data_helper('matplotlib', 'mpl-data/sample_data'),
+            ],
+        }
 
 
 class Tests(OptionalPackage):
     name = "tests"
-    pytest_min_version = '3.4'
     default_config = False
 
-    def check(self):
-        super().check()
-
-        msgs = []
-        msg_template = ('{package} is required to run the Matplotlib test '
-                        'suite. Please install it with pip or your preferred '
-                        'tool to run the test suite')
-
-        bad_pytest = msg_template.format(
-            package='pytest %s or later' % self.pytest_min_version
-        )
-        try:
-            import pytest
-            if is_min_version(pytest.__version__, self.pytest_min_version):
-                msgs += ['using pytest version %s' % pytest.__version__]
-            else:
-                msgs += [bad_pytest]
-        except ImportError:
-            msgs += [bad_pytest]
-
-        return ' / '.join(msgs)
-
     def get_packages(self):
-        return [
-            'matplotlib.tests',
-            'matplotlib.sphinxext.tests',
-            ]
+        return setuptools.find_packages("lib", include=["*.tests"])
 
     def get_package_data(self):
-        baseline_images = [
-            'tests/baseline_images/%s/*' % x
-            for x in os.listdir('lib/matplotlib/tests/baseline_images')]
-
         return {
-            'matplotlib':
-            baseline_images +
-            [
+            'matplotlib': [
+                *_pkg_data_helper('matplotlib', 'tests/baseline_images'),
                 'tests/cmr10.pfb',
                 'tests/mpltest.ttf',
                 'tests/test_rcparams.rc',
@@ -868,178 +593,63 @@ class Tests(OptionalPackage):
                 'sphinxext/tests/tinypages/*.rst',
                 'sphinxext/tests/tinypages/*.py',
                 'sphinxext/tests/tinypages/_static/*',
-            ]}
-
-
-class Toolkits_Tests(Tests):
-    name = "toolkits_tests"
-
-    def check_requirements(self):
-        conf = self.get_config()
-        toolkits_conf = Toolkits.get_config()
-        tests_conf = Tests.get_config()
-
-        if conf is True:
-            Tests.force = True
-            Toolkits.force = True
-        elif conf == "auto" and not (toolkits_conf and tests_conf):
-            # Only auto-install if both toolkits and tests are set
-            # to be installed
-            raise CheckFailed("toolkits_tests needs 'toolkits' and 'tests'")
-        return ""
-
-    def get_packages(self):
-        return [
-            'mpl_toolkits.tests',
+            ],
+            'mpl_toolkits': [
+                *_pkg_data_helper('mpl_toolkits', 'tests/baseline_images'),
             ]
-
-    def get_package_data(self):
-        baseline_images = [
-            'tests/baseline_images/%s/*' % x
-            for x in os.listdir('lib/mpl_toolkits/tests/baseline_images')]
-
-        return {'mpl_toolkits': baseline_images}
-
-    def get_namespace_packages(self):
-        return ['mpl_toolkits']
-
-
-class DelayedExtension(Extension, object):
-    """
-    A distutils Extension subclass where some of its members
-    may have delayed computation until reaching the build phase.
-
-    This is so we can, for example, get the Numpy include dirs
-    after pip has installed Numpy for us if it wasn't already
-    on the system.
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._finalized = False
-        self._hooks = {}
-
-    def add_hook(self, member, func):
-        """
-        Add a hook to dynamically compute a member.
-
-        Parameters
-        ----------
-        member : string
-            The name of the member
-
-        func : callable
-            The function to call to get dynamically-computed values
-            for the member.
-        """
-        self._hooks[member] = func
-
-    def finalize(self):
-        self._finalized = True
-
-    class DelayedMember(property):
-        def __init__(self, name):
-            self._name = name
-
-        def __get__(self, obj, objtype=None):
-            result = getattr(obj, '_' + self._name, [])
-
-            if obj._finalized:
-                if self._name in obj._hooks:
-                    result = obj._hooks[self._name]() + result
-
-            return result
-
-        def __set__(self, obj, value):
-            setattr(obj, '_' + self._name, value)
-
-    include_dirs = DelayedMember('include_dirs')
+        }
 
 
 class Numpy(SetupPackage):
     name = "numpy"
 
-    @staticmethod
-    def include_dirs_hook():
-        if hasattr(builtins, '__NUMPY_SETUP__'):
-            del builtins.__NUMPY_SETUP__
-        import numpy
-        importlib.reload(numpy)
-
-        ext = Extension('test', [])
-        ext.include_dirs.append(numpy.get_include())
-        if not has_include_file(
-                ext.include_dirs, os.path.join("numpy", "arrayobject.h")):
-            warnings.warn(
-                "The C headers for numpy could not be found. "
-                "You may need to install the development package")
-
-        return [numpy.get_include()]
-
-    def check(self):
-        min_version = extract_versions()['__version__numpy__']
-        try:
-            import numpy
-        except ImportError:
-            return 'not found. pip may install it below.'
-
-        if not is_min_version(numpy.__version__, min_version):
-            raise SystemExit(
-                "Requires numpy %s or later to build.  (Found %s)" %
-                (min_version, numpy.__version__))
-
-        return 'version %s' % numpy.__version__
-
     def add_flags(self, ext):
-        # Ensure that PY_ARRAY_UNIQUE_SYMBOL is uniquely defined for
-        # each extension
-        array_api_name = 'MPL_' + ext.name.replace('.', '_') + '_ARRAY_API'
-
-        ext.define_macros.append(('PY_ARRAY_UNIQUE_SYMBOL', array_api_name))
-        ext.add_hook('include_dirs', self.include_dirs_hook)
-
-        ext.define_macros.append(('NPY_NO_DEPRECATED_API',
-                                  'NPY_1_7_API_VERSION'))
-
-        # Allow NumPy's printf format specifiers in C++.
-        ext.define_macros.append(('__STDC_FORMAT_MACROS', 1))
+        import numpy as np
+        ext.include_dirs.append(np.get_include())
+        ext.define_macros.extend([
+            # Ensure that PY_ARRAY_UNIQUE_SYMBOL is uniquely defined for each
+            # extension.
+            ('PY_ARRAY_UNIQUE_SYMBOL',
+             'MPL_' + ext.name.replace('.', '_') + '_ARRAY_API'),
+            ('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION'),
+            # Allow NumPy's printf format specifiers in C++.
+            ('__STDC_FORMAT_MACROS', 1),
+        ])
 
     def get_setup_requires(self):
-        return ['numpy>=1.10.0']
+        return ['numpy>=1.11']
 
     def get_install_requires(self):
-        return ['numpy>=1.10.0']
+        return ['numpy>=1.11']
 
 
 class LibAgg(SetupPackage):
     name = 'libagg'
 
-    def check(self):
-        self.__class__.found_external = True
-        try:
-            return self._check_for_pkg_config(
-                'libagg', 'agg2/agg_basics.h', min_version='PATCH')
-        except CheckFailed as e:
-            self.__class__.found_external = False
-            return str(e) + ' Using local copy.'
-
     def add_flags(self, ext, add_sources=True):
-        if self.found_external:
-            pkg_config.setup_extension(ext, 'libagg')
-        else:
-            ext.include_dirs.insert(0, 'extern/agg24-svn/include')
-            if add_sources:
-                agg_sources = [
-                    'agg_bezier_arc.cpp',
-                    'agg_curves.cpp',
-                    'agg_image_filters.cpp',
-                    'agg_trans_affine.cpp',
-                    'agg_vcgen_contour.cpp',
-                    'agg_vcgen_dash.cpp',
-                    'agg_vcgen_stroke.cpp',
-                    'agg_vpgen_segmentator.cpp'
-                    ]
-                ext.sources.extend(
-                    os.path.join('extern', 'agg24-svn', 'src', x) for x in agg_sources)
+        # We need a patched Agg not available elsewhere, so always use the
+        # vendored version.
+        ext.include_dirs.insert(0, 'extern/agg24-svn/include')
+        if add_sources:
+            agg_sources = [
+                'agg_bezier_arc.cpp',
+                'agg_curves.cpp',
+                'agg_image_filters.cpp',
+                'agg_trans_affine.cpp',
+                'agg_vcgen_contour.cpp',
+                'agg_vcgen_dash.cpp',
+                'agg_vcgen_stroke.cpp',
+                'agg_vpgen_segmentator.cpp'
+                ]
+            ext.sources.extend(os.path.join('extern', 'agg24-svn', 'src', x)
+                               for x in agg_sources)
+
+
+# For FreeType2 and libpng, we add a separate checkdep_foo.c source to at the
+# top of the extension sources.  This file is compiled first and immediately
+# aborts the compilation either with "foo.h: No such file or directory" if the
+# header is not found, or an appropriate error message if the header indicates
+# a too-old version.
 
 
 class FreeType(SetupPackage):
@@ -1053,59 +663,8 @@ class FreeType(SetupPackage):
         "windows_url": "http://gnuwin32.sourceforge.net/packages/freetype.htm"
         }
 
-    def check(self):
-        if options.get('local_freetype'):
-            return "Using local version for testing"
-
-        if sys.platform == 'win32':
-            try:
-                check_include_file(get_include_dirs(), 'ft2build.h', 'freetype')
-            except CheckFailed:
-                check_include_file(get_include_dirs(), os.path.join('freetype2', 'ft2build.h'), 'freetype')
-            return 'Using unknown version found on system.'
-
-        status, output = subprocess.getstatusoutput(
-            "freetype-config --ftversion")
-        if status == 0:
-            version = output
-        else:
-            version = None
-
-        # Early versions of freetype grep badly inside freetype-config,
-        # so catch those cases. (tested with 2.5.3).
-        if version is None or 'No such file or directory\ngrep:' in version:
-            version = self.version_from_header()
-
-        # pkg_config returns the libtool version rather than the
-        # freetype version so we need to explicitly pass the version
-        # to _check_for_pkg_config
-        return self._check_for_pkg_config(
-            'freetype2', 'ft2build.h',
-            min_version='2.3', version=version)
-
-    def version_from_header(self):
-        version = 'unknown'
-        ext = self.get_extension()
-        if ext is None:
-            return version
-        # Return the first version found in the include dirs.
-        for include_dir in ext.include_dirs:
-            header_fname = os.path.join(include_dir, 'freetype.h')
-            if os.path.exists(header_fname):
-                major, minor, patch = 0, 0, 0
-                with open(header_fname, 'r') as fh:
-                    for line in fh:
-                        if line.startswith('#define FREETYPE_'):
-                            value = line.rsplit(' ', 1)[1].strip()
-                            if 'MAJOR' in line:
-                                major = value
-                            elif 'MINOR' in line:
-                                minor = value
-                            else:
-                                patch = value
-                return '.'.join([major, minor, patch])
-
     def add_flags(self, ext):
+        ext.sources.insert(0, 'src/checkdep_freetype2.c')
         if options.get('local_freetype'):
             src_path = os.path.join(
                 'build', 'freetype-{0}'.format(LOCAL_FREETYPE_VERSION))
@@ -1121,19 +680,16 @@ class FreeType(SetupPackage):
             ext.define_macros.append(('FREETYPE_BUILD_TYPE', 'local'))
         else:
             pkg_config.setup_extension(
+                # FreeType 2.3 has libtool version 9.11.3 as can be checked
+                # from the tarball.  For FreeType>=2.4, there is a conversion
+                # table in docs/VERSIONS.txt in the FreeType source tree.
                 ext, 'freetype2',
-                default_include_dirs=[
-                    'include/freetype2', 'freetype2',
-                    'lib/freetype2/include',
-                    'lib/freetype2/include/freetype2'],
-                default_library_dirs=[
-                    'freetype2/lib'],
+                atleast_version='9.11.3',
+                alt_exec=['freetype-config'],
                 default_libraries=['freetype', 'z'])
             ext.define_macros.append(('FREETYPE_BUILD_TYPE', 'system'))
 
     def do_custom_build(self):
-        from pathlib import Path
-
         # We're using a system freetype
         if not options.get('local_freetype'):
             return
@@ -1154,8 +710,7 @@ class FreeType(SetupPackage):
 
         # do we need to download / load the source from cache?
         if not os.path.exists(src_path):
-            if not os.path.exists('build'):
-                os.makedirs('build')
+            os.makedirs('build', exist_ok=True)
 
             url_fmts = [
                 ('https://downloads.sourceforge.net/project/freetype'
@@ -1203,7 +758,8 @@ class FreeType(SetupPackage):
             subprocess.check_call(["make"], env=env, cwd=src_path)
         else:
             # compilation on windows
-            shutil.rmtree(str(Path(src_path, "objs")), ignore_errors=True)
+            shutil.rmtree(str(pathlib.Path(src_path, "objs")),
+                          ignore_errors=True)
             FREETYPE_BUILD_CMD = r"""
 call "%ProgramFiles%\Microsoft SDKs\Windows\v7.0\Bin\SetEnv.Cmd" ^
     /Release /{xXX} /xp
@@ -1220,18 +776,19 @@ set MSBUILD=C:\Windows\Microsoft.NET\Framework\v4.0.30319\MSBuild.exe
             vcvarsall = msvc.find_vcvarsall(10.0)
             if vcvarsall is None:
                 raise RuntimeError('Microsoft VS 2010 required')
-            cmdfile = Path("build/build_freetype.cmd")
+            cmdfile = pathlib.Path("build/build_freetype.cmd")
             cmdfile.write_text(FREETYPE_BUILD_CMD.format(
                 vc20xx=vc, WinXX=WinXX, xXX=xXX, vcvarsall=vcvarsall))
             subprocess.check_call([str(cmdfile.resolve())],
                                   shell=True, cwd=src_path)
             # Move to the corresponding Unix build path.
-            Path(src_path, "objs/.libs").mkdir()
+            pathlib.Path(src_path, "objs/.libs").mkdir()
             # Be robust against change of FreeType version.
-            lib_path, = (Path(src_path, "objs", vc, xXX)
+            lib_path, = (pathlib.Path(src_path, "objs", vc, xXX)
                          .glob("freetype*.lib"))
-            shutil.copy2(str(lib_path),
-                         str(Path(src_path, "objs/.libs/libfreetype.lib")))
+            shutil.copy2(
+                str(lib_path),
+                str(pathlib.Path(src_path, "objs/.libs/libfreetype.lib")))
 
 
 class FT2Font(SetupPackage):
@@ -1244,7 +801,7 @@ class FT2Font(SetupPackage):
             'src/mplutils.cpp',
             'src/py_converters.cpp',
             ]
-        ext = make_extension('matplotlib.ft2font', sources)
+        ext = Extension('matplotlib.ft2font', sources)
         FreeType().add_flags(ext)
         Numpy().add_flags(ext)
         LibAgg().add_flags(ext, add_sources=False)
@@ -1262,35 +819,18 @@ class Png(SetupPackage):
         "windows_url": "http://gnuwin32.sourceforge.net/packages/libpng.htm"
         }
 
-    def check(self):
-        if sys.platform == 'win32':
-            check_include_file(get_include_dirs(), 'png.h', 'png')
-            return 'Using unknown version found on system.'
-
-        status, output = subprocess.getstatusoutput("libpng-config --version")
-        if status == 0:
-            version = output
-        else:
-            version = None
-
-        try:
-            return self._check_for_pkg_config(
-                'libpng', 'png.h',
-                min_version='1.2', version=version)
-        except CheckFailed as e:
-            if has_include_file(get_include_dirs(), 'png.h'):
-                return str(e) + ' Using unknown version found on system.'
-            raise
-
     def get_extension(self):
         sources = [
+            'src/checkdep_libpng.c',
             'src/_png.cpp',
-            'src/mplutils.cpp'
+            'src/mplutils.cpp',
             ]
-        ext = make_extension('matplotlib._png', sources)
+        ext = Extension('matplotlib._png', sources)
         pkg_config.setup_extension(
-            ext, 'libpng', default_libraries=['png', 'z'],
-            alt_exec='libpng-config --ldflags')
+            ext, 'libpng',
+            atleast_version='1.2',
+            alt_exec=['libpng-config', '--ldflags'],
+            default_libraries=['png', 'z'])
         Numpy().add_flags(ext)
         return ext
 
@@ -1298,25 +838,14 @@ class Png(SetupPackage):
 class Qhull(SetupPackage):
     name = "qhull"
 
-    def check(self):
-        self.__class__.found_external = True
-        try:
-            return self._check_for_pkg_config(
-                'libqhull', 'libqhull/qhull_a.h', min_version='2015.2')
-        except CheckFailed as e:
-            self.__class__.found_pkgconfig = False
-            self.__class__.found_external = False
-            return str(e) + ' Using local copy.'
-
     def add_flags(self, ext):
-        if self.found_external:
-            pkg_config.setup_extension(ext, 'qhull',
-                                       default_libraries=['qhull'])
-        else:
-            ext.include_dirs.insert(0, 'extern')
-            ext.sources.extend(sorted(glob.glob('extern/libqhull/*.c')))
-            if sysconfig.get_config_var('LIBM') == '-lm':
-                ext.libraries.extend('m')
+        # Qhull doesn't distribute pkg-config info, so we have no way of
+        # knowing whether a system install is recent enough.  Thus, always use
+        # the vendored version.
+        ext.include_dirs.insert(0, 'extern')
+        ext.sources.extend(sorted(glob.glob('extern/libqhull/*.c')))
+        if sysconfig.get_config_var('LIBM') == '-lm':
+            ext.libraries.extend('m')
 
 
 class TTConv(SetupPackage):
@@ -1329,7 +858,7 @@ class TTConv(SetupPackage):
             'extern/ttconv/pprdrv_tt2.cpp',
             'extern/ttconv/ttutil.cpp'
             ]
-        ext = make_extension('matplotlib.ttconv', sources)
+        ext = Extension('matplotlib.ttconv', sources)
         Numpy().add_flags(ext)
         ext.include_dirs.insert(0, 'extern')
         return ext
@@ -1344,7 +873,7 @@ class Path(SetupPackage):
             'src/_path_wrapper.cpp'
             ]
 
-        ext = make_extension('matplotlib._path', sources)
+        ext = Extension('matplotlib._path', sources)
         Numpy().add_flags(ext)
         LibAgg().add_flags(ext)
         return ext
@@ -1360,7 +889,7 @@ class Image(SetupPackage):
             'src/_image_wrapper.cpp',
             'src/py_converters.cpp'
             ]
-        ext = make_extension('matplotlib._image', sources)
+        ext = Extension('matplotlib._image', sources)
         Numpy().add_flags(ext)
         LibAgg().add_flags(ext)
 
@@ -1376,7 +905,7 @@ class Contour(SetupPackage):
             "src/_contour_wrapper.cpp",
             'src/py_converters.cpp',
             ]
-        ext = make_extension('matplotlib._contour', sources)
+        ext = Extension('matplotlib._contour', sources)
         Numpy().add_flags(ext)
         LibAgg().add_flags(ext, add_sources=False)
         return ext
@@ -1387,8 +916,8 @@ class QhullWrap(SetupPackage):
 
     def get_extension(self):
         sources = ['src/qhull_wrap.c']
-        ext = make_extension('matplotlib._qhull', sources,
-                             define_macros=[('MPL_DEVNULL', os.devnull)])
+        ext = Extension('matplotlib._qhull', sources,
+                        define_macros=[('MPL_DEVNULL', os.devnull)])
         Numpy().add_flags(ext)
         Qhull().add_flags(ext)
         return ext
@@ -1399,28 +928,13 @@ class Tri(SetupPackage):
 
     def get_extension(self):
         sources = [
-            "lib/matplotlib/tri/_tri.cpp",
-            "lib/matplotlib/tri/_tri_wrapper.cpp",
+            "src/tri/_tri.cpp",
+            "src/tri/_tri_wrapper.cpp",
             "src/mplutils.cpp"
             ]
-        ext = make_extension('matplotlib._tri', sources)
+        ext = Extension('matplotlib._tri', sources)
         Numpy().add_flags(ext)
         return ext
-
-
-class InstallRequires(SetupPackage):
-    name = "install_requires"
-
-    def check(self):
-        return "handled by setuptools"
-
-    def get_install_requires(self):
-        return [
-            "cycler>=0.10",
-            "kiwisolver>=1.0.1",
-            "pyparsing>=2.0.1,!=2.0.4,!=2.1.2,!=2.1.6",
-            "python-dateutil>=2.1",
-        ]
 
 
 class BackendAgg(OptionalBackendPackage):
@@ -1434,7 +948,7 @@ class BackendAgg(OptionalBackendPackage):
             "src/_backend_agg.cpp",
             "src/_backend_agg_wrapper.cpp"
             ]
-        ext = make_extension('matplotlib.backends._backend_agg', sources)
+        ext = Extension('matplotlib.backends._backend_agg', sources)
         Numpy().add_flags(ext)
         LibAgg().add_flags(ext)
         FreeType().add_flags(ext)
@@ -1446,7 +960,7 @@ class BackendTkAgg(OptionalBackendPackage):
     force = True
 
     def check(self):
-        return "installing; run-time loading from Python Tcl / Tk"
+        return "installing; run-time loading from Python Tcl/Tk"
 
     def get_extension(self):
         sources = [
@@ -1454,7 +968,7 @@ class BackendTkAgg(OptionalBackendPackage):
             'src/py_converters.cpp',
             ]
 
-        ext = make_extension('matplotlib.backends._tkagg', sources)
+        ext = Extension('matplotlib.backends._tkagg', sources)
         self.add_flags(ext)
         Numpy().add_flags(ext)
         LibAgg().add_flags(ext, add_sources=False)
@@ -1463,8 +977,10 @@ class BackendTkAgg(OptionalBackendPackage):
     def add_flags(self, ext):
         ext.include_dirs.insert(0, 'src')
         if sys.platform == 'win32':
-            # PSAPI library needed for finding Tcl / Tk at run time
-            ext.libraries.extend(['psapi'])
+            # psapi library needed for finding Tcl/Tk at run time.
+            # user32 library needed for window manipulation functions.
+            ext.libraries.extend(['psapi', 'user32'])
+            ext.extra_link_args.extend(["-mwindows"])
         elif sys.platform == 'linux':
             ext.libraries.extend(['dl'])
 
@@ -1483,34 +999,10 @@ class BackendMacOSX(OptionalBackendPackage):
             'src/_macosx.m'
             ]
 
-        ext = make_extension('matplotlib.backends._macosx', sources)
+        ext = Extension('matplotlib.backends._macosx', sources)
         ext.extra_link_args.extend(['-framework', 'Cocoa'])
-        return ext
-
-
-class Windowing(OptionalBackendPackage):
-    """
-    Builds the windowing extension.
-    """
-    name = "windowing"
-
-    def check_requirements(self):
-        if sys.platform != 'win32':
-            raise CheckFailed("Microsoft Windows only")
-        config = self.get_config()
-        if config is False:
-            raise CheckFailed("skipping due to configuration")
-        return ""
-
-    def get_extension(self):
-        sources = [
-            "src/_windowing.cpp"
-            ]
-        ext = make_extension('matplotlib._windowing', sources)
-        ext.include_dirs.extend(['C:/include'])
-        ext.libraries.extend(['user32'])
-        ext.library_dirs.extend(['C:/lib'])
-        ext.extra_link_args.append("-mwindows")
+        if platform.python_implementation().lower() == 'pypy':
+            ext.extra_compile_args.append('-DPYPY=1')
         return ext
 
 
@@ -1541,5 +1033,5 @@ class Dlls(OptionalPackageData):
         """
         try:
             return config.getboolean(cls.config_category, cls.name)
-        except:
+        except Exception:
             return False  # <-- default

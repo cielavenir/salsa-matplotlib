@@ -9,7 +9,6 @@ To generate a report for IPython 2.0, run:
 # Imports
 #-----------------------------------------------------------------------------
 
-import codecs
 import sys
 
 from argparse import ArgumentParser
@@ -48,7 +47,7 @@ def issues2dict(issues):
         idict[i['number']] = i
     return idict
 
-def split_pulls(all_issues, project="ipython/ipython"):
+def split_pulls(all_issues, project="matplotlib/matplotlib"):
     """split a list of closed issues into non-PR Issues and Pull Requests"""
     pulls = []
     issues = []
@@ -61,7 +60,7 @@ def split_pulls(all_issues, project="ipython/ipython"):
     return issues, pulls
 
 
-def issues_closed_since(period=timedelta(days=365), project="ipython/ipython", pulls=False):
+def issues_closed_since(period=timedelta(days=365), project="matplotlib/matplotlib", pulls=False):
     """Get all issues closed since a particular point in time. period
     can either be a datetime object, or a timedelta object. In the
     latter case, it is used as a time before the present.
@@ -121,7 +120,7 @@ if __name__ == "__main__":
     parser.add_argument('--days', type=int,
         help="The number of days of data to summarize (use this or --since-tag)."
     )
-    parser.add_argument('--project', type=str, default="ipython/ipython",
+    parser.add_argument('--project', type=str, default="matplotlib/matplotlib",
         help="The project to summarize."
     )
     parser.add_argument('--links', action='store_true', default=False,
@@ -210,8 +209,8 @@ if __name__ == "__main__":
 
     print("We closed %d issues and merged %d pull requests." % (n_issues, n_pulls))
     if milestone:
-        print("The full list can be seen `on GitHub <https://github.com/%s/milestone/%s>`__"
-            % (project, milestone)
+        print("The full list can be seen `on GitHub <https://github.com/%s/milestone/%s?closed=1>`__"
+            % (project, milestone_id)
         )
 
     print()
@@ -228,3 +227,17 @@ if __name__ == "__main__":
         print()
         print('Issues (%d):\n' % n_issues)
         report(issues, show_urls)
+    print()
+    print()
+    print("""Previous GitHub Stats
+---------------------
+
+
+.. toctree::
+    :maxdepth: 1
+    :glob:
+    :reversed:
+
+    prev_whats_new/github_stats_*
+
+""")
