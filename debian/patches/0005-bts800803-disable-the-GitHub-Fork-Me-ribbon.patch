@@ -8,7 +8,7 @@ Subject: bts800803 disable the GitHub Fork Me ribbon
 
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
-@@ -192,10 +192,6 @@ parents[-1].link|e }}" />
+@@ -193,10 +193,6 @@ parents[-1].link|e }}" />
      <img src="{{pathto("_static/logo2.png", 1) }}" height="125px" border="0" alt="matplotlib"/></a>
  {%- endif %}
  

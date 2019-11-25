@@ -8,8 +8,8 @@ Subject: bts800803 dont use the Raleway font (from the Google Fonts API)
 
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
-@@ -165,7 +165,6 @@ parents[-1].link|e }}" />
-   <link rel="canonical" href="https://matplotlib.org/{{pagename}}.html" />
+@@ -166,7 +166,6 @@ parents[-1].link|e }}" />
+ {%- endif %}
  {% endblock %}
  
 -

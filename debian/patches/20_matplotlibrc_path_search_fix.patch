@@ -11,16 +11,16 @@ Patch-Name: 20_matplotlibrc_path_search_fix.patch
 
 --- a/lib/matplotlib/__init__.py
 +++ b/lib/matplotlib/__init__.py
-@@ -663,6 +663,8 @@ def _get_data_path():
-                                'directory')
+@@ -623,6 +623,8 @@ def _get_data_path():
+             "3.1", name="MATPLOTLIBDATA", obj_type="environment variable")
          return path
  
 +    return '/usr/share/matplotlib/mpl-data'
 +
      def get_candidate_paths():
          yield Path(__file__).with_name('mpl-data')
-         # setuptools' namespace_packages may highjack this init file
-@@ -741,7 +743,7 @@ def matplotlib_fname():
+         # setuptools' namespace_packages may hijack this init file
+@@ -692,7 +694,7 @@ def matplotlib_fname():
              yield matplotlibrc
              yield os.path.join(matplotlibrc, 'matplotlibrc')
          yield os.path.join(get_configdir(), 'matplotlibrc')
@@ -28,4 +28,4 @@ Patch-Name: 20_matplotlibrc_path_search_fix.patch
 +        yield '/etc/matplotlibrc'
  
      for fname in gen_candidates():
-         if os.path.exists(fname):
+         if os.path.exists(fname) and not os.path.isdir(fname):

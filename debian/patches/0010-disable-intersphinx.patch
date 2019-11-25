@@ -8,15 +8,17 @@ Subject: disable intersphinx
 
 --- a/doc/conf.py
 +++ b/doc/conf.py
-@@ -91,11 +91,6 @@ else:
+@@ -100,13 +100,6 @@ else:
      autodoc_default_options = {'members': None, 'undoc-members': None}
  
  intersphinx_mapping = {
 -    'python': ('https://docs.python.org/3', None),
 -    'numpy': ('https://docs.scipy.org/doc/numpy/', None),
 -    'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
--    'pandas': ('https://pandas.pydata.org/pandas-docs/stable', None),
+-    'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+-    'Pillow': ('https://pillow.readthedocs.io/en/stable/', None),
 -    'cycler': ('https://matplotlib.org/cycler', None),
+-    'dateutil': ('https://dateutil.readthedocs.io/en/stable/', None),
  }
  
  

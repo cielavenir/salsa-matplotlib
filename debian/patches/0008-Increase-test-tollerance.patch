@@ -12,7 +12,7 @@ http://pkgs.fedoraproject.org/cgit/rpms/python-matplotlib.git/plain/python-matpl
 
 --- a/lib/matplotlib/testing/decorators.py
 +++ b/lib/matplotlib/testing/decorators.py
-@@ -338,7 +338,7 @@ def _pytest_image_comparison(baseline_im
+@@ -341,7 +341,7 @@ def _pytest_image_comparison(baseline_im
      return decorator
  
  
@@ -31,22 +31,22 @@ http://pkgs.fedoraproject.org/cgit/rpms/python-matplotlib.git/plain/python-matpl
  @pytest.fixture
  def baseline_images(request, fontset, index):
      return ['%s_%s_%02d' % (request.param, fontset, index)]
-@@ -169,7 +168,7 @@ def baseline_images(request, fontset, in
+@@ -173,7 +172,7 @@ def baseline_images(request, fontset, in
                           ['cm', 'stix', 'stixsans', 'dejavusans',
                            'dejavuserif'])
  @pytest.mark.parametrize('baseline_images', ['mathtext'], indirect=True)
 -@image_comparison(baseline_images=None)
 +@image_comparison(baseline_images=None, tol=0.310)
- def test_mathtext_rendering(baseline_images, fontset, index, test):
+ def test_mathtext_rendering(baseline_images, fontset, index, test, recwarn):
      matplotlib.rcParams['mathtext.fontset'] = fontset
      fig = plt.figure(figsize=(5.25, 0.75))
-@@ -183,7 +182,7 @@ def test_mathtext_rendering(baseline_ima
+@@ -187,7 +186,7 @@ def test_mathtext_rendering(baseline_ima
                           ['cm', 'stix', 'stixsans', 'dejavusans',
                            'dejavuserif'])
  @pytest.mark.parametrize('baseline_images', ['mathfont'], indirect=True)
 -@image_comparison(baseline_images=None, extensions=['png'])
 +@image_comparison(baseline_images=None, extensions=['png'], tol=0.310)
- def test_mathfont_rendering(baseline_images, fontset, index, test):
+ def test_mathfont_rendering(baseline_images, fontset, index, test, recwarn):
      matplotlib.rcParams['mathtext.fontset'] = fontset
      fig = plt.figure(figsize=(5.25, 0.75))
 --- a/lib/matplotlib/tests/test_patheffects.py

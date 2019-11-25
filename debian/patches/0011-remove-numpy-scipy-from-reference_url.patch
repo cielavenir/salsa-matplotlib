@@ -8,7 +8,7 @@ Subject: remove numpy scipy from reference_url
 
 --- a/doc/conf.py
 +++ b/doc/conf.py
-@@ -102,8 +102,6 @@ sphinx_gallery_conf = {
+@@ -111,8 +111,6 @@ sphinx_gallery_conf = {
      'doc_module': ('matplotlib', 'mpl_toolkits'),
      'reference_url': {
          'matplotlib': None,
