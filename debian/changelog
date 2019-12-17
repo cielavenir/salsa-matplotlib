@@ -7,12 +7,13 @@ matplotlib (3.1.2-1) UNRELEASED; urgency=medium
   * debian/control
     - bump Standards-Version to 4.4.1 (no changes needed)
     - drop Qt4 from depends; Closes: #941527
+    - add sphinx-copybutton to b-d, needed by doc
   * debian/tests/
     - drop python2 tests and test Qt5 instead of Qt4; Closes: #943169
   * debian/patches/
     - refresh/drop patches as per new upstream code
 
- -- Sandro Tosi <morph@debian.org>  Sun, 24 Nov 2019 20:06:48 -0500
+ -- Sandro Tosi <morph@debian.org>  Mon, 16 Dec 2019 21:02:05 -0500
 
 matplotlib (3.0.2-2) unstable; urgency=medium
 
