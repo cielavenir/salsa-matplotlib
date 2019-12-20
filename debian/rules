@@ -29,6 +29,7 @@ build-arch-stamp:
 
 	cp -f debian/setup.cfg setup.cfg
 
+	set -e; \
 	for v in $(PY3VERS); do \
 		python$$v ./setup.py build $(PY_BUILD_FLAGS) ; \
 		python$$v-dbg ./setup.py build $(PY_BUILD_FLAGS) ; \
@@ -103,6 +104,7 @@ install-arch-stamp: build-arch-stamp
 	dh_testdir
 	dh_testroot
 
+	set -e; \
 	for v in $(PY3VERS) ; do \
 		python$$v ./setup.py install_lib --install-dir $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/ ; \
 		python$$v ./setup.py install_egg_info --install-dir $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/ ; \

@@ -12,8 +12,11 @@ matplotlib (3.1.2-1) UNRELEASED; urgency=medium
     - drop python2 tests and test Qt5 instead of Qt4; Closes: #943169
   * debian/patches/
     - refresh/drop patches as per new upstream code
+  * debian/rules
+    - error out in case of a failure during build or install targets; patch by
+      Matthias Klose; Closes: #942766
 
- -- Sandro Tosi <morph@debian.org>  Mon, 16 Dec 2019 21:02:05 -0500
+ -- Sandro Tosi <morph@debian.org>  Thu, 19 Dec 2019 22:25:12 -0500
 
 matplotlib (3.0.2-2) unstable; urgency=medium
 
