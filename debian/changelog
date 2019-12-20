@@ -15,8 +15,10 @@ matplotlib (3.1.2-1) UNRELEASED; urgency=medium
   * debian/rules
     - error out in case of a failure during build or install targets; patch by
       Matthias Klose; Closes: #942766
+    - skip tests!! temporary measure due to
+      https://github.com/matplotlib/matplotlib/issues/15960
 
- -- Sandro Tosi <morph@debian.org>  Thu, 19 Dec 2019 22:25:12 -0500
+ -- Sandro Tosi <morph@debian.org>  Thu, 19 Dec 2019 22:29:25 -0500
 
 matplotlib (3.0.2-2) unstable; urgency=medium
 
