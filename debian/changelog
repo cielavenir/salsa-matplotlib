@@ -1,4 +1,4 @@
-matplotlib (3.1.2-1) UNRELEASED; urgency=medium
+matplotlib (3.1.2-1) unstable; urgency=medium
 
   * New upstream release; Closes: #945169
   * debian/copyright
@@ -20,7 +20,7 @@ matplotlib (3.1.2-1) UNRELEASED; urgency=medium
   * debian/patches/0016-use-packaged-jquery.patch
     - use the packaged JQuery and JQuery UI
 
- -- Sandro Tosi <morph@debian.org>  Sat, 21 Dec 2019 20:36:14 -0500
+ -- Sandro Tosi <morph@debian.org>  Sat, 21 Dec 2019 21:56:14 -0500
 
 matplotlib (3.0.2-2) unstable; urgency=medium
 
