@@ -10,16 +10,10 @@
 # ensures that test images are exactly reproducible.
 #local_freetype = False
 
-[status]
-# To suppress display of the dependencies and their versions
-# at the top of the build log, uncomment the following line:
-#suppress = True
-
 [packages]
-# There are a number of subpackages of Matplotlib that are considered
-# optional. All except tests are installed by default, but that can
-# be changed here.
-#
+# There are a number of data subpackages from Matplotlib that are
+# considered optional. All except 'tests' data (meaning the baseline
+# image files) are installed by default, but that can be changed here.
 #tests = False
 #sample_data = True
 
@@ -67,8 +61,7 @@
 #
 #backend = Agg
 
-[package_data]
-# Package additional files found in the lib/matplotlib directories.
-#
-# On Windows, package DLL files.
-#dlls = True
+[build]
+# Build options
+# If we should try to use static libraries on Windows
+#staticbuild = True

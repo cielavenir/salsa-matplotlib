@@ -17,6 +17,9 @@ import sys
 import matplotlib
 import sphinx
 
+if sys.version_info < (3, 0, 0):
+    print("You're using python 2.x, conf.py works with python3+ only.")
+    exit()
 # If your extensions are in another directory, add it here. If the directory
 # is relative to the documentation root, use os.path.abspath to make it
 # absolute, like shown here.
@@ -45,6 +48,7 @@ extensions = [
     'sphinxext.custom_roles',
     'sphinxext.github',
     'sphinxext.math_symbol_table',
+    'sphinxext.missing_references',
     'sphinxext.mock_gui_toolkits',
     'sphinxext.skip_deprecated',
     'sphinx_copybutton',
@@ -98,6 +102,11 @@ if sphinx.version_info < (1, 8):
     autodoc_default_flags = ['members', 'undoc-members']
 else:
     autodoc_default_options = {'members': None, 'undoc-members': None}
+
+nitpicky = True
+# change this to True to update the allowed failures
+missing_references_write_json = False
+missing_references_warn_unused_ignores = False
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
@@ -207,7 +216,7 @@ default_role = 'obj'
 
 plot_formats = [('png', 100), ('pdf', 100)]
 
-# Github extension
+# GitHub extension
 
 github_project_url = "https://github.com/matplotlib/matplotlib/"
 
@@ -249,10 +258,9 @@ html_index = 'index.html'
 
 # Custom sidebar templates, maps page names to templates.
 html_sidebars = {
-    'index': ['searchbox.html', 'sidebar_announcement.html',
+    'index': ['sidebar_announcement.html', 'sidebar_versions.html',
               'donate_sidebar.html'],
-    '**': ['searchbox.html', 'localtoc.html', 'relations.html',
-           'pagesource.html']
+    '**': ['localtoc.html', 'relations.html', 'pagesource.html']
 }
 
 # If false, no module index is generated.
@@ -286,8 +294,8 @@ latex_paper_size = 'letter'
 
 latex_documents = [
     ('contents', 'Matplotlib.tex', 'Matplotlib',
-     'John Hunter, Darren Dale, Eric Firing, Michael Droettboom and the '
-     'matplotlib development team', 'manual'),
+     'John Hunter\\and Darren Dale\\and Eric Firing\\and Michael Droettboom'
+     '\\and and the matplotlib development team', 'manual'),
 ]
 
 
@@ -298,6 +306,9 @@ latex_logo = None
 latex_elements = {}
 # Additional stuff for the LaTeX preamble.
 latex_elements['preamble'] = r"""
+   % One line per author on title page
+   \DeclareRobustCommand{\and}%
+     {\end{tabular}\kern-\tabcolsep\\\begin{tabular}[t]{c}}%
    % In the parameters section, place a newline after the Parameters
    % header.  (This is stolen directly from Numpy's conf.py, since it
    % affects Numpy-style docstrings).
@@ -352,6 +363,12 @@ latex_elements = {
     'babel': r'\usepackage{babel}',
     'fontpkg': r'\setmainfont{DejaVu Serif}',
 }
+
+html4_writer = True
+
+inheritance_node_attrs = dict(fontsize=16)
+
+graphviz_output_format = 'svg'
 
 
 def setup(app):

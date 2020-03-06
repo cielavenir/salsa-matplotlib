@@ -21,6 +21,7 @@ just add:
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from cycler import cycler
 plt.style.use('ggplot')
 data = np.random.randn(50)
 
@@ -107,15 +108,22 @@ plt.show()
 # the matplotlib package. rcParams can be modified directly, for example:
 
 mpl.rcParams['lines.linewidth'] = 2
-mpl.rcParams['lines.color'] = 'r'
+mpl.rcParams['lines.linestyle'] = '--'
 plt.plot(data)
+
+###############################################################################
+# Note, that in order to change the usual `plot` color you have to change the
+# *prop_cycle* property of *axes*:
+
+mpl.rcParams['axes.prop_cycle'] = cycler(color=['r', 'g', 'b', 'y'])
+plt.plot(data)  # first color is red
 
 ###############################################################################
 # Matplotlib also provides a couple of convenience functions for modifying rc
 # settings. The :func:`matplotlib.rc` command can be used to modify multiple
 # settings in a single group at once, using keyword arguments:
 
-mpl.rc('lines', linewidth=4, color='g')
+mpl.rc('lines', linewidth=4, linestyle='-.')
 plt.plot(data)
 
 ###############################################################################
@@ -130,11 +138,11 @@ plt.plot(data)
 # The :file:`matplotlibrc` file
 # -----------------------------
 #
-# matplotlib uses :file:`matplotlibrc` configuration files to customize all kinds
-# of properties, which we call `rc settings` or `rc parameters`. You can control
-# the defaults of almost every property in matplotlib: figure size and dpi, line
-# width, color and style, axes, axis and grid properties, text and font
-# properties and so on. matplotlib looks for :file:`matplotlibrc` in four
+# Matplotlib uses :file:`matplotlibrc` configuration files to customize all
+# kinds of properties, which we call 'rc settings' or 'rc parameters'. You can
+# control the defaults of almost every property in Matplotlib: figure size and
+# DPI, line width, color and style, axes, axis and grid properties, text and
+# font properties and so on. Matplotlib looks for :file:`matplotlibrc` in four
 # locations, in the following order:
 #
 # 1. :file:`matplotlibrc` in the current working directory, usually used for
@@ -144,8 +152,9 @@ plt.plot(data)
 #
 # 3. It next looks in a user-specific place, depending on your platform:
 #
-#    - On Linux and FreeBSD, it looks in :file:`.config/matplotlib/matplotlibrc`
-#      (or `$XDG_CONFIG_HOME/matplotlib/matplotlibrc`) if you've customized
+#    - On Linux and FreeBSD, it looks in
+#      :file:`.config/matplotlib/matplotlibrc` (or
+#      :file:`$XDG_CONFIG_HOME/matplotlib/matplotlibrc`) if you've customized
 #      your environment.
 #
 #    - On other platforms, it looks in :file:`.matplotlib/matplotlibrc`.

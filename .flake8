@@ -3,17 +3,24 @@ ignore =
     # Normal default
     E121,E123,E126,E226,E24,E704,W503,W504,
     # Additional ignores:
-    E111, E114, E115, E116, E122, E124, E125, E127, E128, E129, E131,
+    E122, E125, E127, E128, E129, E131,
     E265, E266,
     E305, E306,
     E722, E741,
     F401, F403, F811, F841,
     # Some new flake8 ignores:
     N801, N802, N803, N806, N812,
+    # pydocstyle
+    D100, D101, D102, D103, D104, D105, D106, D107,
+    D200, D202, D203, D204, D205, D207, D209, D212, D213,
+    D300, D301
+    D400, D401, D402, D403, D413,
 
 exclude =
     .git
     build
+    doc/gallery
+    doc/tutorials
     # External files.
     versioneer.py
     tools/gh_api.py
@@ -25,41 +32,21 @@ per-file-ignores =
     setup.py: E402
     setupext.py: E501
 
-    tools/compare_backend_driver_results.py: E501
     tools/subset.py: E221, E251, E261, E302, E501
 
     lib/matplotlib/_cm.py: E202, E203, E302
     lib/matplotlib/_mathtext_data.py: E203, E261
-    lib/matplotlib/backends/_backend_tk.py: E501
-    lib/matplotlib/backends/backend_agg.py: E302
-    lib/matplotlib/backends/backend_cairo.py: E203, E221, E402
-    lib/matplotlib/backends/backend_gtk3.py: E203, E221, E225, E251, E501
-    lib/matplotlib/backends/backend_pgf.py: E731
-    lib/matplotlib/backends/qt_editor/_formlayout.py: E501
-    lib/matplotlib/font_manager.py: E203, E221, E251, E501
-    lib/matplotlib/fontconfig_pattern.py: E201, E203, E221, E222, E225
-    lib/matplotlib/mathtext.py: E201, E202, E203, E211, E221, E222, E225, E251, E301, E402
-    lib/matplotlib/projections/geo.py: E203, E221, E502
-    lib/matplotlib/pylab.py: E501
+    lib/matplotlib/font_manager.py: E221, E251, E501
+    lib/matplotlib/mathtext.py: E221, E251
     lib/matplotlib/rcsetup.py: E501
     lib/matplotlib/tests/test_mathtext.py: E501
-    lib/matplotlib/transforms.py: E201, E202, E203, E501
+    lib/matplotlib/transforms.py: E201, E202, E203
     lib/matplotlib/tri/triinterpolate.py: E201, E221
-    lib/matplotlib/type1font.py: E731
 
-    lib/mpl_toolkits/axes_grid1/axes_divider.py: E402, E501
     lib/mpl_toolkits/axes_grid1/axes_size.py: E272
-    lib/mpl_toolkits/axes_grid1/colorbar.py: E225, E501
     lib/mpl_toolkits/axisartist/angle_helper.py: E221
-    lib/mpl_toolkits/axisartist/clip_path.py: E225
-    lib/mpl_toolkits/axisartist/floating_axes.py: E225, E402, E501
-    lib/mpl_toolkits/axisartist/grid_helper_curvelinear.py: E225, E501
 
     doc/conf.py: E402, E501
-    doc/sphinxext/github.py: E302, E501
-    doc/sphinxext/math_symbol_table.py: E302, E501
-    doc/sphinxext/skip_deprecated.py: E302
-    doc/users/generate_credits.py: E302, E501
     tutorials/advanced/path_tutorial.py: E402, E501
     tutorials/advanced/patheffects_guide.py: E402, E501
     tutorials/advanced/transforms_tutorial.py: E402, E501
@@ -86,6 +73,7 @@ per-file-ignores =
 
     examples/animation/frame_grabbing_sgskip.py: E402
     examples/axes_grid1/inset_locator_demo.py: E402
+    examples/axes_grid1/scatter_hist_locatable_axes.py: E401, E402
     examples/axisartist/demo_curvelinear_grid.py: E402
     examples/color/color_by_yvalue.py: E402
     examples/color/color_cycle_default.py: E402
@@ -110,6 +98,7 @@ per-file-ignores =
     examples/images_contours_and_fields/contourf_hatching.py: E402
     examples/images_contours_and_fields/contourf_log.py: E402
     examples/images_contours_and_fields/demo_bboximage.py: E402
+    examples/images_contours_and_fields/image_antialiasing.py: E402
     examples/images_contours_and_fields/image_clip_path.py: E402
     examples/images_contours_and_fields/image_demo.py: E402
     examples/images_contours_and_fields/image_masked.py: E402
@@ -142,6 +131,7 @@ per-file-ignores =
     examples/lines_bars_and_markers/filled_step.py: E402
     examples/lines_bars_and_markers/horizontal_barchart_distribution.py: E402
     examples/lines_bars_and_markers/joinstyle.py: E402
+    examples/lines_bars_and_markers/scatter_hist.py: E402
     examples/lines_bars_and_markers/scatter_piecharts.py: E402
     examples/lines_bars_and_markers/scatter_with_legend.py: E402
     examples/lines_bars_and_markers/span_regions.py: E402
@@ -175,6 +165,7 @@ per-file-ignores =
     examples/pyplots/annotation_basic.py: E402
     examples/pyplots/annotation_polar.py: E231, E402
     examples/pyplots/auto_subplots_adjust.py: E231, E302, E402
+    examples/pyplots/axline.py: E402
     examples/pyplots/boxplot_demo_pyplot.py: E231, E402
     examples/pyplots/compound_path_demo.py: E231
     examples/pyplots/dollar_ticks.py: E402
@@ -191,7 +182,6 @@ per-file-ignores =
     examples/pyplots/text_commands.py: E231, E402
     examples/pyplots/text_layout.py: E231, E402
     examples/pyplots/whats_new_1_subplot3d.py: E402
-    examples/pyplots/whats_new_98_4_fancy.py: E302, E402
     examples/pyplots/whats_new_98_4_fill_between.py: E225, E402
     examples/pyplots/whats_new_98_4_legend.py: E228, E402
     examples/pyplots/whats_new_99_axes_grid.py: E402
@@ -228,6 +218,7 @@ per-file-ignores =
     examples/style_sheets/plot_solarizedlight2.py: E501
     examples/subplots_axes_and_figures/axes_margins.py: E402
     examples/subplots_axes_and_figures/axes_zoom_effect.py: E402
+    examples/subplots_axes_and_figures/custom_figure_class.py: E402
     examples/subplots_axes_and_figures/demo_constrained_layout.py: E402
     examples/subplots_axes_and_figures/demo_tight_layout.py: E402
     examples/subplots_axes_and_figures/secondary_axis.py: E402
@@ -235,8 +226,9 @@ per-file-ignores =
     examples/subplots_axes_and_figures/zoom_inset_axes.py: E402
     examples/tests/backend_driver_sgskip.py: E402, E501
     examples/text_labels_and_annotations/annotation_demo.py: E501
-    examples/text_labels_and_annotations/demo_text_rotation_mode.py: E402 
+    examples/text_labels_and_annotations/demo_text_rotation_mode.py: E402
     examples/text_labels_and_annotations/custom_legends.py: E402
+    examples/text_labels_and_annotations/fancyarrow_demo.py: E402
     examples/text_labels_and_annotations/font_family_rc_sgskip.py: E402
     examples/text_labels_and_annotations/font_file.py: E402
     examples/text_labels_and_annotations/legend.py: E402
@@ -245,7 +237,7 @@ per-file-ignores =
     examples/text_labels_and_annotations/tex_demo.py: E402
     examples/text_labels_and_annotations/watermark_text.py: E402
     examples/ticks_and_spines/auto_ticks.py: E501
-    examples/ticks_and_spines/date_concise_formatter.py: E402 
+    examples/ticks_and_spines/date_concise_formatter.py: E402
     examples/user_interfaces/canvasagg.py: E402
     examples/user_interfaces/embedding_in_gtk3_panzoom_sgskip.py: E402
     examples/user_interfaces/embedding_in_gtk3_sgskip.py: E402

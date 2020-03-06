@@ -83,7 +83,7 @@ def pick_simple():
     line, = ax1.plot(rand(100), 'o', picker=5)  # 5 points tolerance
 
     # pick the rectangle
-    bars = ax2.bar(range(10), rand(10), picker=True)
+    ax2.bar(range(10), rand(10), picker=True)
     for label in ax2.get_xticklabels():  # make the xtick labels pickable
         label.set_picker(True)
 
@@ -117,9 +117,9 @@ def pick_custom_hit():
 
     def line_picker(line, mouseevent):
         """
-        find the points within a certain distance from the mouseclick in
+        Find the points within a certain distance from the mouseclick in
         data coords and attach some extra attributes, pickx and picky
-        which are the data points that were picked
+        which are the data points that were picked.
         """
         if mouseevent.xdata is None:
             return False, dict()
@@ -157,8 +157,7 @@ def pick_scatter_plot():
         print('onpick3 scatter:', ind, x[ind], y[ind])
 
     fig, ax = plt.subplots()
-    col = ax.scatter(x, y, 100*s, c, picker=True)
-    #fig.savefig('pscoll.eps')
+    ax.scatter(x, y, 100*s, c, picker=True)
     fig.canvas.mpl_connect('pick_event', onpick3)
 
 

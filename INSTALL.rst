@@ -133,18 +133,26 @@ Optionally, you can also install a number of packages to enable better user
 interface toolkits. See :ref:`what-is-a-backend` for more details on the
 optional Matplotlib backends and the capabilities they provide.
 
-* :term:`tk` (>= 8.3, != 8.6.0 or 8.6.1): for the Tk-based backends;
+* `Tk <https://docs.python.org/3/library/tk.html>`_ (>= 8.3, != 8.6.0 or
+  8.6.1): for the Tk-based backends;
 * `PyQt4 <https://pypi.org/project/PyQt4>`_ (>= 4.6) or
-  `PySide <https://pypi.org/project/PySide>`_ (>= 1.0.3): for the Qt4-based
-  backends;
+  `PySide <https://pypi.org/project/PySide>`_ (>= 1.0.3) [#]_: for the
+  Qt4-based backends;
 * `PyQt5 <https://pypi.org/project/PyQt5>`_: for the Qt5-based backends;
 * `PyGObject <https://pypi.org/project/PyGObject/>`_: for the GTK3-based
+  backends [#]_;
+* `wxPython <https://www.wxpython.org/>`_ (>= 4) [#]_: for the wx-based
   backends;
-* :term:`wxpython` (>= 4): for the WX-based backends;
 * `cairocffi <https://cairocffi.readthedocs.io/en/latest/>`_ (>= 0.8) or
   `pycairo <https://pypi.org/project/pycairo>`_: for the cairo-based
   backends;
 * `Tornado <https://pypi.org/project/tornado>`_: for the WebAgg backend;
+
+.. [#] PySide cannot be pip-installed on Linux (but can be conda-installed).
+.. [#] If using pip (and not conda), PyGObject must be built from source; see
+       https://pygobject.readthedocs.io/en/latest/devguide/dev_environ.html.
+.. [#] If using pip (and not conda) on Linux, wxPython wheels must be manually
+       downloaded from https://wxpython.org/pages/downloads/.
 
 For better support of animation output format and image file formats, LaTeX,
 etc., you can install the following:
@@ -156,7 +164,9 @@ etc., you can install the following:
 * `Pillow <https://pillow.readthedocs.io/en/latest/>`_ (>= 3.4): for a larger
   selection of image file formats: JPEG, BMP, and TIFF image files;
 * `LaTeX <https://miktex.org/>`_ and `GhostScript (>=9.0)
-  <https://ghostscript.com/download/>`_ : for rendering text with LaTeX.
+  <https://ghostscript.com/download/>`_ : for rendering text with LaTeX;
+* `fontconfig <https://www.fontconfig.org>`_ (>= 2.7): for detection of system
+  fonts on Linux.
 
 .. note::
 
@@ -275,6 +285,9 @@ There are a few possibilities to build Matplotlib on Windows:
 * Wheels by using conda packages (see below)
 * Conda packages (see below)
 
+If you are building your own Matplotlib wheels (or sdists), note that any DLLs
+that you copy into the source tree will be packaged too.
+
 Wheel builds using conda packages
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -287,13 +300,11 @@ the list of conda packages.
 
 ::
 
-  conda create -n "matplotlib_build" python=3.7 numpy python-dateutil pyparsing tornado cycler tk libpng zlib freetype msinttypes
+  conda create -n "matplotlib_build" python=3.7 numpy python-dateutil pyparsing tornado cycler tk libpng zlib freetype
   conda activate matplotlib_build
-
-For building, call the script ``build_alllocal.cmd`` in the root folder of the
-repository::
-
-  build_alllocal.cmd
+  # force the build against static libpng and zlib libraries
+  set MPLSTATICBUILD=True
+  python setup.py bdist_wheel
 
 
 Conda packages
