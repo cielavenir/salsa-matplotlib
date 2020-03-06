@@ -1,11 +1,12 @@
-matplotlib (3.1.2-3) UNRELEASED; urgency=medium
+matplotlib (3.2.0-1) UNRELEASED; urgency=medium
 
+  * New upstream release
   * debian/control
     - replace `ipython` with `python3-ipython`: mpl requires
       ipython_console_highlighting to build its doc, which is now in the latter
       package; Closes: #943169
 
- -- Sandro Tosi <morph@debian.org>  Thu, 05 Mar 2020 21:16:34 -0500
+ -- Sandro Tosi <morph@debian.org>  Fri, 06 Mar 2020 13:33:28 -0500
 
 matplotlib (3.1.2-2) unstable; urgency=medium
 
