@@ -161,9 +161,9 @@ def test_user_fonts_linux(tmpdir, monkeypatch):
 @pytest.mark.skipif(sys.platform != 'win32', reason='Windows only')
 def test_user_fonts_win32():
     if not os.environ.get('APPVEYOR', False):
-        pytest.xfail('This test does only work on appveyor since user fonts '
-                     'are Windows specific and the developer\'s font '
-                     'directory should remain unchanged')
+        pytest.xfail("This test does only work on appveyor since user fonts "
+                     "are Windows specific and the developer's font directory "
+                     "should remain unchanged.")
 
     font_test_file = 'mpltest.ttf'
 
@@ -198,4 +198,5 @@ def _model_handler(_):
 def test_fork():
     _model_handler(0)  # Make sure the font cache is filled.
     ctx = multiprocessing.get_context("fork")
-    ctx.Pool(processes=2).map(_model_handler, range(2))
+    with ctx.Pool(processes=2) as pool:
+        pool.map(_model_handler, range(2))

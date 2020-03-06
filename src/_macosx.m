@@ -11,9 +11,6 @@
 
 /* Proper way to check for the OS X version we are compiling for, from
    http://developer.apple.com/documentation/DeveloperTools/Conceptual/cross_development */
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
-#define COMPILING_FOR_10_6
-#endif
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
 #define COMPILING_FOR_10_7
 #endif
@@ -204,11 +201,7 @@ static int wait_for_stdin(void)
 - (void)close;
 @end
 
-#ifdef COMPILING_FOR_10_6
 @interface View : NSView <NSWindowDelegate>
-#else
-@interface View : NSView
-#endif
 {   PyObject* canvas;
     NSRect rubberband;
     BOOL inside;
@@ -384,7 +377,7 @@ FigureCanvas_draw(FigureCanvas* self)
 }
 
 static PyObject*
-FigureCanvas_invalidate(FigureCanvas* self)
+FigureCanvas_draw_idle(FigureCanvas* self)
 {
     View* view = self->view;
     if(!view)
@@ -596,12 +589,12 @@ static PyMethodDef FigureCanvas_methods[] = {
     {"draw",
      (PyCFunction)FigureCanvas_draw,
      METH_NOARGS,
-     "Draws the canvas."
+     NULL,  // docstring inherited.
     },
-    {"invalidate",
-     (PyCFunction)FigureCanvas_invalidate,
+    {"draw_idle",
+     (PyCFunction)FigureCanvas_draw_idle,
      METH_NOARGS,
-     "Invalidates the canvas."
+     NULL,  // docstring inherited.
     },
     {"flush_events",
      (PyCFunction)FigureCanvas_flush_events,
@@ -812,10 +805,10 @@ static PyObject*
 FigureManager_set_window_title(FigureManager* self,
                                PyObject *args, PyObject *kwds)
 {
-    char* title;
-    if(!PyArg_ParseTuple(args, "es", "UTF-8", &title))
+    const char* title;
+    if (!PyArg_ParseTuple(args, "s", &title)) {
         return NULL;
-
+    }
     Window* window = self->window;
     if(window)
     {
@@ -826,7 +819,6 @@ FigureManager_set_window_title(FigureManager* self,
         [window setTitle: ns_title];
         [pool release];
     }
-    PyMem_Free(title);
     Py_RETURN_NONE;
 }
 
@@ -1369,10 +1361,10 @@ choose_save_file(PyObject* unused, PyObject* args)
 {
     int result;
     const char* title;
-    char* default_filename;
-    if(!PyArg_ParseTuple(args, "ses", &title, "UTF-8", &default_filename))
+    const char* default_filename;
+    if (!PyArg_ParseTuple(args, "ss", &title, &default_filename)) {
         return NULL;
-
+    }
     NSSavePanel* panel = [NSSavePanel savePanel];
     [panel setTitle: [NSString stringWithCString: title
                                         encoding: NSASCIIStringEncoding]];
@@ -1380,13 +1372,8 @@ choose_save_file(PyObject* unused, PyObject* args)
         [[NSString alloc]
          initWithCString: default_filename
          encoding: NSUTF8StringEncoding];
-    PyMem_Free(default_filename);
-#ifdef COMPILING_FOR_10_6
     [panel setNameFieldStringValue: ns_default_filename];
     result = [panel runModal];
-#else
-    result = [panel runModalForDirectory: nil file: ns_default_filename];
-#endif
     [ns_default_filename release];
 #ifdef COMPILING_FOR_10_10
     if (result == NSModalResponseOK)
@@ -1394,16 +1381,12 @@ choose_save_file(PyObject* unused, PyObject* args)
     if (result == NSOKButton)
 #endif
     {
-#ifdef COMPILING_FOR_10_6
         NSURL* url = [panel URL];
         NSString* filename = [url path];
         if (!filename) {
             PyErr_SetString(PyExc_RuntimeError, "Failed to obtain filename");
             return 0;
         }
-#else
-        NSString* filename = [panel filename];
-#endif
         unsigned int n = [filename length];
         unichar* buffer = malloc(n*sizeof(unichar));
         [filename getCharacters: buffer];
@@ -2583,26 +2566,6 @@ static PyTypeObject TimerType = {
     Timer_new,                 /* tp_new */
 };
 
-#ifndef COMPILING_FOR_10_6
-static bool verify_framework(void)
-{
-    ProcessSerialNumber psn;
-    if (CGMainDisplayID()!=0
-     && GetCurrentProcess(&psn)==noErr
-     && SetFrontProcess(&psn)==noErr) return true;
-    PyErr_SetString(PyExc_ImportError,
-        "Python is not installed as a framework. The Mac OS X backend will "
-        "not be able to function correctly if Python is not installed as a "
-        "framework. See the Python documentation for more information on "
-        "installing Python as a framework on Mac OS X. Please either reinstall "
-        "Python as a framework, or try one of the other backends. If you are "
-        "using (Ana)Conda please install python.app and replace the use of "
-        "'python' with 'pythonw'. See 'Working with Matplotlib on OSX' in the "
-        "Matplotlib FAQ for more information.");
-    return false;
-}
-#endif
-
 static struct PyMethodDef methods[] = {
    {"event_loop_is_running",
     (PyCFunction)event_loop_is_running,
@@ -2651,12 +2614,6 @@ PyObject* PyInit__macosx(void)
      || PyType_Ready(&NavigationToolbar2Type) < 0
      || PyType_Ready(&TimerType) < 0)
         return NULL;
-
-#ifndef COMPILING_FOR_10_6
-    /* if >=10.6 invoke setActivationPolicy in lazy_init */
-    if (!verify_framework())
-        return NULL;
-#endif
 
     module = PyModule_Create(&moduledef);
     if (!module)

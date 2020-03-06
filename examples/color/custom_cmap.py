@@ -9,7 +9,7 @@ For more detail on creating and manipulating colormaps see
 Creating a :doc:`colormap </tutorials/colors/colormaps>`
 from a list of colors can be done with the
 :meth:`~.colors.LinearSegmentedColormap.from_list` method of
-`LinearSegmentedColormap`. You must pass a list of RGB tuples that define the
+`.LinearSegmentedColormap`. You must pass a list of RGB tuples that define the
 mixture of colors from 0 to 1.
 
 
@@ -104,28 +104,28 @@ for n_bin, ax in zip(n_bins, axs.ravel()):
 # --- Custom colormaps ---
 
 cdict1 = {'red':   ((0.0, 0.0, 0.0),
-                   (0.5, 0.0, 0.1),
-                   (1.0, 1.0, 1.0)),
+                    (0.5, 0.0, 0.1),
+                    (1.0, 1.0, 1.0)),
 
-         'green': ((0.0, 0.0, 0.0),
-                   (1.0, 0.0, 0.0)),
+          'green': ((0.0, 0.0, 0.0),
+                    (1.0, 0.0, 0.0)),
 
-         'blue':  ((0.0, 0.0, 1.0),
-                   (0.5, 0.1, 0.0),
-                   (1.0, 0.0, 0.0))
-        }
+          'blue':  ((0.0, 0.0, 1.0),
+                    (0.5, 0.1, 0.0),
+                    (1.0, 0.0, 0.0))
+          }
 
 cdict2 = {'red':   ((0.0, 0.0, 0.0),
-                   (0.5, 0.0, 1.0),
-                   (1.0, 0.1, 1.0)),
+                    (0.5, 0.0, 1.0),
+                    (1.0, 0.1, 1.0)),
 
-         'green': ((0.0, 0.0, 0.0),
-                   (1.0, 0.0, 0.0)),
+          'green': ((0.0, 0.0, 0.0),
+                    (1.0, 0.0, 0.0)),
 
-         'blue':  ((0.0, 0.0, 0.1),
-                   (0.5, 1.0, 0.0),
-                   (1.0, 0.0, 0.0))
-        }
+          'blue':  ((0.0, 0.0, 0.1),
+                    (0.5, 1.0, 0.0),
+                    (1.0, 0.0, 0.0))
+          }
 
 cdict3 = {'red':  ((0.0, 0.0, 0.0),
                    (0.25, 0.0, 0.0),
@@ -133,18 +133,18 @@ cdict3 = {'red':  ((0.0, 0.0, 0.0),
                    (0.75, 1.0, 1.0),
                    (1.0, 0.4, 1.0)),
 
-         'green': ((0.0, 0.0, 0.0),
-                   (0.25, 0.0, 0.0),
-                   (0.5, 0.9, 0.9),
-                   (0.75, 0.0, 0.0),
-                   (1.0, 0.0, 0.0)),
+          'green': ((0.0, 0.0, 0.0),
+                    (0.25, 0.0, 0.0),
+                    (0.5, 0.9, 0.9),
+                    (0.75, 0.0, 0.0),
+                    (1.0, 0.0, 0.0)),
 
-         'blue':  ((0.0, 0.0, 0.4),
-                   (0.25, 1.0, 1.0),
-                   (0.5, 1.0, 0.8),
-                   (0.75, 0.0, 0.0),
-                   (1.0, 0.0, 0.0))
-        }
+          'blue':  ((0.0, 0.0, 0.4),
+                    (0.25, 1.0, 1.0),
+                    (0.5, 1.0, 0.8),
+                    (0.75, 0.0, 0.0),
+                    (1.0, 0.0, 0.0))
+          }
 
 # Make a modified version of cdict3 with some transparency
 # in the middle of the range.
