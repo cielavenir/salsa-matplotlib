@@ -7,8 +7,10 @@ matplotlib (3.2.0-1) UNRELEASED; urgency=medium
       package; Closes: #943169
   * debian/patches
     - refresh, drop patches
+  * debian/patches/setup-py-long-description.patch
+    - populate long description even when running `setup.py clean`
 
- -- Sandro Tosi <morph@debian.org>  Sat, 07 Mar 2020 00:41:07 -0500
+ -- Sandro Tosi <morph@debian.org>  Sat, 07 Mar 2020 01:16:53 -0500
 
 matplotlib (3.1.2-2) unstable; urgency=medium
 
