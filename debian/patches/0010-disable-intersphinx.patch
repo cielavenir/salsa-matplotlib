@@ -8,8 +8,8 @@ Subject: disable intersphinx
 
 --- a/doc/conf.py
 +++ b/doc/conf.py
-@@ -100,13 +100,6 @@ else:
-     autodoc_default_options = {'members': None, 'undoc-members': None}
+@@ -109,13 +109,6 @@ missing_references_write_json = False
+ missing_references_warn_unused_ignores = False
  
  intersphinx_mapping = {
 -    'python': ('https://docs.python.org/3', None),

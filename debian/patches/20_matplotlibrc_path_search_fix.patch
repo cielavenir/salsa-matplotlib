@@ -11,16 +11,16 @@ Patch-Name: 20_matplotlibrc_path_search_fix.patch
 
 --- a/lib/matplotlib/__init__.py
 +++ b/lib/matplotlib/__init__.py
-@@ -623,6 +623,8 @@ def _get_data_path():
-             "3.1", name="MATPLOTLIBDATA", obj_type="environment variable")
-         return path
+@@ -640,6 +640,8 @@ def _get_data_path():
+         "mpl-data subdirectory of the package are deprecated since %(since)s "
+         "and support for them will be removed %(removal)s.")
  
 +    return '/usr/share/matplotlib/mpl-data'
 +
      def get_candidate_paths():
-         yield Path(__file__).with_name('mpl-data')
          # setuptools' namespace_packages may hijack this init file
-@@ -692,7 +694,7 @@ def matplotlib_fname():
+         # so need to try something known to be in Matplotlib, not basemap.
+@@ -708,7 +710,7 @@ def matplotlib_fname():
              yield matplotlibrc
              yield os.path.join(matplotlibrc, 'matplotlibrc')
          yield os.path.join(get_configdir(), 'matplotlibrc')

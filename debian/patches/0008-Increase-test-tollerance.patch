@@ -12,7 +12,7 @@ http://pkgs.fedoraproject.org/cgit/rpms/python-matplotlib.git/plain/python-matpl
 
 --- a/lib/matplotlib/testing/decorators.py
 +++ b/lib/matplotlib/testing/decorators.py
-@@ -341,7 +341,7 @@ def _pytest_image_comparison(baseline_im
+@@ -268,7 +268,7 @@ def _pytest_image_comparison(baseline_im
      return decorator
  
  
@@ -23,7 +23,7 @@ http://pkgs.fedoraproject.org/cgit/rpms/python-matplotlib.git/plain/python-matpl
                       # Default of mpl_test_settings fixture and cleanup too.
 --- a/lib/matplotlib/tests/test_mathtext.py
 +++ b/lib/matplotlib/tests/test_mathtext.py
-@@ -157,7 +157,6 @@ for fonts, chars in font_test_specs:
+@@ -156,7 +156,6 @@ for fonts, chars in font_test_specs:
      for set in chars:
          font_tests.append(wrapper % set)
  
@@ -31,7 +31,7 @@ http://pkgs.fedoraproject.org/cgit/rpms/python-matplotlib.git/plain/python-matpl
  @pytest.fixture
  def baseline_images(request, fontset, index):
      return ['%s_%s_%02d' % (request.param, fontset, index)]
-@@ -173,7 +172,7 @@ def baseline_images(request, fontset, in
+@@ -172,7 +171,7 @@ def baseline_images(request, fontset, in
                           ['cm', 'stix', 'stixsans', 'dejavusans',
                            'dejavuserif'])
  @pytest.mark.parametrize('baseline_images', ['mathtext'], indirect=True)
@@ -40,7 +40,7 @@ http://pkgs.fedoraproject.org/cgit/rpms/python-matplotlib.git/plain/python-matpl
  def test_mathtext_rendering(baseline_images, fontset, index, test, recwarn):
      matplotlib.rcParams['mathtext.fontset'] = fontset
      fig = plt.figure(figsize=(5.25, 0.75))
-@@ -187,7 +186,7 @@ def test_mathtext_rendering(baseline_ima
+@@ -186,7 +185,7 @@ def test_mathtext_rendering(baseline_ima
                           ['cm', 'stix', 'stixsans', 'dejavusans',
                            'dejavuserif'])
  @pytest.mark.parametrize('baseline_images', ['mathfont'], indirect=True)
@@ -51,12 +51,12 @@ http://pkgs.fedoraproject.org/cgit/rpms/python-matplotlib.git/plain/python-matpl
      fig = plt.figure(figsize=(5.25, 0.75))
 --- a/lib/matplotlib/tests/test_patheffects.py
 +++ b/lib/matplotlib/tests/test_patheffects.py
-@@ -119,7 +119,7 @@ def test_SimplePatchShadow_offset():
+@@ -115,7 +115,7 @@ def test_SimplePatchShadow_offset():
      assert pe._offset == (4, 5)
  
  
--@image_comparison(baseline_images=['collection'], tol=0.02, style='mpl20')
-+@image_comparison(baseline_images=['collection'], tol=0.083, style='mpl20')
+-@image_comparison(['collection'], tol=0.02, style='mpl20')
++@image_comparison(['collection'], tol=0.083, style='mpl20')
  def test_collection():
      x, y = np.meshgrid(np.linspace(0, 10, 150), np.linspace(-5, 5, 100))
      data = np.sin(x) + np.cos(y)
