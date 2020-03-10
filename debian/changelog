@@ -12,8 +12,10 @@ matplotlib (3.2.0-1) UNRELEASED; urgency=medium
   * debian/copyright
     - extend packaging copyright years
     - update upstream copyright information
+  * debian/rules
+    - properly detect the platform and build doc with xvfb-run
 
- -- Sandro Tosi <morph@debian.org>  Sat, 07 Mar 2020 19:53:24 -0500
+ -- Sandro Tosi <morph@debian.org>  Mon, 09 Mar 2020 22:54:41 -0400
 
 matplotlib (3.1.2-2) unstable; urgency=medium
 

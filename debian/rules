@@ -4,7 +4,7 @@ export XDG_RUNTIME_DIR=/tmp
 
 PY3VERS := $(shell py3versions -v -r debian/control)
 DEFPY3 := $(shell py3versions -v -d)
-PY_PLATFORM := $(shell python -c 'from distutils.util import get_platform; print get_platform()')
+PY_PLATFORM := $(shell python3 -c 'from distutils.util import get_platform; print(get_platform())')
 pd := python-matplotlib-doc
 p3 := python3-matplotlib
 pdata := python-matplotlib-data
@@ -19,7 +19,7 @@ build-indep-stamp: build-arch-stamp
 	dh_testdir
 
 	# build the doc
-	MPLCONFIGDIR=. MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ PYTHONPATH=$(CURDIR)/build/lib.$(PY_PLATFORM)-$(DEFPY3) $(MAKE) -C doc html
+	MPLCONFIGDIR=. MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ PYTHONPATH=$(CURDIR)/build/lib.$(PY_PLATFORM)-$(DEFPY3) xvfb-run -a $(MAKE) -C doc html
 
 	touch $@
 
