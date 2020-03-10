@@ -5,6 +5,7 @@ matplotlib (3.2.0-1) UNRELEASED; urgency=medium
     - replace `ipython` with `python3-ipython`: mpl requires
       ipython_console_highlighting to build its doc, which is now in the latter
       package; Closes: #943169
+    - add cm-super-minimal to b-d, needed by doc
   * debian/patches
     - refresh, drop patches
   * debian/patches/setup-py-long-description.patch
@@ -15,7 +16,7 @@ matplotlib (3.2.0-1) UNRELEASED; urgency=medium
   * debian/rules
     - properly detect the platform and build doc with xvfb-run
 
- -- Sandro Tosi <morph@debian.org>  Mon, 09 Mar 2020 22:54:41 -0400
+ -- Sandro Tosi <morph@debian.org>  Mon, 09 Mar 2020 22:57:48 -0400
 
 matplotlib (3.1.2-2) unstable; urgency=medium
 
