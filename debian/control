@@ -2,10 +2,10 @@ Source: matplotlib
 Section: python
 Priority: optional
 Maintainer: Sandro Tosi <morph@debian.org>
-Uploaders: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
-Build-Depends: debhelper (>= 7),
-               cm-super-minimal <!nodoc>
+Uploaders: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>,
+Build-Depends: cm-super-minimal <!nodoc>
                dh-python,
+               debhelper (>= 7),
                dvipng,
                ghostscript,
                graphviz,
@@ -15,11 +15,11 @@ Build-Depends: debhelper (>= 7),
                locales-all,
                python3-all-dbg,
                python3-all-dev,
+               python3-cairocffi [!ia64],
+               python3-colorspacious,
+               python3-cxx-dev,
                python3-cycler (>= 0.10.0),
                python3-dateutil,
-               python3-colorspacious,
-               python3-cairocffi [!ia64],
-               python3-cxx-dev,
                python3-gi,
                python3-ipython <!nodoc>,
                python3-ipywidgets,
@@ -35,8 +35,8 @@ Build-Depends: debhelper (>= 7),
                python3-pil,
                python3-pkg-resources,
                python3-pyparsing (>= 1.5.6),
-               python3-pytest,
                python3-pyqt5 [!hurd-i386],
+               python3-pytest,
                python3-setuptools,
                python3-six (>= 1.4),
                python3-sphinx (>= 1.0.7+dfsg),
@@ -52,7 +52,7 @@ Build-Depends: debhelper (>= 7),
                tk8.6-dev,
                xauth,
                xvfb,
-               zlib1g-dev
+               zlib1g-dev,
 XS-Python-Version: all
 Standards-Version: 4.4.1
 Homepage: http://matplotlib.org/
@@ -61,22 +61,22 @@ Vcs-Browser: https://salsa.debian.org/python-team/modules/matplotlib
 
 Package: python3-matplotlib
 Architecture: any
-Depends: python3-dateutil,
+Depends: libjs-jquery,
+         libjs-jquery-ui,
          python-matplotlib-data (>= ${source:Version}),
+         python3-dateutil,
          python3-pyparsing (>= 1.5.6),
          python3-six (>= 1.4),
-         libjs-jquery,
-         libjs-jquery-ui,
          ${misc:Depends},
          ${python3:Depends},
-         ${shlibs:Depends}
+         ${shlibs:Depends},
 Recommends: python3-pil,
-            python3-tk
-Enhances: ipython3
+            python3-tk,
+Enhances: ipython3,
 Suggests: dvipng,
           ffmpeg,
-          gir1.2-gtk-3.0,
           ghostscript,
+          gir1.2-gtk-3.0,
           inkscape,
           ipython3,
           librsvg2-common,
@@ -92,7 +92,7 @@ Suggests: dvipng,
           python3-tornado,
           texlive-extra-utils,
           texlive-latex-extra,
-          ttf-staypuft
+          ttf-staypuft,
 Description: Python based plotting system in a style similar to Matlab (Python 3)
  Matplotlib is a pure Python plotting library designed to bring
  publication quality plotting to Python with a syntax familiar to
@@ -104,7 +104,9 @@ Description: Python based plotting system in a style similar to Matlab (Python 3
 
 Package: python-matplotlib-data
 Architecture: all
-Depends: fonts-lyx, ${misc:Depends}, ttf-bitstream-vera
+Depends: fonts-lyx,
+         ttf-bitstream-vera,
+         ${misc:Depends},
 Description: Python based plotting system (data package)
  Matplotlib is a pure Python plotting library designed to bring
  publication quality plotting to Python with a syntax familiar to
@@ -117,7 +119,8 @@ Description: Python based plotting system (data package)
 Package: python-matplotlib-doc
 Architecture: all
 Section: doc
-Depends: libjs-jquery, ${misc:Depends}
+Depends: libjs-jquery,
+         ${misc:Depends},
 Description: Python based plotting system (documentation package)
  Matplotlib is a pure Python plotting library designed to bring
  publication quality plotting to Python with a syntax familiar to
@@ -131,12 +134,12 @@ Package: python3-matplotlib-dbg
 Architecture: any
 Section: debug
 Depends: python3-all-dbg,
-         python3-matplotlib (= ${binary:Version}),
          python3-kiwisolver-dbg,
+         python3-matplotlib (= ${binary:Version}),
          ${misc:Depends},
-         ${shlibs:Depends}
-Breaks: python-matplotlib-dbg (<< 2.2.3-3)
-Replaces: python-matplotlib-dbg (<< 2.2.3-3)
+         ${shlibs:Depends},
+Breaks: python-matplotlib-dbg (<< 2.2.3-3),
+Replaces: python-matplotlib-dbg (<< 2.2.3-3),
 Description: Python based plotting system (debug extension, Python 3)
  Matplotlib is a pure Python plotting library designed to bring
  publication quality plotting to Python with a syntax familiar to
