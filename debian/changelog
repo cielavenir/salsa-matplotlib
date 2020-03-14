@@ -1,4 +1,4 @@
-matplotlib (3.2.0-1) UNRELEASED; urgency=medium
+matplotlib (3.2.0-1) unstable; urgency=medium
 
   * New upstream release
   * debian/control
@@ -16,7 +16,7 @@ matplotlib (3.2.0-1) UNRELEASED; urgency=medium
   * debian/rules
     - properly detect the platform and build doc with xvfb-run
 
- -- Sandro Tosi <morph@debian.org>  Mon, 09 Mar 2020 22:57:48 -0400
+ -- Sandro Tosi <morph@debian.org>  Sat, 14 Mar 2020 15:04:14 -0400
 
 matplotlib (3.1.2-2) unstable; urgency=medium
 
