@@ -1,3 +1,10 @@
+matplotlib (3.2.0-2) UNRELEASED; urgency=medium
+
+  * debian/control
+    - mark sphinx b-d as nodoc
+
+ -- Sandro Tosi <morph@debian.org>  Fri, 20 Mar 2020 19:22:59 -0400
+
 matplotlib (3.2.0-1) unstable; urgency=medium
 
   * New upstream release
