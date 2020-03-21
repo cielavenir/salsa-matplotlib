@@ -1,4 +1,4 @@
-matplotlib (3.2.1-1) UNRELEASED; urgency=medium
+matplotlib (3.2.1-1) unstable; urgency=medium
 
   * New upstream release
   * debian/control
@@ -7,7 +7,7 @@ matplotlib (3.2.1-1) UNRELEASED; urgency=medium
   * debian/patches/*
     - refresh, update, drop patches
 
- -- Sandro Tosi <morph@debian.org>  Sat, 21 Mar 2020 00:40:06 -0400
+ -- Sandro Tosi <morph@debian.org>  Sat, 21 Mar 2020 00:57:12 -0400
 
 matplotlib (3.2.0-1) unstable; urgency=medium
 
