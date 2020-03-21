@@ -4,8 +4,10 @@ matplotlib (3.2.1-1) UNRELEASED; urgency=medium
   * debian/control
     - mark sphinx b-d as nodoc
     - mark sphinx-gallery as <!stage1>, avoid a circular depend; Closes: #954071
+  * debian/patches/*
+    - refresh, update, drop patches
 
- -- Sandro Tosi <morph@debian.org>  Sat, 21 Mar 2020 00:33:46 -0400
+ -- Sandro Tosi <morph@debian.org>  Sat, 21 Mar 2020 00:40:06 -0400
 
 matplotlib (3.2.0-1) unstable; urgency=medium
 

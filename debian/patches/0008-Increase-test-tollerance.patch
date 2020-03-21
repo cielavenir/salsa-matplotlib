@@ -12,7 +12,7 @@ http://pkgs.fedoraproject.org/cgit/rpms/python-matplotlib.git/plain/python-matpl
 
 --- a/lib/matplotlib/testing/decorators.py
 +++ b/lib/matplotlib/testing/decorators.py
-@@ -268,7 +268,7 @@ def _pytest_image_comparison(baseline_im
+@@ -269,7 +269,7 @@ def _pytest_image_comparison(baseline_im
      return decorator
  
  

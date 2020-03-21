@@ -8,7 +8,7 @@ Subject: dont generate a test failure if images are not close to baseline
 
 --- a/lib/matplotlib/testing/decorators.py
 +++ b/lib/matplotlib/testing/decorators.py
-@@ -131,7 +131,7 @@ def _raise_on_image_difference(expected,
+@@ -132,7 +132,7 @@ def _raise_on_image_difference(expected,
      if err:
          for key in ["actual", "expected"]:
              err[key] = os.path.relpath(err[key])

@@ -3,7 +3,7 @@ Origin: https://src.fedoraproject.org/fork/qulogic/rpms/python-matplotlib/blob/8
 This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 --- a/setup.py
 +++ b/setup.py
-@@ -117,57 +117,6 @@ cmdclass['test'] = NoopTestCommand
+@@ -118,57 +118,6 @@ cmdclass['test'] = NoopTestCommand
  cmdclass['build_ext'] = BuildExtraLibraries
  
  
