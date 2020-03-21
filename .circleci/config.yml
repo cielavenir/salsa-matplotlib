@@ -1,7 +1,7 @@
 # Circle CI configuration file
 # https://circleci.com/docs/
 
-version: 2
+version: 2.1
 
 
 ###########################################
@@ -39,9 +39,9 @@ fonts-run:  &fonts-install
     mkdir -p ~/.local/share/fonts
     wget -nc https://github.com/google/fonts/blob/master/ofl/felipa/Felipa-Regular.ttf?raw=true -O ~/.local/share/fonts/Felipa-Regular.ttf || true
     if [ ! -f ~/.local/share/fonts/Humor-Sans.ttf ]; then
-      wget https://mirrors.kernel.org/ubuntu/pool/universe/f/fonts-humor-sans/fonts-humor-sans_1.0-1_all.deb
+      wget http://http.us.debian.org/debian/pool/main/f/fonts-humor-sans/fonts-humor-sans_1.0-3_all.deb
       mkdir tmp
-      dpkg -x fonts-humor-sans_1.0-1_all.deb tmp
+      dpkg -x fonts-humor-sans_1.0-3_all.deb tmp
       cp tmp/usr/share/fonts/truetype/humor-sans/Humor-Sans.ttf ~/.local/share/fonts
       rm -rf tmp
     else
@@ -115,10 +115,6 @@ jobs:
       - store_artifacts:
           path: doc/build/html
 
-      - run:
-          name: "Built documentation is available at:"
-          command: echo "${CIRCLE_BUILD_URL}/artifacts/${CIRCLE_NODE_INDEX}/${CIRCLE_WORKING_DIRECTORY/#\~/$HOME}/doc/build/html/index.html"
-
   docs-python37:
     docker:
       - image: circleci/python:3.7
@@ -141,9 +137,6 @@ jobs:
       - store_artifacts:
           path: doc/build/html
 
-      - run:
-          name: "Built documentation is available at:"
-          command: echo "${CIRCLE_BUILD_URL}/artifacts/${CIRCLE_NODE_INDEX}/${CIRCLE_WORKING_DIRECTORY/#\~/$HOME}/doc/build/html/index.html"
 
       - add_ssh_keys:
           fingerprints:
