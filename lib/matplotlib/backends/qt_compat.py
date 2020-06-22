@@ -92,7 +92,7 @@ def _setup_pyqt4():
 
     def _setup_pyqt4_internal(api):
         global QtCore, QtGui, QtWidgets, \
-            __version__, is_pyqt5, _getSaveFileName
+            __version__, is_pyqt5, _isdeleted, _getSaveFileName
         # List of incompatible APIs:
         # http://pyqt.sourceforge.net/Docs/PyQt4/incompatible_apis.html
         _sip_apis = ["QDate", "QDateTime", "QString", "QTextStream", "QTime",
@@ -173,4 +173,38 @@ else:  # We should not get there.
 # These globals are only defined for backcompatibility purposes.
 ETS = dict(pyqt=(QT_API_PYQTv2, 4), pyside=(QT_API_PYSIDE, 4),
            pyqt5=(QT_API_PYQT5, 5), pyside2=(QT_API_PYSIDE2, 5))
-QT_RC_MAJOR_VERSION = 5 if is_pyqt5() else 4
+
+QT_RC_MAJOR_VERSION = int(QtCore.qVersion().split(".")[0])
+
+
+def _devicePixelRatioF(obj):
+    """
+    Return obj.devicePixelRatioF() with graceful fallback for older Qt.
+
+    This can be replaced by the direct call when we require Qt>=5.6.
+    """
+    try:
+        # Not available on Qt<5.6
+        return obj.devicePixelRatioF() or 1
+    except AttributeError:
+        pass
+    try:
+        # Not available on Qt4 or some older Qt5.
+        # self.devicePixelRatio() returns 0 in rare cases
+        return obj.devicePixelRatio() or 1
+    except AttributeError:
+        return 1
+
+
+def _setDevicePixelRatioF(obj, val):
+    """
+    Call obj.setDevicePixelRatioF(val) with graceful fallback for older Qt.
+
+    This can be replaced by the direct call when we require Qt>=5.6.
+    """
+    if hasattr(obj, 'setDevicePixelRatioF'):
+        # Not available on Qt<5.6
+        obj.setDevicePixelRatioF(val)
+    elif hasattr(obj, 'setDevicePixelRatio'):
+        # Not available on Qt4 or some older Qt5.
+        obj.setDevicePixelRatio(val)

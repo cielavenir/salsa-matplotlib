@@ -32,7 +32,7 @@ graphics contexts must implement to serve as a matplotlib backend
     The base class for the messaging area.
 """
 
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from enum import IntEnum
 import functools
 import importlib
@@ -52,6 +52,7 @@ from matplotlib import (
 from matplotlib._pylab_helpers import Gcf
 from matplotlib.transforms import Affine2D
 from matplotlib.path import Path
+from matplotlib.cbook import _setattr_cm
 
 try:
     from PIL import __version__ as PILLOW_VERSION
@@ -711,6 +712,23 @@ class RendererBase:
 
         Currently only supported by the agg renderer.
         """
+
+    def _draw_disabled(self):
+        """
+        Context manager to temporary disable drawing.
+
+        This is used for getting the drawn size of Artists.  This lets us
+        run the draw process to update any Python state but does not pay the
+        cost of the draw_XYZ calls on the canvas.
+        """
+        no_ops = {
+            meth_name: lambda *args, **kwargs: None
+            for meth_name in dir(RendererBase)
+            if (meth_name.startswith("draw_")
+                or meth_name in ["open_group", "close_group"])
+        }
+
+        return _setattr_cm(self, **no_ops)
 
 
 class GraphicsContextBase:
@@ -1420,13 +1438,16 @@ class MouseEvent(LocationEvent):
         (*x*, *y*) in figure coords ((0, 0) = bottom left)
         button pressed None, 1, 2, 3, 'up', 'down'
         """
-        LocationEvent.__init__(self, name, canvas, x, y, guiEvent=guiEvent)
         if button in MouseButton.__members__.values():
             button = MouseButton(button)
         self.button = button
         self.key = key
         self.step = step
         self.dblclick = dblclick
+
+        # super-init is deferred to the end because it calls back on
+        # 'axes_enter_event', which requires a fully initialized event.
+        LocationEvent.__init__(self, name, canvas, x, y, guiEvent=guiEvent)
 
     def __str__(self):
         return (f"{self.name}: "
@@ -1512,19 +1533,19 @@ class KeyEvent(LocationEvent):
         cid = fig.canvas.mpl_connect('key_press_event', on_key)
     """
     def __init__(self, name, canvas, key, x=0, y=0, guiEvent=None):
-        LocationEvent.__init__(self, name, canvas, x, y, guiEvent=guiEvent)
         self.key = key
+        # super-init deferred to the end: callback errors if called before
+        LocationEvent.__init__(self, name, canvas, x, y, guiEvent=guiEvent)
 
 
-def _get_renderer(figure, print_method, *, draw_disabled=False):
+def _get_renderer(figure, print_method):
     """
     Get the renderer that would be used to save a `~.Figure`, and cache it on
     the figure.
 
-    If *draw_disabled* is True, additionally replace draw_foo methods on
-    *renderer* by no-ops.  This is used by the tight-bbox-saving renderer,
-    which needs to walk through the artist tree to compute the tight-bbox, but
-    for which the output file may be closed early.
+    If you need a renderer without any active draw methods use
+    renderer._draw_disabled to temporary patch them out at your call site.
+
     """
     # This is implemented by triggering a draw, then immediately jumping out of
     # Figure.draw() by raising an exception.
@@ -1539,11 +1560,6 @@ def _get_renderer(figure, print_method, *, draw_disabled=False):
             print_method(io.BytesIO())
         except Done as exc:
             renderer, = figure._cachedRenderer, = exc.args
-
-    if draw_disabled:
-        for meth_name in dir(RendererBase):
-            if meth_name.startswith("draw_"):
-                setattr(renderer, meth_name, lambda *args, **kwargs: None)
 
     return renderer
 
@@ -2052,8 +2068,9 @@ default: :rc:`savefig.bbox`
         # Some code (e.g. Figure.show) differentiates between having *no*
         # manager and a *None* manager, which should be fixed at some point,
         # but this should be fine.
-        with cbook._setattr_cm(self, _is_saving=True, manager=None), \
-                cbook._setattr_cm(self.figure, dpi=dpi):
+        with cbook._setattr_cm(self, manager=None), \
+                cbook._setattr_cm(self.figure, dpi=dpi), \
+                cbook._setattr_cm(canvas, _is_saving=True):
 
             if facecolor is None:
                 facecolor = rcParams['savefig.facecolor']
@@ -2074,9 +2091,13 @@ default: :rc:`savefig.bbox`
                     renderer = _get_renderer(
                         self.figure,
                         functools.partial(
-                            print_method, dpi=dpi, orientation=orientation),
-                        draw_disabled=True)
-                    self.figure.draw(renderer)
+                            print_method, dpi=dpi, orientation=orientation)
+                        )
+                    ctx = (renderer._draw_disabled()
+                           if hasattr(renderer, '_draw_disabled')
+                           else suppress())
+                    with ctx:
+                        self.figure.draw(renderer)
                     bbox_artists = kwargs.pop("bbox_extra_artists", None)
                     bbox_inches = self.figure.get_tightbbox(renderer,
                             bbox_extra_artists=bbox_artists)
@@ -2272,7 +2293,7 @@ default: :rc:`savefig.bbox`
         The event loop blocks until a callback function triggers
         `stop_event_loop`, or *timeout* is reached.
 
-        If *timeout* is negative, never timeout.
+        If *timeout* is 0 or negative, never timeout.
 
         Only interactive backends need to reimplement this method and it relies
         on `flush_events` being properly implemented.

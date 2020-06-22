@@ -213,32 +213,31 @@ class Collection(artist.Artist, cm.ScalarMappable):
             # we may have transform.contains_branch(transData) but not
             # transforms.get_affine().contains_branch(transData).  But later,
             # be careful to only apply the affine part that remains.
-        if not transOffset.is_affine:
-            offsets = transOffset.transform_non_affine(offsets)
 
         if isinstance(offsets, np.ma.MaskedArray):
             offsets = offsets.filled(np.nan)
             # get_path_collection_extents handles nan but not masked arrays
 
         if len(paths) and len(offsets):
-            if transform.contains_branch(transData):
+            if any(transform.contains_branch_seperately(transData)):
                 # collections that are just in data units (like quiver)
                 # can properly have the axes limits set by their shape +
                 # offset.  LineCollections that have no offsets can
                 # also use this algorithm (like streamplot).
                 result = mpath.get_path_collection_extents(
                     transform.get_affine(), paths, self.get_transforms(),
-                    offsets, transOffset.get_affine().frozen())
-                return result.inverse_transformed(transData)
+                    transOffset.transform_non_affine(offsets),
+                    transOffset.get_affine().frozen())
+                return result.transformed(transData.inverted())
             if not self._offsetsNone:
                 # this is for collections that have their paths (shapes)
                 # in physical, axes-relative, or figure-relative units
                 # (i.e. like scatter). We can't uniquely set limits based on
                 # those shapes, so we just set the limits based on their
                 # location.
-                # Finish the transform:
-                offsets = (transOffset.get_affine() +
-                           transData.inverted()).transform(offsets)
+
+                offsets = (transOffset - transData).transform(offsets)
+                # note A-B means A B^{-1}
                 offsets = np.ma.masked_invalid(offsets)
                 if not offsets.mask.all():
                     points = np.row_stack((offsets.min(axis=0),

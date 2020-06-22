@@ -288,7 +288,7 @@ class RendererWx(RendererBase):
             w = self.width
             h = self.height
         rows, cols = im.shape[:2]
-        bitmap = wx.Bitmap.FromBufferRGBA(cols, rows, im.tostring())
+        bitmap = wx.Bitmap.FromBufferRGBA(cols, rows, im.tobytes())
         gc = self.get_gc()
         gc.select()
         gc.gfx_ctx.DrawBitmap(bitmap, int(l), int(self.height - b),
@@ -702,7 +702,9 @@ class _FigureCanvasWxBase(FigureCanvasBase, wx.Panel):
         The 'WXAgg' backend sets origin accordingly.
         """
         DEBUG_MSG("gui_repaint()", 1, self)
-        if self.IsShownOnScreen():
+        # The "if self" check avoids a "wrapped C/C++ object has been deleted"
+        # RuntimeError if doing things after window is closed.
+        if self and self.IsShownOnScreen():
             if not drawDC:
                 # not called from OnPaint use a ClientDC
                 drawDC = wx.ClientDC(self)
@@ -776,13 +778,13 @@ class _FigureCanvasWxBase(FigureCanvasBase, wx.Panel):
                 # no change in size
                 return
         self._width, self._height = size
-        # Create a new, correctly sized bitmap
-        self.bitmap = wx.Bitmap(self._width, self._height)
-
         self._isDrawn = False
 
         if self._width <= 1 or self._height <= 1:
             return  # Empty figure
+
+        # Create a new, correctly sized bitmap
+        self.bitmap = wx.Bitmap(self._width, self._height)
 
         dpival = self.figure.dpi
         winch = self._width / dpival
@@ -978,14 +980,11 @@ class FigureCanvasWx(_FigureCanvasWxBase):
 
         # Now that we have rendered into the bitmap, save it to the appropriate
         # file type and clean up.
-        if isinstance(filename, str):
-            if not image.SaveFile(filename, filetype):
-                raise RuntimeError(f'Could not save figure to {filename}')
-        elif cbook.is_writable_file_like(filename):
-            if not isinstance(image, wx.Image):
-                image = image.ConvertToImage()
-            if not image.SaveStream(filename, filetype):
-                raise RuntimeError(f'Could not save figure to {filename}')
+        if (cbook.is_writable_file_like(filename) and
+                not isinstance(image, wx.Image)):
+            image = image.ConvertToImage()
+        if not image.SaveFile(filename, filetype):
+            raise RuntimeError(f'Could not save figure to {filename}')
 
         # Restore everything to normal
         self.bitmap = origBitmap
@@ -997,7 +996,10 @@ class FigureCanvasWx(_FigureCanvasWxBase):
         # otherwise.
         if self._isDrawn:
             self.draw()
-        self.Refresh()
+        # The "if self" check avoids a "wrapped C/C++ object has been deleted"
+        # RuntimeError if doing things after window is closed.
+        if self:
+            self.Refresh()
 
 
 ########################################################################
@@ -1501,7 +1503,7 @@ class NavigationToolbar2Wx(NavigationToolbar2, wx.ToolBar):
 
     def set_message(self, s):
         status_bar = self.GetTopLevelParent().GetStatusBar()
-        if status_bar is not None:
+        if status_bar is not None and hasattr(status_bar, 'set_function'):
             status_bar.set_function(s)
 
     def set_history_buttons(self):
