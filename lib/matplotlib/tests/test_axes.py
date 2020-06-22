@@ -750,7 +750,11 @@ def test_polar_invertedylim():
 def test_polar_invertedylim_rorigin():
     fig = plt.figure()
     ax = fig.add_axes([0.1, 0.1, 0.8, 0.8], polar=True)
-    ax.set_ylim(2, 0)
+    ax.yaxis.set_inverted(True)
+    # Set the rlims to inverted (2, 0) without calling set_rlim, to check that
+    # viewlims are correctly unstaled before draw()ing.
+    ax.plot([0, 0], [0, 2], c="none")
+    ax.margins(0)
     ax.set_rorigin(3)
 
 
@@ -2083,6 +2087,22 @@ class TestScatter:
                 Axes._parse_scatter_color_args(
                     c=c_case, edgecolors="black", kwargs={}, xsize=xsize,
                     get_next_color_func=get_next_color)
+
+    @pytest.mark.style('default')
+    @check_figures_equal(extensions=["png"])
+    def test_scatter_single_color_c(self, fig_test, fig_ref):
+        rgb = [[1, 0.5, 0.05]]
+        rgba = [[1, 0.5, 0.05, .5]]
+
+        # set via color kwarg
+        ax_ref = fig_ref.subplots()
+        ax_ref.scatter(np.ones(3), range(3), color=rgb)
+        ax_ref.scatter(np.ones(4)*2, range(4), color=rgba)
+
+        # set via broadcasting via c
+        ax_test = fig_test.subplots()
+        ax_test.scatter(np.ones(3), range(3), c=rgb)
+        ax_test.scatter(np.ones(4)*2, range(4), c=rgba)
 
 
 def _params(c=None, xsize=2, **kwargs):
@@ -6674,3 +6694,33 @@ def test_invisible_axes():
     assert fig.canvas.inaxes((200, 200)) is not None
     ax.set_visible(False)
     assert fig.canvas.inaxes((200, 200)) is None
+
+
+@pytest.mark.parametrize('auto', (True, False, None))
+def test_unautoscaley(auto):
+    fig, ax = plt.subplots()
+    x = np.arange(100)
+    y = np.linspace(-.1, .1, 100)
+    ax.scatter(x, y)
+
+    post_auto = ax.get_autoscaley_on() if auto is None else auto
+
+    ax.set_ylim((-.5, .5), auto=auto)
+    assert post_auto == ax.get_autoscaley_on()
+    fig.canvas.draw()
+    assert_array_equal(ax.get_ylim(), (-.5, .5))
+
+
+@pytest.mark.parametrize('auto', (True, False, None))
+def test_unautoscalex(auto):
+    fig, ax = plt.subplots()
+    x = np.arange(100)
+    y = np.linspace(-.1, .1, 100)
+    ax.scatter(y, x)
+
+    post_auto = ax.get_autoscalex_on() if auto is None else auto
+
+    ax.set_xlim((-.5, .5), auto=auto)
+    assert post_auto == ax.get_autoscalex_on()
+    fig.canvas.draw()
+    assert_array_equal(ax.get_xlim(), (-.5, .5))
