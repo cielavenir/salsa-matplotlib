@@ -3,7 +3,7 @@ Origin: https://src.fedoraproject.org/fork/qulogic/rpms/python-matplotlib/blob/8
 This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 --- a/setup.py
 +++ b/setup.py
-@@ -118,57 +118,6 @@ cmdclass['test'] = NoopTestCommand
+@@ -120,58 +120,6 @@ cmdclass['test'] = NoopTestCommand
  cmdclass['build_ext'] = BuildExtraLibraries
  
  
@@ -25,8 +25,9 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 -        try:
 -            buff = download_or_cache(url, sha)
 -        except Exception:
--            raise IOError(f"Failed to download jquery-ui.  Please download "
--                          f"{url} and extract it to {dest}.")
+-            raise IOError(
+-                "Failed to download jquery-ui.  Please download "
+-                "{url} and extract it to {dest}.".format(url=url, dest=dest))
 -        with ZipFile(buff) as zf:
 -            zf.extractall(dest)
 -

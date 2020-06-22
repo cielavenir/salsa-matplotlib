@@ -8,7 +8,7 @@ Subject: bts800803 remote the Google Analytics tracking
 
 --- a/doc/_templates/layout.html
 +++ b/doc/_templates/layout.html
-@@ -85,14 +85,4 @@ Doc version {{ sha }}.
+@@ -94,14 +94,4 @@ Doc version {{ sha }}.
  {%- endif %}
      </div>
  </footer>
