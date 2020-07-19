@@ -1,3 +1,9 @@
+matplotlib (3.3.0-1) UNRELEASED; urgency=medium
+
+  * New upstream release
+
+ -- Sandro Tosi <morph@debian.org>  Sun, 19 Jul 2020 15:45:53 -0400
+
 matplotlib (3.2.2-1) unstable; urgency=medium
 
   * New upstream release
