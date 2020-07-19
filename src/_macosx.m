@@ -202,7 +202,6 @@ static int wait_for_stdin(void)
 @interface View : NSView <NSWindowDelegate>
 {   PyObject* canvas;
     NSRect rubberband;
-    BOOL inside;
     NSTrackingRectTag tracking;
     @public double device_scale;
 }
@@ -333,6 +332,14 @@ FigureCanvas_init(FigureCanvas *self, PyObject *args, PyObject *kwds)
 
     NSRect rect = NSMakeRect(0.0, 0.0, width, height);
     self->view = [self->view initWithFrame: rect];
+    self->view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    int opts = (NSTrackingMouseEnteredAndExited | NSTrackingMouseMoved |
+                NSTrackingActiveInKeyWindow | NSTrackingInVisibleRect);
+    [self->view addTrackingArea: [
+        [NSTrackingArea alloc] initWithRect: rect
+                                    options: opts
+                                      owner: self->view
+                                   userInfo: nil]];
     [self->view setCanvas: (PyObject*)self];
     return 0;
 }
@@ -448,46 +455,6 @@ FigureCanvas_remove_rubberband(FigureCanvas* self)
     }
     [view removeRubberband];
     Py_RETURN_NONE;
-}
-
-static NSImage* _read_ppm_image(PyObject* obj)
-{
-    int width;
-    int height;
-    const char* data;
-    int n;
-    int i;
-    NSBitmapImageRep* bitmap;
-    unsigned char* bitmapdata;
-
-    if (!obj) return NULL;
-    if (!PyTuple_Check(obj)) return NULL;
-    if (!PyArg_ParseTuple(obj, "iit#", &width, &height, &data, &n)) return NULL;
-    if (width*height*3 != n) return NULL; /* RGB image uses 3 colors / pixel */
-
-    bitmap = [[NSBitmapImageRep alloc]
-                  initWithBitmapDataPlanes: NULL
-                                pixelsWide: width
-                                pixelsHigh: height
-                             bitsPerSample: 8
-                           samplesPerPixel: 3
-                                  hasAlpha: NO
-                                  isPlanar: NO
-                            colorSpaceName: NSDeviceRGBColorSpace
-                              bitmapFormat: 0
-                               bytesPerRow: width*3
-                               bitsPerPixel: 24];
-    if (!bitmap) return NULL;
-    bitmapdata = [bitmap bitmapData];
-    for (i = 0; i < n; i++) bitmapdata[i] = data[i];
-
-    NSSize size = NSMakeSize(width, height);
-    NSImage* image = [[NSImage alloc] initWithSize: size];
-    if (image) [image addRepresentation: bitmap];
-
-    [bitmap release];
-
-    return image;
 }
 
 static PyObject*
@@ -733,7 +700,6 @@ FigureManager_init(FigureManager *self, PyObject *args, PyObject *kwds)
     [window setTitle: [NSString stringWithCString: title
                                          encoding: NSASCIIStringEncoding]];
 
-    [window setAcceptsMouseMovedEvents: YES];
     [window setDelegate: view];
     [window makeFirstResponder: view];
     [[window contentView] addSubview: view];
@@ -822,6 +788,22 @@ FigureManager_get_window_title(FigureManager* self)
     }
 }
 
+static PyObject*
+FigureManager_resize(FigureManager* self, PyObject *args, PyObject *kwds)
+{
+    int width, height;
+    if (!PyArg_ParseTuple(args, "ii", &width, &height)) {
+        return NULL;
+    }
+    Window* window = self->window;
+    if(window)
+    {
+        // 36 comes from hard-coded size of toolbar later in code
+        [window setContentSize: NSMakeSize(width, height + 36.)];
+    }
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef FigureManager_methods[] = {
     {"show",
      (PyCFunction)FigureManager_show,
@@ -842,6 +824,11 @@ static PyMethodDef FigureManager_methods[] = {
      (PyCFunction)FigureManager_get_window_title,
      METH_NOARGS,
      "Returns the title of the window associated with the figure manager."
+    },
+    {"resize",
+     (PyCFunction)FigureManager_resize,
+     METH_VARARGS,
+     "Resize the window (in pixels)."
     },
     {NULL}  /* Sentinel */
 };
@@ -909,8 +896,9 @@ static PyTypeObject FigureManagerType = {
 typedef struct {
     PyObject_HEAD
     NSPopUpButton* menu;
-    NSText* messagebox;
+    NSTextView* messagebox;
     NavigationToolbar2Handler* handler;
+    int height;
 } NavigationToolbar2;
 
 @implementation NavigationToolbar2Handler
@@ -1118,7 +1106,7 @@ NavigationToolbar2_init(NavigationToolbar2 *self, PyObject *args, PyObject *kwds
     const int height = 36;
     const int imagesize = 24;
 
-    const char* basedir;
+    self->height = height;
 
     obj = PyObject_GetAttrString((PyObject*)self, "canvas");
     if (obj==NULL)
@@ -1140,8 +1128,6 @@ NavigationToolbar2_init(NavigationToolbar2 *self, PyObject *args, PyObject *kwds
         return -1;
     }
 
-    if(!PyArg_ParseTuple(args, "s", &basedir)) return -1;
-
     NSRect bounds = [view bounds];
     NSWindow* window = [view window];
 
@@ -1151,27 +1137,17 @@ NavigationToolbar2_init(NavigationToolbar2 *self, PyObject *args, PyObject *kwds
     bounds.size.height += height;
     [window setContentSize: bounds.size];
 
-    NSString* dir = [NSString stringWithCString: basedir
-                                       encoding: NSASCIIStringEncoding];
+    const char* images[7];
+    const char* tooltips[7];
+    if (!PyArg_ParseTuple(args, "(sssssss)(sssssss)",
+                &images[0], &images[1], &images[2], &images[3],
+                &images[4], &images[5], &images[6],
+                &tooltips[0], &tooltips[1], &tooltips[2], &tooltips[3],
+                &tooltips[4], &tooltips[5], &tooltips[6])) {
+        return -1;
+    }
 
     NSButton* buttons[7];
-
-    NSString* images[7] = {@"home.pdf",
-                           @"back.pdf",
-                           @"forward.pdf",
-                           @"move.pdf",
-                           @"zoom_to_rect.pdf",
-                           @"subplots.pdf",
-                           @"filesave.pdf"};
-
-    NSString* tooltips[7] = {@"Reset original view",
-                             @"Back to  previous view",
-                             @"Forward to next view",
-                             @"Pan axes with left mouse, zoom with right",
-                             @"Zoom to rectangle",
-                             @"Configure subplots",
-                             @"Save the figure"};
-
     SEL actions[7] = {@selector(home:),
                       @selector(back:),
                       @selector(forward:),
@@ -1179,7 +1155,6 @@ NavigationToolbar2_init(NavigationToolbar2 *self, PyObject *args, PyObject *kwds
                       @selector(zoom:),
                       @selector(configure_subplots:),
                       @selector(save_figure:)};
-
     NSButtonType buttontypes[7] = {NSMomentaryLightButton,
                                    NSMomentaryLightButton,
                                    NSMomentaryLightButton,
@@ -1204,9 +1179,11 @@ NavigationToolbar2_init(NavigationToolbar2 *self, PyObject *args, PyObject *kwds
     rect.origin.x = gap;
     rect.origin.y = 0.5*(height - rect.size.height);
 
-    for (i = 0; i < 7; i++)
-    {
-        NSString* filename = [dir stringByAppendingPathComponent: images[i]];
+    for (i = 0; i < 7; i++) {
+        NSString* filename = [NSString stringWithCString: images[i]
+                                                encoding: NSUTF8StringEncoding];
+        NSString* tooltip = [NSString stringWithCString: tooltips[i]
+                                               encoding: NSUTF8StringEncoding];
         NSImage* image = [[NSImage alloc] initWithContentsOfFile: filename];
         buttons[i] = [[NSButton alloc] initWithFrame: rect];
         [image setSize: size];
@@ -1215,7 +1192,7 @@ NavigationToolbar2_init(NavigationToolbar2 *self, PyObject *args, PyObject *kwds
         [buttons[i] setImage: image];
         [buttons[i] scaleUnitSquareToSize: scale];
         [buttons[i] setImagePosition: NSImageOnly];
-        [buttons[i] setToolTip: tooltips[i]];
+        [buttons[i] setToolTip: tooltip];
         [[window contentView] addSubview: buttons[i]];
         [buttons[i] release];
         [image release];
@@ -1229,7 +1206,9 @@ NavigationToolbar2_init(NavigationToolbar2 *self, PyObject *args, PyObject *kwds
     rect.size.width = 300;
     rect.size.height = 0;
     rect.origin.x += height;
-    NSText* messagebox = [[NSText alloc] initWithFrame: rect];
+    NSTextView* messagebox = [[NSTextView alloc] initWithFrame: rect];
+    messagebox.textContainer.maximumNumberOfLines = 2;
+    messagebox.textContainer.lineBreakMode = NSLineBreakByTruncatingTail;
     [messagebox setFont: font];
     [messagebox setDrawsBackground: NO];
     [messagebox setSelectable: NO];
@@ -1269,12 +1248,25 @@ NavigationToolbar2_set_message(NavigationToolbar2 *self, PyObject* args)
 
     if(!PyArg_ParseTuple(args, "y", &message)) return NULL;
 
-    NSText* messagebox = self->messagebox;
+    NSTextView* messagebox = self->messagebox;
 
     if (messagebox)
     {
         NSString* text = [NSString stringWithUTF8String: message];
         [messagebox setString: text];
+
+        // Adjust width with the window size
+        NSRect rectWindow = [messagebox.superview frame];
+        NSRect rect = [messagebox frame];
+        rect.size.width = rectWindow.size.width - rect.origin.x;
+        [messagebox setFrame: rect];
+
+        // Adjust height with the content size
+        [messagebox.layoutManager ensureLayoutForTextContainer: messagebox.textContainer];
+        NSRect contentSize = [messagebox.layoutManager usedRectForTextContainer: messagebox.textContainer];
+        rect = [messagebox frame];
+        rect.origin.y = 0.5 * (self->height - contentSize.size.height);
+        [messagebox setFrame: rect];
     }
 
     Py_RETURN_NONE;
@@ -1559,8 +1551,6 @@ static WindowServerConnectionManager *sharedWindowServerConnectionManager = nil;
 {
     self = [super initWithFrame: rect];
     rubberband = NSZeroRect;
-    inside = false;
-    tracking = 0;
     device_scale = 1;
     return self;
 }
@@ -1569,7 +1559,6 @@ static WindowServerConnectionManager *sharedWindowServerConnectionManager = nil;
 {
     FigureCanvas* fc = (FigureCanvas*)canvas;
     if (fc) fc->view = NULL;
-    [self removeTrackingRect: tracking];
     [super dealloc];
 }
 
@@ -1667,26 +1656,15 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
             goto exit;
         }
     }
-
-    renderer = PyObject_CallMethod(canvas, "_draw", "", NULL);
-    if (!renderer)
-    {
+    if (!(renderer = PyObject_CallMethod(canvas, "_draw", "", NULL))
+        || !(renderer_buffer = PyObject_GetAttrString(renderer, "_renderer"))) {
         PyErr_Print();
         goto exit;
     }
-
-    renderer_buffer = PyObject_GetAttrString(renderer, "_renderer");
-    if (!renderer_buffer) {
-        PyErr_Print();
-        goto exit;
-    }
-
     if (_copy_agg_buffer(cr, renderer_buffer)) {
         printf("copy_agg_buffer failed\n");
         goto exit;
     }
-
-
     if (!NSIsEmptyRect(rubberband)) {
         NSFrameRect(rubberband);
     }
@@ -1709,8 +1687,6 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
     width = size.width;
     height = size.height;
 
-    [self setFrameSize: size];
-
     PyGILState_STATE gstate = PyGILState_Ensure();
     PyObject* result = PyObject_CallMethod(
             canvas, "resize", "ii", width, height);
@@ -1719,11 +1695,6 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
     else
         PyErr_Print();
     PyGILState_Release(gstate);
-    if (tracking) [self removeTrackingRect: tracking];
-    tracking = [self addTrackingRect: [self bounds]
-                               owner: self
-                            userData: nil
-                        assumeInside: NO];
     [self setNeedsDisplay: YES];
 }
 
@@ -1766,8 +1737,6 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
 {
     PyGILState_STATE gstate;
     PyObject* result;
-    NSWindow* window = [self window];
-    if ([window isKeyWindow]==false) return;
 
     int x, y;
     NSPoint location = [event locationInWindow];
@@ -1784,19 +1753,13 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
     else
         PyErr_Print();
     PyGILState_Release(gstate);
-
-    [window setAcceptsMouseMovedEvents: YES];
-    inside = true;
 }
 
 - (void)mouseExited:(NSEvent *)event
 {
     PyGILState_STATE gstate;
     PyObject* result;
-    NSWindow* window = [self window];
-    if ([window isKeyWindow]==false) return;
 
-    if (inside==false) return;
     gstate = PyGILState_Ensure();
     result = PyObject_CallMethod(canvas, "leave_notify_event", "");
     if(result)
@@ -1804,9 +1767,6 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
     else
         PyErr_Print();
     PyGILState_Release(gstate);
-
-    [[self window] setAcceptsMouseMovedEvents: NO];
-    inside = false;
 }
 
 - (void)mouseDown:(NSEvent *)event
@@ -2384,63 +2344,37 @@ Timer__timer_start(Timer* self, PyObject* args)
     CFRunLoopRef runloop;
     CFRunLoopTimerRef timer;
     CFRunLoopTimerContext context;
-    double milliseconds;
     CFAbsoluteTime firstFire;
     CFTimeInterval interval;
-    PyObject* attribute;
-    PyObject* failure;
+    PyObject* py_interval = NULL, * py_single = NULL, * py_on_timer = NULL;
+    int single;
     runloop = CFRunLoopGetCurrent();
     if (!runloop) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to obtain run loop");
         return NULL;
     }
-    attribute = PyObject_GetAttrString((PyObject*)self, "_interval");
-    if (attribute==NULL)
-    {
-        PyErr_SetString(PyExc_AttributeError, "Timer has no attribute '_interval'");
-        return NULL;
+    if (!(py_interval = PyObject_GetAttrString((PyObject*)self, "_interval"))
+        || ((interval = PyFloat_AsDouble(py_interval) / 1000.), PyErr_Occurred())
+        || !(py_single = PyObject_GetAttrString((PyObject*)self, "_single"))
+        || ((single = PyObject_IsTrue(py_single)) == -1)
+        || !(py_on_timer = PyObject_GetAttrString((PyObject*)self, "_on_timer"))) {
+        goto exit;
     }
-    milliseconds = PyFloat_AsDouble(attribute);
-    failure = PyErr_Occurred();
-    Py_DECREF(attribute);
-    if (failure) return NULL;
-    attribute = PyObject_GetAttrString((PyObject*)self, "_single");
-    if (attribute==NULL)
-    {
-        PyErr_SetString(PyExc_AttributeError, "Timer has no attribute '_single'");
-        return NULL;
-    }
-    // Need to tell when to first fire this timer, so get the current time
-    // and add an interval.
-    interval = milliseconds / 1000.0;
+    // (current time + interval) is time of first fire.
     firstFire = CFAbsoluteTimeGetCurrent() + interval;
-    switch (PyObject_IsTrue(attribute)) {
-        case 1:
-            interval = 0;
-            break;
-        case 0: // Set by default above
-            break;
-        case -1:
-        default:
-            PyErr_SetString(PyExc_ValueError, "Cannot interpret _single attribute as True of False");
-            return NULL;
+    if (single) {
+        interval = 0;
     }
-    Py_DECREF(attribute);
-    attribute = PyObject_GetAttrString((PyObject*)self, "_on_timer");
-    if (attribute==NULL)
-    {
-        PyErr_SetString(PyExc_AttributeError, "Timer has no attribute '_on_timer'");
-        return NULL;
-    }
-    if (!PyMethod_Check(attribute)) {
+    if (!PyMethod_Check(py_on_timer)) {
         PyErr_SetString(PyExc_RuntimeError, "_on_timer should be a Python method");
-        return NULL;
+        goto exit;
     }
+    Py_INCREF(py_on_timer);
     context.version = 0;
     context.retain = NULL;
     context.release = context_cleanup;
     context.copyDescription = NULL;
-    context.info = attribute;
+    context.info = py_on_timer;
     timer = CFRunLoopTimerCreate(kCFAllocatorDefault,
                                  firstFire,
                                  interval,
@@ -2449,9 +2383,8 @@ Timer__timer_start(Timer* self, PyObject* args)
                                  timer_callback,
                                  &context);
     if (!timer) {
-        Py_DECREF(attribute);
         PyErr_SetString(PyExc_RuntimeError, "Failed to create timer");
-        return NULL;
+        goto exit;
     }
     if (self->timer) {
         CFRunLoopTimerInvalidate(self->timer);
@@ -2462,7 +2395,15 @@ Timer__timer_start(Timer* self, PyObject* args)
      * the timer lost before we have a chance to decrease the reference count
      * of the attribute */
     self->timer = timer;
-    Py_RETURN_NONE;
+exit:
+    Py_XDECREF(py_interval);
+    Py_XDECREF(py_single);
+    Py_XDECREF(py_on_timer);
+    if (PyErr_Occurred()) {
+        return NULL;
+    } else {
+        Py_RETURN_NONE;
+    }
 }
 
 static PyObject*
@@ -2577,6 +2518,8 @@ static struct PyModuleDef moduledef = {
     NULL
 };
 
+#pragma GCC visibility push(default)
+
 PyObject* PyInit__macosx(void)
 {
     PyObject *module;
@@ -2602,3 +2545,5 @@ PyObject* PyInit__macosx(void)
 
     return module;
 }
+
+#pragma GCC visibility pop
