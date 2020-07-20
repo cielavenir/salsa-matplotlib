@@ -8,17 +8,19 @@ Subject: disable intersphinx
 
 --- a/doc/conf.py
 +++ b/doc/conf.py
-@@ -115,13 +115,6 @@ missing_references_write_json = False
+@@ -113,15 +113,6 @@ missing_references_write_json = False
  missing_references_warn_unused_ignores = False
  
  intersphinx_mapping = {
--    'python': ('https://docs.python.org/3', None),
--    'numpy': ('https://docs.scipy.org/doc/numpy/', None),
--    'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
--    'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
 -    'Pillow': ('https://pillow.readthedocs.io/en/stable/', None),
--    'cycler': ('https://matplotlib.org/cycler', None),
+-    'cycler': ('https://matplotlib.org/cycler/', None),
 -    'dateutil': ('https://dateutil.readthedocs.io/en/stable/', None),
+-    'ipykernel': ('https://ipykernel.readthedocs.io/en/latest/', None),
+-    'numpy': ('https://numpy.org/doc/stable/', None),
+-    'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+-    'pytest': ('https://pytest.org/en/stable/', None),
+-    'python': ('https://docs.python.org/3/', None),
+-    'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
  }
  
  
