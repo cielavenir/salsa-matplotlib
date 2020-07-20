@@ -4,10 +4,11 @@ matplotlib (3.3.0-1) UNRELEASED; urgency=medium
   * debian/control
     - bump b-d on sphinx-gallery to >= 0.7.0
     - add sphinxcontrib.svg2pdfconverter to b-d, needed by doc
+    - bump Standards-Version to 4.5.0 (no changes needed)
   * debian/patches/*
     - refresh, update, drop patches
 
- -- Sandro Tosi <morph@debian.org>  Sun, 19 Jul 2020 22:10:53 -0400
+ -- Sandro Tosi <morph@debian.org>  Sun, 19 Jul 2020 22:11:19 -0400
 
 matplotlib (3.2.2-1) unstable; urgency=medium
 
