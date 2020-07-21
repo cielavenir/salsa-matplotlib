@@ -10,8 +10,10 @@ matplotlib (3.3.0-1) UNRELEASED; urgency=medium
     - refresh, update, drop patches
   * debian/setup.cfg
     - use the system-installed freetype library
+  * debian/rules
+    - re-enable running unittests at build-time
 
- -- Sandro Tosi <morph@debian.org>  Mon, 20 Jul 2020 22:19:06 -0400
+ -- Sandro Tosi <morph@debian.org>  Mon, 20 Jul 2020 23:42:49 -0400
 
 matplotlib (3.2.2-1) unstable; urgency=medium
 
