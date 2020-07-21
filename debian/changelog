@@ -7,8 +7,10 @@ matplotlib (3.3.0-1) UNRELEASED; urgency=medium
     - bump Standards-Version to 4.5.0 (no changes needed)
   * debian/patches/*
     - refresh, update, drop patches
+  * debian/setup.cfg
+    - use the system-installed freetype library
 
- -- Sandro Tosi <morph@debian.org>  Sun, 19 Jul 2020 22:11:19 -0400
+ -- Sandro Tosi <morph@debian.org>  Mon, 20 Jul 2020 21:48:28 -0400
 
 matplotlib (3.2.2-1) unstable; urgency=medium
 
