@@ -1,0 +1,96 @@
+From 32ef14501575aee447256546373a9f4e587e22e5 Mon Sep 17 00:00:00 2001
+From: Jody Klymak <jklymak@gmail.com>
+Date: Mon, 20 Jul 2020 14:36:32 -0700
+Subject: [PATCH] FIX: undeprecate and udate num2epoch/epoch2num
+
+---
+ .../deprecations/17983-JMK.rst                |  8 ++++
+ lib/matplotlib/dates.py                       | 38 +++++++++++++++----
+ lib/matplotlib/tests/test_dates.py            | 12 ++++++
+ 3 files changed, 51 insertions(+), 7 deletions(-)
+ create mode 100644 doc/api/next_api_changes/deprecations/17983-JMK.rst
+
+--- /dev/null
++++ b/doc/api/next_api_changes/deprecations/17983-JMK.rst
+@@ -0,0 +1,8 @@
++Reverted deprecation of `~.dates.num2epoch` and `~.dates.epoch2num`
++~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++
++These two functions were deprecated in 3.3.0, and did not return
++an accurate Matplotlib datenum relative to the new Matplotlib epoch
++handling (`~.dates.get_epoch` and :rc:`date.epoch`).  This version
++reverts the deprecation and fixes those functions to work with
++`~.dates.get_epoch`. 
+--- a/lib/matplotlib/dates.py
++++ b/lib/matplotlib/dates.py
+@@ -1752,21 +1752,45 @@ class MicrosecondLocator(DateLocator):
+         return self._interval
+ 
+ 
+-@cbook.deprecated("3.3")
+ def epoch2num(e):
+     """
+-    Convert an epoch or sequence of epochs to the new date format,
+-    that is days since 0001.
++    Convert UNIX time to days since Matplotlib epoch.
++
++    Parameters
++    ----------
++    e : list of floats
++        Time in seconds since 1970-01-01.
++
++    Returns
++    -------
++    `numpy.array`
++        Time in days since Matplotlib epoch (see `~.dates.get_epoch()`).
+     """
+-    return EPOCH_OFFSET + np.asarray(e) / SEC_PER_DAY
++
++    dt = (np.datetime64('1970-01-01T00:00:00', 's') -
++          np.datetime64(get_epoch(), 's')).astype(float)
++
++    return (dt + np.asarray(e)) / SEC_PER_DAY
+ 
+ 
+-@cbook.deprecated("3.3")
+ def num2epoch(d):
+     """
+-    Convert days since 0001 to epoch.  *d* can be a number or sequence.
++    Convert days since Matplotlib epoch to UNIX time.
++
++    Parameters
++    ----------
++    d : list of floats
++        Time in days since Matplotlib epoch (see `~.dates.get_epoch()`).
++
++    Returns
++    -------
++    `numpy.array`
++        Time in seconds since 1970-01-01.
+     """
+-    return (np.asarray(d) - EPOCH_OFFSET) * SEC_PER_DAY
++    dt = (np.datetime64('1970-01-01T00:00:00', 's') -
++          np.datetime64(get_epoch(), 's')).astype(float)
++
++    return np.asarray(d) * SEC_PER_DAY - dt
+ 
+ 
+ @cbook.deprecated("3.2")
+--- a/lib/matplotlib/tests/test_dates.py
++++ b/lib/matplotlib/tests/test_dates.py
+@@ -947,3 +947,15 @@ def test_change_epoch():
+     np.testing.assert_allclose(
+         mdates.date2num(np.datetime64('1970-01-01T12:00:00')),
+         0.5)
++
++
++def test_epoch2num():
++    mdates._reset_epoch_test_example()
++    mdates.set_epoch('0000-12-31')
++    assert mdates.epoch2num(86400) == 719164.0
++    assert mdates.num2epoch(719165.0) == 86400 * 2
++    # set back to the default
++    mdates._reset_epoch_test_example()
++    mdates.set_epoch('1970-01-01T00:00:00')
++    assert mdates.epoch2num(86400) == 1.0
++    assert mdates.num2epoch(2.0) == 86400 * 2
