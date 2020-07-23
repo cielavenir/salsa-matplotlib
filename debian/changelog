@@ -1,9 +1,9 @@
-matplotlib (3.3.0-3) UNRELEASED; urgency=medium
+matplotlib (3.3.0-3) unstable; urgency=medium
 
   * debian/patches/PR17983.patch
     - undeprecate and update num2epoch/epoch2num
 
- -- Sandro Tosi <morph@debian.org>  Wed, 22 Jul 2020 21:09:47 -0400
+ -- Sandro Tosi <morph@debian.org>  Wed, 22 Jul 2020 21:54:52 -0400
 
 matplotlib (3.3.0-2) unstable; urgency=medium
 
