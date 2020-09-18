@@ -1,4 +1,4 @@
-matplotlib (3.3.2-1) UNRELEASED; urgency=medium
+matplotlib (3.3.2-1) unstable; urgency=medium
 
   * New upstream release
   * debian/patches/PR17983.patch
@@ -8,7 +8,7 @@ matplotlib (3.3.2-1) UNRELEASED; urgency=medium
   * debian/control
     - add certifi to b-d
 
- -- Sandro Tosi <morph@debian.org>  Thu, 17 Sep 2020 23:47:56 -0400
+ -- Sandro Tosi <morph@debian.org>  Fri, 18 Sep 2020 00:34:24 -0400
 
 matplotlib (3.3.0-3) unstable; urgency=medium
 
