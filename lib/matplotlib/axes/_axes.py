@@ -4597,7 +4597,7 @@ default: :rc:`scatter.edgecolors`
         `~matplotlib.collections.PolyCollection`
             A `.PolyCollection` defining the hexagonal bins.
 
-            - `.PolyCollection.get_offset` contains a Mx2 array containing
+            - `.PolyCollection.get_offsets` contains a Mx2 array containing
               the x, y positions of the M hexagon centers.
             - `.PolyCollection.get_array` contains the values of the M
               hexagons.
@@ -5302,8 +5302,10 @@ default: :rc:`scatter.edgecolors`
             "x", x, y1, y2,
             where=where, interpolate=interpolate, step=step, **kwargs)
 
-    fill_between.__doc__ = _fill_between_x_or_y.__doc__.format(
-        dir="horizontal", ind="x", dep="y")
+    if _fill_between_x_or_y.__doc__:
+        fill_between.__doc__ = _fill_between_x_or_y.__doc__.format(
+            dir="horizontal", ind="x", dep="y"
+        )
     fill_between = _preprocess_data(
         docstring.dedent_interpd(fill_between),
         replace_names=["x", "y1", "y2", "where"])
@@ -5314,8 +5316,10 @@ default: :rc:`scatter.edgecolors`
             "y", y, x1, x2,
             where=where, interpolate=interpolate, step=step, **kwargs)
 
-    fill_betweenx.__doc__ = _fill_between_x_or_y.__doc__.format(
-        dir="vertical", ind="y", dep="x")
+    if _fill_between_x_or_y.__doc__:
+        fill_betweenx.__doc__ = _fill_between_x_or_y.__doc__.format(
+            dir="vertical", ind="y", dep="x"
+        )
     fill_betweenx = _preprocess_data(
         docstring.dedent_interpd(fill_betweenx),
         replace_names=["y", "x1", "x2", "where"])
@@ -5539,6 +5543,15 @@ default: :rc:`scatter.edgecolors`
         # - reset shading if shading='auto' to flat or nearest
         #   depending on size;
 
+        _valid_shading = ['gouraud', 'nearest', 'flat', 'auto']
+        try:
+            cbook._check_in_list(_valid_shading, shading=shading)
+        except ValueError as err:
+            cbook._warn_external(f"shading value '{shading}' not in list of "
+                                 f"valid values {_valid_shading}. Setting "
+                                 "shading='auto'.")
+            shading = 'auto'
+
         if len(args) == 1:
             C = np.asanyarray(args[0])
             nrows, ncols = C.shape
@@ -5617,6 +5630,14 @@ default: :rc:`scatter.edgecolors`
                     # helper for below
                     if np.shape(X)[1] > 1:
                         dX = np.diff(X, axis=1)/2.
+                        if not (np.all(dX >= 0) or np.all(dX <= 0)):
+                            cbook._warn_external(
+                                f"The input coordinates to {funcname} are "
+                                "interpreted as cell centers, but are not "
+                                "monotonically increasing or decreasing. "
+                                "This may lead to incorrectly calculated cell "
+                                "edges, in which case, please supply "
+                                f"explicit cell edges to {funcname}.")
                         X = np.hstack((X[:, [0]] - dX[:, [0]],
                                        X[:, :-1] + dX,
                                        X[:, [-1]] + dX[:, [-1]]))
@@ -6699,13 +6720,19 @@ such objects
                     height = m - bottom
                 else:
                     height = m
-                patch = _barfunc(bins[:-1]+boffset, height, width,
-                                 align='center', log=log,
-                                 color=c, **{bottom_kwarg: bottom})
-                patches.append(patch)
+                bars = _barfunc(bins[:-1]+boffset, height, width,
+                                align='center', log=log,
+                                color=c, **{bottom_kwarg: bottom})
+                patches.append(bars)
                 if stacked:
                     bottom[:] = m
                 boffset += dw
+            # Remove stickies from all bars but the lowest ones, as otherwise
+            # margin expansion would be unable to cross the stickies in the
+            # middle of the bars.
+            for bars in patches[1:]:
+                for patch in bars:
+                    patch.sticky_edges.x[:] = patch.sticky_edges.y[:] = []
 
         elif histtype.startswith('step'):
             # these define the perimeter of the polygon

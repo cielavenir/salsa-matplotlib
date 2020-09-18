@@ -146,8 +146,13 @@ _test_timeout = 10  # Empirically, 1s is not enough on Travis.
 @pytest.mark.parametrize("toolbar", ["toolbar2", "toolmanager"])
 @pytest.mark.flaky(reruns=3)
 def test_interactive_backend(backend, toolbar):
-    if backend == "macosx" and toolbar == "toolmanager":
-        pytest.skip("toolmanager is not implemented for macosx.")
+    if backend == "macosx":
+        if toolbar == "toolmanager":
+            pytest.skip("toolmanager is not implemented for macosx.")
+        if toolbar == "toolbar2" and os.environ.get('TRAVIS'):
+            # See https://github.com/matplotlib/matplotlib/issues/18213
+            pytest.skip("toolbar2 for macosx is buggy on Travis.")
+
     proc = subprocess.run(
         [sys.executable, "-c", _test_script,
          json.dumps({"toolbar": toolbar})],
@@ -186,3 +191,37 @@ def test_webagg():
     conn.close()
     proc.send_signal(signal.SIGINT)
     assert proc.wait(timeout=_test_timeout) == 0
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="this a linux-only test")
+@pytest.mark.backend('Qt5Agg', skip_on_importerror=True)
+def test_lazy_linux_headless():
+    test_script = """
+import os
+import sys
+
+# make it look headless
+del os.environ['DISPLAY']
+
+# we should fast-track to Agg
+import matplotlib.pyplot as plt
+plt.get_backend() == 'agg'
+assert 'PyQt5' not in sys.modules
+
+# make sure we really have pyqt installed
+import PyQt5
+assert 'PyQt5' in sys.modules
+
+# try to switch and make sure we fail with ImportError
+try:
+    plt.switch_backend('qt5agg')
+except ImportError:
+    ...
+else:
+    sys.exit(1)
+
+"""
+    proc = subprocess.run([sys.executable, "-c", test_script])
+    if proc.returncode:
+        pytest.fail("The subprocess returned with non-zero exit status "
+                    f"{proc.returncode}.")

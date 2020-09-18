@@ -1111,3 +1111,28 @@ def test_exact_vmin():
 
     # check than the RBGA values are the same
     assert np.all(from_image == direct_computation)
+
+
+@pytest.mark.network
+@pytest.mark.flaky
+def test_https_imread_smoketest():
+    v = mimage.imread('https://matplotlib.org/1.5.0/_static/logo2.png')
+
+
+@check_figures_equal(extensions=['png'])
+def test_huge_range_log(fig_test, fig_ref):
+    data = np.full((5, 5), -1, dtype=np.float64)
+    data[0:2, :] = 1E20
+
+    ax = fig_test.subplots()
+    im = ax.imshow(data, norm=colors.LogNorm(vmin=100, vmax=data.max()),
+                   interpolation='nearest', cmap='viridis')
+
+    data = np.full((5, 5), -1, dtype=np.float64)
+    data[0:2, :] = 1000
+
+    cm = copy(plt.get_cmap('viridis'))
+    cm.set_under('w')
+    ax = fig_ref.subplots()
+    im = ax.imshow(data, norm=colors.Normalize(vmin=100, vmax=data.max()),
+                   interpolation='nearest', cmap=cm)
