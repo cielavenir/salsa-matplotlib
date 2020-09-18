@@ -5,8 +5,10 @@ matplotlib (3.3.2-1) UNRELEASED; urgency=medium
     - drop, merged upstream
   * debian/patches/*
     - refresh patches
+  * debian/control
+    - add certifi to b-d
 
- -- Sandro Tosi <morph@debian.org>  Thu, 17 Sep 2020 23:41:29 -0400
+ -- Sandro Tosi <morph@debian.org>  Thu, 17 Sep 2020 23:47:56 -0400
 
 matplotlib (3.3.0-3) unstable; urgency=medium
 
