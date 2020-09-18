@@ -1,8 +1,10 @@
 matplotlib (3.3.2-1) UNRELEASED; urgency=medium
 
   * New upstream release
+  * debian/patches/PR17983.patch
+    - drop, merged upstream
 
- -- Sandro Tosi <morph@debian.org>  Thu, 17 Sep 2020 23:36:26 -0400
+ -- Sandro Tosi <morph@debian.org>  Thu, 17 Sep 2020 23:40:50 -0400
 
 matplotlib (3.3.0-3) unstable; urgency=medium
 
