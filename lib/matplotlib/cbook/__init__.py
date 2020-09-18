@@ -1312,7 +1312,7 @@ def _check_1d(x):
             with warnings.catch_warnings(record=True) as w:
                 warnings.filterwarnings(
                     "always",
-                    category=DeprecationWarning,
+                    category=Warning,
                     message='Support for multi-dimensional indexing')
 
                 ndim = x[:, None].ndim
@@ -1326,7 +1326,11 @@ def _check_1d(x):
             if ndim < 2:
                 return np.atleast_1d(x)
             return x
-        except (IndexError, TypeError):
+        # In pandas 1.1.0, multidimensional indexing leads to an
+        # AssertionError for some Series objects, but should be
+        # IndexError as described in
+        # https://github.com/pandas-dev/pandas/issues/35527
+        except (AssertionError, IndexError, TypeError):
             return np.atleast_1d(x)
 
 
@@ -1341,6 +1345,17 @@ def _reshape_2D(X, name):
 
     *name* is used to generate the error message for invalid inputs.
     """
+
+    # unpack if we have a values or to_numpy method.
+    try:
+        X = X.to_numpy()
+    except AttributeError:
+        try:
+            if isinstance(X.values, np.ndarray):
+                X = X.values
+        except AttributeError:
+            pass
+
     # Iterate over columns for ndarrays.
     if isinstance(X, np.ndarray):
         X = X.T
@@ -1363,7 +1378,10 @@ def _reshape_2D(X, name):
     result = []
     is_1d = True
     for xi in X:
-        if isinstance(xi, collections.abc.Iterable):
+        # check if this is iterable, except for strings which we
+        # treat as singletons.
+        if (isinstance(xi, collections.abc.Iterable) and
+                not isinstance(xi, str)):
             is_1d = False
         xi = np.asanyarray(xi)
         nd = np.ndim(xi)

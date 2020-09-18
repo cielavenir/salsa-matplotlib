@@ -42,6 +42,13 @@ def _get_hash(data):
     return hasher.hexdigest()
 
 
+@functools.lru_cache()
+def _get_ssl_context():
+    import certifi
+    import ssl
+    return ssl.create_default_context(cafile=certifi.where())
+
+
 def download_or_cache(url, sha):
     """
     Get bytes from the given url or local cache.
@@ -73,7 +80,8 @@ def download_or_cache(url, sha):
     # default User-Agent, but not (for example) wget; so I don't feel too
     # bad passing in an empty User-Agent.
     with urllib.request.urlopen(
-            urllib.request.Request(url, headers={"User-Agent": ""})) as req:
+            urllib.request.Request(url, headers={"User-Agent": ""}),
+            context=_get_ssl_context()) as req:
         data = req.read()
 
     file_sha = _get_hash(data)
@@ -592,7 +600,21 @@ class FreeType(SetupPackage):
                  "--with-png=no", "--with-harfbuzz=no", "--enable-static",
                  "--disable-shared"],
                 env=env, cwd=src_path)
-            subprocess.check_call(["make"], env=env, cwd=src_path)
+            if 'GNUMAKE' in env:
+                make = env['GNUMAKE']
+            elif 'MAKE' in env:
+                make = env['MAKE']
+            else:
+                try:
+                    output = subprocess.check_output(['make', '-v'],
+                                                     stderr=subprocess.DEVNULL)
+                except subprocess.CalledProcessError:
+                    output = b''
+                if b'GNU' not in output and b'makepp' not in output:
+                    make = 'gmake'
+                else:
+                    make = 'make'
+            subprocess.check_call([make], env=env, cwd=src_path)
         else:  # compilation on windows
             shutil.rmtree(src_path / "objs", ignore_errors=True)
             msbuild_platform = (
@@ -652,6 +674,7 @@ class BackendMacOSX(OptionalPackage):
             'src/_macosx.m'
             ]
         ext = Extension('matplotlib.backends._macosx', sources)
+        ext.extra_compile_args.extend(['-Werror=unguarded-availability'])
         ext.extra_link_args.extend(['-framework', 'Cocoa'])
         if platform.python_implementation().lower() == 'pypy':
             ext.extra_compile_args.append('-DPYPY=1')

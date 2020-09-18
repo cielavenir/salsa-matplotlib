@@ -8,7 +8,6 @@ import os
 import logging
 from numbers import Number
 from pathlib import Path
-import urllib.parse
 
 import numpy as np
 import PIL.PngImagePlugin
@@ -535,9 +534,13 @@ class _ImageBase(martist.Artist, cm.ScalarMappable):
                 resampled_masked = np.ma.masked_array(A_resampled, out_mask)
                 # we have re-set the vmin/vmax to account for small errors
                 # that may have moved input values in/out of range
+                s_vmin, s_vmax = vrange
+                if isinstance(self.norm, mcolors.LogNorm):
+                    if s_vmin < 0:
+                        s_vmin = max(s_vmin, np.finfo(scaled_dtype).eps)
                 with cbook._setattr_cm(self.norm,
-                                       vmin=vrange[0],
-                                       vmax=vrange[1],
+                                       vmin=s_vmin,
+                                       vmax=s_vmax,
                                        ):
                     output = self.norm(resampled_masked)
             else:
@@ -1443,9 +1446,12 @@ def imread(fname, format=None):
         - (M, N, 3) for RGB images.
         - (M, N, 4) for RGBA images.
     """
+    # hide imports to speed initial import on systems with slow linkers
+    from urllib import parse
+
     if format is None:
         if isinstance(fname, str):
-            parsed = urllib.parse.urlparse(fname)
+            parsed = parse.urlparse(fname)
             # If the string is a URL (Windows paths appear as if they have a
             # length-1 scheme), assume png.
             if len(parsed.scheme) > 1:
@@ -1468,10 +1474,18 @@ def imread(fname, format=None):
     img_open = (
         PIL.PngImagePlugin.PngImageFile if ext == 'png' else PIL.Image.open)
     if isinstance(fname, str):
-        parsed = urllib.parse.urlparse(fname)
+
+        parsed = parse.urlparse(fname)
         if len(parsed.scheme) > 1:  # Pillow doesn't handle URLs directly.
+            # hide imports to speed initial import on systems with slow linkers
             from urllib import request
-            with urllib.request.urlopen(fname) as response:
+            with request.urlopen(fname,
+                                 context=mpl._get_ssl_context()) as response:
+                import io
+                try:
+                    response.seek(0)
+                except (AttributeError, io.UnsupportedOperation):
+                    response = io.BytesIO(response.read())
                 return imread(response, format=ext)
     with img_open(fname) as image:
         return (_pil_png_to_float_array(image)

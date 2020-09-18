@@ -481,6 +481,8 @@ class Path3DCollection(PathCollection):
         self._offsets3d = juggle_axes(xs, ys, np.atleast_1d(zs), zdir)
         self._facecolor3d = self.get_facecolor()
         self._edgecolor3d = self.get_edgecolor()
+        self._sizes3d = self.get_sizes()
+        self._linewidth3d = self.get_linewidth()
         self.stale = True
 
     def do_3d_projection(self, renderer):
@@ -489,11 +491,10 @@ class Path3DCollection(PathCollection):
 
         fcs = (_zalpha(self._facecolor3d, vzs) if self._depthshade else
                self._facecolor3d)
-        fcs = mcolors.to_rgba_array(fcs, self._alpha)
-        self.set_facecolors(fcs)
-
         ecs = (_zalpha(self._edgecolor3d, vzs) if self._depthshade else
                self._edgecolor3d)
+        sizes = self._sizes3d
+        lws = self._linewidth3d
 
         # Sort the points based on z coordinates
         # Performance optimization: Create a sorted index array and reorder
@@ -504,8 +505,14 @@ class Path3DCollection(PathCollection):
         vzs = vzs[z_markers_idx]
         vxs = vxs[z_markers_idx]
         vys = vys[z_markers_idx]
-        fcs = fcs[z_markers_idx]
-        ecs = ecs[z_markers_idx]
+        if len(fcs) > 1:
+            fcs = fcs[z_markers_idx]
+        if len(ecs) > 1:
+            ecs = ecs[z_markers_idx]
+        if len(sizes) > 1:
+            sizes = sizes[z_markers_idx]
+        if len(lws) > 1:
+            lws = lws[z_markers_idx]
         vps = np.column_stack((vxs, vys))
 
         fcs = mcolors.to_rgba_array(fcs, self._alpha)
@@ -513,6 +520,8 @@ class Path3DCollection(PathCollection):
 
         self.set_edgecolors(ecs)
         self.set_facecolors(fcs)
+        self.set_sizes(sizes)
+        self.set_linewidth(lws)
 
         PathCollection.set_offsets(self, vps)
 
@@ -571,7 +580,7 @@ class Poly3DCollection(PolyCollection):
         Parameters
         ----------
         verts : list of array-like Nx3
-            Each element describes a polygon as a sequnce of ``N_i`` points
+            Each element describes a polygon as a sequence of ``N_i`` points
             ``(x, y, z)``.
         zsort : {'average', 'min', 'max'}, default: 'average'
             The calculation method for the z-order.
