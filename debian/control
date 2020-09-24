@@ -61,8 +61,8 @@ Build-Depends: cm-super-minimal <!nodoc>,
 XS-Python-Version: all
 Standards-Version: 4.5.0
 Homepage: http://matplotlib.org/
-Vcs-Git: https://salsa.debian.org/python-team/modules/matplotlib.git
-Vcs-Browser: https://salsa.debian.org/python-team/modules/matplotlib
+Vcs-Git: https://salsa.debian.org/python-team/packages/matplotlib.git
+Vcs-Browser: https://salsa.debian.org/python-team/packages/matplotlib
 
 Package: python3-matplotlib
 Architecture: any
