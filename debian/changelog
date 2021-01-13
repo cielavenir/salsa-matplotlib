@@ -4,8 +4,10 @@ matplotlib (3.3.3-1) UNRELEASED; urgency=medium
   * Use the new Debian Python Team contact name and address
   * debian/control
     - bump Standards-Version to 4.5.1 (no changes needed)
+  * debian/copyright
+    - extend packaging copyright years
 
- -- Sandro Tosi <morph@debian.org>  Tue, 12 Jan 2021 23:48:18 -0500
+ -- Sandro Tosi <morph@debian.org>  Tue, 12 Jan 2021 23:48:37 -0500
 
 matplotlib (3.3.2-2) unstable; urgency=medium
 
