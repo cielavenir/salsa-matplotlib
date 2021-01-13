@@ -474,8 +474,10 @@ class _ImageBase(martist.Artist, cm.ScalarMappable):
                 # do not run the vmin/vmax through the same pipeline we can
                 # have values close or equal to the boundaries end up on the
                 # wrong side.
-                vrange = np.array([self.norm.vmin, self.norm.vmax],
-                                  dtype=scaled_dtype)
+                vmin, vmax = self.norm.vmin, self.norm.vmax
+                if vmin is np.ma.masked:
+                    vmin, vmax = a_min, a_max
+                vrange = np.array([vmin, vmax], dtype=scaled_dtype)
 
                 A_scaled -= a_min
                 vrange -= a_min
@@ -1479,8 +1481,12 @@ def imread(fname, format=None):
         if len(parsed.scheme) > 1:  # Pillow doesn't handle URLs directly.
             # hide imports to speed initial import on systems with slow linkers
             from urllib import request
-            with request.urlopen(fname,
-                                 context=mpl._get_ssl_context()) as response:
+            ssl_ctx = mpl._get_ssl_context()
+            if ssl_ctx is None:
+                _log.debug(
+                    "Could not get certifi ssl context, https may not work."
+                )
+            with request.urlopen(fname, context=ssl_ctx) as response:
                 import io
                 try:
                     response.seek(0)
