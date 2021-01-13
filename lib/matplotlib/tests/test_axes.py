@@ -1189,6 +1189,22 @@ def test_pcolornearest(fig_test, fig_ref):
 
 
 @check_figures_equal(extensions=["png"])
+def test_pcolornearestunits(fig_test, fig_ref):
+    ax = fig_test.subplots()
+    x = [datetime.datetime.fromtimestamp(x * 3600) for x in range(10)]
+    y = np.arange(0, 3)
+    np.random.seed(19680801)
+    Z = np.random.randn(2, 9)
+    ax.pcolormesh(x, y, Z, shading='flat')
+
+    ax = fig_ref.subplots()
+    # specify the centers
+    x2 = [datetime.datetime.fromtimestamp((x + 0.5) * 3600) for x in range(9)]
+    y2 = y[:-1] + np.diff(y) / 2
+    ax.pcolormesh(x2, y2, Z, shading='nearest')
+
+
+@check_figures_equal(extensions=["png"])
 def test_pcolordropdata(fig_test, fig_ref):
     ax = fig_test.subplots()
     x = np.arange(0, 10)
@@ -4294,26 +4310,35 @@ def test_twin_spines_on_top():
     ax2.fill_between("i", "j", color='#7FC97F', alpha=.5, data=data)
 
 
-def test_rcparam_grid_minor():
-    orig_grid = matplotlib.rcParams['axes.grid']
-    orig_locator = matplotlib.rcParams['axes.grid.which']
+@pytest.mark.parametrize("grid_which, major_visible, minor_visible", [
+    ("both", True, True),
+    ("major", True, False),
+    ("minor", False, True),
+])
+def test_rcparam_grid_minor(grid_which, major_visible, minor_visible):
+    mpl.rcParams.update({"axes.grid": True, "axes.grid.which": grid_which})
+    fig, ax = plt.subplots()
+    fig.canvas.draw()
+    assert all(tick.gridline.get_visible() == major_visible
+               for tick in ax.xaxis.majorTicks)
+    assert all(tick.gridline.get_visible() == minor_visible
+               for tick in ax.xaxis.minorTicks)
 
-    matplotlib.rcParams['axes.grid'] = True
 
-    values = (
-        (('both'), (True, True)),
-        (('major'), (True, False)),
-        (('minor'), (False, True))
-        )
-
-    for locator, result in values:
-        matplotlib.rcParams['axes.grid.which'] = locator
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
-        assert (ax.xaxis._gridOnMajor, ax.xaxis._gridOnMinor) == result
-
-    matplotlib.rcParams['axes.grid'] = orig_grid
-    matplotlib.rcParams['axes.grid.which'] = orig_locator
+def test_grid():
+    fig, ax = plt.subplots()
+    ax.grid()
+    fig.canvas.draw()
+    assert ax.xaxis.majorTicks[0].gridline.get_visible()
+    ax.grid(visible=False)
+    fig.canvas.draw()
+    assert not ax.xaxis.majorTicks[0].gridline.get_visible()
+    ax.grid(visible=True)
+    fig.canvas.draw()
+    assert ax.xaxis.majorTicks[0].gridline.get_visible()
+    ax.grid()
+    fig.canvas.draw()
+    assert not ax.xaxis.majorTicks[0].gridline.get_visible()
 
 
 def test_vline_limit():
@@ -6348,6 +6373,13 @@ def test_bbox_aspect_axes_init():
         sizes.extend([bb.width, bb.height])
 
     assert_allclose(sizes, sizes[0])
+
+
+def test_redraw_in_frame():
+    fig, ax = plt.subplots(1, 1)
+    ax.plot([1, 2, 3])
+    fig.canvas.draw()
+    ax.redraw_in_frame()
 
 
 def test_invisible_axes():
