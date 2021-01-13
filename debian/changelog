@@ -1,4 +1,4 @@
-matplotlib (3.3.3-1) UNRELEASED; urgency=medium
+matplotlib (3.3.3-1) unstable; urgency=medium
 
   * New upstream release
   * Use the new Debian Python Team contact name and address
@@ -7,7 +7,7 @@ matplotlib (3.3.3-1) UNRELEASED; urgency=medium
   * debian/copyright
     - extend packaging copyright years
 
- -- Sandro Tosi <morph@debian.org>  Tue, 12 Jan 2021 23:48:37 -0500
+ -- Sandro Tosi <morph@debian.org>  Wed, 13 Jan 2021 00:44:26 -0500
 
 matplotlib (3.3.2-2) unstable; urgency=medium
 
