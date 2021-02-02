@@ -1,4 +1,4 @@
-matplotlib (3.3.4-1) UNRELEASED; urgency=medium
+matplotlib (3.3.4-1) unstable; urgency=medium
 
   * New upstream release
   * debian/control
@@ -6,7 +6,7 @@ matplotlib (3.3.4-1) UNRELEASED; urgency=medium
   * debian/rules
     - enable hardening flags
 
- -- Sandro Tosi <morph@debian.org>  Mon, 01 Feb 2021 22:17:01 -0500
+ -- Sandro Tosi <morph@debian.org>  Mon, 01 Feb 2021 23:04:57 -0500
 
 matplotlib (3.3.3-1) unstable; urgency=medium
 
