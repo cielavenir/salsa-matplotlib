@@ -125,6 +125,7 @@ Architecture: all
 Section: doc
 Depends: libjs-jquery,
          ${misc:Depends},
+	 ${sphinxdoc:Depends}
 Description: Python based plotting system (documentation package)
  Matplotlib is a pure Python plotting library designed to bring
  publication quality plotting to Python with a syntax familiar to
