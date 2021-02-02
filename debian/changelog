@@ -3,8 +3,10 @@ matplotlib (3.3.4-1) UNRELEASED; urgency=medium
   * New upstream release
   * debian/control
     - add sphinxdoc:Depends to -doc depends
+  * debian/rules
+    - enable hardening flags
 
- -- Sandro Tosi <morph@debian.org>  Mon, 01 Feb 2021 22:13:06 -0500
+ -- Sandro Tosi <morph@debian.org>  Mon, 01 Feb 2021 22:17:01 -0500
 
 matplotlib (3.3.3-1) unstable; urgency=medium
 

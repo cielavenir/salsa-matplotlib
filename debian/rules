@@ -11,6 +11,10 @@ pdata := python-matplotlib-data
 p3dbg := python3-matplotlib-dbg
 DEB_BUILD_OPTIONS += --no-parallel
 
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+
 # build
 build: build-arch build-indep
 
