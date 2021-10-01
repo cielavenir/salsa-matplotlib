@@ -15,7 +15,6 @@ Build-Depends: cm-super-minimal <!nodoc>,
                libpng-dev,
                locales-all,
                optipng <!nodoc>,
-               python3-all-dbg,
                python3-all-dev,
                python3-cairocffi [!ia64],
                python3-certifi (>= 2020.6.20-1),
@@ -27,11 +26,9 @@ Build-Depends: cm-super-minimal <!nodoc>,
                python3-ipython <!nodoc>,
                python3-ipywidgets,
                python3-kiwisolver,
-               python3-kiwisolver-dbg,
                python3-mock,
                python3-nose,
                python3-numpy,
-               python3-numpy-dbg,
                python3-numpydoc,
                python3-pandas [!hppa !m68k !powerpcspe !sparc64 !sh4 !x32],
                python3-pil,
@@ -47,7 +44,6 @@ Build-Depends: cm-super-minimal <!nodoc>,
                python3-sphinx-gallery (>= 0.7.0) <!stage1> <!nodoc>,
                python3-sphinxcontrib.svg2pdfconverter <!nodoc>,
                python3-tk,
-               python3-tk-dbg,
                python3-tornado,
                tcl8.6-dev,
                texlive-fonts-recommended,
@@ -134,22 +130,3 @@ Description: Python based plotting system (documentation package)
  users or an object oriented interface familiar to Python users.
  .
  This package contains documentation for python-matplotlib.
-
-Package: python3-matplotlib-dbg
-Architecture: any
-Section: debug
-Depends: python3-all-dbg,
-         python3-kiwisolver-dbg,
-         python3-matplotlib (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends},
-Breaks: python-matplotlib-dbg (<< 2.2.3-3),
-Replaces: python-matplotlib-dbg (<< 2.2.3-3),
-Description: Python based plotting system (debug extension, Python 3)
- Matplotlib is a pure Python plotting library designed to bring
- publication quality plotting to Python with a syntax familiar to
- Matlab users. All of the plotting commands in the pylab interface can
- be accessed either via a functional interface familiar to Matlab
- users or an object oriented interface familiar to Python users.
- .
- This package contains the debug extension for python3-matplotlib.

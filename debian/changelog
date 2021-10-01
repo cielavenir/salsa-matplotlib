@@ -1,3 +1,9 @@
+matplotlib (3.3.4-2) UNRELEASED; urgency=medium
+
+  * remove -dbg package; Closes: #994311
+
+ -- Sandro Tosi <morph@debian.org>  Thu, 30 Sep 2021 20:08:01 -0400
+
 matplotlib (3.3.4-1) unstable; urgency=medium
 
   * New upstream release

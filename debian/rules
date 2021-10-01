@@ -8,7 +8,6 @@ PY_PLATFORM := $(shell python3 -c 'from distutils.util import get_platform; prin
 pd := python-matplotlib-doc
 p3 := python3-matplotlib
 pdata := python-matplotlib-data
-p3dbg := python3-matplotlib-dbg
 DEB_BUILD_OPTIONS += --no-parallel
 
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
@@ -36,7 +35,6 @@ build-arch-stamp:
 	set -e; \
 	for v in $(PY3VERS); do \
 		python$$v ./setup.py build $(PY_BUILD_FLAGS) ; \
-		python$$v-dbg ./setup.py build $(PY_BUILD_FLAGS) ; \
 	done
 
 ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
@@ -45,8 +43,6 @@ ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 	-for v in $(PY3VERS); do \
 		LIB=$$(python$$v -c "from distutils.command.build import build ; from distutils.core import Distribution ; b = build(Distribution()) ; b.finalize_options() ; print(b.build_platlib)") ; \
 		PYTHONPATH=$$LIB MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ MPLCONFIGDIR=. xvfb-run -a python$$v tests.py --verbose --full-trace ; \
-		LIB=$$(python$$v-dbg -c "from distutils.command.build import build ; from distutils.core import Distribution ; b = build(Distribution()) ; b.finalize_options() ; print(b.build_platlib)") ; \
-		PYTHONPATH=$$LIB MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ MPLCONFIGDIR=. xvfb-run -a python$$v-dbg tests.py --verbose --full-trace ; \
 	done
 	rm -f matplotlibrc
 endif
@@ -61,7 +57,6 @@ clean:
 	
 	for i in $(PY3VERS); do \
 		python$$i ./setup.py clean --all; \
-		python$$i-dbg ./setup.py clean --all; \
 	done
 
 	# clean the doc
@@ -112,11 +107,7 @@ install-arch-stamp: build-arch-stamp
 	for v in $(PY3VERS) ; do \
 		python$$v ./setup.py install_lib --install-dir $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/ ; \
 		python$$v ./setup.py install_egg_info --install-dir $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/ ; \
-		python$$v-dbg ./setup.py install --root=$(CURDIR)/debian/$(p3dbg) --install-layout=deb ; \
 	done
-
-	find debian/$(p3dbg) ! -type d ! -name '*.so' | xargs rm -f
-	find debian/$(p3dbg) -depth -empty -exec rmdir {} \;
 
 	find debian/ -name '*.pyc' | xargs rm -rf
 	find debian/ -name '__pycache__' | xargs rm -rf
@@ -131,9 +122,6 @@ install-arch-stamp: build-arch-stamp
 
 	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/mpl-data/
 	rm -rf $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/backends/Matplotlib.nib/
-
-	rm -rf $(CURDIR)/debian/$(p3dbg)/usr/lib/python3/dist-packages/matplotlib/mpl-data/
-	rm -rf $(CURDIR)/debian/$(p3dbg)/usr/lib/python3/dist-packages/matplotlib/backends/Matplotlib.nib/
 
 	-rm $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/backends/web_backend/jquery/js/jquery-1.7.1.min.js
 	-rm $(CURDIR)/debian/$(p3)/usr/lib/python3/dist-packages/matplotlib/backends/web_backend/jquery/js/jquery-ui.min.js
@@ -196,7 +184,6 @@ binary-arch: build-arch install-arch
 	dh_python3 -a
 	dh_link -a
 	dh_lintian -a
-	dh_strip -a -p$(p3) --dbg-package=$(p3dbg)
 	dh_compress -a
 	dh_fixperms -a
 	dh_installdeb -a

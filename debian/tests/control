@@ -1,5 +1,5 @@
 Tests: tkagg
-Depends: xauth, xvfb, python3-matplotlib, python3-matplotlib-dbg, python3-tk, python3-tk-dbg, python3-numpy, python3-numpy-dbg
+Depends: xauth, xvfb, python3-matplotlib, python3-tk, python3-numpy
 
 Tests: qt5agg
-Depends: xauth, xvfb, python3-matplotlib, python3-matplotlib-dbg, python3-pyqt5, python3-pyqt5-dbg, python3-numpy, python3-numpy-dbg
+Depends: xauth, xvfb, python3-matplotlib, python3-pyqt5, python3-numpy
