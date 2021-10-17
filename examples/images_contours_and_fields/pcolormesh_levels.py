@@ -3,12 +3,11 @@
 pcolormesh
 ==========
 
-`.axes.Axes.pcolormesh` allows you to generate 2-D image-style plots.  Note it
+`.axes.Axes.pcolormesh` allows you to generate 2D image-style plots.  Note it
 is faster than the similar `~.axes.Axes.pcolor`.
 
 """
 
-import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.colors import BoundaryNorm
 from matplotlib.ticker import MaxNLocator
@@ -51,11 +50,12 @@ ax.pcolormesh(X, Y, Z)
 # ---------------------
 #
 # Often a user wants to pass *X* and *Y* with the same sizes as *Z* to
-# `.axes.Axes.pcolormesh`.  This is also allowed if ``shading='auto'`` is
-# passed (default set by :rc:`pcolor.shading`).  Pre Matplotlib 3.3,
+# `.axes.Axes.pcolormesh`. This is also allowed if ``shading='auto'`` is
+# passed (default set by :rc:`pcolor.shading`). Pre Matplotlib 3.3,
 # ``shading='flat'`` would drop the last column and row of *Z*; while that
 # is still allowed for back compatibility purposes, a DeprecationWarning is
-# raised.
+# raised. If this is really what you want, then simply drop the last row and
+# column of Z manually:
 
 x = np.arange(10)  # len = 10
 y = np.arange(6)  # len = 6
@@ -64,7 +64,8 @@ X, Y = np.meshgrid(x, y)
 fig, axs = plt.subplots(2, 1, sharex=True, sharey=True)
 axs[0].pcolormesh(X, Y, Z, vmin=np.min(Z), vmax=np.max(Z), shading='auto')
 axs[0].set_title("shading='auto' = 'nearest'")
-axs[1].pcolormesh(X, Y, Z, vmin=np.min(Z), vmax=np.max(Z), shading='flat')
+axs[1].pcolormesh(X, Y, Z[:-1, :-1], vmin=np.min(Z), vmax=np.max(Z),
+                  shading='flat')
 axs[1].set_title("shading='flat'")
 
 ###############################################################################
@@ -93,7 +94,7 @@ levels = MaxNLocator(nbins=15).tick_values(z.min(), z.max())
 
 # pick the desired colormap, sensible levels, and define a normalization
 # instance which takes data values and translates those into levels.
-cmap = plt.get_cmap('PiYG')
+cmap = plt.colormaps['PiYG']
 norm = BoundaryNorm(levels, ncolors=cmap.N, clip=True)
 
 fig, (ax0, ax1) = plt.subplots(nrows=2)
@@ -119,18 +120,13 @@ plt.show()
 
 #############################################################################
 #
-# ------------
+# .. admonition:: References
 #
-# References
-# """"""""""
+#    The use of the following functions, methods, classes and modules is shown
+#    in this example:
 #
-# The use of the following functions and methods is shown in this example:
-
-matplotlib.axes.Axes.pcolormesh
-matplotlib.pyplot.pcolormesh
-matplotlib.axes.Axes.contourf
-matplotlib.pyplot.contourf
-matplotlib.figure.Figure.colorbar
-matplotlib.pyplot.colorbar
-matplotlib.colors.BoundaryNorm
-matplotlib.ticker.MaxNLocator
+#    - `matplotlib.axes.Axes.pcolormesh` / `matplotlib.pyplot.pcolormesh`
+#    - `matplotlib.axes.Axes.contourf` / `matplotlib.pyplot.contourf`
+#    - `matplotlib.figure.Figure.colorbar` / `matplotlib.pyplot.colorbar`
+#    - `matplotlib.colors.BoundaryNorm`
+#    - `matplotlib.ticker.MaxNLocator`

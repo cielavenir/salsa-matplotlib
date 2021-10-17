@@ -6,13 +6,12 @@ Simple Axisline
 """
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.axisartist.axislines import SubplotZero
+from mpl_toolkits.axisartist.axislines import AxesZero
 
 
 fig = plt.figure()
 fig.subplots_adjust(right=0.85)
-ax = SubplotZero(fig, 1, 1, 1)
-fig.add_subplot(ax)
+ax = fig.add_subplot(axes_class=AxesZero)
 
 # make right and top axis invisible
 ax.axis["right"].set_visible(False)
@@ -25,9 +24,9 @@ ax.axis["xzero"].label.set_text("Axis Zero")
 ax.set_ylim(-2, 4)
 ax.set_xlabel("Label X")
 ax.set_ylabel("Label Y")
-# or
-#ax.axis["bottom"].label.set_text("Label X")
-#ax.axis["left"].label.set_text("Label Y")
+# Or:
+# ax.axis["bottom"].label.set_text("Label X")
+# ax.axis["left"].label.set_text("Label Y")
 
 # make new (right-side) yaxis, but with some offset
 ax.axis["right2"] = ax.new_fixed_axis(loc="right", offset=(20, 0))

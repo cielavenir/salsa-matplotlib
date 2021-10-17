@@ -1,7 +1,7 @@
 """
-=================
-Demo Axes Divider
-=================
+============
+Axes Divider
+============
 
 Axes divider to calculate location of axes and
 create a divider for them using existing axes instances.
@@ -22,7 +22,7 @@ def demo_simple_image(ax):
 
     im = ax.imshow(Z, extent=extent)
     cb = plt.colorbar(im)
-    plt.setp(cb.ax.get_yticklabels(), visible=False)
+    cb.ax.yaxis.set_tick_params(labelright=False)
 
 
 def demo_locatable_axes_hard(fig):
@@ -33,10 +33,12 @@ def demo_locatable_axes_hard(fig):
     divider = SubplotDivider(fig, 2, 2, 2, aspect=True)
 
     # axes for image
-    ax = Axes(fig, divider.get_position())
+    ax = fig.add_axes(divider.get_position(), axes_class=Axes)
 
     # axes for colorbar
-    ax_cb = Axes(fig, divider.get_position())
+    # (the label prevents Axes.add_axes from incorrectly believing that the two
+    # axes are the same)
+    ax_cb = fig.add_axes(divider.get_position(), axes_class=Axes, label="cb")
 
     h = [Size.AxesX(ax),  # main axes
          Size.Fixed(0.05),  # padding, 0.1 inch
@@ -51,9 +53,6 @@ def demo_locatable_axes_hard(fig):
     ax.set_axes_locator(divider.new_locator(nx=0, ny=0))
     ax_cb.set_axes_locator(divider.new_locator(nx=2, ny=0))
 
-    fig.add_axes(ax)
-    fig.add_axes(ax_cb)
-
     ax_cb.axis["left"].toggle(all=False)
     ax_cb.axis["right"].toggle(ticks=True)
 
@@ -61,7 +60,7 @@ def demo_locatable_axes_hard(fig):
 
     im = ax.imshow(Z, extent=extent)
     plt.colorbar(im, cax=ax_cb)
-    plt.setp(ax_cb.get_yticklabels(), visible=False)
+    ax_cb.yaxis.set_tick_params(labelright=False)
 
 
 def demo_locatable_axes_easy(ax):

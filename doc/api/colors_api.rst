@@ -2,8 +2,11 @@
 ``matplotlib.colors``
 *********************
 
-The Color :ref:`tutorials <tutorials-colors>` and :ref:`examples
-<color_examples>` demonstrate how to set colors and colormaps.
+.. note::
+
+   The Color :ref:`tutorials <tutorials-colors>` and :ref:`examples
+   <color_examples>` demonstrate how to set colors and colormaps. You may want
+   to read those instead.
 
 .. currentmodule:: matplotlib.colors
 
@@ -20,7 +23,7 @@ Classes
 
    BoundaryNorm
    Colormap
-   DivergingNorm
+   CenteredNorm
    LightSource
    LinearSegmentedColormap
    ListedColormap
@@ -30,6 +33,7 @@ Classes
    PowerNorm
    SymLogNorm
    TwoSlopeNorm
+   FuncNorm
 
 Functions
 ---------
@@ -47,5 +51,5 @@ Functions
    to_rgba_array
    is_color_like
    same_color
-   makeMappingArray
    get_named_colors_mapping
+   make_norm_from_scale

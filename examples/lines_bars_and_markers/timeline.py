@@ -83,14 +83,13 @@ for d, l, r in zip(dates, levels, names):
                 verticalalignment="bottom" if l > 0 else "top")
 
 # format xaxis with 4 month intervals
-ax.get_xaxis().set_major_locator(mdates.MonthLocator(interval=4))
-ax.get_xaxis().set_major_formatter(mdates.DateFormatter("%b %Y"))
+ax.xaxis.set_major_locator(mdates.MonthLocator(interval=4))
+ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
 plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
 
 # remove y axis and spines
-ax.get_yaxis().set_visible(False)
-for spine in ["left", "top", "right"]:
-    ax.spines[spine].set_visible(False)
+ax.yaxis.set_visible(False)
+ax.spines[["left", "top", "right"]].set_visible(False)
 
 ax.margins(y=0.1)
 plt.show()
@@ -98,18 +97,14 @@ plt.show()
 
 #############################################################################
 #
-# ------------
+# .. admonition:: References
 #
-# References
-# """"""""""
+#    The use of the following functions, methods, classes and modules is shown
+#    in this example:
 #
-# The use of the following functions, methods and classes is shown
-# in this example:
-
-import matplotlib
-matplotlib.axes.Axes.annotate
-matplotlib.axes.Axes.vlines
-matplotlib.axis.Axis.set_major_locator
-matplotlib.axis.Axis.set_major_formatter
-matplotlib.dates.MonthLocator
-matplotlib.dates.DateFormatter
+#    - `matplotlib.axes.Axes.annotate`
+#    - `matplotlib.axes.Axes.vlines`
+#    - `matplotlib.axis.Axis.set_major_locator`
+#    - `matplotlib.axis.Axis.set_major_formatter`
+#    - `matplotlib.dates.MonthLocator`
+#    - `matplotlib.dates.DateFormatter`

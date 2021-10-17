@@ -15,7 +15,6 @@ the input vectors.
 
 """
 
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -55,15 +54,16 @@ _annotate(ax, x, y, "shading='flat'")
 # -----------------------------
 #
 # Often, however, data is provided where *X* and *Y* match the shape of *Z*.
-# As of Matplotlib v3.3, ``shading='flat'`` is deprecated when this is the
-# case, a warning is raised, and the last row and column of *Z* are dropped.
-# This dropping of the last row and column is what Matplotlib did silently
-# previous to v3.3, and is compatible with what Matlab does.
+# While this makes sense for other ``shading`` types, it is no longer permitted
+# when ``shading='flat'`` (and will raise a MatplotlibDeprecationWarning as of
+# Matplotlib v3.3). Historically, Matplotlib silently dropped the last row and
+# column of *Z* in this case, to match Matlab's behavior. If this behavior is
+# still desired, simply drop the last row and column manually:
 
 x = np.arange(ncols)  # note *not* ncols + 1 as before
 y = np.arange(nrows)
 fig, ax = plt.subplots()
-ax.pcolormesh(x, y, Z, shading='flat', vmin=Z.min(), vmax=Z.max())
+ax.pcolormesh(x, y, Z[:-1, :-1], shading='flat', vmin=Z.min(), vmax=Z.max())
 _annotate(ax, x, y, "shading='flat': X, Y, C same shape")
 
 ###############################################################################
@@ -120,12 +120,9 @@ _annotate(ax, x, y, "shading='gouraud'; X, Y same shape as Z")
 plt.show()
 #############################################################################
 #
-# ------------
+# .. admonition:: References
 #
-# References
-# """"""""""
+#    The use of the following functions, methods, classes and modules is shown
+#    in this example:
 #
-# The use of the following functions and methods is shown in this example:
-
-matplotlib.axes.Axes.pcolormesh
-matplotlib.pyplot.pcolormesh
+#    - `matplotlib.axes.Axes.pcolormesh` / `matplotlib.pyplot.pcolormesh`

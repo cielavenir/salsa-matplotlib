@@ -20,7 +20,7 @@ import weakref
 import numpy as np
 from numpy import ma
 
-from matplotlib import cbook, docstring, font_manager
+from matplotlib import _api, cbook, docstring, font_manager
 import matplotlib.artist as martist
 import matplotlib.collections as mcollections
 from matplotlib.patches import CirclePolygon
@@ -37,6 +37,11 @@ Call signature::
 
 *X*, *Y* define the arrow locations, *U*, *V* define the arrow directions, and
 *C* optionally sets the color.
+
+Each arrow is internally represented by a filled polygon with a default edge
+linewidth of 0. As a result, an arrow is rather a filled area, not a line with
+a head, and `.PolyCollection` properties like *linewidth*, *linestyle*,
+*facecolor*, etc. act accordingly.
 
 **Arrow size**
 
@@ -84,7 +89,7 @@ C : 1D or 2D array-like, optional
     use *color* instead.  The size of *C* must match the number of arrow
     locations.
 
-units : {'width', 'height', 'dots', 'inches', 'x', 'y' 'xy'}, default: 'width'
+units : {'width', 'height', 'dots', 'inches', 'x', 'y', 'xy'}, default: 'width'
     The arrow dimensions (except for *length*) are measured in multiples of
     this unit.
 
@@ -177,19 +182,28 @@ color : color or color sequence, optional
     Explicit color(s) for the arrows. If *C* has been set, *color* has no
     effect.
 
-    This is a synonym for the `~.PolyCollection` *facecolor* parameter.
+    This is a synonym for the `.PolyCollection` *facecolor* parameter.
 
 Other Parameters
 ----------------
+data : indexable object, optional
+    DATA_PARAMETER_PLACEHOLDER
+
 **kwargs : `~matplotlib.collections.PolyCollection` properties, optional
     All other keyword arguments are passed on to `.PolyCollection`:
 
-    %(PolyCollection)s
+    %(PolyCollection:kwdoc)s
+
+Returns
+-------
+`~matplotlib.quiver.Quiver`
 
 See Also
 --------
 .Axes.quiverkey : Add a key to a quiver plot.
 """ % docstring.interpd.params
+
+docstring.interpd.update(quiver_doc=_quiver_doc)
 
 
 class QuiverKey(martist.Artist):
@@ -249,7 +263,7 @@ class QuiverKey(martist.Artist):
             Any additional keyword arguments are used to override vector
             properties taken from *Q*.
         """
-        martist.Artist.__init__(self)
+        super().__init__()
         self.Q = Q
         self.X = X
         self.Y = Y
@@ -352,7 +366,7 @@ class QuiverKey(martist.Artist):
         self.stale = False
 
     def _set_transform(self):
-        self.set_transform(cbook._check_getitem({
+        self.set_transform(_api.check_getitem({
             "data": self.Q.axes.transData,
             "axes": self.Q.axes.transAxes,
             "figure": self.Q.axes.figure.transFigure,
@@ -360,7 +374,7 @@ class QuiverKey(martist.Artist):
         }, coordinates=self.coord))
 
     def set_figure(self, fig):
-        martist.Artist.set_figure(self, fig)
+        super().set_figure(fig)
         self.text.set_figure(fig)
 
     def contains(self, mouseevent):
@@ -373,11 +387,6 @@ class QuiverKey(martist.Artist):
                 self.vector.contains(mouseevent)[0]):
             return True, {}
         return False, {}
-
-    @cbook.deprecated("3.2")
-    @property
-    def quiverkey_doc(self):
-        return self.__init__.__doc__
 
 
 def _parse_args(*args, caller_name='function'):
@@ -490,15 +499,13 @@ class Quiver(mcollections.PolyCollection):
         if pivot.lower() == 'mid':
             pivot = 'middle'
         self.pivot = pivot.lower()
-        cbook._check_in_list(self._PIVOT_VALS, pivot=self.pivot)
+        _api.check_in_list(self._PIVOT_VALS, pivot=self.pivot)
 
         self.transform = kw.pop('transform', ax.transData)
         kw.setdefault('facecolors', color)
         kw.setdefault('linewidths', (0,))
-        mcollections.PolyCollection.__init__(self, [], offsets=self.XY,
-                                             transOffset=self.transform,
-                                             closed=False,
-                                             **kw)
+        super().__init__([], offsets=self.XY, transOffset=self.transform,
+                         closed=False, **kw)
         self.polykw = kw
         self.set_UVC(U, V, C)
         self._initialized = False
@@ -515,10 +522,6 @@ class Quiver(mcollections.PolyCollection):
                 self_weakref._initialized = False
 
         self._cid = ax.figure.callbacks.connect('dpi_changed', on_dpi_change)
-
-    @cbook.deprecated("3.3", alternative="axes")
-    def ax(self):
-        return self.axes
 
     def remove(self):
         # docstring inherited
@@ -561,7 +564,7 @@ class Quiver(mcollections.PolyCollection):
         verts = self._make_verts(self.U, self.V, self.angles)
         self.set_verts(verts, closed=False)
         self._new_UV = False
-        mcollections.PolyCollection.draw(self, renderer)
+        super().draw(renderer)
         self.stale = False
 
     def set_UVC(self, U, V, C=None):
@@ -746,7 +749,7 @@ class Quiver(mcollections.PolyCollection):
             # float first, as with 'mid'.
             X = X - X[:, 3, np.newaxis]
         elif self.pivot != 'tail':
-            cbook._check_in_list(["middle", "tip", "tail"], pivot=self.pivot)
+            _api.check_in_list(["middle", "tip", "tail"], pivot=self.pivot)
 
         tooshort = length < self.minlength
         if tooshort.any():
@@ -891,11 +894,14 @@ barbs : `~matplotlib.quiver.Barbs`
 
 Other Parameters
 ----------------
+data : indexable object, optional
+    DATA_PARAMETER_PLACEHOLDER
+
 **kwargs
     The barbs can further be customized using `.PolyCollection` keyword
     arguments:
 
-    %(PolyCollection)s
+    %(PolyCollection:kwdoc)s
 """ % docstring.interpd.params
 
 docstring.interpd.update(barbs_doc=_barbs_doc)
@@ -971,9 +977,8 @@ class Barbs(mcollections.PolyCollection):
 
         # Make a collection
         barb_size = self._length ** 2 / 4  # Empirically determined
-        mcollections.PolyCollection.__init__(self, [], (barb_size,),
-                                             offsets=xy,
-                                             transOffset=transform, **kw)
+        super().__init__([], (barb_size,), offsets=xy, transOffset=transform,
+                         **kw)
         self.set_transform(transforms.IdentityTransform())
 
         self.set_UVC(u, v, c)
@@ -1155,8 +1160,10 @@ class Barbs(mcollections.PolyCollection):
         return barb_list
 
     def set_UVC(self, U, V, C=None):
-        self.u = ma.masked_invalid(U, copy=False).ravel()
-        self.v = ma.masked_invalid(V, copy=False).ravel()
+        # We need to ensure we have a copy, not a reference to an array that
+        # might change before draw().
+        self.u = ma.masked_invalid(U, copy=True).ravel()
+        self.v = ma.masked_invalid(V, copy=True).ravel()
 
         # Flip needs to have the same number of entries as everything else.
         # Use broadcast_to to avoid a bloated array of identical values.
@@ -1167,7 +1174,7 @@ class Barbs(mcollections.PolyCollection):
             flip = self.flip
 
         if C is not None:
-            c = ma.masked_invalid(C, copy=False).ravel()
+            c = ma.masked_invalid(C, copy=True).ravel()
             x, y, u, v, c, flip = cbook.delete_masked_points(
                 self.x.ravel(), self.y.ravel(), self.u, self.v, c,
                 flip.ravel())
@@ -1213,7 +1220,7 @@ class Barbs(mcollections.PolyCollection):
             self.x.ravel(), self.y.ravel(), self.u, self.v)
         _check_consistent_shapes(x, y, u, v)
         xy = np.column_stack((x, y))
-        mcollections.PolyCollection.set_offsets(self, xy)
+        super().set_offsets(xy)
         self.stale = True
 
     barbs_doc = _barbs_doc

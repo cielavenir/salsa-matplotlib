@@ -40,6 +40,7 @@ Inheritance
    :template: autosummary.rst
    :nosignatures:
 
+   Axis.clear
    Axis.cla
    Axis.get_scale
 
@@ -76,6 +77,7 @@ Axis Label
    Axis.set_label_coords
    Axis.set_label_position
    Axis.set_label_text
+   Axis.get_label
    Axis.get_label_position
    Axis.get_label_text
 
@@ -121,8 +123,10 @@ Data and view intervals
 
    Axis.get_data_interval
    Axis.get_view_interval
+   Axis.get_inverted
    Axis.set_data_interval
    Axis.set_view_interval
+   Axis.set_inverted
 
 Rendering helpers
 -----------------
@@ -165,17 +169,6 @@ Units
    Axis.update_units
 
 
-Incremental navigation
-----------------------
-
-.. autosummary::
-   :toctree: _as_gen
-   :template: autosummary.rst
-   :nosignatures:
-
-   Axis.pan
-   Axis.zoom
-
 XAxis Specific
 --------------
 
@@ -188,6 +181,7 @@ XAxis Specific
    XAxis.get_text_heights
    XAxis.get_ticks_position
    XAxis.set_ticks_position
+   XAxis.set_label_position
    XAxis.tick_bottom
    XAxis.tick_top
 
@@ -204,6 +198,7 @@ YAxis Specific
    YAxis.get_ticks_position
    YAxis.set_offset_position
    YAxis.set_ticks_position
+   YAxis.set_label_position
    YAxis.tick_left
    YAxis.tick_right
 
@@ -222,8 +217,6 @@ Other
    Axis.limit_range_for_scale
    Axis.reset_ticks
    Axis.set_default_intervals
-   Axis.get_smart_bounds
-   Axis.set_smart_bounds
 
 Discouraged
 -----------
@@ -264,8 +257,6 @@ specify a matching series of labels.  Calling ``set_ticks`` makes a
    :template: autosummary.rst
    :nosignatures:
 
-
-   Tick.apply_tickdir
    Tick.get_loc
    Tick.get_pad
    Tick.get_pad_pixels
@@ -275,4 +266,5 @@ specify a matching series of labels.  Calling ``set_ticks`` makes a
    Tick.set_label1
    Tick.set_label2
    Tick.set_pad
+   Tick.set_url
    Tick.update_position

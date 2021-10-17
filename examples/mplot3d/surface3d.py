@@ -1,9 +1,9 @@
 """
-======================
-3D surface (color map)
-======================
+=====================
+3D surface (colormap)
+=====================
 
-Demonstrates plotting a 3D surface colored with the coolwarm color map.
+Demonstrates plotting a 3D surface colored with the coolwarm colormap.
 The surface is made opaque by using antialiased=False.
 
 Also demonstrates using the LinearLocator and custom formatting for the
@@ -42,17 +42,13 @@ plt.show()
 
 #############################################################################
 #
-# ------------
+# .. admonition:: References
 #
-# References
-# """"""""""
+#    The use of the following functions, methods, classes and modules is shown
+#    in this example:
 #
-# The use of the following functions, methods, classes and modules is shown
-# in this example:
-
-import matplotlib
-matplotlib.pyplot.subplots
-matplotlib.axis.Axis.set_major_formatter
-matplotlib.axis.Axis.set_major_locator
-matplotlib.ticker.LinearLocator
-matplotlib.ticker.StrMethodFormatter
+#    - `matplotlib.pyplot.subplots`
+#    - `matplotlib.axis.Axis.set_major_formatter`
+#    - `matplotlib.axis.Axis.set_major_locator`
+#    - `matplotlib.ticker.LinearLocator`
+#    - `matplotlib.ticker.StrMethodFormatter`

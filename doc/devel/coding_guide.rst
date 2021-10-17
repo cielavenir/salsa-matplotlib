@@ -1,5 +1,3 @@
-.. _pr-guidelines:
-
 .. raw:: html
 
    <style>
@@ -8,6 +6,8 @@
    .checklist li:before { content: "\2610\2001"; margin-left: -24px; }
    .checklist li p {display: inline; }
    </style>
+
+.. _pr-guidelines:
 
 ***********************
 Pull request guidelines
@@ -41,14 +41,16 @@ When making a PR, pay attention to:
   the review process.
 * It is ok to open incomplete or work-in-progress PRs if you need help or
   feedback from the developers. You may mark these as
-  `draft pull requests <https://help.github.com/en/articles/about-pull-requests#draft-pull-requests>`_
+  `draft pull requests <https://docs.github.com/en/github/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests#draft-pull-requests>`_
   on GitHub.
 * When updating your PR, instead of adding new commits to fix something, please
   consider amending your initial commit(s) to keep the history clean.
-  You can achieve this using::
+  You can achieve this using
 
-      git commit --amend --no-edit
-      git push [your-remote-repo] [your-branch] --force-with-lease
+  .. code-block:: bash
+
+     git commit --amend --no-edit
+     git push [your-remote-repo] [your-branch] --force-with-lease
 
 See also :ref:`contributing` for how to make a PR.
 
@@ -80,12 +82,12 @@ Organizational topics:
 * Tag with descriptive :ref:`labels <pr-labels>`.
 * Set the :ref:`milestone <pr-milestones>`.
 * Keep an eye on the :ref:`number of commits <pr-squashing>`.
-* Approve if all of the above topics handled.
+* Approve if all of the above topics are handled.
 * :ref:`Merge  <pr-merging>` if a sufficient number of approvals is reached.
 
 .. _pr-guidelines-details:
 
-Detailed Guidelines
+Detailed guidelines
 ===================
 
 .. _pr-documentation:
@@ -110,8 +112,9 @@ Documentation
   :file:`doc/users/whats_new.rst`.
 
 * If you change the API in a backward-incompatible way, please
-  document it in the relevant file in most recent
-  :file:`doc/api/api_changes_X.Y`.
+  document it by adding a file in the relevant subdirectory of
+  :file:`doc/api/next_api_changes/`, probably in the ``behavior/``
+  subdirectory.
 
 .. _pr-labels:
 
@@ -158,14 +161,14 @@ Merging
   core developers (those with commit rights) should review all pull
   requests.  If you are the first to review a PR and approve of the
   changes use the GitHub `'approve review'
-  <https://help.github.com/articles/reviewing-changes-in-pull-requests/>`__
+  <https://docs.github.com/en/github/collaborating-with-pull-requests/reviewing-changes-in-pull-requests>`__
   tool to mark it as such.  If you are a subsequent reviewer please
   approve the review and if you think no more review is needed, merge
   the PR.
 
-  Ensure that all API changes are documented in the relevant file in
-  the most recent :file:`doc/api/api_changes_X.Y` and significant new features
-  have an entry in :file:`doc/user/whats_new`.
+  Ensure that all API changes are documented in a file in one of the
+  subdirectories of :file:`doc/api/next_api_changes`, and significant new
+  features have an entry in :file:`doc/user/whats_new`.
 
   - If a PR already has a positive review, a core developer (e.g. the first
     reviewer, but not necessarily) may champion that PR for merging.  In order
@@ -191,15 +194,15 @@ Automated tests
 Whenever a pull request is created or updated, various automated test tools
 will run on all supported platforms and versions of Python.
 
-* Make sure the Linting, Travis, AppVeyor, CircleCI, and Azure pipelines are
-  passing before merging (All checks are listed at the bottom of the GitHub
-  page of your pull request). Here are some tips for finding the cause of the
-  test failure:
+* Make sure the Linting, GitHub Actions, AppVeyor, CircleCI, and Azure
+  pipelines are passing before merging (All checks are listed at the bottom of
+  the GitHub page of your pull request). Here are some tips for finding the
+  cause of the test failure:
 
   - If *Linting* fails, you have a code style issue, which will be listed
     as annotations on the pull request's diff.
-  - If a Travis or AppVeyor run fails, search the log for ``FAILURES``. The
-    subsequent section will contain information on the failed tests.
+  - If a GitHub Actions or AppVeyor run fails, search the log for ``FAILURES``.
+    The subsequent section will contain information on the failed tests.
   - If CircleCI fails, likely you have some reStructuredText style issue in
     the docs. Search the CircleCI log for ``WARNING``.
   - If Azure pipelines fail with an image comparison error, you can find the
@@ -218,6 +221,18 @@ will run on all supported platforms and versions of Python.
 
   .. _tox: https://tox.readthedocs.io/
 
+* If you know your changes do not need to be tested (this is very rare!), all
+  CIs can be skipped for a given commit by including ``[ci skip]`` or
+  ``[skip ci]`` in the commit message. If you know only a subset of CIs need
+  to be run (e.g., if you are changing some block of plain reStructuredText and
+  want only CircleCI to run to render the result), individual CIs can be
+  skipped on individual commits as well by using the following substrings
+  in commit messages:
+
+  - GitHub Actions: ``[skip actions]``
+  - AppVeyor: ``[skip appveyor]`` (must be in the first line of the commit)
+  - Azure Pipelines: ``[skip azp]``
+  - CircleCI: ``[skip circle]``
 
 .. _pr-squashing:
 
@@ -245,7 +260,7 @@ Number of commits and squashing
 
 .. _branches_and_backports:
 
-Branches and Backports
+Branches and backports
 ======================
 
 Current branches
@@ -254,20 +269,13 @@ The current active branches are
 
 *master*
   The current development version. Future minor releases (*v3.N.0*) will be
-  branched from this. Supports Python 3.6+.
+  branched from this. Supports Python 3.7+.
 
 *v3.N.x*
   Maintenance branch for Matplotlib 3.N. Future patch releases will be
   branched from this.  Supports Python 3.6+.
 
 *v3.N.M-doc*
-  Documentation for the current release.  On a patch release, this will be
-  replaced by a properly named branch for the new release.
-
-*v2.2.x*
-  Maintenance branch for Matplotlib 2.2 LTS.  Supports Python 2.7, 3.4+.
-
-*v2.2.N-doc*
   Documentation for the current release.  On a patch release, this will be
   replaced by a properly named branch for the new release.
 
@@ -346,22 +354,26 @@ the merge notification) or through the git CLI tools.
 
 Assuming that you already have a local branch ``v2.2.x`` (if not, then
 ``git checkout -b v2.2.x``), and that your remote pointing to
-``https://github.com/matplotlib/matplotlib`` is called ``upstream``::
+``https://github.com/matplotlib/matplotlib`` is called ``upstream``:
 
-  git fetch upstream
-  git checkout v2.2.x  # or include -b if you don't already have this.
-  git reset --hard upstream/v2.2.x
-  git cherry-pick -m 1 TARGET_SHA
-  # resolve conflicts and commit if required
+.. code-block:: bash
+
+   git fetch upstream
+   git checkout v2.2.x  # or include -b if you don't already have this.
+   git reset --hard upstream/v2.2.x
+   git cherry-pick -m 1 TARGET_SHA
+   # resolve conflicts and commit if required
 
 Files with conflicts can be listed by ``git status``,
 and will have to be fixed by hand (search on ``>>>>>``).  Once
 the conflict is resolved, you will have to re-add the file(s) to the branch
-and then continue the cherry pick::
+and then continue the cherry pick:
 
-  git add lib/matplotlib/conflicted_file.py
-  git add lib/matplotlib/conflicted_file2.py
-  git cherry-pick --continue
+.. code-block:: bash
+
+   git add lib/matplotlib/conflicted_file.py
+   git add lib/matplotlib/conflicted_file2.py
+   git cherry-pick --continue
 
 Use your discretion to push directly to upstream or to open a PR; be
 sure to push or PR against the ``v2.2.x`` upstream branch, not ``master``!

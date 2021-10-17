@@ -1,11 +1,11 @@
 .. _whats-new-2-0-0:
 
-New in matplotlib 2.0
-=====================
+What's new in Matplotlib 2.0 (Jan 17, 2017)
+===========================================
 
 .. note::
 
-   matplotlib 2.0 supports Python 2.7, and 3.4+
+   Matplotlib 2.0 supports Python 2.7, and 3.4+
 
 
 
@@ -117,10 +117,11 @@ choropleths, labeled image features, etc.
 
 
 
-Axis offset label now responds to `labelcolor`
+Axis offset label now responds to *labelcolor*
 ----------------------------------------------
 
-Axis offset labels are now colored the same as axis tick markers when `labelcolor` is altered.
+Axis offset labels are now colored the same as axis tick markers when
+*labelcolor* is altered.
 
 Improved offset text choice
 ---------------------------
@@ -187,11 +188,11 @@ Improved image support
 ----------------------
 
 Prior to version 2.0, matplotlib resampled images by first applying
-the color map and then resizing the result.  Since the resampling was
+the colormap and then resizing the result.  Since the resampling was
 performed on the colored image, this introduced colors in the output
-image that didn't actually exist in the color map.  Now, images are
+image that didn't actually exist in the colormap.  Now, images are
 resampled first (and entirely in floating-point, if the input image is
-floating-point), and then the color map is applied.
+floating-point), and then the colormap is applied.
 
 In order to make this important change, the image handling code was
 almost entirely rewritten.  As a side effect, image resampling uses

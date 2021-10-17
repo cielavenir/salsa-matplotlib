@@ -66,6 +66,7 @@ Basic
 
    Axes.bar
    Axes.barh
+   Axes.bar_label
 
    Axes.stem
    Axes.eventplot
@@ -137,6 +138,7 @@ Binned
    Axes.hexbin
    Axes.hist
    Axes.hist2d
+   Axes.stairs
 
 Contours
 --------
@@ -150,8 +152,8 @@ Contours
    Axes.contour
    Axes.contourf
 
-Array
------
+2D arrays
+---------
 
 .. autosummary::
    :toctree: _as_gen
@@ -165,7 +167,7 @@ Array
    Axes.pcolormesh
    Axes.spy
 
-Unstructured Triangles
+Unstructured triangles
 ----------------------
 
 .. autosummary::
@@ -179,7 +181,7 @@ Unstructured Triangles
    Axes.tricontourf
 
 
-Text and Annotations
+Text and annotations
 --------------------
 
 .. autosummary::
@@ -198,8 +200,8 @@ Text and Annotations
    Axes.secondary_yaxis
 
 
-Fields
-------
+Vector fields
+-------------
 
 .. autosummary::
    :toctree: _as_gen
@@ -274,7 +276,7 @@ Axis / limits
    Axes.get_xaxis
    Axes.get_yaxis
 
-Axis Limits and direction
+Axis limits and direction
 -------------------------
 
 .. autosummary::
@@ -293,14 +295,13 @@ Axis Limits and direction
    Axes.get_ylim
 
    Axes.update_datalim
-   Axes.update_datalim_bounds
 
    Axes.set_xbound
    Axes.get_xbound
    Axes.set_ybound
    Axes.get_ybound
 
-Axis Labels, title, and legend
+Axis labels, title, and legend
 ------------------------------
 
 .. autosummary::
@@ -434,7 +435,7 @@ Units
    Axes.have_units
 
 
-Adding Artists
+Adding artists
 ==============
 
 .. autosummary::
@@ -470,7 +471,7 @@ Twinning and sharing
    Axes.get_shared_y_axes
 
 
-Axes Position
+Axes position
 =============
 .. autosummary::
    :toctree: _as_gen
@@ -489,7 +490,7 @@ Axes Position
    Axes.set_position
 
 
-Async/Event based
+Async/event based
 =================
 
 .. autosummary::
@@ -531,14 +532,6 @@ Interactive
 
    Axes.mouseover
    Axes.in_axes
-
-   Axes.pick
-   Axes.pickable
-   Axes.get_picker
-   Axes.set_picker
-
-   Axes.set_contains
-   Axes.get_contains
 
    Axes.contains
    Axes.contains_point
@@ -594,7 +587,6 @@ non-rectilinear Axes.
    Axes.get_xaxis_transform
    Axes.get_yaxis_transform
    Axes.get_data_ratio
-   Axes.get_data_ratio_log
 
    Axes.get_xaxis_text1_transform
    Axes.get_xaxis_text2_transform
@@ -614,3 +606,4 @@ Other
    Axes.get_default_bbox_extra_artists
    Axes.get_transformed_clip_path_and_affine
    Axes.has_data
+   Axes.set
