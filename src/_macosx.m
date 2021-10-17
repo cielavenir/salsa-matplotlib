@@ -10,18 +10,48 @@
 #endif
 
 /* Proper way to check for the OS X version we are compiling for, from
-   http://developer.apple.com/documentation/DeveloperTools/Conceptual/cross_development */
+ * https://developer.apple.com/library/archive/documentation/DeveloperTools/Conceptual/cross_development/Using/using.html
+ */
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
 #define COMPILING_FOR_10_7
 #endif
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10100
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
 #define COMPILING_FOR_10_10
 #endif
 
+#if __MAC_OS_X_VERSION_MIN_REQUIRED < 101200
+/* A lot of symbols were renamed in Sierra and cause deprecation warnings
+   so define macros for the new names if we are compiling on an older SDK */
+#define NSEventMaskAny                       NSAnyEventMask
+#define NSEventTypeApplicationDefined        NSApplicationDefined
+#define NSEventModifierFlagCommand           NSCommandKeyMask
+#define NSEventModifierFlagControl           NSControlKeyMask
+#define NSEventModifierFlagOption            NSAlternateKeyMask
+#define NSEventModifierFlagShift             NSShiftKeyMask
+#define NSEventTypeKeyUp                     NSKeyUp
+#define NSEventTypeKeyDown                   NSKeyDown
+#define NSEventTypeMouseMoved                NSMouseMoved
+#define NSEventTypeLeftMouseDown             NSLeftMouseDown
+#define NSEventTypeRightMouseDown            NSRightMouseDown
+#define NSEventTypeOtherMouseDown            NSOtherMouseDown
+#define NSEventTypeLeftMouseDragged          NSLeftMouseDragged
+#define NSEventTypeRightMouseDragged         NSRightMouseDragged
+#define NSEventTypeOtherMouseDragged         NSOtherMouseDragged
+#define NSEventTypeLeftMouseUp               NSLeftMouseUp
+#define NSEventTypeRightMouseUp              NSRightMouseUp
+#define NSEventTypeOtherMouseUp              NSOtherMouseUp
+#define NSWindowStyleMaskClosable            NSClosableWindowMask
+#define NSWindowStyleMaskMiniaturizable      NSMiniaturizableWindowMask
+#define NSWindowStyleMaskResizable           NSResizableWindowMask
+#define NSWindowStyleMaskTitled              NSTitledWindowMask
+#endif
 
-/* CGFloat was defined in Mac OS X 10.5 */
-#ifndef CGFLOAT_DEFINED
-#define CGFloat float
+#if __MAC_OS_X_VERSION_MIN_REQUIRED < 101400
+/* A few more deprecations in Mojave */
+#define NSButtonTypeMomentaryLight           NSMomentaryLightButton
+#define NSButtonTypePushOnPushOff            NSPushOnPushOffButton
+#define NSBezelStyleShadowlessSquare         NSShadowlessSquareBezelStyle
+#define CGContext                            graphicsPort
 #endif
 
 
@@ -140,7 +170,7 @@ static int wait_for_stdin(void)
         NSEvent* event;
         while (true) {
             while (true) {
-                event = [NSApp nextEventMatchingMask: NSAnyEventMask
+                event = [NSApp nextEventMatchingMask: NSEventMaskAny
                                            untilDate: [NSDate distantPast]
                                               inMode: NSDefaultRunLoopMode
                                              dequeue: YES];
@@ -233,29 +263,6 @@ static int wait_for_stdin(void)
 - (void)scrollWheel:(NSEvent *)event;
 - (BOOL)acceptsFirstResponder;
 //- (void)flagsChanged:(NSEvent*)event;
-@end
-
-@interface ScrollableButton : NSButton
-{
-    SEL scrollWheelUpAction;
-    SEL scrollWheelDownAction;
-}
-- (void)setScrollWheelUpAction:(SEL)action;
-- (void)setScrollWheelDownAction:(SEL)action;
-- (void)scrollWheel:(NSEvent *)event;
-@end
-
-@interface MenuItem: NSMenuItem
-{   int index;
-}
-+ (MenuItem*)menuItemWithTitle:(NSString*)title;
-+ (MenuItem*)menuItemSelectAll;
-+ (MenuItem*)menuItemInvertAll;
-+ (MenuItem*)menuItemForAxis:(int)i;
-- (void)toggle:(id)sender;
-- (void)selectAll:(id)sender;
-- (void)invertAll:(id)sender;
-- (int)index;
 @end
 
 /* ---------------------------- Python classes ---------------------------- */
@@ -509,11 +516,11 @@ FigureCanvas_start_event_loop(FigureCanvas* self, PyObject* args, PyObject* keyw
         (timeout > 0.0) ? [NSDate dateWithTimeIntervalSinceNow: timeout]
                         : [NSDate distantFuture];
     while (true)
-    {   NSEvent* event = [NSApp nextEventMatchingMask: NSAnyEventMask
+    {   NSEvent* event = [NSApp nextEventMatchingMask: NSEventMaskAny
                                             untilDate: date
                                                inMode: NSDefaultRunLoopMode
                                               dequeue: YES];
-       if (!event || [event type]==NSApplicationDefined) break;
+       if (!event || [event type]==NSEventTypeApplicationDefined) break;
        [NSApp sendEvent: event];
     }
 
@@ -529,7 +536,7 @@ FigureCanvas_start_event_loop(FigureCanvas* self, PyObject* args, PyObject* keyw
 static PyObject*
 FigureCanvas_stop_event_loop(FigureCanvas* self)
 {
-    NSEvent* event = [NSEvent otherEventWithType: NSApplicationDefined
+    NSEvent* event = [NSEvent otherEventWithType: NSEventTypeApplicationDefined
                                         location: NSZeroPoint
                                    modifierFlags: 0
                                        timestamp: 0.0
@@ -653,7 +660,6 @@ FigureManager_init(FigureManager *self, PyObject *args, PyObject *kwds)
     NSRect rect;
     Window* window;
     View* view;
-    const char* title;
     PyObject* size;
     int width, height;
     PyObject* obj;
@@ -665,7 +671,7 @@ FigureManager_init(FigureManager *self, PyObject *args, PyObject *kwds)
         return -1;
     }
 
-    if(!PyArg_ParseTuple(args, "Os", &obj, &title)) return -1;
+    if(!PyArg_ParseTuple(args, "O", &obj)) return -1;
 
     canvas = (FigureCanvas*)obj;
     view = canvas->view;
@@ -689,17 +695,14 @@ FigureManager_init(FigureManager *self, PyObject *args, PyObject *kwds)
     rect.size.width = width;
 
     self->window = [self->window initWithContentRect: rect
-                                         styleMask: NSTitledWindowMask
-                                                  | NSClosableWindowMask
-                                                  | NSResizableWindowMask
-                                                  | NSMiniaturizableWindowMask
+                                         styleMask: NSWindowStyleMaskTitled
+                                                  | NSWindowStyleMaskClosable
+                                                  | NSWindowStyleMaskResizable
+                                                  | NSWindowStyleMaskMiniaturizable
                                            backing: NSBackingStoreBuffered
                                              defer: YES
                                        withManager: (PyObject*)self];
     window = self->window;
-    [window setTitle: [NSString stringWithCString: title
-                                         encoding: NSASCIIStringEncoding]];
-
     [window setDelegate: view];
     [window makeFirstResponder: view];
     [[window contentView] addSubview: view];
@@ -1155,13 +1158,13 @@ NavigationToolbar2_init(NavigationToolbar2 *self, PyObject *args, PyObject *kwds
                       @selector(zoom:),
                       @selector(configure_subplots:),
                       @selector(save_figure:)};
-    NSButtonType buttontypes[7] = {NSMomentaryLightButton,
-                                   NSMomentaryLightButton,
-                                   NSMomentaryLightButton,
-                                   NSPushOnPushOffButton,
-                                   NSPushOnPushOffButton,
-                                   NSMomentaryLightButton,
-                                   NSMomentaryLightButton};
+    NSButtonType buttontypes[7] = {NSButtonTypeMomentaryLight,
+                                   NSButtonTypeMomentaryLight,
+                                   NSButtonTypeMomentaryLight,
+                                   NSButtonTypePushOnPushOff,
+                                   NSButtonTypePushOnPushOff,
+                                   NSButtonTypeMomentaryLight,
+                                   NSButtonTypeMomentaryLight};
 
     rect.origin.x = 0;
     rect.origin.y = 0;
@@ -1187,7 +1190,7 @@ NavigationToolbar2_init(NavigationToolbar2 *self, PyObject *args, PyObject *kwds
         NSImage* image = [[NSImage alloc] initWithContentsOfFile: filename];
         buttons[i] = [[NSButton alloc] initWithFrame: rect];
         [image setSize: size];
-        [buttons[i] setBezelStyle: NSShadowlessSquareBezelStyle];
+        [buttons[i] setBezelStyle: NSBezelStyleShadowlessSquare];
         [buttons[i] setButtonType: buttontypes[i]];
         [buttons[i] setImage: image];
         [buttons[i] scaleUnitSquareToSize: scale];
@@ -1370,13 +1373,15 @@ set_cursor(PyObject* unused, PyObject* args)
 {
     int i;
     if(!PyArg_ParseTuple(args, "i", &i)) return NULL;
-    switch (i)
-    { case 0: [[NSCursor pointingHandCursor] set]; break;
+    switch (i) {
       case 1: [[NSCursor arrowCursor] set]; break;
-      case 2: [[NSCursor crosshairCursor] set]; break;
-      case 3: [[NSCursor openHandCursor] set]; break;
+      case 2: [[NSCursor pointingHandCursor] set]; break;
+      case 3: [[NSCursor crosshairCursor] set]; break;
+      case 4: [[NSCursor openHandCursor] set]; break;
       /* OSX handles busy state itself so no need to set a cursor here */
-      case 4: break;
+      case 5: break;
+      case 6: [[NSCursor resizeLeftRightCursor] set]; break;
+      case 7: [[NSCursor resizeUpDownCursor] set]; break;
       default: return NULL;
     }
     Py_RETURN_NONE;
@@ -1517,10 +1522,10 @@ static WindowServerConnectionManager *sharedWindowServerConnectionManager = nil;
 - (ToolWindow*)initWithContentRect:(NSRect)rect master:(NSWindow*)window
 {
     [self initWithContentRect: rect
-                    styleMask: NSTitledWindowMask
-                             | NSClosableWindowMask
-                             | NSResizableWindowMask
-                             | NSMiniaturizableWindowMask
+                    styleMask: NSWindowStyleMaskTitled
+                             | NSWindowStyleMaskClosable
+                             | NSWindowStyleMaskResizable
+                             | NSWindowStyleMaskMiniaturizable
                       backing: NSBackingStoreBuffered
                         defer: YES];
     [self setTitle: @"Subplot Configuration Tool"];
@@ -1647,7 +1652,7 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
 
     PyGILState_STATE gstate = PyGILState_Ensure();
 
-    CGContextRef cr = [[NSGraphicsContext currentContext] graphicsPort];
+    CGContextRef cr = [[NSGraphicsContext currentContext] CGContext];
 
     double new_device_scale = _get_device_scale(cr);
 
@@ -1717,7 +1722,7 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
 - (BOOL)windowShouldClose:(NSNotification*)notification
 {
     NSWindow* window = [self window];
-    NSEvent* event = [NSEvent otherEventWithType: NSApplicationDefined
+    NSEvent* event = [NSEvent otherEventWithType: NSEventTypeApplicationDefined
                                         location: NSZeroPoint
                                    modifierFlags: 0
                                        timestamp: 0.0
@@ -1783,12 +1788,12 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
     x = location.x * device_scale;
     y = location.y * device_scale;
     switch ([event type])
-    {    case NSLeftMouseDown:
+    {    case NSEventTypeLeftMouseDown:
          {   unsigned int modifier = [event modifierFlags];
-             if (modifier & NSControlKeyMask)
+             if (modifier & NSEventModifierFlagControl)
                  /* emulate a right-button click */
                  num = 3;
-             else if (modifier & NSAlternateKeyMask)
+             else if (modifier & NSEventModifierFlagOption)
                  /* emulate a middle-button click */
                  num = 2;
              else
@@ -1799,8 +1804,8 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
              }
              break;
          }
-         case NSOtherMouseDown: num = 2; break;
-         case NSRightMouseDown: num = 3; break;
+         case NSEventTypeOtherMouseDown: num = 2; break;
+         case NSEventTypeRightMouseDown: num = 3; break;
          default: return; /* Unknown mouse event */
     }
     if ([event clickCount] == 2) {
@@ -1827,13 +1832,13 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
     x = location.x * device_scale;
     y = location.y * device_scale;
     switch ([event type])
-    {    case NSLeftMouseUp:
+    {    case NSEventTypeLeftMouseUp:
              num = 1;
              if ([NSCursor currentCursor]==[NSCursor closedHandCursor])
                  [[NSCursor openHandCursor] set];
              break;
-         case NSOtherMouseUp: num = 2; break;
-         case NSRightMouseUp: num = 3; break;
+         case NSEventTypeOtherMouseUp: num = 2; break;
+         case NSEventTypeRightMouseUp: num = 3; break;
          default: return; /* Unknown mouse event */
     }
     gstate = PyGILState_Ensure();
@@ -1880,127 +1885,12 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
     PyGILState_Release(gstate);
 }
 
-- (void)rightMouseDown:(NSEvent *)event
-{
-    int x, y;
-    int num = 3;
-    int dblclick = 0;
-    PyObject* result;
-    PyGILState_STATE gstate;
-    NSPoint location = [event locationInWindow];
-    location = [self convertPoint: location fromView: nil];
-    x = location.x * device_scale;
-    y = location.y * device_scale;
-    gstate = PyGILState_Ensure();
-    if ([event clickCount] == 2) {
-      dblclick = 1;
-    }
-    result = PyObject_CallMethod(canvas, "button_press_event", "iiii", x, y, num, dblclick);
-    if(result)
-        Py_DECREF(result);
-    else
-        PyErr_Print();
-
-    PyGILState_Release(gstate);
-}
-
-- (void)rightMouseUp:(NSEvent *)event
-{
-    int x, y;
-    int num = 3;
-    PyObject* result;
-    PyGILState_STATE gstate;
-    NSPoint location = [event locationInWindow];
-    location = [self convertPoint: location fromView: nil];
-    x = location.x * device_scale;
-    y = location.y * device_scale;
-    gstate = PyGILState_Ensure();
-    result = PyObject_CallMethod(canvas, "button_release_event", "iii", x, y, num);
-    if(result)
-        Py_DECREF(result);
-    else
-        PyErr_Print();
-
-    PyGILState_Release(gstate);
-}
-
-- (void)rightMouseDragged:(NSEvent *)event
-{
-    int x, y;
-    NSPoint location = [event locationInWindow];
-    location = [self convertPoint: location fromView: nil];
-    x = location.x * device_scale;
-    y = location.y * device_scale;
-    PyGILState_STATE gstate = PyGILState_Ensure();
-    PyObject* result = PyObject_CallMethod(canvas, "motion_notify_event", "ii", x, y);
-    if(result)
-        Py_DECREF(result);
-    else
-        PyErr_Print();
-
-    PyGILState_Release(gstate);
-}
-
-- (void)otherMouseDown:(NSEvent *)event
-{
-    int x, y;
-    int num = 2;
-    int dblclick = 0;
-    PyObject* result;
-    PyGILState_STATE gstate;
-    NSPoint location = [event locationInWindow];
-    location = [self convertPoint: location fromView: nil];
-    x = location.x * device_scale;
-    y = location.y * device_scale;
-    gstate = PyGILState_Ensure();
-    if ([event clickCount] == 2) {
-      dblclick = 1;
-    }
-    result = PyObject_CallMethod(canvas, "button_press_event", "iiii", x, y, num, dblclick);
-    if(result)
-        Py_DECREF(result);
-    else
-        PyErr_Print();
-
-    PyGILState_Release(gstate);
-}
-
-- (void)otherMouseUp:(NSEvent *)event
-{
-    int x, y;
-    int num = 2;
-    PyObject* result;
-    PyGILState_STATE gstate;
-    NSPoint location = [event locationInWindow];
-    location = [self convertPoint: location fromView: nil];
-    x = location.x * device_scale;
-    y = location.y * device_scale;
-    gstate = PyGILState_Ensure();
-    result = PyObject_CallMethod(canvas, "button_release_event", "iii", x, y, num);
-    if(result)
-        Py_DECREF(result);
-    else
-        PyErr_Print();
-
-    PyGILState_Release(gstate);
-}
-
-- (void)otherMouseDragged:(NSEvent *)event
-{
-    int x, y;
-    NSPoint location = [event locationInWindow];
-    location = [self convertPoint: location fromView: nil];
-    x = location.x * device_scale;
-    y = location.y * device_scale;
-    PyGILState_STATE gstate = PyGILState_Ensure();
-    PyObject* result = PyObject_CallMethod(canvas, "motion_notify_event", "ii", x, y);
-    if(result)
-        Py_DECREF(result);
-    else
-        PyErr_Print();
-
-    PyGILState_Release(gstate);
-}
+- (void)rightMouseDown:(NSEvent *)event { [self mouseDown: event]; }
+- (void)rightMouseUp:(NSEvent *)event { [self mouseUp: event]; }
+- (void)rightMouseDragged:(NSEvent *)event { [self mouseDragged: event]; }
+- (void)otherMouseDown:(NSEvent *)event { [self mouseDown: event]; }
+- (void)otherMouseUp:(NSEvent *)event { [self mouseUp: event]; }
+- (void)otherMouseDragged:(NSEvent *)event { [self mouseDragged: event]; }
 
 - (void)setRubberband:(NSRect)rect
 {
@@ -2062,17 +1952,17 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
                                         ];
 
     NSMutableString* returnkey = [NSMutableString string];
-    if ([event modifierFlags] & NSControlKeyMask)
+    if ([event modifierFlags] & NSEventModifierFlagControl)
         [returnkey appendString:@"ctrl+" ];
-    if ([event modifierFlags] & NSAlternateKeyMask)
+    if ([event modifierFlags] & NSEventModifierFlagOption)
         [returnkey appendString:@"alt+" ];
-    if ([event modifierFlags] & NSCommandKeyMask)
+    if ([event modifierFlags] & NSEventModifierFlagCommand)
         [returnkey appendString:@"cmd+" ];
 
     unichar uc = [[event charactersIgnoringModifiers] characterAtIndex:0];
     NSString* specialchar = [specialkeymappings objectForKey:[NSNumber numberWithUnsignedLong:uc]];
     if (specialchar){
-        if ([event modifierFlags] & NSShiftKeyMask)
+        if ([event modifierFlags] & NSEventModifierFlagShift)
             [returnkey appendString:@"shift+" ];
         [returnkey appendString:specialchar];
     }
@@ -2175,110 +2065,6 @@ static int _copy_agg_buffer(CGContextRef cr, PyObject *renderer)
     PyGILState_Release(gstate);
 }
  */
-@end
-
-@implementation ScrollableButton
-- (void)setScrollWheelUpAction:(SEL)action
-{
-    scrollWheelUpAction = action;
-}
-
-- (void)setScrollWheelDownAction:(SEL)action
-{
-    scrollWheelDownAction = action;
-}
-
-- (void)scrollWheel:(NSEvent*)event
-{
-    float d = [event deltaY];
-    Window* target = [self target];
-    if (d > 0)
-        [NSApp sendAction: scrollWheelUpAction to: target from: self];
-    else if (d < 0)
-        [NSApp sendAction: scrollWheelDownAction to: target from: self];
-}
-@end
-
-@implementation MenuItem
-+ (MenuItem*)menuItemWithTitle: (NSString*)title
-{
-    MenuItem* item = [[MenuItem alloc] initWithTitle: title
-                                              action: nil
-                                       keyEquivalent: @""];
-    item->index = -1;
-    return [item autorelease];
-}
-
-+ (MenuItem*)menuItemForAxis: (int)i
-{
-    NSString* title = [NSString stringWithFormat: @"Axis %d", i+1];
-    MenuItem* item = [[MenuItem alloc] initWithTitle: title
-                                              action: @selector(toggle:)
-                                       keyEquivalent: @""];
-    [item setTarget: item];
-    [item setState: NSOnState];
-    item->index = i;
-    return [item autorelease];
-}
-
-+ (MenuItem*)menuItemSelectAll
-{
-    MenuItem* item = [[MenuItem alloc] initWithTitle: @"Select All"
-                                              action: @selector(selectAll:)
-                                       keyEquivalent: @""];
-    [item setTarget: item];
-    item->index = -1;
-    return [item autorelease];
-}
-
-+ (MenuItem*)menuItemInvertAll
-{
-    MenuItem* item = [[MenuItem alloc] initWithTitle: @"Invert All"
-                                              action: @selector(invertAll:)
-                                       keyEquivalent: @""];
-    [item setTarget: item];
-    item->index = -1;
-    return [item autorelease];
-}
-
-- (void)toggle:(id)sender
-{
-    if ([self state]) [self setState: NSOffState];
-    else [self setState: NSOnState];
-}
-
-- (void)selectAll:(id)sender
-{
-    NSMenu* menu = [sender menu];
-    if(!menu) return; /* Weird */
-    NSArray* items = [menu itemArray];
-    NSEnumerator* enumerator = [items objectEnumerator];
-    MenuItem* item;
-    while ((item = [enumerator nextObject]))
-    {
-        if (item->index >= 0) [item setState: NSOnState];
-    }
-}
-
-- (void)invertAll:(id)sender
-{
-    NSMenu* menu = [sender menu];
-    if(!menu) return; /* Weird */
-    NSArray* items = [menu itemArray];
-    NSEnumerator* enumerator = [items objectEnumerator];
-    MenuItem* item;
-    while ((item = [enumerator nextObject]))
-    {
-        if (item->index < 0) continue;
-        if ([item state]==NSOffState) [item setState: NSOnState];
-        else [item setState: NSOffState];
-    }
-}
-
-- (int)index
-{
-    return self->index;
-}
 @end
 
 static PyObject*
@@ -2509,15 +2295,7 @@ static struct PyMethodDef methods[] = {
 };
 
 static struct PyModuleDef moduledef = {
-    PyModuleDef_HEAD_INIT,
-    "_macosx",
-    "Mac OS X native backend",
-    -1,
-    methods,
-    NULL,
-    NULL,
-    NULL,
-    NULL
+    PyModuleDef_HEAD_INIT, "_macosx", "Mac OS X native backend", -1, methods
 };
 
 #pragma GCC visibility push(default)

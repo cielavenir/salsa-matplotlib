@@ -113,7 +113,7 @@ Deprecation of the constructor means that classes inheriting from
 
 Locators
 ~~~~~~~~
-The unused `.Locator.autoscale` method is deprecated (pass the axis limits to
+The unused ``Locator.autoscale`` method is deprecated (pass the axis limits to
 `.Locator.view_limits` instead).
 
 Animation
@@ -141,6 +141,11 @@ Passing scalars to parameter *where* in ``fill_between()`` and
 *where* must be of the same size as *x* (or *y*), scalars were accepted and
 broadcasted to the size of *x*. Non-matching sizes will raise a ``ValueError``
 in the future.
+
+``scatter()``
+~~~~~~~~~~~~~
+Passing the *verts* parameter to `.axes.Axes.scatter` is deprecated; use the
+*marker* parameter instead.
 
 ``tight_layout()``
 ~~~~~~~~~~~~~~~~~~
@@ -223,7 +228,7 @@ to a NumPy array with ``np.asarray`` before processing it.
 
 Colors
 ~~~~~~
-The function `matplotlib.colors.makeMappingArray` is not considered part of
+The function ``matplotlib.colors.makeMappingArray`` is not considered part of
 the public API any longer. Thus, it's deprecated.
 
 Using a string of single-character colors as a color sequence (e.g. "rgb") is
@@ -255,8 +260,8 @@ both 1) matplotlib's conftests have not been called and 2) nose is in
 During the deprecation period, to force the generation of nose base tests,
 import nose first.
 
-The ``switch_backend_warn`` parameter to ``matplotlib.test`` has no effect and
-is deprecated.
+The *switch_backend_warn* parameter to ``matplotlib.test`` has no effect and is
+deprecated.
 
 ``testing.jpl_units.UnitDbl.UnitDbl.checkUnits`` is deprecated.
 

@@ -1,11 +1,38 @@
-.. _toolkit_mplot3d-api:
+.. _toolkit_mplot3d-index:
+.. currentmodule:: mpl_toolkits.mplot3d
 
-***********
-mplot3d API
-***********
+************************
+``mpl_toolkits.mplot3d``
+************************
 
-.. contents::
-   :backlinks: none
+The mplot3d toolkit adds simple 3D plotting capabilities (scatter, surface,
+line, mesh, etc.) to Matplotlib by supplying an Axes object that can create
+a 2D projection of a 3D scene.  The resulting graph will have the same look
+and feel as regular 2D plots.  Not the fastest or most feature complete 3D
+library out there, but it ships with Matplotlib and thus may be a lighter
+weight solution for some use cases.
+
+See the :doc:`mplot3d tutorial </tutorials/toolkits/mplot3d>` for
+more information.
+
+.. image:: /_static/demo_mplot3d.png
+   :align: center
+
+The interactive backends also provide the ability to rotate and zoom the 3D
+scene.  One can rotate the 3D scene by simply clicking-and-dragging the scene.
+Zooming is done by right-clicking the scene and dragging the mouse up and down
+(unlike 2D plots, the toolbar zoom button is not used).
+
+.. toctree::
+   :maxdepth: 2
+
+   mplot3d/faq.rst
+
+.. note::
+   `.pyplot` cannot be used to add content to 3D plots, because its function
+   signatures are strictly 2D and cannot handle the additional information
+   needed for 3D. Instead, use the explicit API by calling the respective
+   methods on the `.Axes3D` object.
 
 .. automodule:: mpl_toolkits.mplot3d
    :no-members:
@@ -18,8 +45,7 @@ mplot3d API
 ===================================
 
 .. note::
-   Significant effort went into bringing axes3d to feature-parity with
-   regular axes objects for version 1.1.0. However, more work remains.
+   3D plotting in Matplotlib is still not as mature as the 2D case.
    Please report any functions that do not behave as expected as a bug.
    In addition, help and patches would be greatly appreciated!
 

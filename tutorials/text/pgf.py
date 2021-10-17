@@ -1,6 +1,6 @@
 r"""
 *********************************
-Typesetting With XeLaTeX/LuaLaTeX
+Typesetting with XeLaTeX/LuaLaTeX
 *********************************
 
 How to typeset text with the ``pgf`` backend in Matplotlib.
@@ -97,7 +97,7 @@ When saving to ``.pgf``, the font configuration Matplotlib used for the
 layout of the figure is included in the header of the text file.
 
 .. literalinclude:: ../../gallery/userdemo/pgf_fonts.py
-   :end-before: plt.savefig
+   :end-before: fig.savefig
 
 
 .. _pgf-preamble:
@@ -114,7 +114,7 @@ specified in the rc parameters, make sure to disable :rc:`pgf.rcfonts`.
 .. only:: html
 
     .. literalinclude:: ../../gallery/userdemo/pgf_preamble_sgskip.py
-        :end-before: plt.savefig
+        :end-before: fig.savefig
 
 .. only:: latex
 
@@ -133,7 +133,7 @@ Please note that when selecting pdflatex, the fonts and Unicode handling must
 be configured in the preamble.
 
 .. literalinclude:: ../../gallery/userdemo/pgf_texsystem.py
-   :end-before: plt.savefig
+   :end-before: fig.savefig
 
 
 .. _pgf-troubleshooting:
@@ -149,11 +149,6 @@ Troubleshooting
   to include the directories containing the latex, dvipng and ghostscript
   executables. See :ref:`environment-variables` and
   :ref:`setting-windows-environment-variables` for details.
-
-* A limitation on Windows causes the backend to keep file handles that have
-  been opened by your application open. As a result, it may not be possible
-  to delete the corresponding files until the application closes (see
-  `#1324 <https://github.com/matplotlib/matplotlib/issues/1324>`_).
 
 * Sometimes the font rendering in figures that are saved to png images is
   very bad. This happens when the pdftocairo tool is not available and
@@ -175,7 +170,7 @@ Troubleshooting
   alternatively make the fonts available to your OS. See this
   `tex.stackexchange.com question`__ for more details.
 
-  __ http://tex.stackexchange.com/questions/43642
+  __ https://tex.stackexchange.com/q/43642/
 
 * If the font configuration used by Matplotlib differs from the font setting
   in yout LaTeX document, the alignment of text elements in imported figures
@@ -187,7 +182,7 @@ Troubleshooting
   big scatter graphs.  In an extreme case this can cause TeX to run out of
   memory: "TeX capacity exceeded, sorry"  You can configure latex to increase
   the amount of memory available to generate the ``.pdf`` image as discussed on
-  `tex.stackexchange.com <http://tex.stackexchange.com/questions/7953>`_.
+  `tex.stackexchange.com <https://tex.stackexchange.com/q/7953/>`_.
   Another way would be to "rasterize" parts of the graph causing problems
   using either the ``rasterized=True`` keyword, or ``.set_rasterized(True)`` as
   per :doc:`this example </gallery/misc/rasterization_demo>`.

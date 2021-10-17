@@ -176,8 +176,7 @@ class RendererAgg
                               ColorArray &edgecolors,
                               LineWidthArray &linewidths,
                               DashesVector &linestyles,
-                              AntialiasedArray &antialiaseds,
-                              e_offset_position offset_position);
+                              AntialiasedArray &antialiaseds);
 
     template <class CoordinateArray, class OffsetArray, class ColorArray>
     void draw_quad_mesh(GCAgg &gc,
@@ -277,7 +276,6 @@ class RendererAgg
                                        LineWidthArray &linewidths,
                                        DashesVector &linestyles,
                                        AntialiasedArray &antialiaseds,
-                                       e_offset_position offset_position,
                                        bool check_snap,
                                        bool has_curves);
 
@@ -472,7 +470,7 @@ RendererAgg::draw_path(GCAgg &gc, PathIterator &path, agg::trans_affine &trans, 
 
     trans *= agg::trans_affine_scaling(1.0, -1.0);
     trans *= agg::trans_affine_translation(0.0, (double)height);
-    bool clip = !face.first && !gc.has_hatchpath() && !path.has_curves();
+    bool clip = !face.first && !gc.has_hatchpath();
     bool simplify = path.should_simplify() && clip;
     double snapping_linewidth = points_to_pixels(gc.linewidth);
     if (gc.color.a == 0.0) {
@@ -911,7 +909,6 @@ inline void RendererAgg::_draw_path_collection_generic(GCAgg &gc,
                                                        LineWidthArray &linewidths,
                                                        DashesVector &linestyles,
                                                        AntialiasedArray &antialiaseds,
-                                                       e_offset_position offset_position,
                                                        bool check_snap,
                                                        bool has_curves)
 {
@@ -969,11 +966,7 @@ inline void RendererAgg::_draw_path_collection_generic(GCAgg &gc,
             double xo = offsets(i % Noffsets, 0);
             double yo = offsets(i % Noffsets, 1);
             offset_trans.transform(&xo, &yo);
-            if (offset_position == OFFSET_POSITION_DATA) {
-                trans = agg::trans_affine_translation(xo, yo) * trans;
-            } else {
-                trans *= agg::trans_affine_translation(xo, yo);
-            }
+            trans *= agg::trans_affine_translation(xo, yo);
         }
 
         // These transformations must be done post-offsets
@@ -999,7 +992,7 @@ inline void RendererAgg::_draw_path_collection_generic(GCAgg &gc,
             }
         }
 
-        bool do_clip = !face.first && !gc.has_hatchpath() && !has_curves;
+        bool do_clip = !face.first && !gc.has_hatchpath();
 
         if (check_snap) {
             gc.isaa = antialiaseds(i % Naa);
@@ -1047,8 +1040,7 @@ inline void RendererAgg::draw_path_collection(GCAgg &gc,
                                               ColorArray &edgecolors,
                                               LineWidthArray &linewidths,
                                               DashesVector &linestyles,
-                                              AntialiasedArray &antialiaseds,
-                                              e_offset_position offset_position)
+                                              AntialiasedArray &antialiaseds)
 {
     _draw_path_collection_generic(gc,
                                   master_transform,
@@ -1064,7 +1056,6 @@ inline void RendererAgg::draw_path_collection(GCAgg &gc,
                                   linewidths,
                                   linestyles,
                                   antialiaseds,
-                                  offset_position,
                                   true,
                                   true);
 }
@@ -1160,13 +1151,6 @@ inline void RendererAgg::draw_quad_mesh(GCAgg &gc,
     array::scalar<double, 1> linewidths(gc.linewidth);
     array::scalar<uint8_t, 1> antialiaseds(antialiased);
     DashesVector linestyles;
-    ColorArray *edgecolors_ptr = &edgecolors;
-
-    if (edgecolors.size() == 0) {
-        if (antialiased) {
-            edgecolors_ptr = &facecolors;
-        }
-    }
 
     _draw_path_collection_generic(gc,
                                   master_transform,
@@ -1178,12 +1162,11 @@ inline void RendererAgg::draw_quad_mesh(GCAgg &gc,
                                   offsets,
                                   offset_trans,
                                   facecolors,
-                                  *edgecolors_ptr,
+                                  edgecolors,
                                   linewidths,
                                   linestyles,
                                   antialiaseds,
-                                  OFFSET_POSITION_FIGURE,
-                                  false,
+                                  true, // check_snap
                                   false);
 }
 

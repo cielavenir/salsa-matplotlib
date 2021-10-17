@@ -1,9 +1,9 @@
 .. _github-stats-3-3-0:
 
-GitHub Stats for Matplotlib 3.3.0
-=================================
+GitHub statistics for 3.3.0 (Jul 16, 2020)
+==========================================
 
-GitHub stats for 2020/03/03 - 2020/07/16 (tag: v3.2.0)
+GitHub statistics for 2020/03/03 (tag: v3.2.0) - 2020/07/16
 
 These lists are automatically generated, and may be incomplete or contain duplicates.
 
@@ -203,7 +203,7 @@ Pull Requests (1066):
 * :ghpull:`17795`: Backport PR #17781 on branch v3.3.x (Fix limit setting after plotting empty data)
 * :ghpull:`17764`: FIX: be more careful about not importing pyplot early
 * :ghpull:`17781`: Fix limit setting after plotting empty data
-* :ghpull:`17787`: Backport PR #17784 on branch v3.3.x (Allow passing emtpy list of ticks to FixedLocator)
+* :ghpull:`17787`: Backport PR #17784 on branch v3.3.x (Allow passing empty list of ticks to FixedLocator)
 * :ghpull:`17784`: Allow passing empty list of ticks to FixedLocator
 * :ghpull:`17766`: Backport PR #17752 on branch v3.3.x (Numpydoc-ify various functions)
 * :ghpull:`17752`: Numpydoc-ify various functions

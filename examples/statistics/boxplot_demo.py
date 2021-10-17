@@ -102,7 +102,7 @@ data = [
 ]
 
 fig, ax1 = plt.subplots(figsize=(10, 6))
-fig.canvas.set_window_title('A Boxplot Example')
+fig.canvas.manager.set_window_title('A Boxplot Example')
 fig.subplots_adjust(left=0.075, right=0.95, top=0.9, bottom=0.25)
 
 bp = ax1.boxplot(data, notch=0, sym='+', vert=1, whis=1.5)
@@ -230,3 +230,13 @@ ax.set_ylabel('response')
 plt.setp(bp['whiskers'], color='k', linestyle='-')
 plt.setp(bp['fliers'], markersize=3.0)
 plt.show()
+
+#############################################################################
+#
+# .. admonition:: References
+#
+#    The use of the following functions, methods, classes and modules is shown
+#    in this example:
+#
+#    - `matplotlib.axes.Axes.boxplot` / `matplotlib.pyplot.boxplot`
+#    - `matplotlib.artist.Artist.set` / `matplotlib.pyplot.setp`

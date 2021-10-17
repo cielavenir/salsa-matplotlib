@@ -46,10 +46,10 @@ locate your :file:`matplotlib/` configuration directory, use
     >>> mpl.get_configdir()
     '/home/darren/.config/matplotlib'
 
-On unix-like systems, this directory is generally located in your
+On Unix-like systems, this directory is generally located in your
 :envvar:`HOME` directory under the :file:`.config/` directory.
 
-In addition, users have a cache directory. On unix-like systems, this is
+In addition, users have a cache directory. On Unix-like systems, this is
 separate from the configuration directory by default. To locate your
 :file:`.cache/` directory, use :func:`matplotlib.get_cachedir`::
 
@@ -57,7 +57,7 @@ separate from the configuration directory by default. To locate your
     >>> mpl.get_cachedir()
     '/home/darren/.cache/matplotlib'
 
-On windows, both the config directory and the cache directory are
+On Windows, both the config directory and the cache directory are
 the same and are in your :file:`Documents and Settings` or :file:`Users`
 directory by default::
 
@@ -87,13 +87,13 @@ There is a good chance your question has already been asked:
 - `GitHub issues <https://github.com/matplotlib/matplotlib/issues>`_.
 
 - Stackoverflow questions tagged `matplotlib
-  <http://stackoverflow.com/questions/tagged/matplotlib>`_.
+  <https://stackoverflow.com/questions/tagged/matplotlib>`_.
 
 If you are unable to find an answer to your question through search, please
 provide the following information in your e-mail to the `mailing list
 <https://mail.python.org/mailman/listinfo/matplotlib-users>`_:
 
-* Your operating system (Linux/UNIX users: post the output of ``uname -a``).
+* Your operating system (Linux/Unix users: post the output of ``uname -a``).
 
 * Matplotlib version::
 
@@ -161,7 +161,7 @@ mode::
     rm -rf /path/to/site-packages/matplotlib*
     git clean -xdf
     git pull
-    python -mpip install -v . > build.out
+    python -m pip install -v . > build.out
     python -c "from pylab import *; set_loglevel('debug'); plot(); show()" > run.out
 
 and post :file:`build.out` and :file:`run.out` to the `matplotlib-devel

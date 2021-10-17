@@ -45,8 +45,7 @@ def plot_bar_graphs(ax, prng, min_value=5, max_value=25, nb_samples=5):
     width = 0.25
     ax.bar(x, ya, width)
     ax.bar(x + width, yb, width, color='C2')
-    ax.set_xticks(x + width)
-    ax.set_xticklabels(['a', 'b', 'c', 'd', 'e'])
+    ax.set_xticks(x + width, labels=['a', 'b', 'c', 'd', 'e'])
     return ax
 
 
@@ -137,7 +136,8 @@ if __name__ == "__main__":
 
     # Plot a demonstration figure for every available style sheet.
     for style_label in style_list:
-        with plt.style.context(style_label):
-            fig = plot_figure(style_label=style_label)
+        with plt.rc_context({"figure.max_open_warning": len(style_list)}):
+            with plt.style.context(style_label):
+                fig = plot_figure(style_label=style_label)
 
     plt.show()

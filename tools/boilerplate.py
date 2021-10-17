@@ -22,9 +22,31 @@ import textwrap
 
 # This line imports the installed copy of matplotlib, and not the local copy.
 import numpy as np
-from matplotlib import cbook, mlab
+from matplotlib import _api, mlab
 from matplotlib.axes import Axes
+from matplotlib.backend_bases import MouseButton
 from matplotlib.figure import Figure
+
+
+# we need to define a custom str because py310 change
+# In Python 3.10 the repr and str representation of Enums changed from
+#
+#  str: 'ClassName.NAME' -> 'NAME'
+#  repr: '<ClassName.NAME: value>' -> 'ClassName.NAME'
+#
+# which is more consistent with what str/repr should do, however this breaks
+# boilerplate which needs to get the ClassName.NAME version in all versions of
+# Python. Thus, we locally monkey patch our preferred str representation in
+# here.
+#
+# bpo-40066
+# https://github.com/python/cpython/pull/22392/
+def enum_str_back_compat_patch(self):
+    return f'{type(self).__name__}.{self.name}'
+
+# only monkey patch if we have to.
+if str(MouseButton.LEFT) != 'MouseButton.Left':
+    MouseButton.__str__ = enum_str_back_compat_patch
 
 
 # This is the magic line that must exist in pyplot, after which the boilerplate
@@ -57,17 +79,7 @@ def {name}{signature}:
     return gcf().{called_name}{call}
 """
 
-# Used for colormap functions
-CMAP_TEMPLATE = AUTOGEN_MSG + '''
-def {name}():
-    """
-    Set the colormap to "{name}".
-
-    This changes the default colormap as well as the colormap of the current
-    image if there is one. See ``help(colormaps)`` for more information.
-    """
-    set_cmap("{name}")
-'''
+CMAP_TEMPLATE = "def {name}(): set_cmap({name!r})\n"  # Colormap functions.
 
 
 class value_formatter:
@@ -84,8 +96,8 @@ class value_formatter:
             self._repr = "mlab.window_hanning"
         elif value is np.mean:
             self._repr = "np.mean"
-        elif value is cbook.deprecation._deprecated_parameter:
-            self._repr = "cbook.deprecation._deprecated_parameter"
+        elif value is _api.deprecation._deprecated_parameter:
+            self._repr = "_api.deprecation._deprecated_parameter"
         elif isinstance(value, Enum):
             # Enum str is Class.Name whereas their repr is <Class.Name: value>.
             self._repr = str(value)
@@ -126,7 +138,13 @@ def generate_function(name, called_fullname, template, **kwargs):
     class_name, called_name = called_fullname.split('.')
     class_ = {'Axes': Axes, 'Figure': Figure}[class_name]
 
-    signature = inspect.signature(getattr(class_, called_name))
+    meth = getattr(class_, called_name)
+    decorator = _api.deprecation.DECORATORS.get(meth)
+    # Generate the wrapper with the non-kwonly signature, as it will get
+    # redecorated with make_keyword_only by _copy_docstring_and_deprecators.
+    if decorator and decorator.func is _api.make_keyword_only:
+        meth = meth.__wrapped__
+    signature = inspect.signature(meth)
     # Replace self argument.
     params = list(signature.parameters.values())[1:]
     signature = str(signature.replace(parameters=[
@@ -190,6 +208,7 @@ def boilerplate_gen():
         'ginput',
         'subplots_adjust',
         'suptitle',
+        'tight_layout',
         'waitforbuttonpress',
     )
 
@@ -209,9 +228,9 @@ def boilerplate_gen():
         'bar',
         'barbs',
         'barh',
+        'bar_label',
         'boxplot',
         'broken_barh',
-        'cla',
         'clabel',
         'cohere',
         'contour',
@@ -225,6 +244,7 @@ def boilerplate_gen():
         'grid',
         'hexbin',
         'hist',
+        'stairs',
         'hist2d',
         'hlines',
         'imshow',
@@ -310,6 +330,8 @@ def boilerplate_gen():
         yield generate_function(name, f'Axes.{called_name}', template,
                                 sci_command=cmappable.get(name))
 
+    yield AUTOGEN_MSG
+    yield '\n'
     cmaps = (
         'autumn',
         'bone',
@@ -335,7 +357,7 @@ def boilerplate_gen():
     for name in cmaps:
         yield CMAP_TEMPLATE.format(name=name)
 
-    yield '\n'
+    yield '\n\n'
     yield '_setup_pyplot_info_docstrings()'
 
 

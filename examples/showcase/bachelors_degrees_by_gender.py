@@ -8,6 +8,11 @@ styling of plot frame, tick lines and labels, and line graph properties.
 
 Also demonstrates the custom placement of text labels along the right edge
 as an alternative to a conventional legend.
+
+Note: The third-party mpl style dufte_ produces similar-looking plots with
+less code.
+
+.. _dufte: https://github.com/nschloe/dufte
 """
 
 import numpy as np
@@ -32,15 +37,12 @@ ax.set_prop_cycle(color=[
     '#17becf', '#9edae5'])
 
 # Remove the plot frame lines. They are unnecessary here.
-ax.spines['top'].set_visible(False)
-ax.spines['bottom'].set_visible(False)
-ax.spines['right'].set_visible(False)
-ax.spines['left'].set_visible(False)
+ax.spines[:].set_visible(False)
 
 # Ensure that the axis ticks only show up on the bottom and left of the plot.
 # Ticks on the right and top of the plot are generally unnecessary.
-ax.get_xaxis().tick_bottom()
-ax.get_yaxis().tick_left()
+ax.xaxis.tick_bottom()
+ax.yaxis.tick_left()
 
 fig.subplots_adjust(left=.06, right=.75, bottom=.02, top=.94)
 # Limit the range of the plot to only where the data is.
@@ -117,19 +119,15 @@ plt.show()
 
 #############################################################################
 #
-# ------------
+# .. admonition:: References
 #
-# References
-# """"""""""
+#    The use of the following functions, methods, classes and modules is shown
+#    in this example:
 #
-# The use of the following functions, methods, classes and modules is shown
-# in this example:
-
-import matplotlib
-matplotlib.pyplot.subplots
-matplotlib.axes.Axes.text
-matplotlib.axis.Axis.set_major_formatter
-matplotlib.axis.XAxis.tick_bottom
-matplotlib.axis.YAxis.tick_left
-matplotlib.artist.Artist.set_visible
-matplotlib.ticker.StrMethodFormatter
+#    - `matplotlib.pyplot.subplots`
+#    - `matplotlib.axes.Axes.text`
+#    - `matplotlib.axis.Axis.set_major_formatter`
+#    - `matplotlib.axis.XAxis.tick_bottom`
+#    - `matplotlib.axis.YAxis.tick_left`
+#    - `matplotlib.artist.Artist.set_visible`
+#    - `matplotlib.ticker.StrMethodFormatter`

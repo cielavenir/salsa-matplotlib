@@ -50,7 +50,8 @@ def _get_xdg_cache_dir():
     """
     Return the XDG cache directory.
 
-    See https://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html
+    See
+    https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
     """
     cache_dir = os.environ.get("XDG_CACHE_HOME")
     if not cache_dir:
@@ -62,6 +63,11 @@ def _get_xdg_cache_dir():
 
 if __name__ == "__main__":
     data = {
+        "v3.4.3": "5194481",
+        "v3.4.2": "4743323",
+        "v3.4.1": "4649959",
+        "v3.4.0": "4638398",
+        "v3.3.4": "4475376",
         "v3.3.3": "4268928",
         "v3.3.2": "4030140",
         "v3.3.1": "3984190",

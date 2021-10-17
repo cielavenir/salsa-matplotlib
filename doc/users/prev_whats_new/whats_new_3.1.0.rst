@@ -1,6 +1,7 @@
+.. _whats-new-3-1-0:
 
-What's new in Matplotlib 3.1
-============================
+What's new in Matplotlib 3.1 (May 18, 2019)
+===========================================
 
 For a list of all of the issues and pull requests since the last
 revision, see the :ref:`github-stats`.
@@ -130,10 +131,10 @@ now directly forwards to the visibility of the underlying Rectangle artist
 
 Matplotlib uses Pillow to handle saving to the JPEG and TIFF formats.  The
 `~.Figure.savefig()` function gained a *pil_kwargs* keyword argument, which can
-be used to forward arguments to Pillow's `pillow.Image.save()`.
+be used to forward arguments to Pillow's `PIL.Image.Image.save`.
 
 The *pil_kwargs* argument can also be used when saving to PNG.  In that case,
-Matplotlib also uses Pillow's `pillow.Image.save()` instead of going through its
+Matplotlib also uses Pillow's `PIL.Image.Image.save` instead of going through its
 own builtin PNG support.
 
 
@@ -168,7 +169,7 @@ Return type of ArtistInspector.get_aliases changed
 was used to simulate a set in earlier versions of Python.  It has now been
 replaced by a set, i.e. ``{fullname: {alias1, alias2, ...}}``.
 
-This value is also stored in `.ArtistInspector.aliasd`, which has likewise
+This value is also stored in ``ArtistInspector.aliasd``, which has likewise
 changed.
 
 
@@ -176,7 +177,7 @@ changed.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Alternatively to strings like ``"data"`` or ``"axes fraction"``,
-`ConnectionPatch` now accepts any `~matplotlib.transforms.Transform` as input
+`.ConnectionPatch` now accepts any `~matplotlib.transforms.Transform` as input
 for the *coordsA* and *coordsB* arguments. This allows to draw lines between
 points defined in different user defined coordinate systems. Also see the
 :doc:`Connect Simple01 example </gallery/userdemo/connect_simple01>`.
@@ -332,7 +333,7 @@ were previously displayed as ``1e+04``.
 MouseEvent button attribute is now an IntEnum
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The :attr:`button` attribute of `~.MouseEvent` instances can take the values
+The ``button`` attribute of `~.MouseEvent` instances can take the values
 None, 1 (left button), 2 (middle button), 3 (right button), "up" (scroll), and
 "down" (scroll).  For better legibility, the 1, 2, and 3 values are now
 represented using the `enum.IntEnum` class `matplotlib.backend_bases.MouseButton`,

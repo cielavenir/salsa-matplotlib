@@ -2,9 +2,9 @@
 
 .. _mpl-shell:
 
-=====================
- Interactive Figures
-=====================
+===================
+Interactive figures
+===================
 
 .. toctree::
 
@@ -63,15 +63,16 @@ it also ensures that the GUI toolkit event loop is properly integrated
 with the command line (see :ref:`cp_integration`).
 
 In this example, we create and modify a figure via an IPython prompt.
-The figure displays in a Qt5Agg GUI window. To configure the integration
+The figure displays in a QtAgg GUI window. To configure the integration
 and enable :ref:`interactive mode <controlling-interactive>` use the
 ``%matplotlib`` magic:
 
 .. highlight:: ipython
 
 ::
+
    In [1]: %matplotlib
-   Using matplotlib backend: Qt5Agg
+   Using matplotlib backend: QtAgg
 
    In [2]: import matplotlib.pyplot as plt
 
@@ -152,9 +153,11 @@ If in interactive mode:
 If not in interactive mode:
 
 - newly created figures and changes to figures are not displayed until
-   * `.pyplot.show()` is called
-   * `.pyplot.pause()` is called
-   * `.FigureCanvasBase.flush_events()` is called
+
+  * `.pyplot.show()` is called
+  * `.pyplot.pause()` is called
+  * `.FigureCanvasBase.flush_events()` is called
+
 - `pyplot.show()` runs the GUI event loop and does not return until all the plot windows are closed
 
 If you are in non-interactive mode (or created figures while in
@@ -200,12 +203,12 @@ helpful keybindings are registered by default.
 
 .. _key-event-handling:
 
-Navigation Keyboard Shortcuts
+Navigation keyboard shortcuts
 -----------------------------
 
 The following table holds all the default keys, which can be
-overwritten by use of your :ref:`matplotlibrc
-<sphx_glr_tutorials_introductory_customizing.py>`.
+overwritten by use of your :doc:`matplotlibrc
+</tutorials/introductory/customizing>`.
 
 ================================== ===============================
 Command                            Default key binding and rcParam
@@ -248,8 +251,8 @@ documentation of your GUI toolkit for details.
 
 
 
-Jupyter Notebooks / Lab
------------------------
+Jupyter Notebooks / JupyterLab
+------------------------------
 
 .. note::
 

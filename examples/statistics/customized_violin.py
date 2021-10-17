@@ -3,12 +3,11 @@
 Violin plot customization
 =========================
 
-This example demonstrates how to fully customize violin plots.
-The first plot shows the default style by providing only
-the data. The second plot first limits what matplotlib draws
-with additional kwargs. Then a simplified representation of
-a box plot is drawn on top. Lastly, the styles of the artists
-of the violins are modified.
+This example demonstrates how to fully customize violin plots. The first plot
+shows the default style by providing only the data. The second plot first
+limits what Matplotlib draws with additional keyword arguments. Then a
+simplified representation of a box plot is drawn on top. Lastly, the styles of
+the artists of the violins are modified.
 
 For more information on violin plots, the scikit-learn docs have a great
 section: https://scikit-learn.org/stable/modules/density.html
@@ -28,10 +27,9 @@ def adjacent_values(vals, q1, q3):
 
 
 def set_axis_style(ax, labels):
-    ax.get_xaxis().set_tick_params(direction='out')
+    ax.xaxis.set_tick_params(direction='out')
     ax.xaxis.set_ticks_position('bottom')
-    ax.set_xticks(np.arange(1, len(labels) + 1))
-    ax.set_xticklabels(labels)
+    ax.set_xticks(np.arange(1, len(labels) + 1), labels=labels)
     ax.set_xlim(0.25, len(labels) + 0.75)
     ax.set_xlabel('Sample name')
 
@@ -74,3 +72,13 @@ for ax in [ax1, ax2]:
 
 plt.subplots_adjust(bottom=0.15, wspace=0.05)
 plt.show()
+
+#############################################################################
+#
+# .. admonition:: References
+#
+#    The use of the following functions, methods, classes and modules is shown
+#    in this example:
+#
+#    - `matplotlib.axes.Axes.violinplot` / `matplotlib.pyplot.violinplot`
+#    - `matplotlib.axes.Axes.vlines` / `matplotlib.pyplot.vlines`
