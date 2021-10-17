@@ -8,7 +8,7 @@ Subject: disable intersphinx
 
 --- a/doc/conf.py
 +++ b/doc/conf.py
-@@ -118,15 +118,6 @@ missing_references_write_json = False
+@@ -152,15 +152,6 @@ missing_references_write_json = False
  missing_references_warn_unused_ignores = False
  
  intersphinx_mapping = {

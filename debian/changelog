@@ -1,8 +1,10 @@
 matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
 
   * New upstream release candidate
+  * debian/patches/
+    - refresh, remove outdated patches
 
- -- Sandro Tosi <morph@debian.org>  Sat, 16 Oct 2021 22:37:42 -0400
+ -- Sandro Tosi <morph@debian.org>  Sun, 17 Oct 2021 00:20:01 -0400
 
 matplotlib (3.3.4-2) unstable; urgency=medium
 

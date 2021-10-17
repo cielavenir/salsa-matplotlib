@@ -11,20 +11,20 @@ Patch-Name: 20_matplotlibrc_path_search_fix.patch
 
 --- a/lib/matplotlib/__init__.py
 +++ b/lib/matplotlib/__init__.py
-@@ -540,6 +540,8 @@ def _get_data_path():
-     if path.is_dir():
-         return str(path)
- 
+@@ -524,7 +524,7 @@ def get_cachedir():
+ @_logged_cached('matplotlib data path: %s')
+ def get_data_path():
+     """Return the path to Matplotlib data."""
+-    return str(Path(__file__).with_name("mpl-data"))
 +    return '/usr/share/matplotlib/mpl-data'
-+
-     cbook.warn_deprecated(
-         "3.2", message="Matplotlib installs where the data is not in the "
-         "mpl-data subdirectory of the package are deprecated since %(since)s "
-@@ -597,7 +599,7 @@ def matplotlib_fname():
+ 
+ 
+ def matplotlib_fname():
+@@ -562,7 +562,7 @@ def matplotlib_fname():
              yield matplotlibrc
              yield os.path.join(matplotlibrc, 'matplotlibrc')
          yield os.path.join(get_configdir(), 'matplotlibrc')
--        yield os.path.join(_get_data_path(), 'matplotlibrc')
+-        yield os.path.join(get_data_path(), 'matplotlibrc')
 +        yield '/etc/matplotlibrc'
  
      for fname in gen_candidates():
