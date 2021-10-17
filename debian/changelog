@@ -5,8 +5,10 @@ matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
     - refresh, remove outdated patches
   * debian/patches/fake-setutools-scm.patch
     - fake setuptools_scm, creating the same file it would
+  * debian/control
+    - add setuptools-scm, setuptools-scm-git-archive to b-d, needed by setup.py
 
- -- Sandro Tosi <morph@debian.org>  Sun, 17 Oct 2021 00:35:00 -0400
+ -- Sandro Tosi <morph@debian.org>  Sun, 17 Oct 2021 01:14:43 -0400
 
 matplotlib (3.3.4-2) unstable; urgency=medium
 
