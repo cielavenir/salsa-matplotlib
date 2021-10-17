@@ -30,7 +30,7 @@ build-arch: build-arch-stamp
 build-arch-stamp:
 	dh_testdir
 
-	cp -f debian/setup.cfg setup.cfg
+	cp -f debian/mplsetup.cfg mplsetup.cfg
 
 	set -e; \
 	for v in $(PY3VERS); do \
