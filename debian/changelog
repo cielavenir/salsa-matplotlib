@@ -8,10 +8,12 @@ matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
   * debian/control
     - add setuptools-scm, setuptools-scm-git-archive to b-d, needed by setup.py
     - replace transitional pkg ttf-staypuft with fonts-staypuft; Closes: #987629
+    - replace obsolete ttf-bitstream-vera with fonts-dejavu-core;
+      Closes: #985559
   * rename setup.cfg to the new filename, mplsetup.cfg
   * use the system-available libqhull during build
 
- -- Sandro Tosi <morph@debian.org>  Sun, 17 Oct 2021 21:33:22 -0400
+ -- Sandro Tosi <morph@debian.org>  Sun, 17 Oct 2021 21:44:44 -0400
 
 matplotlib (3.3.4-2) unstable; urgency=medium
 

@@ -12,8 +12,8 @@ Build-Depends: cm-super-minimal <!nodoc>,
                graphviz,
                inkscape [!kfreebsd-amd64],
                libfreetype6-dev,
-               libqhull-dev,
                libpng-dev,
+               libqhull-dev,
                locales-all,
                optipng <!nodoc>,
                python3-all-dev,
@@ -78,6 +78,7 @@ Recommends: python3-pil,
 Enhances: ipython3,
 Suggests: dvipng,
           ffmpeg,
+          fonts-staypuft,
           ghostscript,
           gir1.2-gtk-3.0,
           inkscape,
@@ -95,7 +96,6 @@ Suggests: dvipng,
           python3-tornado,
           texlive-extra-utils,
           texlive-latex-extra,
-          fonts-staypuft,
 Description: Python based plotting system in a style similar to Matlab (Python 3)
  Matplotlib is a pure Python plotting library designed to bring
  publication quality plotting to Python with a syntax familiar to
@@ -107,8 +107,8 @@ Description: Python based plotting system in a style similar to Matlab (Python 3
 
 Package: python-matplotlib-data
 Architecture: all
-Depends: fonts-lyx,
-         ttf-bitstream-vera,
+Depends: fonts-dejavu-core,
+         fonts-lyx,
          ${misc:Depends},
 Description: Python based plotting system (data package)
  Matplotlib is a pure Python plotting library designed to bring
@@ -124,7 +124,7 @@ Architecture: all
 Section: doc
 Depends: libjs-jquery,
          ${misc:Depends},
-	 ${sphinxdoc:Depends}
+         ${sphinxdoc:Depends},
 Description: Python based plotting system (documentation package)
  Matplotlib is a pure Python plotting library designed to bring
  publication quality plotting to Python with a syntax familiar to
