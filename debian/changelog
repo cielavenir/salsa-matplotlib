@@ -1,6 +1,6 @@
 matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
 
-  * New upstream release candidate
+  * New upstream release candidate; Closes: #994533
   * debian/patches/
     - refresh, remove outdated patches
   * debian/patches/fake-setutools-scm.patch
