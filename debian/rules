@@ -74,8 +74,8 @@ clean:
 
 	find . -name '*.pyc' -exec rm {} \;
 
-	dh_clean lib/matplotlib/mpl-data/matplotlib.conf \
-		lib/matplotlib/mpl-data/matplotlibrc setup.cfg
+	#dh_clean lib/matplotlib/mpl-data/matplotlib.conf \
+	#	lib/matplotlib/mpl-data/matplotlibrc setup.cfg
 	rm -rf build
 	rm -rf lib/matplotlib.egg-info
 
