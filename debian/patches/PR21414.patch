@@ -1,0 +1,45 @@
+From e799ffb445a984230a459328a1fe1c95244bcc7c Mon Sep 17 00:00:00 2001
+From: Antony Lee <anntzer.lee@gmail.com>
+Date: Thu, 21 Oct 2021 11:33:05 +0200
+Subject: [PATCH] Support pathological tmpdirs in TexManager.
+
+tex does not support paths that contain tildes, and tmpdir may be such a
+path.  Fortunately, we can arrange to refer to paths relatively instead.
+
+No test, as that would involve setting up another MPLCONFIGDIR just for
+that purpose, which is rather costly as we'd need to regen the font
+cache for it.  But one can try e.g.
+```
+MPLCONFIGDIR=/tmp/has~tilde python -c 'from pylab import *; figtext(.5, .5, "a", usetex=True); show()'
+```
+---
+ lib/matplotlib/texmanager.py | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/lib/matplotlib/texmanager.py b/lib/matplotlib/texmanager.py
+index b61e8b7acff..62aca98a32b 100644
+--- a/lib/matplotlib/texmanager.py
++++ b/lib/matplotlib/texmanager.py
+@@ -258,16 +258,19 @@ def make_dvi(self, tex, fontsize):
+         basefile = self.get_basefile(tex, fontsize)
+         dvifile = '%s.dvi' % basefile
+         if not os.path.exists(dvifile):
+-            texfile = self.make_tex(tex, fontsize)
++            texfile = Path(self.make_tex(tex, fontsize))
+             # Generate the dvi in a temporary directory to avoid race
+             # conditions e.g. if multiple processes try to process the same tex
+             # string at the same time.  Having tmpdir be a subdirectory of the
+             # final output dir ensures that they are on the same filesystem,
+-            # and thus replace() works atomically.
++            # and thus replace() works atomically.  It also allows referring to
++            # the texfile with a relative path (for pathological MPLCONFIGDIRs,
++            # the absolute path may contain characters (e.g. ~) that TeX does
++            # not support.)
+             with TemporaryDirectory(dir=Path(dvifile).parent) as tmpdir:
+                 self._run_checked_subprocess(
+                     ["latex", "-interaction=nonstopmode", "--halt-on-error",
+-                     texfile], tex, cwd=tmpdir)
++                     f"../{texfile.name}"], tex, cwd=tmpdir)
+                 (Path(tmpdir) / Path(dvifile).name).replace(dvifile)
+         return dvifile
+ 
