@@ -11,8 +11,8 @@ matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
     - replace obsolete ttf-bitstream-vera with fonts-dejavu-core;
       Closes: #985559
     - add pil.imagetk to b-d, needed by tests
-    - add ffmpeg, fonts-comic-neue, fonts-humor-sans, fonttools to b-d, needed
-      by doc
+    - add ffmpeg, fonts-comic-neue, fonts-humor-sans, fonttools,
+      pydata-sphinx-theme to b-d, needed by doc
   * rename setup.cfg to the new filename, mplsetup.cfg
   * use the system-available libqhull during build
   * debian/riles
@@ -20,7 +20,7 @@ matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
   * debian/patches/PR21414.patch
     - fix doc build with a basedir containing a ~, like in Debian's RC releases
 
- -- Sandro Tosi <morph@debian.org>  Thu, 21 Oct 2021 22:16:50 -0400
+ -- Sandro Tosi <morph@debian.org>  Sat, 23 Oct 2021 23:07:57 -0400
 
 matplotlib (3.3.4-2) unstable; urgency=medium
 
