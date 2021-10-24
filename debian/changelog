@@ -13,6 +13,7 @@ matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
     - add pil.imagetk to b-d, needed by tests
     - add ffmpeg, fonts-comic-neue, fonts-humor-sans, fonttools,
       pydata-sphinx-theme to b-d, needed by doc
+    - drop nose, no longer needed (see #997758)
   * rename setup.cfg to the new filename, mplsetup.cfg
   * use the system-available libqhull during build
   * debian/rules
@@ -27,7 +28,7 @@ matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
   * debian/python-matplotlib-data.install
     - update locationfor default matplotlibrc location
 
- -- Sandro Tosi <morph@debian.org>  Sat, 23 Oct 2021 23:12:55 -0400
+ -- Sandro Tosi <morph@debian.org>  Sun, 24 Oct 2021 14:24:39 -0400
 
 matplotlib (3.3.4-2) unstable; urgency=medium
 
