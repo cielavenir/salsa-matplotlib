@@ -21,8 +21,10 @@ matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
     - fix doc build with a basedir containing a ~, like in Debian's RC releases
   * debian/patches/20_matplotlibrc_path_search_fix.patch
     - handle date directory location both during build and at runtime
+  * debian/patches/docs-no-sphinx-panel.patch
+    - temporarily remove sphinx-panels extension
 
- -- Sandro Tosi <morph@debian.org>  Sat, 23 Oct 2021 23:09:07 -0400
+ -- Sandro Tosi <morph@debian.org>  Sat, 23 Oct 2021 23:10:03 -0400
 
 matplotlib (3.3.4-2) unstable; urgency=medium
 

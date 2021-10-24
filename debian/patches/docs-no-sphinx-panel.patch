@@ -1,0 +1,10 @@
+--- a/doc/conf.py
++++ b/doc/conf.py
+@@ -77,7 +77,6 @@ extensions = [
+     'sphinxext.skip_deprecated',
+     'sphinxext.redirect_from',
+     'sphinx_copybutton',
+-    'sphinx_panels',
+ ]
+ 
+ exclude_patterns = [
