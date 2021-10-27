@@ -1,4 +1,4 @@
-matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
+matplotlib (3.5.0~rc1-1) experimental; urgency=medium
 
   * New upstream release candidate; Closes: #994533
   * debian/patches/
@@ -31,7 +31,7 @@ matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
   * debian/python-matplotlib-data.install
     - update locationfor default matplotlibrc location
 
- -- Sandro Tosi <morph@debian.org>  Wed, 27 Oct 2021 01:42:29 -0400
+ -- Sandro Tosi <morph@debian.org>  Wed, 27 Oct 2021 01:43:15 -0400
 
 matplotlib (3.3.4-2) unstable; urgency=medium
 
