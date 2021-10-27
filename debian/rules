@@ -144,6 +144,8 @@ install-indep: build-indep
 	dh_testroot -i
 	dh_prep
 	dh_install -p $(pdata)
+	# set the default backend
+	sed -i '/backend:/s/.*/backend: TkAgg/' debian/python-matplotlib-data//etc/matplotlibrc
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/Vera*.ttf
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/*.TXT
 	rm -fr $(CURDIR)/debian/$(pdata)/usr/share/matplotlib/mpl-data/fonts/ttf/local.conf

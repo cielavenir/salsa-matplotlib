@@ -15,6 +15,7 @@ matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
       pydata-sphinx-theme to b-d, needed by doc
     - drop nose, no longer needed (see #997758)
     - add pil.imagetk to python3-matplotlib recommends, needed by TkAgg backend
+    - set TkAgg as default backend in /etc/matplotlibrc
   * rename setup.cfg to the new filename, mplsetup.cfg
   * use the system-available libqhull during build
   * debian/rules
@@ -30,7 +31,7 @@ matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
   * debian/python-matplotlib-data.install
     - update locationfor default matplotlibrc location
 
- -- Sandro Tosi <morph@debian.org>  Wed, 27 Oct 2021 00:12:04 -0400
+ -- Sandro Tosi <morph@debian.org>  Wed, 27 Oct 2021 01:42:29 -0400
 
 matplotlib (3.3.4-2) unstable; urgency=medium
 
