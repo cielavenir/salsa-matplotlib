@@ -19,6 +19,7 @@ matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
   * debian/rules
     - skip removing some of upstream config files, setup.cfg and matplotlibrc
     - set HOME to a writable location during doc build
+    - manually copy clipboard.js
   * debian/patches/PR21414.patch
     - fix doc build with a basedir containing a ~, like in Debian's RC releases
   * debian/patches/20_matplotlibrc_path_search_fix.patch
@@ -28,7 +29,7 @@ matplotlib (3.5.0~rc1-1) UNRELEASED; urgency=medium
   * debian/python-matplotlib-data.install
     - update locationfor default matplotlibrc location
 
- -- Sandro Tosi <morph@debian.org>  Sun, 24 Oct 2021 14:24:39 -0400
+ -- Sandro Tosi <morph@debian.org>  Tue, 26 Oct 2021 23:30:17 -0400
 
 matplotlib (3.3.4-2) unstable; urgency=medium
 

@@ -22,6 +22,7 @@ build-indep-stamp: build-arch-stamp
 	dh_testdir
 
 	# build the doc
+	ln -s  /usr/share/javascript/clipboard.js/clipboard.js doc/_static/clipboard.min.js
 	MPLCONFIGDIR=. MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ PYTHONPATH=$(CURDIR)/build/lib.$(PY_PLATFORM)-$(DEFPY3) HOME=/tmp xvfb-run -a $(MAKE) -C doc html
 
 	touch $@
@@ -39,7 +40,6 @@ build-arch-stamp:
 
 ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 	echo "backend      : TkAgg" > matplotlibrc
-
 	-for v in $(PY3VERS); do \
 		LIB=$$(python$$v -c "from distutils.command.build import build ; from distutils.core import Distribution ; b = build(Distribution()) ; b.finalize_options() ; print(b.build_platlib)") ; \
 		PYTHONPATH=$$LIB MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ MPLCONFIGDIR=. xvfb-run -a python$$v tests.py --verbose --full-trace ; \
@@ -159,6 +159,7 @@ binary-indep: build-indep install-indep
 	# remove pyc file from doc
 	dh_installexamples -p$(pd) -i examples/*
 	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js -X.py -Xobjects.inv -X.html
+	ln -s /usr/share/javascript/clipboard.js/clipboard.js debian/python-matplotlib-doc/usr/share/doc/python-matplotlib-doc/html/_static/clipboard.min.js
 	dh_link -i
 	dh_sphinxdoc
 	find $(CURDIR)/debian/$(pd)/ -type f -name '*.pyc' | xargs --no-run-if-empty rm
