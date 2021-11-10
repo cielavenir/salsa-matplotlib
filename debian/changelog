@@ -1,4 +1,4 @@
-matplotlib (3.5.0~rc1-2) UNRELEASED; urgency=medium
+matplotlib (3.5.0~rc1-2) experimental; urgency=medium
 
   * debian/copyright
     - remove stanzas for files no longer in upstream tarball
@@ -6,7 +6,7 @@ matplotlib (3.5.0~rc1-2) UNRELEASED; urgency=medium
     - install plot_directive in mpl-data, needed by
       matplotlib.sphinxext.plot_directive
 
- -- Sandro Tosi <morph@debian.org>  Tue, 09 Nov 2021 23:27:31 -0500
+ -- Sandro Tosi <morph@debian.org>  Tue, 09 Nov 2021 23:53:58 -0500
 
 matplotlib (3.5.0~rc1-1) experimental; urgency=medium
 
