@@ -2,8 +2,11 @@ matplotlib (3.5.0~rc1-2) UNRELEASED; urgency=medium
 
   * debian/copyright
     - remove stanzas for files no longer in upstream tarball
+  * debian/python-matplotlib-data.install
+    - install plot_directive in mpl-data, needed by
+      matplotlib.sphinxext.plot_directive
 
- -- Sandro Tosi <morph@debian.org>  Tue, 09 Nov 2021 22:58:40 -0500
+ -- Sandro Tosi <morph@debian.org>  Tue, 09 Nov 2021 23:27:31 -0500
 
 matplotlib (3.5.0~rc1-1) experimental; urgency=medium
 

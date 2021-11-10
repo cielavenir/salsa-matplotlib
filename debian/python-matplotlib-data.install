@@ -5,3 +5,4 @@ lib/matplotlib/mpl-data/matplotlibrc /etc/
 lib/matplotlib/mpl-data/matplotlibrc /usr/share/matplotlib/mpl-data/
 lib/matplotlib/mpl-data/sample_data/ /usr/share/matplotlib/
 lib/matplotlib/mpl-data/stylelib/ /usr/share/matplotlib/mpl-data/
+lib/matplotlib/mpl-data/plot_directive/ /usr/share/matplotlib/mpl-data/
