@@ -1253,10 +1253,11 @@ class Axes(_AxesBase):
         --------
         .. plot:: gallery/lines_bars_and_markers/eventplot_demo.py
         """
-        # We do the conversion first since not all unitized data is uniform
-        positions, lineoffsets, linelengths = self._process_unit_info(
-            [("x", positions), ("y", lineoffsets), ("y", linelengths)], kwargs)
 
+        lineoffsets, linelengths = self._process_unit_info(
+                [("y", lineoffsets), ("y", linelengths)], kwargs)
+
+        # fix positions, noting that it can be a list of lists:
         if not np.iterable(positions):
             positions = [positions]
         elif any(np.iterable(position) for position in positions):
@@ -1266,6 +1267,11 @@ class Axes(_AxesBase):
 
         if len(positions) == 0:
             return []
+
+        poss = []
+        for position in positions:
+            poss += self._process_unit_info([("x", position)], kwargs)
+        positions = poss
 
         # prevent 'singular' keys from **kwargs dict from overriding the effect
         # of 'plural' keyword arguments (e.g. 'color' overriding 'colors')
@@ -4308,9 +4314,7 @@ default: :rc:`scatter.edgecolors`
 
         """
         # Process **kwargs to handle aliases, conflicts with explicit kwargs:
-
         x, y = self._process_unit_info([("x", x), ("y", y)], kwargs)
-
         # np.ma.ravel yields an ndarray, not a masked array,
         # unless its argument is a masked array.
         x = np.ma.ravel(x)
@@ -5629,9 +5633,8 @@ default: :rc:`scatter.edgecolors`
             expanded as needed into the appropriate 2D arrays, making a
             rectangular grid.
 
-        shading : {'flat', 'nearest', 'auto'}, optional
-            The fill style for the quadrilateral; defaults to 'flat' or
-            :rc:`pcolor.shading`. Possible values:
+        shading : {'flat', 'nearest', 'auto'}, default: :rc:`pcolor.shading`
+            The fill style for the quadrilateral. Possible values:
 
             - 'flat': A solid color is used for each quad. The color of the
               quad (i, j), (i+1, j), (i, j+1), (i+1, j+1) is given by
@@ -6016,9 +6019,10 @@ default: :rc:`scatter.edgecolors`
         # convert to one dimensional array
         C = C.ravel()
 
-        snap = kwargs.get('snap', rcParams['pcolormesh.snap'])
+        kwargs.setdefault('snap', rcParams['pcolormesh.snap'])
+
         collection = mcoll.QuadMesh(
-            coords, antialiased=antialiased, shading=shading, snap=snap,
+            coords, antialiased=antialiased, shading=shading,
             array=C, cmap=cmap, norm=norm, alpha=alpha, **kwargs)
         collection._scale_norm(norm, vmin, vmax)
         self._pcolor_grid_deprecation_helper()

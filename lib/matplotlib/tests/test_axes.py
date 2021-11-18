@@ -1249,22 +1249,23 @@ def test_pcolorflaterror():
         ax.pcolormesh(x, y, Z, shading='flat')
 
 
+@pytest.mark.parametrize('snap', [False, True])
 @check_figures_equal(extensions=["png"])
-def test_pcolorauto(fig_test, fig_ref):
+def test_pcolorauto(fig_test, fig_ref, snap):
     ax = fig_test.subplots()
     x = np.arange(0, 10)
     y = np.arange(0, 4)
     np.random.seed(19680801)
     Z = np.random.randn(3, 9)
     # this is the same as flat; note that auto is default
-    ax.pcolormesh(x, y, Z)
+    ax.pcolormesh(x, y, Z, snap=snap)
 
     ax = fig_ref.subplots()
     # specify the centers
     x2 = x[:-1] + np.diff(x) / 2
     y2 = y[:-1] + np.diff(y) / 2
     # this is same as nearest:
-    ax.pcolormesh(x2, y2, Z)
+    ax.pcolormesh(x2, y2, Z, snap=snap)
 
 
 @image_comparison(['canonical'])
@@ -4113,6 +4114,21 @@ def test_eventplot_orientation(data, orientation):
     fig, ax = plt.subplots(1, 1)
     ax.eventplot(data, **opts)
     plt.draw()
+
+
+@check_figures_equal(extensions=['png'])
+def test_eventplot_units_list(fig_test, fig_ref):
+    # test that list of lists converted properly:
+    ts_1 = [datetime.datetime(2021, 1, 1), datetime.datetime(2021, 1, 2),
+            datetime.datetime(2021, 1, 3)]
+    ts_2 = [datetime.datetime(2021, 1, 15), datetime.datetime(2021, 1, 16)]
+
+    ax = fig_ref.subplots()
+    ax.eventplot(ts_1, lineoffsets=0)
+    ax.eventplot(ts_2, lineoffsets=1)
+
+    ax = fig_test.subplots()
+    ax.eventplot([ts_1, ts_2])
 
 
 @image_comparison(['marker_styles.png'], remove_text=True)

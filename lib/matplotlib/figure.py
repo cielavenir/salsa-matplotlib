@@ -317,9 +317,7 @@ class FigureBase(Artist):
         return inside, {}
 
     def get_window_extent(self, *args, **kwargs):
-        """
-        Return the figure bounding box in display space. Arguments are ignored.
-        """
+        # docstring inherited
         return self.bbox
 
     def _suplabels(self, t, info, **kwargs):
@@ -1595,7 +1593,10 @@ default: %(va)s
 
     def get_tightbbox(self, renderer, bbox_extra_artists=None):
         """
-        Return a (tight) bounding box of the figure in inches.
+        Return a (tight) bounding box of the figure *in inches*.
+
+        Note that `.FigureBase` differs from all other artists, which return
+        their `.Bbox` in pixels.
 
         Artists that have ``artist.set_in_layout(False)`` are not included
         in the bbox.
@@ -1908,10 +1909,10 @@ default: %(va)s
         for ax in ret.values():
             if sharex:
                 ax.sharex(ax0)
-                ax._label_outer_xaxis()
+                ax._label_outer_xaxis(check_patch=True)
             if sharey:
                 ax.sharey(ax0)
-                ax._label_outer_yaxis()
+                ax._label_outer_yaxis(check_patch=True)
         for k, ax in ret.items():
             if isinstance(k, str):
                 ax.set_label(k)
@@ -2656,10 +2657,9 @@ class Figure(FigureBase):
         if forward:
             canvas = getattr(self, 'canvas')
             if canvas is not None:
-                dpi_ratio = getattr(canvas, '_dpi_ratio', 1)
                 manager = getattr(canvas, 'manager', None)
                 if manager is not None:
-                    manager.resize(*(size * self.dpi / dpi_ratio).astype(int))
+                    manager.resize(*(size * self.dpi).astype(int))
         self.stale = True
 
     def get_size_inches(self):

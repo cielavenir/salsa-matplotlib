@@ -312,8 +312,10 @@ class FigureCanvasQT(QtWidgets.QWidget, FigureCanvasBase):
 
     def wheelEvent(self, event):
         x, y = self.mouseEventCoords(self._get_position(event))
-        # from QWheelEvent::delta doc
-        if event.pixelDelta().x() == 0 and event.pixelDelta().y() == 0:
+        # from QWheelEvent::pixelDelta doc: pixelDelta is sometimes not
+        # provided (`isNull()`) and is unreliable on X11 ("xcb").
+        if (event.pixelDelta().isNull()
+                or QtWidgets.QApplication.instance().platformName() == "xcb"):
             steps = event.angleDelta().y() / 120
         else:
             steps = event.pixelDelta().y()
@@ -587,8 +589,10 @@ class FigureManagerQT(FigureManagerBase):
         return toolbar
 
     def resize(self, width, height):
-        # these are Qt methods so they return sizes in 'virtual' pixels
-        # so we do not need to worry about dpi scaling here.
+        # The Qt methods return sizes in 'virtual' pixels so we do need to
+        # rescale from physical to logical pixels.
+        width = int(width / self.canvas.device_pixel_ratio)
+        height = int(height / self.canvas.device_pixel_ratio)
         extra_width = self.window.width() - self.canvas.width()
         extra_height = self.window.height() - self.canvas.height()
         self.canvas.resize(width, height)
