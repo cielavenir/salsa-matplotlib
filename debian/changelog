@@ -1,8 +1,10 @@
 matplotlib (3.5.0-1) UNRELEASED; urgency=medium
 
   * New upstream release
+  * debian/control
+    - bump b-d on sphinx-gallery to >= 0.10.0
 
- -- Sandro Tosi <morph@debian.org>  Wed, 17 Nov 2021 22:22:02 -0500
+ -- Sandro Tosi <morph@debian.org>  Wed, 17 Nov 2021 22:45:39 -0500
 
 matplotlib (3.5.0~rc1-2) experimental; urgency=medium
 
