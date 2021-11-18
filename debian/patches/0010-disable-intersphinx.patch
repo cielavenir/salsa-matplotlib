@@ -8,7 +8,7 @@ Subject: disable intersphinx
 
 --- a/doc/conf.py
 +++ b/doc/conf.py
-@@ -152,15 +152,6 @@ missing_references_write_json = False
+@@ -152,16 +152,6 @@ missing_references_write_json = False
  missing_references_warn_unused_ignores = False
  
  intersphinx_mapping = {
@@ -21,6 +21,7 @@ Subject: disable intersphinx
 -    'pytest': ('https://pytest.org/en/stable/', None),
 -    'python': ('https://docs.python.org/3/', None),
 -    'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
+-    'tornado': ('https://www.tornadoweb.org/en/stable/', None),
  }
  
  
