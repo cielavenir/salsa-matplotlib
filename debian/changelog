@@ -14,8 +14,10 @@ matplotlib (3.5.0-1) UNRELEASED; urgency=medium
     - fix autopkgtests but installing pil.imagetk and allowing stderr
   * debian/copyright
     - simplify and fix afm fonts copyright generation
+  * debian/TODO.debian
+    - remove, no longer relevant
 
- -- Sandro Tosi <morph@debian.org>  Sun, 21 Nov 2021 00:00:42 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 21 Nov 2021 00:02:30 -0500
 
 matplotlib (3.5.0~rc1-2) experimental; urgency=medium
 
