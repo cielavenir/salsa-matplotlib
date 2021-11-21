@@ -3,12 +3,13 @@ matplotlib (3.5.0-1) UNRELEASED; urgency=medium
   * New upstream release
   * debian/control
     - bump b-d on sphinx-gallery to >= 0.10.0
+    - bump b-d on numpy to >= 1.20.0
   * debian/patches
     - refresh, remove merged patches
   * debian/patches/docs-still-use-pydata-theme.patch
     - keep using pydata_sphinx_theme until mpl_sphinx_theme is available
 
- -- Sandro Tosi <morph@debian.org>  Wed, 17 Nov 2021 22:48:40 -0500
+ -- Sandro Tosi <morph@debian.org>  Sat, 20 Nov 2021 22:44:21 -0500
 
 matplotlib (3.5.0~rc1-2) experimental; urgency=medium
 
