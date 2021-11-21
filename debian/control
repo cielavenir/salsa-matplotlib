@@ -62,7 +62,7 @@ Build-Depends: cm-super-minimal <!nodoc>,
                xvfb,
                zlib1g-dev,
 XS-Python-Version: all
-Standards-Version: 4.5.1
+Standards-Version: 4.6.0.1
 Homepage: http://matplotlib.org/
 Vcs-Git: https://salsa.debian.org/python-team/packages/matplotlib.git
 Vcs-Browser: https://salsa.debian.org/python-team/packages/matplotlib
