@@ -265,243 +265,6 @@ License:
  paragraph is not modified. Adobe Systems has no responsibility or obligation
  to support the use of the AFM files.
 
-## afm files copyright auto-generated with
-## grep Copyright * | sed 's/Comment //;s/Notice //;s/^ //' | sort -u | sed 's|^|\nFiles lib/matplotlib/mpl-data/fonts/afm/|;s|:|\nCopyright |' | sed 's/^Files /Files: /;s/^Copyright /Copyright: /'
-
-Files: lib/matplotlib/mpl-data/fonts/afm/cmex10.afm
-Copyright: Copyright (c) 1997 American Mathematical Society.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/cmmi10.afm
-Copyright: Copyright (c) 1997 American Mathematical Society.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/cmr10.afm
-Copyright: Copyright (c) 1997 American Mathematical Society.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/cmsy10.afm
-Copyright: Copyright (c) 1997 American Mathematical Society.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/cmtt10.afm
-Copyright: Copyright (c) 1997 American Mathematical Society.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pagd8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pagd8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991 Adobe Systems Incorporated.  All Rights Reserved.ITC Avant Garde Gothic is a registered trademark of International Typeface Corporation.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pagdo8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pagdo8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991 Adobe Systems Incorporated.  All Rights Reserved.ITC Avant Garde Gothic is a registered trademark of International Typeface Corporation.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pagk8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pagk8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991 Adobe Systems Incorporated.  All Rights Reserved.ITC Avant Garde Gothic is a registered trademark of International Typeface Corporation.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pagko8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pagko8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991 Adobe Systems Incorporated.  All Rights Reserved.ITC Avant Garde Gothic is a registered trademark of International Typeface Corporation.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pbkd8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1992 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pbkd8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1992 Adobe Systems Incorporated.  All Rights Reserved.ITC Bookman is a registered trademark of International Typeface Corporation.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pbkdi8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1992 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pbkdi8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1992 Adobe Systems Incorporated.  All Rights Reserved.ITC Bookman is a registered trademark of International Typeface Corporation.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pbkl8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1992 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pbkl8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1992 Adobe Systems Incorporated.  All Rights Reserved.ITC Bookman is a registered trademark of International Typeface Corporation.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pbkli8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1992 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pbkli8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1992 Adobe Systems Incorporated.  All Rights Reserved.ITC Bookman is a registered trademark of International Typeface Corporation.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pcrb8a.afm
-Copyright: Copyright (c) 1989, 1990, 1991, Adobe Systems Incorporated. All rights reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pcrbo8a.afm
-Copyright: Copyright (c) 1989, 1990, 1991, Adobe Systems Incorporated. All rights reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pcrr8a.afm
-Copyright: Copyright (c) 1989, 1990, 1991 Adobe Systems Incorporated. All rights reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pcrro8a.afm
-Copyright: Copyright (c) 1989, 1990, 1991 Adobe Systems Incorporated. All rights reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvb8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvb8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvb8an.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvb8an.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvbo8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvbo8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvbo8an.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvbo8an.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvl8a.afm
-Copyright:  Copyright (c) 1985, 1987, 1988 Adobe Systems Incorporated. All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvl8a.afm
-Copyright: Copyright (c) 1985, 1987, 1988 Adobe Systems Incorporated.  All Rights Reserved.Helvetica is a trademark of Linotype Company.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvlo8a.afm
-Copyright:  Copyright (c) 1985, 1987, 1988 Adobe Systems Incorporated. All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvlo8a.afm
-Copyright: Copyright (c) 1985, 1987, 1988 Adobe Systems Incorporated.  All Rights Reserved.Helvetica is a trademark of Linotype Company.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvr8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All rights reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvr8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All rights reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvr8an.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All rights reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvr8an.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All rights reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvro8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All rights reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvro8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All rights reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvro8an.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All rights reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/phvro8an.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All rights reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pncb8a.afm
-Copyright: Copyright (c) 1985, 1987, 1988, 1991 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pncbi8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pncr8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pncri8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pplb8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pplb8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Palatino is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pplbi8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pplbi8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Palatino is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pplr8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pplr8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Palatino is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pplri8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pplri8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Palatino is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/psyr.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All rights reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/ptmb8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/ptmb8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Times is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/ptmbi8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/ptmbi8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Times is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/ptmr8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/ptmr8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Times is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/ptmri8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/ptmri8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Times is a trademark of Linotype AG and/or its subsidiaries.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/putb8a.afm
-Copyright: Copyright (c) 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/putb8a.afm
-Copyright: Copyright (c) 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.Utopia is a registered trademark of Adobe Systems Incorporated.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/putbi8a.afm
-Copyright: Copyright (c) 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/putbi8a.afm
-Copyright: Copyright (c) 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.Utopia is a registered trademark of Adobe Systems Incorporated.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/putr8a.afm
-Copyright: Copyright (c) 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/putr8a.afm
-Copyright: Copyright (c) 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.Utopia is a registered trademark of Adobe Systems Incorporated.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/putri8a.afm
-Copyright: Copyright (c) 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/putri8a.afm
-Copyright: Copyright (c) 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.Utopia is a registered trademark of Adobe Systems Incorporated.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pzcmi8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pzcmi8a.afm
-Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.ITC Zapf Chancery is a registered trademark of International Typeface Corporation.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pzdr.afm
-Copyright: Copyright (c) 1985, 1987, 1988, 1989 Adobe Systems Incorporated.  All rights reserved.
-
-Files: lib/matplotlib/mpl-data/fonts/afm/pzdr.afm
-Copyright: Copyright (c) 1985, 1987, 1988, 1989 Adobe Systems Incorporated.  All rights reserved.ITC Zapf Dingbats is a registered trademark of International Typeface Corporation.
-
 Files: src/_tkmini.h
 Copyright:  Copyright (c) 1987-1994 The Regents of the University of California.
  Copyright (c) 1993-1996 Lucent Technologies.
@@ -735,3 +498,145 @@ License: BSD-3-Clause
 
 Files: doc/_static/fa/*
 License: CC-BY-4.0
+
+## afm files copyright auto-generated with
+## grep "Notice Copyright" lib/matplotlib/mpl-data/fonts/afm/* | sort -u | sed 's|^|\nFiles |;s|:|\nCopyright |' | sed 's/^Files /Files: /;s/^Copyright Notice /Copyright: /'
+
+
+Files: lib/matplotlib/mpl-data/fonts/afm/cmex10.afm
+Copyright: Copyright (c) 1997 American Mathematical Society.  All Rights Reserved.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/cmmi10.afm
+Copyright: Copyright (c) 1997 American Mathematical Society.  All Rights Reserved.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/cmr10.afm
+Copyright: Copyright (c) 1997 American Mathematical Society.  All Rights Reserved.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/cmsy10.afm
+Copyright: Copyright (c) 1997 American Mathematical Society.  All Rights Reserved.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/cmtt10.afm
+Copyright: Copyright (c) 1997 American Mathematical Society.  All Rights Reserved.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pagd8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991 Adobe Systems Incorporated.  All Rights Reserved.ITC Avant Garde Gothic is a registered trademark of International Typeface Corporation.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pagdo8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991 Adobe Systems Incorporated.  All Rights Reserved.ITC Avant Garde Gothic is a registered trademark of International Typeface Corporation.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pagk8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991 Adobe Systems Incorporated.  All Rights Reserved.ITC Avant Garde Gothic is a registered trademark of International Typeface Corporation.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pagko8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990, 1991 Adobe Systems Incorporated.  All Rights Reserved.ITC Avant Garde Gothic is a registered trademark of International Typeface Corporation.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pbkd8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1992 Adobe Systems Incorporated.  All Rights Reserved.ITC Bookman is a registered trademark of International Typeface Corporation.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pbkdi8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1992 Adobe Systems Incorporated.  All Rights Reserved.ITC Bookman is a registered trademark of International Typeface Corporation.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pbkl8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1992 Adobe Systems Incorporated.  All Rights Reserved.ITC Bookman is a registered trademark of International Typeface Corporation.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pbkli8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1992 Adobe Systems Incorporated.  All Rights Reserved.ITC Bookman is a registered trademark of International Typeface Corporation.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pcrb8a.afm
+Copyright: Copyright (c) 1989, 1990, 1991, Adobe Systems Incorporated. All rights reserved.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pcrbo8a.afm
+Copyright: Copyright (c) 1989, 1990, 1991, Adobe Systems Incorporated. All rights reserved.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pcrr8a.afm
+Copyright: Copyright (c) 1989, 1990, 1991 Adobe Systems Incorporated. All rights reserved.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pcrro8a.afm
+Copyright: Copyright (c) 1989, 1990, 1991 Adobe Systems Incorporated. All rights reserved.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/phvb8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/phvb8an.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/phvbo8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/phvbo8an.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/phvl8a.afm
+Copyright: Copyright (c) 1985, 1987, 1988 Adobe Systems Incorporated.  All Rights Reserved.Helvetica is a trademark of Linotype Company.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/phvlo8a.afm
+Copyright: Copyright (c) 1985, 1987, 1988 Adobe Systems Incorporated.  All Rights Reserved.Helvetica is a trademark of Linotype Company.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/phvr8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All rights reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/phvr8an.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All rights reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/phvro8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All rights reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/phvro8an.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All rights reserved.Helvetica is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pncb8a.afm
+Copyright: Copyright (c) 1985, 1987, 1988, 1991 Adobe Systems Incorporated.  All Rights Reserved.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pncbi8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pncr8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pncri8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pplb8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Palatino is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pplbi8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Palatino is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pplr8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Palatino is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pplri8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Palatino is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/psyr.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All rights reserved.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/ptmb8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Times is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/ptmbi8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Times is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/ptmr8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Times is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/ptmri8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.Times is a trademark of Linotype AG and/or its subsidiaries.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/putb8a.afm
+Copyright: Copyright (c) 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.Utopia is a registered trademark of Adobe Systems Incorporated.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/putbi8a.afm
+Copyright: Copyright (c) 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.Utopia is a registered trademark of Adobe Systems Incorporated.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/putr8a.afm
+Copyright: Copyright (c) 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.Utopia is a registered trademark of Adobe Systems Incorporated.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/putri8a.afm
+Copyright: Copyright (c) 1989, 1991 Adobe Systems Incorporated.  All Rights Reserved.Utopia is a registered trademark of Adobe Systems Incorporated.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pzcmi8a.afm
+Copyright: Copyright (c) 1985, 1987, 1989, 1990 Adobe Systems Incorporated.  All Rights Reserved.ITC Zapf Chancery is a registered trademark of International Typeface Corporation.
+
+Files: lib/matplotlib/mpl-data/fonts/afm/pzdr.afm
+Copyright: Copyright (c) 1985, 1987, 1988, 1989 Adobe Systems Incorporated.  All rights reserved.ITC Zapf Dingbats is a registered trademark of International Typeface Corporation.

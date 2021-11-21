@@ -12,8 +12,10 @@ matplotlib (3.5.0-1) UNRELEASED; urgency=medium
     - no longer manually copy cliboard.js, now that sphinx-copybutton is fixed
   * debian/tests/control
     - fix autopkgtests but installing pil.imagetk and allowing stderr
+  * debian/copyright
+    - simplify and fix afm fonts copyright generation
 
- -- Sandro Tosi <morph@debian.org>  Sat, 20 Nov 2021 23:47:50 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 21 Nov 2021 00:00:42 -0500
 
 matplotlib (3.5.0~rc1-2) experimental; urgency=medium
 
