@@ -10,8 +10,10 @@ matplotlib (3.5.0-1) UNRELEASED; urgency=medium
     - keep using pydata_sphinx_theme until mpl_sphinx_theme is available
   * debian/rules
     - no longer manually copy cliboard.js, now that sphinx-copybutton is fixed
+  * debian/tests/control
+    - fix autopkgtests but installing pil.imagetk and allowing stderr
 
- -- Sandro Tosi <morph@debian.org>  Sat, 20 Nov 2021 23:09:16 -0500
+ -- Sandro Tosi <morph@debian.org>  Sat, 20 Nov 2021 23:47:50 -0500
 
 matplotlib (3.5.0~rc1-2) experimental; urgency=medium
 

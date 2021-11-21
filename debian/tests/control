@@ -1,5 +1,6 @@
 Tests: tkagg
-Depends: xauth, xvfb, python3-matplotlib, python3-tk, python3-numpy
+Depends: xauth, xvfb, python3-matplotlib, python3-tk, python3-pil.imagetk, python3-numpy
 
 Tests: qt5agg
 Depends: xauth, xvfb, python3-matplotlib, python3-pyqt5, python3-numpy
+Restrictions: allow-stderr
