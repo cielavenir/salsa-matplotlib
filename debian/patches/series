@@ -8,5 +8,4 @@
 0014-py3k-sphinx.patch
 0015-disable-sphinx--W.patch
 fake-setutools-scm.patch
-docs-no-sphinx-panel.patch
 docs-still-use-pydata-theme.patch
