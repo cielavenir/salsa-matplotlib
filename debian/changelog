@@ -1,11 +1,11 @@
-matplotlib (3.5.0-3) UNRELEASED; urgency=medium
+matplotlib (3.5.0-3) unstable; urgency=medium
 
   * debian/control
     - move pil.imagetk to Depends, so everyone's happy; Closes: #999533
   * debian/patches/PR21686.patch
     - add PR 21686, fixing sagemath doc build; Closes: #1001102
 
- -- Sandro Tosi <morph@debian.org>  Mon, 06 Dec 2021 00:18:39 -0500
+ -- Sandro Tosi <morph@debian.org>  Mon, 06 Dec 2021 00:22:14 -0500
 
 matplotlib (3.5.0-2) unstable; urgency=medium
 
