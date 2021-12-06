@@ -9,3 +9,4 @@
 0015-disable-sphinx--W.patch
 fake-setutools-scm.patch
 docs-still-use-pydata-theme.patch
+PR21686.patch

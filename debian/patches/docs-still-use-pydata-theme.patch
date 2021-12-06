@@ -1,6 +1,6 @@
 --- a/doc/conf.py
 +++ b/doc/conf.py
-@@ -278,7 +278,7 @@ html_css_files = [
+@@ -279,7 +279,7 @@ html_css_files = [
      f"mpl.css?{SHA}",
  ]
  
