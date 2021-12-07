@@ -72,7 +72,7 @@ Package: python3-matplotlib
 Architecture: any
 Depends: libjs-jquery,
          libjs-jquery-ui,
-         python-matplotlib-data (>= ${source:Version}),
+         python-matplotlib-data (>= ${source:Upstream-Version}),
          python3-dateutil,
          python3-pil.imagetk,
          python3-pyparsing (>= 1.5.6),
