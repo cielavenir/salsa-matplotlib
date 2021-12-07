@@ -1,10 +1,10 @@
-matplotlib (3.5.0-4) UNRELEASED; urgency=medium
+matplotlib (3.5.0-4) unstable; urgency=medium
 
   * debian/control
     - use source:Upstream-Version when defining Depends on -data, fixing a
       FTBFS on buildds due to circular dependencies
 
- -- Sandro Tosi <morph@debian.org>  Mon, 06 Dec 2021 23:06:26 -0500
+ -- Sandro Tosi <morph@debian.org>  Mon, 06 Dec 2021 23:07:14 -0500
 
 matplotlib (3.5.0-3) unstable; urgency=medium
 
