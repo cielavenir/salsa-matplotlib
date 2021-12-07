@@ -1,10 +1,10 @@
-matplotlib (3.5.0-5) UNRELEASED; urgency=medium
+matplotlib (3.5.0-5) unstable; urgency=medium
 
   * Comment out sphinx-gallery from b-d, and dont build doc, once again hoping
     this will fix the dependency loop currently preventin mpl to be build on
     buildds
 
- -- Sandro Tosi <morph@debian.org>  Tue, 07 Dec 2021 01:25:44 -0500
+ -- Sandro Tosi <morph@debian.org>  Tue, 07 Dec 2021 01:26:30 -0500
 
 matplotlib (3.5.0-4) unstable; urgency=medium
 
