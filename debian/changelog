@@ -1,11 +1,12 @@
-matplotlib (3.5.0-6) UNRELEASED; urgency=medium
+matplotlib (3.5.1-1) UNRELEASED; urgency=medium
 
+  * New upstream release
   * debian/python-matplotlib-data.install
    - install the entire content of mpl-data for python-matplotlib-data,
      including kpsewhich.lua; Closes: #1002923
   * re-enable doc building
 
- -- Sandro Tosi <morph@debian.org>  Sat, 01 Jan 2022 17:20:38 -0500
+ -- Sandro Tosi <morph@debian.org>  Sat, 01 Jan 2022 17:24:20 -0500
 
 matplotlib (3.5.0-5) unstable; urgency=medium
 
