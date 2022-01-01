@@ -1,3 +1,11 @@
+matplotlib (3.5.0-6) UNRELEASED; urgency=medium
+
+  * debian/python-matplotlib-data.install
+   - install the entire content of mpl-data for python-matplotlib-data,
+     including kpsewhich.lua; Closes: #1002923
+
+ -- Sandro Tosi <morph@debian.org>  Sat, 01 Jan 2022 15:23:22 -0500
+
 matplotlib (3.5.0-5) unstable; urgency=medium
 
   * Comment out sphinx-gallery from b-d, and dont build doc, once again hoping
