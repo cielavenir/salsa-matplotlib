@@ -280,6 +280,8 @@ class _ColorbarAxesLocator:
         # make tight_layout happy..
         ss = getattr(self._cbar.ax, 'get_subplotspec', None)
         if ss is None:
+            if self._orig_locator is None:
+                return None
             ss = self._orig_locator.get_subplotspec()
         else:
             ss = ss()
@@ -783,8 +785,6 @@ class Colorbar:
         xy[[2, 3], 1] += fac
         # back to axes units...
         xy = self.ax.transAxes.inverted().transform(inches.transform(xy))
-        if self.orientation == 'horizontal':
-            xy = xy.T
         col.set_clip_path(mpath.Path(xy, closed=True),
                           self.ax.transAxes)
         self.ax.add_collection(col)
@@ -817,6 +817,12 @@ class Colorbar:
             b = self.norm.boundaries
             if locator is None:
                 locator = ticker.FixedLocator(b, nbins=10)
+        elif isinstance(self.norm, colors.NoNorm):
+            if locator is None:
+                # put ticks on integers between the boundaries of NoNorm
+                nv = len(self._values)
+                base = 1 + int(nv / 10)
+                locator = ticker.IndexLocator(base=base, offset=.5)
         elif self.boundaries is not None:
             b = self._boundaries[self._inside]
             if locator is None:
@@ -828,11 +834,6 @@ class Colorbar:
                 locator = self._long_axis().get_major_locator()
             if minorlocator is None:
                 minorlocator = self._long_axis().get_minor_locator()
-            if isinstance(self.norm, colors.NoNorm):
-                # default locator:
-                nv = len(self._values)
-                base = 1 + int(nv / 10)
-                locator = ticker.IndexLocator(base=base, offset=0)
 
         if minorlocator is None:
             minorlocator = ticker.NullLocator()
@@ -1090,6 +1091,11 @@ class Colorbar:
         # otherwise values are set from the boundaries
         if isinstance(self.norm, colors.BoundaryNorm):
             b = self.norm.boundaries
+        elif isinstance(self.norm, colors.NoNorm):
+            # NoNorm has N blocks, so N+1 boundaries, centered on integers:
+            b = np.arange(self.cmap.N + 1) - .5
+        elif self.boundaries is not None:
+            b = self.boundaries
         else:
             # otherwise make the boundaries from the size of the cmap:
             N = self.cmap.N + 1
@@ -1106,7 +1112,8 @@ class Colorbar:
             self.norm.vmax = 1
         self.norm.vmin, self.norm.vmax = mtransforms.nonsingular(
             self.norm.vmin, self.norm.vmax, expander=0.1)
-        if not isinstance(self.norm, colors.BoundaryNorm):
+        if (not isinstance(self.norm, colors.BoundaryNorm) and
+                (self.boundaries is None)):
             b = self.norm.inverse(b)
 
         self._boundaries = np.asarray(b, dtype=float)
@@ -1128,34 +1135,36 @@ class Colorbar:
         norm = copy.deepcopy(self.norm)
         norm.vmin = self.vmin
         norm.vmax = self.vmax
-        x = np.array([0.0, 1.0])
         y, extendlen = self._proportional_y()
         # invert:
         if (isinstance(norm, (colors.BoundaryNorm, colors.NoNorm)) or
-                (self.__scale == 'manual')):
-            # if a norm doesn't have a named scale, or we are not using a norm:
-            dv = self.vmax - self.vmin
-            y = y * dv + self.vmin
+                self.boundaries is not None):
+            y = y * (self.vmax - self.vmin) + self.vmin  # not using a norm.
         else:
             y = norm.inverse(y)
         self._y = y
-        X, Y = np.meshgrid(x, y)
+        X, Y = np.meshgrid([0., 1.], y)
         if self.orientation == 'vertical':
             return (X, Y, extendlen)
         else:
             return (Y, X, extendlen)
 
     def _forward_boundaries(self, x):
+        # map boundaries equally between 0 and 1...
         b = self._boundaries
-        y = np.interp(x, b, np.linspace(0, b[-1], len(b)))
+        y = np.interp(x, b, np.linspace(0, 1, len(b)))
+        # the following avoids ticks in the extends:
         eps = (b[-1] - b[0]) * 1e-6
+        # map these _well_ out of bounds to keep any ticks out
+        # of the extends region...
         y[x < b[0]-eps] = -1
         y[x > b[-1]+eps] = 2
         return y
 
     def _inverse_boundaries(self, x):
+        # invert the above...
         b = self._boundaries
-        return np.interp(x, np.linspace(0, b[-1], len(b)), b)
+        return np.interp(x, np.linspace(0, 1, len(b)), b)
 
     def _reset_locator_formatter_scale(self):
         """
@@ -1174,8 +1183,8 @@ class Colorbar:
                 self._set_scale('function', functions=funcs)
             elif self.spacing == 'proportional':
                 self._set_scale('linear')
-        elif hasattr(self.norm, '_scale') and self.norm._scale is not None:
-            # use the norm's scale:
+        elif getattr(self.norm, '_scale', None):
+            # use the norm's scale (if it exists and is not None):
             self._set_scale(self.norm._scale)
         elif type(self.norm) is colors.Normalize:
             # plain Normalize:
@@ -1225,7 +1234,8 @@ class Colorbar:
         Return colorbar data coordinates for the boundaries of
         a proportional colorbar, plus extension lengths if required:
         """
-        if isinstance(self.norm, colors.BoundaryNorm):
+        if (isinstance(self.norm, colors.BoundaryNorm) or
+                self.boundaries is not None):
             y = (self._boundaries - self._boundaries[self._inside][0])
             y = y / (self._boundaries[self._inside][-1] -
                      self._boundaries[self._inside][0])
