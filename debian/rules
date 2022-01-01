@@ -22,7 +22,7 @@ build-indep-stamp: build-arch-stamp
 	dh_testdir
 
 	# build the doc
-	# MPLCONFIGDIR=. MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ PYTHONPATH=$(CURDIR)/build/lib.$(PY_PLATFORM)-$(DEFPY3) HOME=/tmp xvfb-run -a $(MAKE) -C doc html
+	MPLCONFIGDIR=. MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ PYTHONPATH=$(CURDIR)/build/lib.$(PY_PLATFORM)-$(DEFPY3) HOME=/tmp xvfb-run -a $(MAKE) -C doc html
 
 	touch $@
 
@@ -156,7 +156,7 @@ binary-indep: build-indep install-indep
 	dh_testdir -i
 	dh_testroot -i
 	dh_installchangelogs
-	#dh_installdocs -p$(pd) -i doc/build/html/ tutorials/
+	dh_installdocs -p$(pd) -i doc/build/html/ tutorials/
 	# remove pyc file from doc
 	dh_installexamples -p$(pd) -i examples/*
 	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js -X.py -Xobjects.inv -X.html
