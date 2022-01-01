@@ -7,8 +7,10 @@ matplotlib (3.5.1-1) UNRELEASED; urgency=medium
   * re-enable doc building
   * debian/copyright
     - extend packaging copyright years
+  * debian/patches
+    - refresh, drop patches merged upstream
 
- -- Sandro Tosi <morph@debian.org>  Sat, 01 Jan 2022 17:27:54 -0500
+ -- Sandro Tosi <morph@debian.org>  Sat, 01 Jan 2022 17:29:18 -0500
 
 matplotlib (3.5.0-5) unstable; urgency=medium
 
