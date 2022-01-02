@@ -1,4 +1,4 @@
-matplotlib (3.5.1-1) UNRELEASED; urgency=medium
+matplotlib (3.5.1-1) unstable; urgency=medium
 
   * New upstream release
   * debian/python-matplotlib-data.install
@@ -14,7 +14,7 @@ matplotlib (3.5.1-1) UNRELEASED; urgency=medium
     - ignore test_backend_nbagg.py, until nbconvert is made compatible with
       mistune 2.x, see #1001283 and #1002372
 
- -- Sandro Tosi <morph@debian.org>  Sun, 02 Jan 2022 16:21:43 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 02 Jan 2022 16:42:00 -0500
 
 matplotlib (3.5.0-5) unstable; urgency=medium
 
