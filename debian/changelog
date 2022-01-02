@@ -9,8 +9,10 @@ matplotlib (3.5.1-1) UNRELEASED; urgency=medium
     - extend packaging copyright years
   * debian/patches
     - refresh, drop patches merged upstream
+  * debian/rules
+    - use pytest directly when running the test suite
 
- -- Sandro Tosi <morph@debian.org>  Sat, 01 Jan 2022 17:29:18 -0500
+ -- Sandro Tosi <morph@debian.org>  Sun, 02 Jan 2022 15:44:25 -0500
 
 matplotlib (3.5.0-5) unstable; urgency=medium
 
