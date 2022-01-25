@@ -11,6 +11,14 @@ pdata := python-matplotlib-data
 DEB_BUILD_OPTIONS += --no-parallel
 
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+# https://bugs.debian.org/1000435
+# it is due to a bug of gcc-11
+ifneq (,$(filter $(DEB_HOST_ARCH), mips64 mips64el mips64r6 mips64r6el))
+  DEB_CFLAGS_MAINT_APPEND += -O3
+  DEB_CXXFLAGS_MAINT_APPEND += -O3
+endif
+
 DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/buildflags.mk
 
