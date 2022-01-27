@@ -29,8 +29,10 @@ build-indep: build-indep-stamp
 build-indep-stamp: build-arch-stamp
 	dh_testdir
 
+ifeq (,$(findstring nodoc,$(DEB_BUILD_PROFILES)))
 	# build the doc
 	MPLCONFIGDIR=. MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ PYTHONPATH=$(CURDIR)/build/lib.$(PY_PLATFORM)-$(DEFPY3) HOME=/tmp xvfb-run -a $(MAKE) -C doc html
+endif
 
 	touch $@
 
