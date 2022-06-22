@@ -2,7 +2,6 @@
 70_bts720549_try_StayPuft_for_xkcd.patch
 0008-Increase-test-tollerance.patch
 0010-disable-intersphinx.patch
-0011-remove-numpy-scipy-from-reference_url.patch
 0012-dont-generate-a-test-failure-if-images-are-not-close.patch
 #0013-static-SHA.patch
 0014-py3k-sphinx.patch
