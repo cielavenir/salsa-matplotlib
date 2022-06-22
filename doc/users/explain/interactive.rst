@@ -19,7 +19,7 @@ Matplotlib ships with :ref:`backends <what-is-a-backend>` binding to
 several GUI toolkits (Qt, Tk, Wx, GTK, macOS, JavaScript) and third party
 packages provide bindings to `kivy
 <https://github.com/kivy-garden/garden.matplotlib>`__ and `Jupyter Lab
-<https://github.com/matplotlib/ipympl>`__.  For the figures to be responsive to
+<https://matplotlib.org/ipympl>`__.  For the figures to be responsive to
 mouse, keyboard, and paint events, the GUI event loop needs to be integrated
 with an interactive prompt. We recommend using IPython (see :ref:`below <ipython-pylab>`).
 
@@ -47,11 +47,8 @@ collected. `.Figure`\s can be closed and deregistered from `.pyplot` individuall
 
 For more discussion of Matplotlib's event system and integrated event loops, please read:
 
-.. toctree::
-    :maxdepth: 1
-
-    interactive_guide.rst
-    event_handling.rst
+   - :ref:`interactive_figures_and_eventloops`
+   - :ref:`event-handling-tutorial`
 
 
 .. _ipython-pylab:
