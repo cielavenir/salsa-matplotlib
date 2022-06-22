@@ -3,6 +3,15 @@
 # Add steps that analyze code, save the dist with the build record, publish to a PyPI-compatible index, and more:
 # https://docs.microsoft.com/en-us/azure/devops/pipelines/ecosystems/python?view=azure-devops
 
+trigger:
+  branches:
+    exclude:
+      - v*-doc
+pr:
+  branches:
+    exclude:
+      - v*-doc
+
 stages:
 
 - stage: Check
@@ -118,12 +127,16 @@ stages:
         displayName: 'Install dependencies with pip'
 
       - bash: |
-          python -m pip install -ve . ||
+          # Due to https://github.com/pypa/setuptools/pull/2896
+          SETUPTOOLS_USE_DISTUTILS=stdlib python -m pip install -ve . ||
             [[ "$PYTHON_VERSION" = 'Pre' ]]
         displayName: "Install self"
 
       - script: env
         displayName: 'print env'
+
+      - script: pip list
+        displayName: 'print pip'
 
       - bash: |
           PYTHONFAULTHANDLER=1 python -m pytest --junitxml=junit/test-results.xml -raR --maxfail=50 --timeout=300 --durations=25 --cov-report= --cov=lib -n 2 ||
