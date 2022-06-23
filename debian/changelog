@@ -6,7 +6,13 @@ matplotlib (3.5.2-1) UNRELEASED; urgency=medium
   * debian/control
     - add cm-super-minimal to matplotlib Suggests; Closes: #1010216
 
- -- Sandro Tosi <morph@debian.org>  Wed, 22 Jun 2022 19:53:18 -0400
+  [ Laurent Bigonville ]
+  * debian/control
+    - Mark python-matplotlib-doc with <!nodoc> build-profile
+  * debian/rules
+    - Do not build the doc if the <nodoc> profile is set
+
+ -- Sandro Tosi <morph@debian.org>  Wed, 22 Jun 2022 20:12:13 -0400
 
 matplotlib (3.5.1-3) unstable; urgency=medium
 
