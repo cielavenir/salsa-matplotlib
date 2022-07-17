@@ -102,6 +102,9 @@ clean:
 	# remove embedded CXX to prevent it to be picked up
 	rm -rf extern/CXX/
 
+	# remove auto-generated version file
+	rm -f lib/matplotlib/_version.py
+
 # install
 install-arch: build-arch install-arch-stamp
 	dh_testdir
