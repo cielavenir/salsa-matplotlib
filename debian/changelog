@@ -1,3 +1,9 @@
+matplotlib (3.5.2-5) UNRELEASED; urgency=medium
+
+  * Revert the temporary inkscape change.
+
+ -- Stefano Rivera <stefanor@debian.org>  Sun, 13 Nov 2022 13:46:34 +0200
+
 matplotlib (3.5.2-4) unstable; urgency=medium
 
   * Team upload.
