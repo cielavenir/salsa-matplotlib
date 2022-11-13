@@ -1,9 +1,10 @@
-matplotlib (3.5.2-4) UNRELEASED; urgency=medium
+matplotlib (3.5.2-4) unstable; urgency=medium
 
+  * Team upload.
   * Move all the <!nodoc> Build-Depends to Build-Depends-Indep (to avoid
     indirectly Build-Depending on inkscape, right now).
 
- -- Stefano Rivera <stefanor@debian.org>  Sun, 13 Nov 2022 13:59:44 +0200
+ -- Stefano Rivera <stefanor@debian.org>  Sun, 13 Nov 2022 14:38:38 +0200
 
 matplotlib (3.5.2-3) unstable; urgency=medium
 
