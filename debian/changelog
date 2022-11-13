@@ -1,8 +1,9 @@
-matplotlib (3.5.2-3) UNRELEASED; urgency=medium
+matplotlib (3.5.2-3) unstable; urgency=medium
 
+  * Team upload.
   * Build without inkscape, which is currently FTBFS, temporarily.
 
- -- Stefano Rivera <stefanor@debian.org>  Sun, 13 Nov 2022 12:14:58 +0200
+ -- Stefano Rivera <stefanor@debian.org>  Sun, 13 Nov 2022 12:55:09 +0200
 
 matplotlib (3.5.2-2) unstable; urgency=medium
 
