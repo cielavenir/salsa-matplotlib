@@ -1,8 +1,12 @@
 matplotlib (3.5.2-5) UNRELEASED; urgency=medium
 
+  [ Stefano Rivera ]
   * Revert the temporary inkscape change.
 
- -- Stefano Rivera <stefanor@debian.org>  Sun, 13 Nov 2022 13:46:34 +0200
+  [ Sandro Tosi ]
+  * keep inkscrape disabled in b-d
+
+ -- Sandro Tosi <morph@debian.org>  Thu, 15 Dec 2022 17:10:26 -0500
 
 matplotlib (3.5.2-4) unstable; urgency=medium
 
