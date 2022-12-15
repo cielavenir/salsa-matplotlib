@@ -18,7 +18,7 @@ stages:
   jobs:
   - job: Skip
     pool:
-      vmImage: 'ubuntu-18.04'
+      vmImage: 'ubuntu-latest'
     variables:
       DECODE_PERCENTS: 'false'
       RET: 'true'
@@ -38,33 +38,33 @@ stages:
     - job: Pytest
       strategy:
         matrix:
-          Linux_py37:
-            vmImage: 'ubuntu-18.04'
-            python.version: '3.7'
           Linux_py38:
-            vmImage: 'ubuntu-18.04'
+            vmImage: 'ubuntu-20.04'  # keep one job pinned to the oldest image
             python.version: '3.8'
           Linux_py39:
-            vmImage: 'ubuntu-18.04'
+            vmImage: 'ubuntu-latest'
             python.version: '3.9'
-          macOS_py37:
-            vmImage: 'macOS-10.15'
-            python.version: '3.7'
+          Linux_py310:
+            vmImage: 'ubuntu-latest'
+            python.version: '3.10'
           macOS_py38:
             vmImage: 'macOS-latest'
             python.version: '3.8'
           macOS_py39:
             vmImage: 'macOS-latest'
             python.version: '3.9'
-          Windows_py37:
-            vmImage: 'vs2017-win2016'
-            python.version: '3.7'
+          macOS_py310:
+            vmImage: 'macOS-latest'
+            python.version: '3.10'
           Windows_py38:
-            vmImage: 'windows-latest'
+            vmImage: 'windows-2019'  # keep one job pinned to the oldest image
             python.version: '3.8'
           Windows_py39:
             vmImage: 'windows-latest'
             python.version: '3.9'
+          Windows_py310:
+            vmImage: 'windows-latest'
+            python.version: '3.10'
         maxParallel: 4
       pool:
         vmImage: '$(vmImage)'
@@ -91,12 +91,13 @@ stages:
               cm-super \
               dvipng \
               ffmpeg \
+              fonts-noto-cjk \
               gdb \
               gir1.2-gtk-3.0 \
               graphviz \
               inkscape \
               libcairo2 \
-              libgirepository-1.0.1 \
+              libgirepository-1.0-1 \
               lmodern \
               fonts-freefont-otf \
               poppler-utils \
@@ -111,6 +112,8 @@ stages:
           darwin)
             brew install --cask xquartz
             brew install pkg-config ffmpeg imagemagick mplayer ccache
+            brew tap homebrew/cask-fonts
+            brew install font-noto-sans-cjk-sc
             ;;
           win32)
             ;;

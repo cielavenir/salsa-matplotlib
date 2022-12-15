@@ -141,7 +141,6 @@ Update :file:`doc/users/release_notes.rst`:
          prev_whats_new/whats_new_X.Y.0.rst
          ../api/prev_api_changes/api_changes_X.Y.0.rst
          prev_whats_new/github_stats_X.Y.0.rst
-
 - For bugfix releases add the GitHub stats and (if present) the API changes to
   the existing X.Y section
 
@@ -149,6 +148,15 @@ Update :file:`doc/users/release_notes.rst`:
 
      ../api/prev_api_changes/api_changes_X.Y.Z.rst
      prev_whats_new/github_stats_X.Y.Z.rst
+
+Update version switcher
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Update ``doc/_static/switcher.json``.  If a minor release, ``X.Y.Z``, create
+a new entry ``version: X.Y.(Z-1)``, and change the name of stable
+``name: stable/X.Y.Z``.  If a major release, ``X.Y.0``, change the name
+of ``name: devel/X.(Y+1)`` and ``name: stable/X.Y.0`` as well as adding
+a new version for the previous stable.
 
 Verify that docs build
 ----------------------
@@ -212,7 +220,7 @@ with the tag [#]_::
 
 Finally, push the tag to GitHub::
 
-  git push DANGER master v2.0.0
+  git push DANGER main v2.0.0
 
 Congratulations, the scariest part is done!
 
@@ -365,12 +373,12 @@ which will build both the html and pdf version of the documentation.
 
 The built documentation exists in the `matplotlib.github.com
 <https://github.com/matplotlib/matplotlib.github.com/>`__ repository.
-Pushing changes to master automatically updates the website.
+Pushing changes to main automatically updates the website.
 
 The documentation is organized by version.  At the root of the tree is always
 the documentation for the latest stable release.  Under that, there are
 directories containing the documentation for older versions.  The documentation
-for current master is built on Circle CI and pushed to the `devdocs
+for current main is built on Circle CI and pushed to the `devdocs
 <https://github.com/matplotlib/devdocs/>`__ repository.  These are available at
 `matplotlib.org/devdocs <https://matplotlib.org/devdocs/>`__.
 
@@ -395,7 +403,7 @@ the newly released version.  Now commit and push everything to GitHub ::
 
   git add *
   git commit -a -m 'Updating docs for v2.0.0'
-  git push DANGER master
+  git push DANGER main
 
 Congratulations you have now done the third scariest part!
 

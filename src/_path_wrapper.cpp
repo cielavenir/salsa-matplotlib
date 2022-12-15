@@ -312,7 +312,7 @@ static PyObject *Py_get_path_collection_extents(PyObject *self, PyObject *args)
 const char *Py_point_in_path_collection__doc__ =
     "point_in_path_collection("
     "x, y, radius, master_transform, paths, transforms, offsets, "
-    "offset_trans, filled, offset_position)\n"
+    "offset_trans, filled)\n"
     "--\n\n";
 
 static PyObject *Py_point_in_path_collection(PyObject *self, PyObject *args)
@@ -324,11 +324,10 @@ static PyObject *Py_point_in_path_collection(PyObject *self, PyObject *args)
     numpy::array_view<const double, 2> offsets;
     agg::trans_affine offset_trans;
     bool filled;
-    PyObject *offset_position; // no longer used
     std::vector<int> result;
 
     if (!PyArg_ParseTuple(args,
-                          "dddO&O&O&O&O&O&O:point_in_path_collection",
+                          "dddO&O&O&O&O&O&:point_in_path_collection",
                           &x,
                           &y,
                           &radius,
@@ -343,8 +342,7 @@ static PyObject *Py_point_in_path_collection(PyObject *self, PyObject *args)
                           &convert_trans_affine,
                           &offset_trans,
                           &convert_bool,
-                          &filled,
-                          &offset_position)) {
+                          &filled)) {
         return NULL;
     }
 
@@ -699,7 +697,7 @@ const char *Py_convert_to_string__doc__ =
     "--\n\n"
     "Convert *path* to a bytestring.\n"
     "\n"
-    "The first five parameters (up to *sketch*) are interpreted as in \n"
+    "The first five parameters (up to *sketch*) are interpreted as in\n"
     "`.cleanup_path`.  The following ones are detailed below.\n"
     "\n"
     "Parameters\n"
@@ -711,7 +709,7 @@ const char *Py_convert_to_string__doc__ =
     "sketch : tuple of 3 floats, or None\n"
     "precision : int\n"
     "    The precision used to \"%.*f\"-format the values.  Trailing zeros\n"
-    "    and decimal points are always removed.  (precision=-1 is a special \n"
+    "    and decimal points are always removed.  (precision=-1 is a special\n"
     "    case used to implement ttconv-back-compatible conversion.)\n"
     "codes : sequence of 5 bytestrings\n"
     "    The bytes representation of each opcode (MOVETO, LINETO, CURVE3,\n"

@@ -7,24 +7,57 @@ Contributing
 This project is a community effort, and everyone is welcome to
 contribute. Everyone within the community
 is expected to abide by our
-`code of conduct <https://github.com/matplotlib/matplotlib/blob/master/CODE_OF_CONDUCT.md>`_.
+`code of conduct <https://github.com/matplotlib/matplotlib/blob/main/CODE_OF_CONDUCT.md>`_.
 
 The project is hosted on
 https://github.com/matplotlib/matplotlib
 
+Get Connected
+=============
+
+Do I really have something to contribute to Matplotlib?
+-------------------------------------------------------
+
+100% yes. There are so many ways to contribute to our community.
+
+When in doubt, we recommend going together! Get connected with our community of
+active contributors, many of whom felt just like you when they started out and
+are happy to welcome you and support you as you get to know how we work, and
+where things are. Take a look at the next sections to learn more.
+
 Contributor incubator
-=====================
+---------------------
 
-If you are interested in becoming a regular contributor to Matplotlib, but
-don't know where to start or feel insecure about it, you can join our non-public
-communication channel for new contributors. To do so, please go to `gitter
-<https://gitter.im/matplotlib/matplotlib>`_ and ask to be added to '#incubator'.
-This is a private gitter room moderated by core Matplotlib developers where you can
-get guidance and support for your first few PRs.  This is a place you can ask questions
-about anything: how to use git, github, how our PR review process works, technical questions
-about the code, what makes for good documentation or a blog post, how to get involved involved
-in community work, or get "pre-review" on your PR.
+The incubator is our non-public communication channel for new contributors. It
+is a private gitter room moderated by core Matplotlib developers where you can
+get guidance and support for your first few PRs. It's a place you can ask
+questions about anything: how to use git, github, how our PR review process
+works, technical questions about the code, what makes for good documentation
+or a blog post, how to get involved in community work, or get
+"pre-review" on your PR.
 
+To join, please go to our public `gitter
+<https://gitter.im/matplotlib/matplotlib>`_ community channel, and ask to be
+added to '#incubator'. One of our core developers will see your message and will
+add you.
+
+New Contributors meeting
+------------------------
+
+Once a month, we host a meeting to discuss topics that interest new
+contributors. Anyone can attend, present, or sit in and listen to the call.
+Among our attendees are fellow new contributors, as well as maintainers, and
+veteran contributors, who are keen to support onboarding of new folks and
+share their experience. You can find our community calendar link at the
+`Scientific Python website <https://scientific-python.org/calendars/>`_, and
+you can browse previous meeting notes on `github
+<https://github.com/matplotlib/ProjectManagement/tree/master/
+new_contributor_meeting>`_.
+We recommend joining the meeting to clarify any doubts, or lingering
+questions you might have, and to get to know a few of the people behind the
+GitHub handles 😉. You can reach out to @noatamir on `gitter
+<https://gitter.im/matplotlib/matplotlib>`_ for any clarifications or
+suggestions. We <3 feedback!
 
 .. _new_contributors:
 
@@ -32,13 +65,32 @@ Issues for new contributors
 ---------------------------
 
 While any contributions are welcome, we have marked some issues as
-particularly suited for new contributors by the label
-`good first issue <https://github.com/matplotlib/matplotlib/labels/good%20first%20issue>`_
-These are well documented issues, that do not require a deep understanding of
-the internals of Matplotlib. The issues may additionally be tagged with a
-difficulty. ``Difficulty: Easy`` is suited for people with little Python experience.
-``Difficulty: Medium`` and ``Difficulty: Hard`` are not trivial to solve and
-require more thought and programming experience.
+particularly suited for new contributors by the label `good first issue
+<https://github.com/matplotlib/matplotlib/labels/good%20first%20issue>`_. These
+are well documented issues, that do not require a deep understanding of the
+internals of Matplotlib. The issues may additionally be tagged with a
+difficulty. ``Difficulty: Easy`` is suited for people with little Python
+experience. ``Difficulty: Medium`` and ``Difficulty: Hard`` require more
+programming experience. This could be for a variety of reasons, among them,
+though not necessarily all at the same time:
+
+- The issue is in areas of the code base which have more interdependencies,
+  or legacy code.
+- It has less clearly defined tasks, which require some independent
+  exploration, making suggestions, or follow-up discussions to clarify a good
+  path to resolve the issue.
+- It involves Python features such as decorators and context managers, which
+  have subtleties due to our implementation decisions.
+
+In general, the Matplotlib project does not assign issues. Issues are
+"assigned" or "claimed" by opening a PR; there is no other assignment
+mechanism. If you have opened such a PR, please comment on the issue thread to
+avoid duplication of work. Please check if there is an existing PR for the
+issue you are addressing. If there is, try to work with the author by
+submitting reviews of their code or commenting on the PR rather than opening
+a new PR; duplicate PRs are subject to being closed.  However, if the existing
+PR is an outline, unlikely to work, or stalled, and the original author is
+unresponsive, feel free to open a new PR referencing the old one.
 
 .. _submitting-a-bug-report:
 
@@ -73,7 +125,7 @@ If you are reporting a bug, please do your best to include the following:
       >>> platform.python_version()
       '3.9.2'
 
-We have preloaded the issue creation page with a Markdown template that you can
+We have preloaded the issue creation page with a Markdown form that you can
 use to organize this information.
 
 Thank you for your help in keeping bug reports complete, targeted and descriptive.
@@ -123,9 +175,9 @@ A brief overview is:
 
 5. Create a branch to hold your changes::
 
-      git checkout -b my-feature origin/master
+      git checkout -b my-feature origin/main
 
-   and start making changes. Never work in the ``master`` branch!
+   and start making changes. Never work in the ``main`` branch!
 
 6. Work on this copy, on your computer, using Git to do the version control.
    When you're done editing e.g., ``lib/matplotlib/collections.py``, do::
@@ -279,6 +331,12 @@ API consistency and stability are of great value. Therefore, API changes
 (e.g. signature changes, behavior changes, removals) will only be conducted
 if the added benefit is worth the user effort for adapting.
 
+Because we are a visualization library our primary output is the final
+visualization the user sees.  Thus it is our :ref:`long standing
+<color_changes>` policy that the appearance of the figure is part of the API
+and any changes, either semantic or esthetic, will be treated as a
+backwards-incompatible API change.
+
 API changes in Matplotlib have to be performed following the deprecation process
 below, except in very rare circumstances as deemed necessary by the development team.
 This ensures that users are notified before the change will take effect and thus
@@ -288,7 +346,7 @@ Rules
 ~~~~~
 
 - Deprecations are targeted at the next point.release (e.g. 3.x)
-- Deprecated API is generally removed two two point-releases after introduction
+- Deprecated API is generally removed two point-releases after introduction
   of the deprecation. Longer deprecations can be imposed by core developers on
   a case-by-case basis to give more time for the transition
 - The old API must remain fully functional during the deprecation period
@@ -303,8 +361,8 @@ Introducing
 1. Announce the deprecation in a new file
    :file:`doc/api/next_api_changes/deprecations/99999-ABC.rst` where ``99999``
    is the pull request number and ``ABC`` are the contributor's initials.
-2. If possible, issue a `.MatplotlibDeprecationWarning` when the deprecated
-   API is used. There are a number of helper tools for this:
+2. If possible, issue a `~matplotlib.MatplotlibDeprecationWarning` when the
+   deprecated API is used. There are a number of helper tools for this:
 
    - Use ``_api.warn_deprecated()`` for general deprecation warnings
    - Use the decorator ``@_api.deprecated`` to deprecate classes, functions,
@@ -526,7 +584,9 @@ running the script::
     from matplotlib import my_matplotlib_module
     my_matplotlib_module.set_range(0, 0)  # set range
 
-will display::
+will display
+
+.. code-block:: none
 
     UserWarning: Attempting to set identical bottom==top
     warnings.warn('Attempting to set identical bottom==top')

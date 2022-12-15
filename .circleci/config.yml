@@ -31,7 +31,7 @@ commands:
               git remote add upstream https://github.com/matplotlib/matplotlib.git
             fi
             git fetch upstream
-            if [[ "$CIRCLE_BRANCH" != "master" ]] && \
+            if [[ "$CIRCLE_BRANCH" != "main" ]] && \
                [[ "$CIRCLE_PR_NUMBER" != "" ]]; then
               echo "Merging ${CIRCLE_PR_NUMBER}"
               git pull --ff-only upstream "refs/pull/${CIRCLE_PR_NUMBER}/merge"
@@ -55,10 +55,12 @@ commands:
               texlive-latex-recommended \
               texlive-pictures \
               texlive-xetex \
+              ttf-wqy-zenhei \
               graphviz \
               fonts-crosextra-carlito \
               fonts-freefont-otf \
               fonts-humor-sans \
+              fonts-noto-cjk \
               optipng
 
   fonts-install:
@@ -86,7 +88,7 @@ commands:
             python -m pip install --upgrade --user wheel
             python -m pip install --upgrade --user 'setuptools!=60.6.0'
 
-  deps-install:
+  doc-deps-install:
     parameters:
       numpy_version:
         type: string
@@ -95,6 +97,8 @@ commands:
       - run:
           name: Install Python dependencies
           command: |
+            python -m pip install --no-deps --user \
+                git+https://github.com/matplotlib/mpl-sphinx-theme.git
             python -m pip install --user \
                 numpy<< parameters.numpy_version >> codecov coverage \
                 -r requirements/doc/doc-requirements.txt
@@ -133,11 +137,11 @@ commands:
             export SOURCE_DATE_EPOCH="$(git log -1 --format=%at $(git describe --abbrev=0))"
             # Set release mode only when deploying to devdocs.
             if [ "$CIRCLE_PROJECT_USERNAME" = "matplotlib" ] && \
-               [ "$CIRCLE_BRANCH" = "master" ] && \
+               [ "$CIRCLE_BRANCH" = "main" ] && \
                [ "$CIRCLE_PR_NUMBER" = "" ]; then
               export RELEASE_TAG='-t release'
             fi
-            make html O="-T $RELEASE_TAG"
+            make html O="-T $RELEASE_TAG -j4"
             rm -r build/html/_sources
           working_directory: doc
       - save_cache:
@@ -149,7 +153,12 @@ commands:
     steps:
       - run:
           name: Bundle sphinx-gallery documentation artifacts
-          command: tar cf doc/build/sphinx-gallery-files.tar.gz doc/api/_as_gen doc/gallery doc/tutorials
+          command: >
+            tar cf doc/build/sphinx-gallery-files.tar.gz
+            doc/api/_as_gen
+            doc/gallery
+            doc/plot_types
+            doc/tutorials
           when: always
       - store_artifacts:
           path: doc/build/sphinx-gallery-files.tar.gz
@@ -163,6 +172,7 @@ jobs:
   docs-python38:
     docker:
       - image: cimg/python:3.8
+    resource_class: large
     steps:
       - checkout
       - check-skip
@@ -172,8 +182,8 @@ jobs:
       - fonts-install
       - pip-install
 
-      - deps-install
       - mpl-install
+      - doc-deps-install
 
       - doc-build
 

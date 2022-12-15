@@ -87,10 +87,12 @@ Random data in tests
 Random data is a very convenient way to generate data for examples,
 however the randomness is problematic for testing (as the tests
 must be deterministic!).  To work around this set the seed in each test.
-For numpy use::
+For numpy's default random number generator use::
 
   import numpy as np
-  np.random.seed(19680801)
+  rng = np.random.default_rng(19680801)
+
+and then use ``rng`` when generating the random numbers.
 
 The seed is John Hunter's birthday.
 
@@ -157,7 +159,9 @@ workflows
 GitHub Actions should be automatically enabled for your personal Matplotlib
 fork once the YAML workflow files are in it. It generally isn't necessary to
 look at these workflows, since any pull request submitted against the main
-Matplotlib repository will be tested.
+Matplotlib repository will be tested. The Tests workflow is skipped in forked
+repositories but you can trigger a run manually from the `GitHub web interface
+<https://docs.github.com/en/actions/managing-workflow-runs/manually-running-a-workflow>`_.
 
 You can see the GitHub Actions results at
 https://github.com/your_GitHub_user_name/matplotlib/actions -- here's `an
@@ -169,7 +173,7 @@ Using tox
 
 `Tox <https://tox.readthedocs.io/en/latest/>`_ is a tool for running tests
 against multiple Python environments, including multiple versions of Python
-(e.g., 3.6, 3.7) and even different Python implementations altogether
+(e.g., 3.7, 3.8) and even different Python implementations altogether
 (e.g., CPython, PyPy, Jython, etc.), as long as all these versions are
 available on your system's $PATH (consider using your system package manager,
 e.g. apt-get, yum, or Homebrew, to install them).
@@ -186,7 +190,7 @@ You can also run tox on a subset of environments:
 
 .. code-block:: bash
 
-    $ tox -e py37,py38
+    $ tox -e py38,py39
 
 Tox processes everything serially so it can take a long time to test
 several environments. To speed it up, you might try using a new,
@@ -256,4 +260,3 @@ The test discovery scope can be narrowed to single test modules or even single
 functions::
 
     python -m pytest --pyargs matplotlib.tests.test_simplification.py::test_clipping
-

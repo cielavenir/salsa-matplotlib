@@ -82,27 +82,20 @@ it, use
 
    make SPHINXOPTS= html
 
-On Windows the arguments must be at the end of the statement:
-
-.. code-block:: bat
-
-   make html SPHINXOPTS=
-
 You can use the ``O`` variable to set additional options:
 
 * ``make O=-j4 html`` runs a parallel build with 4 processes.
 * ``make O=-Dplot_formats=png:100 html`` saves figures in low resolution.
 * ``make O=-Dplot_gallery=0 html`` skips the gallery build.
 
-Multiple options can be combined using e.g. ``make O='-j4 -Dplot_gallery=0'
+Multiple options can be combined, e.g. ``make O='-j4 -Dplot_gallery=0'
 html``.
 
-On Windows, either use the format shown above or set options as environment variables, e.g.:
+On Windows, set the options as environment variables, e.g.:
 
 .. code-block:: bat
 
-   set O=-W --keep-going -j4
-   make html
+   set SPHINXOPTS= & set O=-j4 -Dplot_gallery=0 & make html
 
 Showing locally built docs
 --------------------------
@@ -199,7 +192,7 @@ Documents can be linked with the ``:doc:`` directive:
 
    See the :doc:`/users/installing/index`
 
-   See the tutorial :doc:`/tutorials/introductory/usage`
+   See the tutorial :doc:`/tutorials/introductory/quick_start`
 
    See the example :doc:`/gallery/lines_bars_and_markers/simple_plot`
 
@@ -207,7 +200,7 @@ will render as:
 
   See the :doc:`/users/installing/index`
 
-  See the tutorial :doc:`/tutorials/introductory/usage`
+  See the tutorial :doc:`/tutorials/introductory/quick_start`
 
   See the example :doc:`/gallery/lines_bars_and_markers/simple_plot`
 
@@ -269,7 +262,7 @@ generates a link like this: `matplotlib.collections.LineCollection`.
 have to use qualifiers like ``:class:``, ``:func:``, ``:meth:`` and the likes.
 
 Often, you don't want to show the full package and module name. As long as the
-target is unanbigous you can simply leave them out:
+target is unambiguous you can simply leave them out:
 
 .. code-block:: rst
 
@@ -368,7 +361,7 @@ An example docstring looks like:
 
 .. code-block:: python
 
-    def hlines(self, y, xmin, xmax, colors='k', linestyles='solid',
+    def hlines(self, y, xmin, xmax, colors=None, linestyles='solid',
                label='', **kwargs):
         """
         Plot horizontal lines at each *y* from *xmin* to *xmax*.
@@ -382,24 +375,26 @@ An example docstring looks like:
             Respective beginning and end of each line. If scalars are
             provided, all lines will have the same length.
 
-        colors : array-like of colors, default: 'k'
+        colors : list of colors, default: :rc:`lines.color`
 
-        linestyles : {'solid', 'dashed', 'dashdot', 'dotted'}, default: 'solid'
+        linestyles : {'solid', 'dashed', 'dashdot', 'dotted'}, optional
 
         label : str, default: ''
 
         Returns
         -------
-        lines : `~matplotlib.collections.LineCollection`
+        `~matplotlib.collections.LineCollection`
 
         Other Parameters
         ----------------
-        **kwargs : `~matplotlib.collections.LineCollection` properties
+        data : indexable object, optional
+            DATA_PARAMETER_PLACEHOLDER
+        **kwargs :  `~matplotlib.collections.LineCollection` properties.
 
-        See also
+        See Also
         --------
         vlines : vertical lines
-        axhline: horizontal line across the axes
+        axhline : horizontal line across the Axes
         """
 
 See the `~.Axes.hlines` documentation for how this renders.
@@ -566,10 +561,10 @@ effect.
 Sphinx automatically links code elements in the definition blocks of ``See
 also`` sections. No need to use backticks there::
 
-   See also
+   See Also
    --------
    vlines : vertical lines
-   axhline: horizontal line across the axes
+   axhline : horizontal line across the Axes
 
 Wrapping parameter lists
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -673,7 +668,7 @@ Keyword arguments
 
 Since Matplotlib uses a lot of pass-through ``kwargs``, e.g., in every function
 that creates a line (`~.pyplot.plot`, `~.pyplot.semilogx`, `~.pyplot.semilogy`,
-etc...), it can be difficult for the new user to know which ``kwargs`` are
+etc.), it can be difficult for the new user to know which ``kwargs`` are
 supported.  Matplotlib uses a docstring interpolation scheme to support
 documentation of every function that takes a ``**kwargs``.  The requirements
 are:
@@ -684,14 +679,14 @@ are:
 2. as automated as possible so that as properties change, the docs
    are updated automatically.
 
-The ``@docstring.interpd`` decorator implements this.  Any function accepting
+The ``@_docstring.interpd`` decorator implements this.  Any function accepting
 `.Line2D` pass-through ``kwargs``, e.g., `matplotlib.axes.Axes.plot`, can list
 a summary of the `.Line2D` properties, as follows:
 
 .. code-block:: python
 
   # in axes.py
-  @docstring.interpd
+  @_docstring.interpd
   def plot(self, *args, **kwargs):
       """
       Some stuff omitted
@@ -726,7 +721,7 @@ gets interpolated into the docstring.
 
 Note that this scheme does not work for decorating an Artist's ``__init__``, as
 the subclass and its properties are not defined yet at that point.  Instead,
-``@docstring.interpd`` can be used to decorate the class itself -- at that
+``@_docstring.interpd`` can be used to decorate the class itself -- at that
 point, `.kwdoc` can list the properties and interpolate them into
 ``__init__.__doc__``.
 
@@ -847,7 +842,7 @@ render as comments in :doc:`/gallery/lines_bars_and_markers/simple_plot`.
 
 Tutorials are made with the exact same mechanism, except they are longer, and
 typically have more than one comment block (i.e.
-:doc:`/tutorials/introductory/usage`).  The first comment block
+:doc:`/tutorials/introductory/quick_start`).  The first comment block
 can be the same as the example above.  Subsequent blocks of ReST text
 are delimited by a line of ``###`` characters:
 
@@ -962,41 +957,6 @@ Use the full path for this directive, relative to the doc root at
 found by users at ``http://matplotlib.org/stable/old_topic/old_info2``.
 For clarity, do not use relative links.
 
-
-Adding animations
------------------
-
-Animations are scraped automatically by Sphinx-gallery. If this is not
-desired,
-there is also a Matplotlib Google/Gmail account with username ``mplgithub``
-which was used to setup the github account but can be used for other
-purposes, like hosting Google docs or Youtube videos.  You can embed a
-Matplotlib animation in the docs by first saving the animation as a
-movie using :meth:`matplotlib.animation.Animation.save`, and then
-uploading to `Matplotlib's Youtube
-channel <https://www.youtube.com/user/matplotlib>`_ and inserting the
-embedding string youtube provides like:
-
-.. code-block:: rst
-
-  .. raw:: html
-
-     <iframe width="420" height="315"
-       src="https://www.youtube.com/embed/32cjc6V0OZY"
-       frameborder="0" allowfullscreen>
-     </iframe>
-
-An example save command to generate a movie looks like this
-
-.. code-block:: python
-
-    ani = animation.FuncAnimation(fig, animate, np.arange(1, len(y)),
-        interval=25, blit=True, init_func=init)
-
-    ani.save('double_pendulum.mp4', fps=15)
-
-Contact Michael Droettboom for the login password to upload youtube videos of
-google docs to the mplgithub account.
 
 .. _inheritance-diagrams:
 
