@@ -8,8 +8,8 @@ mplsetup.cfg.template for more information.
 # and/or pip.
 import sys
 
-py_min_version = (3, 7)  # minimal supported python version
-since_mpl_version = (3, 4)  # py_min_version is required since this mpl version
+py_min_version = (3, 8)  # minimal supported python version
+since_mpl_version = (3, 6)  # py_min_version is required since this mpl version
 
 if sys.version_info < py_min_version:
     error = """
@@ -32,7 +32,6 @@ import subprocess
 from setuptools import setup, find_packages, Distribution, Extension
 import setuptools.command.build_ext
 import setuptools.command.build_py
-import setuptools.command.test
 import setuptools.command.sdist
 
 import setupext
@@ -65,12 +64,6 @@ def has_flag(self, flagname):
                 raise
             return False
     return True
-
-
-class NoopTestCommand(setuptools.command.test.test):
-    def __init__(self, dist):
-        print("Matplotlib does not support running tests with "
-              "'python setup.py test'. Please run 'pytest'.")
 
 
 class BuildExtraLibraries(setuptools.command.build_ext.build_ext):
@@ -140,7 +133,7 @@ class BuildExtraLibraries(setuptools.command.build_ext.build_ext):
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.STDOUT,
                                         universal_newlines=True)
-            except Exception as e:
+            except Exception:
                 pass
             else:
                 version = result.stdout.lower()
@@ -167,12 +160,6 @@ class BuildExtraLibraries(setuptools.command.build_ext.build_ext):
         return env
 
     def build_extensions(self):
-        # Remove the -Wstrict-prototypes option, it's not valid for C++.  Fixed
-        # in Py3.7 as bpo-5755.
-        try:
-            self.compiler.compiler_so.remove('-Wstrict-prototypes')
-        except (ValueError, AttributeError):
-            pass
         if (self.compiler.compiler_type == 'msvc' and
                 os.environ.get('MPL_DISABLE_FH4')):
             # Disable FH4 Exception Handling implementation so that we don't
@@ -207,7 +194,7 @@ def update_matplotlibrc(path):
     # line.  Otherwise, use the default `##backend: Agg` which has no effect
     # even after decommenting, which allows _auto_backend_sentinel to be filled
     # in at import time.
-    template_lines = path.read_text().splitlines(True)
+    template_lines = path.read_text(encoding="utf-8").splitlines(True)
     backend_line_idx, = [  # Also asserts that there is a single such line.
         idx for idx, line in enumerate(template_lines)
         if "#backend:" in line]
@@ -215,7 +202,7 @@ def update_matplotlibrc(path):
         "#backend: {}\n".format(setupext.options["backend"])
         if setupext.options["backend"]
         else "##backend: Agg\n")
-    path.write_text("".join(template_lines))
+    path.write_text("".join(template_lines), encoding="utf-8")
 
 
 class BuildPy(setuptools.command.build_py.build_py):
@@ -276,7 +263,7 @@ setup(  # Finally, pass this all along to setuptools to do the heavy lifting.
     author="John D. Hunter, Michael Droettboom",
     author_email="matplotlib-users@python.org",
     url="https://matplotlib.org",
-    download_url="https://matplotlib.org/users/installing.html",
+    download_url="https://matplotlib.org/stable/users/installing/index.html",
     project_urls={
         'Documentation': 'https://matplotlib.org',
         'Source Code': 'https://github.com/matplotlib/matplotlib',
@@ -296,10 +283,10 @@ setup(  # Finally, pass this all along to setuptools to do the heavy lifting.
         'License :: OSI Approved :: Python Software Foundation License',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
         'Topic :: Scientific/Engineering :: Visualization',
     ],
 
@@ -315,22 +302,22 @@ setup(  # Finally, pass this all along to setuptools to do the heavy lifting.
     python_requires='>={}'.format('.'.join(str(n) for n in py_min_version)),
     setup_requires=[
         "certifi>=2020.06.20",
-        "numpy>=1.17",
-        "setuptools_scm>=4",
-        "setuptools_scm_git_archive",
+        "numpy>=1.19",
+        "setuptools_scm>=7",
     ],
     install_requires=[
+        "contourpy>=1.0.1",
         "cycler>=0.10",
         "fonttools>=4.22.0",
         "kiwisolver>=1.0.1",
-        "numpy>=1.17",
+        "numpy>=1.19",
         "packaging>=20.0",
         "pillow>=6.2.0",
         "pyparsing>=2.2.1",
         "python-dateutil>=2.7",
     ] + (
         # Installing from a git checkout that is not producing a wheel.
-        ["setuptools_scm>=4"] if (
+        ["setuptools_scm>=7"] if (
             Path(__file__).with_name(".git").exists() and
             os.environ.get("CIBUILDWHEEL", "0") != "1"
         ) else []
@@ -343,7 +330,6 @@ setup(  # Finally, pass this all along to setuptools to do the heavy lifting.
         "fallback_version": "0.0+UNKNOWN",
     },
     cmdclass={
-        "test": NoopTestCommand,
         "build_ext": BuildExtraLibraries,
         "build_py": BuildPy,
         "sdist": Sdist,

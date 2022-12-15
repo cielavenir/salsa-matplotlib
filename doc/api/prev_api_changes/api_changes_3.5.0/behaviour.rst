@@ -47,16 +47,16 @@ corresponding ``Axes.add_*`` method.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Historically, it has not been possible to filter
-`.MatplotlibDeprecationWarning`\s by checking for `DeprecationWarning`, since we
-subclass `UserWarning` directly.
+`~matplotlib.MatplotlibDeprecationWarning`\s by checking for
+`DeprecationWarning`, since we subclass `UserWarning` directly.
 
 The decision to not subclass `DeprecationWarning` has to do with a decision
 from core Python in the 2.x days to not show `DeprecationWarning`\s to users.
 However, there is now a more sophisticated filter in place (see
 https://www.python.org/dev/peps/pep-0565/).
 
-Users will now see `.MatplotlibDeprecationWarning` only during interactive
-sessions, and these can be silenced by the standard mechanism:
+Users will now see `~matplotlib.MatplotlibDeprecationWarning` only during
+interactive sessions, and these can be silenced by the standard mechanism:
 
 .. code:: python
 
@@ -198,8 +198,8 @@ This affects `.ContourSet` itself and its subclasses, `.QuadContourSet`
 ``hatch.SmallFilledCircles`` inherits from ``hatch.Circles``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``hatch.SmallFilledCircles`` class now inherits from ``hatch.Circles``
-rather than from ``hatch.SmallCircles``.
+The `.hatch.SmallFilledCircles` class now inherits from `.hatch.Circles` rather
+than from `.hatch.SmallCircles`.
 
 hexbin with a log norm
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -229,19 +229,19 @@ defaults to *False*.
 
 Type 1 fonts have a large part of their code encrypted as an obsolete
 copy-protection measure. This part is now available decrypted as the
-``decrypted`` attribute of `~.type1font.Type1Font`. This decrypted data is not
-yet parsed, but this is a prerequisite for implementing subsetting.
+``decrypted`` attribute of ``matplotlib.type1font.Type1Font``. This decrypted
+data is not yet parsed, but this is a prerequisite for implementing subsetting.
 
 3D contourf polygons placed between levels
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The polygons used in a 3D `~mpl_toolkits.mplot3d.Axes3D.contourf` plot are now
+The polygons used in a 3D `~.Axes3D.contourf` plot are now
 placed halfway between the contour levels, as each polygon represents the
 location of values that lie between two levels.
 
 ``AxesDivider`` now defaults to rcParams-specified pads
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-`.AxesDivider.append_axes`, `.AxesDivider.new_horizontal`, and
-`.AxesDivider.new_vertical` now default to paddings specified by
+`.AxesDivider.append_axes`, ``AxesDivider.new_horizontal``, and
+``AxesDivider.new_vertical`` now default to paddings specified by
 :rc:`figure.subplot.wspace` and :rc:`figure.subplot.hspace` rather than zero.

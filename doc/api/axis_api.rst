@@ -41,7 +41,6 @@ Inheritance
    :nosignatures:
 
    Axis.clear
-   Axis.cla
    Axis.get_scale
 
 
@@ -151,6 +150,7 @@ Interactive
    :nosignatures:
 
    Axis.contains
+   Axis.pickradius
    Axis.get_pickradius
    Axis.set_pickradius
 

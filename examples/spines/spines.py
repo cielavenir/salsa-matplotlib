@@ -5,9 +5,12 @@ Spines
 
 This demo compares:
 
-- normal axes, with spines on all four sides;
-- an axes with spines only on the left and bottom;
-- an axes using custom bounds to limit the extent of the spine.
+- normal Axes, with spines on all four sides;
+- an Axes with spines only on the left and bottom;
+- an Axes using custom bounds to limit the extent of the spine.
+
+Each `.axes.Axes` has a list of `.Spine` objects, accessible
+via the container ``ax.spines``.
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -44,3 +47,12 @@ ax2.yaxis.set_ticks_position('left')
 ax2.xaxis.set_ticks_position('bottom')
 
 plt.show()
+
+# .. admonition:: References
+#
+#    The use of the following functions, methods, classes and modules is shown
+#    in this example:
+#
+#    - `matplotlib.Spines.set_visible`
+#    - `matplotlib.Spines.set_bounds`
+#    - `matplotlib.axis.set_ticks_position`

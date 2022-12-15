@@ -27,6 +27,7 @@ Interactive
 -----------
 
 .. autosummary::
+   :template: autosummary.rst
    :toctree: _as_gen
    :nosignatures:
 
@@ -35,6 +36,8 @@ Interactive
    Artist.pchanged
    Artist.get_cursor_data
    Artist.format_cursor_data
+   Artist.set_mouseover
+   Artist.get_mouseover
    Artist.mouseover
    Artist.contains
    Artist.pick
@@ -46,6 +49,7 @@ Clipping
 --------
 
 .. autosummary::
+   :template: autosummary.rst
    :toctree: _as_gen
    :nosignatures:
 
@@ -60,6 +64,7 @@ Bulk Properties
 ---------------
 
 .. autosummary::
+   :template: autosummary.rst
    :toctree: _as_gen
    :nosignatures:
 
@@ -72,6 +77,7 @@ Drawing
 -------
 
 .. autosummary::
+   :template: autosummary.rst
    :toctree: _as_gen
    :nosignatures:
 
@@ -99,12 +105,14 @@ Drawing
 
    Artist.get_agg_filter
    Artist.get_window_extent
+   Artist.get_tightbbox
    Artist.get_transformed_clip_path_and_affine
 
 Figure and Axes
 ---------------
 
 .. autosummary::
+   :template: autosummary.rst
    :toctree: _as_gen
    :nosignatures:
 
@@ -119,6 +127,7 @@ Children
 --------
 
 .. autosummary::
+   :template: autosummary.rst
    :toctree: _as_gen
    :nosignatures:
 
@@ -129,6 +138,7 @@ Transform
 ---------
 
 .. autosummary::
+   :template: autosummary.rst
    :toctree: _as_gen
    :nosignatures:
 
@@ -140,6 +150,7 @@ Units
 -----
 
 .. autosummary::
+   :template: autosummary.rst
    :toctree: _as_gen
    :nosignatures:
 
@@ -151,6 +162,7 @@ Metadata
 --------
 
 .. autosummary::
+   :template: autosummary.rst
    :toctree: _as_gen
    :nosignatures:
 
@@ -165,6 +177,7 @@ Miscellaneous
 -------------
 
 .. autosummary::
+   :template: autosummary.rst
    :toctree: _as_gen
    :nosignatures:
 
@@ -177,6 +190,7 @@ Functions
 =========
 
 .. autosummary::
+   :template: autosummary.rst
    :toctree: _as_gen
    :nosignatures:
 

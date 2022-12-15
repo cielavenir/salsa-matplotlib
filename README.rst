@@ -7,14 +7,14 @@
 .. |GitHubActions| image:: https://github.com/matplotlib/matplotlib/workflows/Tests/badge.svg
 .. _GitHubActions: https://github.com/matplotlib/matplotlib/actions?query=workflow%3ATests
 
-.. |AzurePipelines| image:: https://dev.azure.com/matplotlib/matplotlib/_apis/build/status/matplotlib.matplotlib?branchName=master
-.. _AzurePipelines: https://dev.azure.com/matplotlib/matplotlib/_build/latest?definitionId=1&branchName=master
+.. |AzurePipelines| image:: https://dev.azure.com/matplotlib/matplotlib/_apis/build/status/matplotlib.matplotlib?branchName=main
+.. _AzurePipelines: https://dev.azure.com/matplotlib/matplotlib/_build/latest?definitionId=1&branchName=main
 
-.. |AppVeyor| image:: https://ci.appveyor.com/api/projects/status/github/matplotlib/matplotlib?branch=master&svg=true
+.. |AppVeyor| image:: https://ci.appveyor.com/api/projects/status/github/matplotlib/matplotlib?branch=main&svg=true
 .. _AppVeyor: https://ci.appveyor.com/project/matplotlib/matplotlib
 
-.. |Codecov| image:: https://codecov.io/github/matplotlib/matplotlib/badge.svg?branch=master&service=github
-.. _Codecov: https://codecov.io/github/matplotlib/matplotlib?branch=master
+.. |Codecov| image:: https://codecov.io/github/matplotlib/matplotlib/badge.svg?branch=main&service=github
+.. _Codecov: https://codecov.io/github/matplotlib/matplotlib?branch=main
 
 .. |LGTM| image:: https://img.shields.io/lgtm/grade/python/github/matplotlib/matplotlib.svg?logo=lgtm&logoWidth=18
 .. _LGTM: https://lgtm.com/projects/g/matplotlib/matplotlib
@@ -51,7 +51,7 @@ Check out our `home page <https://matplotlib.org/>`_ for more information.
 
 Matplotlib produces publication-quality figures in a variety of hardcopy
 formats and interactive environments across platforms. Matplotlib can be used
-in Python scripts, the Python and IPython shell, web application servers, and
+in Python scripts, Python/IPython shells, web application servers, and
 various graphical user interface toolkits.
 
 
@@ -116,4 +116,3 @@ For more information, please visit `the informational page
 <https://sustainable-open-science-and-software.github.io/>`__ or download the
 `participant information sheet
 <https://sustainable-open-science-and-software.github.io/assets/PIS_sustainable_software.pdf>`__.
-
