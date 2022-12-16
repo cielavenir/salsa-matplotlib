@@ -6,8 +6,10 @@ matplotlib (3.6.2-1) UNRELEASED; urgency=medium
   [ Sandro Tosi ]
   * New upstream release
   * keep inkscrape disabled in b-d
+  * debian/patches
+    - refresh patches
 
- -- Sandro Tosi <morph@debian.org>  Thu, 15 Dec 2022 17:11:43 -0500
+ -- Sandro Tosi <morph@debian.org>  Fri, 16 Dec 2022 14:18:22 -0500
 
 matplotlib (3.5.2-4) unstable; urgency=medium
 
