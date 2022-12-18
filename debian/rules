@@ -5,7 +5,6 @@ export XDG_RUNTIME_DIR=/tmp
 PY3VERS := $(shell py3versions -v -r debian/control)
 DEFPY3 := $(shell py3versions -v -d)
 PY_PLATFORM := $(shell python3 -c 'from distutils.util import get_platform; print(get_platform())')
-pd := python-matplotlib-doc
 p3 := python3-matplotlib
 pdata := python-matplotlib-data
 DEB_BUILD_OPTIONS += --no-parallel
@@ -28,11 +27,6 @@ build: build-arch build-indep
 build-indep: build-indep-stamp
 build-indep-stamp: build-arch-stamp
 	dh_testdir
-
-ifeq (,$(findstring nodoc,$(DEB_BUILD_PROFILES)))
-	# build the doc
-	MPLCONFIGDIR=. MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ PYTHONPATH=$(CURDIR)/build/lib.$(PY_PLATFORM)-$(DEFPY3) HOME=/tmp xvfb-run -a $(MAKE) -C doc html
-endif
 
 	touch $@
 
@@ -170,13 +164,9 @@ binary-indep: build-indep install-indep
 	dh_testdir -i
 	dh_testroot -i
 	dh_installchangelogs
-	dh_installdocs -p$(pd) -i doc/build/html/ tutorials/
 	# remove pyc file from doc
-	dh_installexamples -p$(pd) -i examples/*
 	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js -X.py -Xobjects.inv -X.html
 	dh_link -i
-	dh_sphinxdoc
-	find $(CURDIR)/debian/$(pd)/ -type f -name '*.pyc' | xargs --no-run-if-empty rm
 	dh_lintian -i
 	dh_fixperms -i
 	dh_installdeb -i

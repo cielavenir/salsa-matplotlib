@@ -47,23 +47,6 @@ Build-Depends: debhelper (>= 7),
                xauth,
                xvfb,
                zlib1g-dev,
-Build-Depends-Indep:
-               cm-super-minimal <!nodoc>,
-               ffmpeg <!nodoc>,
-               fonts-comic-neue <!nodoc>,
-               fonts-humor-sans <!nodoc>,
-               fonts-staypuft <!nodoc>,
-               optipng <!nodoc>,
-               python3-fonttools <!nodoc>,
-               python3-ipython <!nodoc>,
-               python3-mpl-sphinx-theme <!nodoc>,
-               python3-pydata-sphinx-theme (>= 0.7.1) <!nodoc>,
-               python3-scipy <!nodoc>,
-               python3-sphinx <!nodoc>,
-               python3-sphinx-copybutton <!nodoc>,
-               python3-sphinx-gallery (>= 0.10.0) <!stage1> <!nodoc>,
-               python3-sphinx-panels <!nodoc>,
-               python3-sphinxcontrib.svg2pdfconverter <!nodoc>,
 XS-Python-Version: all
 Standards-Version: 4.6.1
 Homepage: http://matplotlib.org/
@@ -94,7 +77,6 @@ Suggests: cm-super-minimal,
           inkscape,
           ipython3,
           librsvg2-common,
-          python-matplotlib-doc,
           python3-cairocffi,
           python3-gi,
           python3-gi-cairo,
@@ -127,19 +109,3 @@ Description: Python based plotting system (data package)
  users or an object oriented interface familiar to Python users.
  .
  This package contains architecture independent data for python-matplotlib.
-
-Package: python-matplotlib-doc
-Architecture: all
-Section: doc
-Depends: libjs-jquery,
-         ${misc:Depends},
-         ${sphinxdoc:Depends},
-Build-Profiles: <!nodoc>
-Description: Python based plotting system (documentation package)
- Matplotlib is a pure Python plotting library designed to bring
- publication quality plotting to Python with a syntax familiar to
- Matlab users. All of the plotting commands in the pylab interface can
- be accessed either via a functional interface familiar to Matlab
- users or an object oriented interface familiar to Python users.
- .
- This package contains documentation for python-matplotlib.
