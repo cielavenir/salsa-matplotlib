@@ -8,8 +8,10 @@ matplotlib (3.6.2-1) UNRELEASED; urgency=medium
   * keep inkscrape disabled in b-d
   * debian/patches
     - refresh patches
+  * debian/rules
+    - remove .eggs directory, created by setuptools-scm
 
- -- Sandro Tosi <morph@debian.org>  Fri, 16 Dec 2022 14:18:22 -0500
+ -- Sandro Tosi <morph@debian.org>  Sat, 17 Dec 2022 20:08:12 -0500
 
 matplotlib (3.5.2-4) unstable; urgency=medium
 

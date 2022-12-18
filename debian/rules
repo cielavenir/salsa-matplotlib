@@ -104,6 +104,7 @@ clean:
 
 	# remove auto-generated version file
 	rm -f lib/matplotlib/_version.py
+	rm -rf .eggs/
 
 # install
 install-arch: build-arch install-arch-stamp
