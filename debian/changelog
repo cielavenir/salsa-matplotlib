@@ -1,4 +1,4 @@
-matplotlib (3.6.2-1) UNRELEASED; urgency=medium
+matplotlib (3.6.2-1) experimental; urgency=medium
 
   [ Stefano Rivera ]
   * Revert the temporary inkscape change.
@@ -17,7 +17,7 @@ matplotlib (3.6.2-1) UNRELEASED; urgency=medium
   * debian/control
     - add fonttools to b-d, needed by tests
 
- -- Sandro Tosi <morph@debian.org>  Mon, 19 Dec 2022 01:55:47 -0500
+ -- Sandro Tosi <morph@debian.org>  Mon, 19 Dec 2022 01:56:13 -0500
 
 matplotlib (3.5.2-4) unstable; urgency=medium
 
