@@ -10,13 +10,14 @@ matplotlib (3.6.2-1) UNRELEASED; urgency=medium
     - refresh patches
   * debian/rules
     - remove .eggs directory, created by setuptools-scm
+    - skip failing tests
   * Stop building the -doc package; the cost of maintaining the build process
     and packaging more and more new packages is no longer sustainable, given the
     few users actually installing it.
   * debian/control
     - add fonttools to b-d, needed by tests
 
- -- Sandro Tosi <morph@debian.org>  Sat, 17 Dec 2022 20:34:21 -0500
+ -- Sandro Tosi <morph@debian.org>  Mon, 19 Dec 2022 01:55:47 -0500
 
 matplotlib (3.5.2-4) unstable; urgency=medium
 
