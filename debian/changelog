@@ -7,8 +7,9 @@ matplotlib (3.6.2-2) UNRELEASED; urgency=medium
       texlive-luatex, texlive-science, texlive-xetex, wxgtk4.0, xarray
   * debian/rules
     - enable test_contour.py tests
+    - exclude another test failing with Qt
 
- -- Sandro Tosi <morph@debian.org>  Fri, 23 Dec 2022 17:47:30 -0500
+ -- Sandro Tosi <morph@debian.org>  Fri, 23 Dec 2022 17:49:35 -0500
 
 matplotlib (3.6.2-1) experimental; urgency=medium
 
