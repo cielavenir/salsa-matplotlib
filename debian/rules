@@ -43,11 +43,10 @@ build-arch-stamp:
 
 ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
 	echo "backend      : TkAgg" > matplotlibrc
-	# test_contour.py requires countourpy, not yet packaged (other tests will fail at runtime, this fails at collect time)
 	# all the "not" tests are due to https://github.com/matplotlib/matplotlib/issues/24770
 	-for v in $(PY3VERS); do \
 		LIB=$$(python$$v -c "from distutils.command.build import build ; from distutils.core import Distribution ; b = build(Distribution()) ; b.finalize_options() ; print(b.build_platlib)") ; \
-		PYTHONPATH=$$LIB MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ MPLCONFIGDIR=. xvfb-run -a python$$v -m pytest --verbose --full-trace $$LIB/matplotlib/tests/ --ignore-glob=*/test_backend_nbagg.py --ignore-glob=*/test_contour.py -k 'not test_fig_close and not test_fig_sigint_override and not test_correct_key and not test_device_pixel_ratio_change and not test_subplottool and not test_figureoptions and not test_double_resize and not test_canvas_reinit and not test_form_widget_get_with_datetime_and_date_fields';  \
+		PYTHONPATH=$$LIB MATPLOTLIBDATA=$(CURDIR)/lib/matplotlib/mpl-data/ MPLCONFIGDIR=. xvfb-run -a python$$v -m pytest --verbose --full-trace $$LIB/matplotlib/tests/ --ignore-glob=*/test_backend_nbagg.py -k 'not test_fig_close and not test_fig_sigint_override and not test_correct_key and not test_device_pixel_ratio_change and not test_subplottool and not test_figureoptions and not test_double_resize and not test_canvas_reinit and not test_form_widget_get_with_datetime_and_date_fields';  \
 	done
 	rm -f matplotlibrc
 endif
