@@ -1,3 +1,10 @@
+matplotlib (3.6.2-2) UNRELEASED; urgency=medium
+
+  * debian/control
+    - add contourpy to b-d, needed by tests
+
+ -- Sandro Tosi <morph@debian.org>  Fri, 23 Dec 2022 01:23:27 -0500
+
 matplotlib (3.6.2-1) experimental; urgency=medium
 
   [ Stefano Rivera ]
