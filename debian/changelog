@@ -8,8 +8,10 @@ matplotlib (3.6.2-2) UNRELEASED; urgency=medium
   * debian/rules
     - enable test_contour.py tests
     - exclude another test failing with Qt
+  * debian/tests
+    - use py3versions --supported
 
- -- Sandro Tosi <morph@debian.org>  Fri, 23 Dec 2022 17:49:35 -0500
+ -- Sandro Tosi <morph@debian.org>  Fri, 23 Dec 2022 22:48:34 -0500
 
 matplotlib (3.6.2-1) experimental; urgency=medium
 
