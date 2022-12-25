@@ -1,3 +1,9 @@
+matplotlib (3.6.2-3) unstable; urgency=medium
+
+  * upload to unstable
+
+ -- Sandro Tosi <morph@debian.org>  Sun, 25 Dec 2022 14:49:42 -0500
+
 matplotlib (3.6.2-2) experimental; urgency=medium
 
   * debian/control
