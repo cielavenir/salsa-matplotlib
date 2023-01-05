@@ -165,6 +165,7 @@ binary-indep: build-indep install-indep
 	dh_testdir -i
 	dh_testroot -i
 	dh_installchangelogs
+	dh_installdocs -p$(pdata)
 	# remove pyc file from doc
 	dh_compress -i -Xexamples -Xexamples/data -Xpdf -X.js -X.py -Xobjects.inv -X.html
 	dh_link -i
