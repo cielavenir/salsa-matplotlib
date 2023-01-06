@@ -3,8 +3,10 @@ matplotlib (3.6.2-4) UNRELEASED; urgency=medium
   * debian/rules
     - run dh_installdocs on the -data pkg, to unstall changelog;
       Closes: #1027049
+  * debian/patches/PR24862.patch
+    - Fix argument checking in Axes3D.quiver; Closes: #1027285
 
- -- Sandro Tosi <morph@debian.org>  Thu, 05 Jan 2023 10:59:33 -0500
+ -- Sandro Tosi <morph@debian.org>  Thu, 05 Jan 2023 23:48:31 -0500
 
 matplotlib (3.6.2-3) unstable; urgency=medium
 

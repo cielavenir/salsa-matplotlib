@@ -6,3 +6,4 @@
 #0013-static-SHA.patch
 0014-py3k-sphinx.patch
 0015-disable-sphinx--W.patch
+PR24862.patch
