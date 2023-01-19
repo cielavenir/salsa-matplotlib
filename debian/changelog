@@ -3,8 +3,10 @@ matplotlib (3.6.3-1) UNRELEASED; urgency=medium
   * New upstream release
   * debian/patches/PR24862.patch
     - refresh patch
+  * debian/copyright
+    - extend packaging copyright years
 
- -- Sandro Tosi <morph@debian.org>  Wed, 18 Jan 2023 21:12:22 -0500
+ -- Sandro Tosi <morph@debian.org>  Wed, 18 Jan 2023 21:42:39 -0500
 
 matplotlib (3.6.2-4) unstable; urgency=medium
 
