@@ -944,6 +944,11 @@ def draw():
 
     This is equivalent to calling ``fig.canvas.draw_idle()``, where ``fig`` is
     the current figure.
+
+    See Also
+    --------
+    .FigureCanvasBase.draw_idle
+    .FigureCanvasBase.draw
     """
     gcf().canvas.draw_idle()
 
@@ -962,7 +967,10 @@ def savefig(*args, **kwargs):
 def figlegend(*args, **kwargs):
     return gcf().legend(*args, **kwargs)
 if Figure.legend.__doc__:
-    figlegend.__doc__ = Figure.legend.__doc__.replace("legend(", "figlegend(")
+    figlegend.__doc__ = Figure.legend.__doc__ \
+        .replace(" legend(", " figlegend(") \
+        .replace("fig.legend(", "plt.figlegend(") \
+        .replace("ax.plot(", "plt.plot(")
 
 
 ## Axes ##

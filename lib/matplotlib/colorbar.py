@@ -800,7 +800,7 @@ class Colorbar:
 
     def update_ticks(self):
         """
-        Setup the ticks and ticklabels. This should not be needed by users.
+        Set up the ticks and ticklabels. This should not be needed by users.
         """
         # Get the locator and formatter; defaults to self._locator if not None.
         self._get_ticker_locator_formatter()
@@ -923,7 +923,7 @@ class Colorbar:
             of locations.
 
         update_ticks : bool, default: True
-            This keyword argument is ignored and will be be removed.
+            This keyword argument is ignored and will be removed.
             Deprecated
 
          minor : bool
@@ -1003,7 +1003,7 @@ class Colorbar:
 
         Notes
         -----
-        By default, Matplotlib supports the above mentioned scales.
+        By default, Matplotlib supports the above-mentioned scales.
         Additionally, custom scales may be registered using
         `matplotlib.scale.register_scale`. These scales can then also
         be used here.
@@ -1167,7 +1167,11 @@ class Colorbar:
         self._minorlocator = None
         self._formatter = None
         self._minorformatter = None
-        if (self.boundaries is not None or
+        if (isinstance(self.mappable, contour.ContourSet) and
+                isinstance(self.norm, colors.LogNorm)):
+            # if contours have lognorm, give them a log scale...
+            self._set_scale('log')
+        elif (self.boundaries is not None or
                 isinstance(self.norm, colors.BoundaryNorm)):
             if self.spacing == 'uniform':
                 funcs = (self._forward_boundaries, self._inverse_boundaries)

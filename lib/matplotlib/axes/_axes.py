@@ -55,6 +55,12 @@ class Axes(_AxesBase):
     are 'xlim_changed' and 'ylim_changed' and the callback will be called with
     func(*ax*) where *ax* is the `Axes` instance.
 
+    .. note::
+
+        As a user, you do not instantiate Axes directly, but use Axes creation
+        methods instead; e.g. from `.pyplot` or `.Figure`:
+        `~.pyplot.subplots`, `~.pyplot.subplot_mosaic` or `.Figure.add_axes`.
+
     Attributes
     ----------
     dataLim : `.Bbox`
@@ -2907,9 +2913,9 @@ class Axes(_AxesBase):
         basefmt : str, default: 'C3-' ('C2-' in classic mode)
             A format string defining the properties of the baseline.
 
-        orientation : str, default: 'vertical'
+        orientation : {'vertical', 'horizontal'}, default: 'vertical'
             If 'vertical', will produce a plot with stems oriented vertically,
-            otherwise the stems will be oriented horizontally.
+            If 'horizontal', the stems will be oriented horizontally.
 
         bottom : float, default: 0
             The y/x-position of the baseline (depending on orientation).
@@ -6221,7 +6227,7 @@ default: :rc:`scatter.edgecolors`
 
            - It supports only flat shading (no outlines)
            - It lacks support for log scaling of the axes.
-           - It does not have a have a pyplot wrapper.
+           - It does not have a pyplot wrapper.
 
         Parameters
         ----------

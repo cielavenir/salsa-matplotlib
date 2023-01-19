@@ -323,7 +323,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
                 paths.append(mpath.Path(np.column_stack([xs, ys]), path.codes))
             xs = self.convert_xunits(offsets[:, 0])
             ys = self.convert_yunits(offsets[:, 1])
-            offsets = np.column_stack([xs, ys])
+            offsets = np.ma.column_stack([xs, ys])
 
         if not transform.is_affine:
             paths = [transform.transform_path_non_affine(path)
@@ -716,7 +716,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
         Parameters
         ----------
-        c : color or list of rgba tuples
+        c : color or list of RGBA tuples
 
         See Also
         --------
@@ -1469,7 +1469,7 @@ class LineCollection(Collection):
         ----------
         c : color or list of colors
             Single color (all lines have same color), or a
-            sequence of rgba tuples; if it is a sequence the lines will
+            sequence of RGBA tuples; if it is a sequence the lines will
             cycle through the sequence.
         """
         self.set_edgecolor(c)

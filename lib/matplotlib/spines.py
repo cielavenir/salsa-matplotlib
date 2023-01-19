@@ -23,7 +23,7 @@ class Spine(mpatches.Patch):
 
     Spines are subclasses of `.Patch`, and inherit much of their behavior.
 
-    Spines draw a line, a circle, or an arc depending if
+    Spines draw a line, a circle, or an arc depending on if
     `~.Spine.set_patch_line`, `~.Spine.set_patch_circle`, or
     `~.Spine.set_patch_arc` has been called. Line-like is the default.
 
@@ -302,8 +302,12 @@ class Spine(mpatches.Patch):
 
         Additionally, shorthand notations define a special positions:
 
-        * 'center' -> ('axes', 0.5)
-        * 'zero' -> ('data', 0.0)
+        * 'center' -> ``('axes', 0.5)``
+        * 'zero' -> ``('data', 0.0)``
+
+        Examples
+        --------
+        :doc:`/gallery/spines/spine_placement_demo`
         """
         if position in ('center', 'zero'):  # special positions
             pass
@@ -512,7 +516,7 @@ class Spines(MutableMapping):
     The container of all `.Spine`\s in an Axes.
 
     The interface is dict-like mapping names (e.g. 'left') to `.Spine` objects.
-    Additionally it implements some pandas.Series-like features like accessing
+    Additionally, it implements some pandas.Series-like features like accessing
     elements by attribute::
 
         spines['top'].set_visible(False)

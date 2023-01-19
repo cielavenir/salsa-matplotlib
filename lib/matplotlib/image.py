@@ -1487,7 +1487,7 @@ def imread(fname, format=None):
     format : str, optional
         The image file format assumed for reading the data.  The image is
         loaded as a PNG file if *format* is set to "png", if *fname* is a path
-        or opened file with a ".png" extension, or if it is an URL.  In all
+        or opened file with a ".png" extension, or if it is a URL.  In all
         other cases, *format* is ignored and the format is auto-detected by
         `PIL.Image.open`.
 
@@ -1552,7 +1552,7 @@ def imsave(fname, arr, vmin=None, vmax=None, cmap=None, format=None,
     RGB(A) images are passed through.  Single channel images will be
     colormapped according to *cmap* and *norm*.
 
-    .. note ::
+    .. note::
 
        If you want to save a single channel image as gray scale please use an
        image I/O library (such as pillow, tifffile, or imageio) directly.
@@ -1630,6 +1630,9 @@ def imsave(fname, arr, vmin=None, vmax=None, cmap=None, format=None,
             rgba = sm.to_rgba(arr, bytes=True)
         if pil_kwargs is None:
             pil_kwargs = {}
+        else:
+            # we modify this below, so make a copy (don't modify caller's dict)
+            pil_kwargs = pil_kwargs.copy()
         pil_shape = (rgba.shape[1], rgba.shape[0])
         image = PIL.Image.frombuffer(
             "RGBA", pil_shape, rgba, "raw", "RGBA", 0, 1)

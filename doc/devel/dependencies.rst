@@ -210,7 +210,8 @@ C++ compiler
 
 Matplotlib requires a C++ compiler that supports C++11.
 
-- `gcc 4.8.1 <https://gcc.gnu.org/projects/cxx-status.html#cxx11>`_ or higher
+- `gcc 4.8.1 <https://gcc.gnu.org/projects/cxx-status.html#cxx11>`_ or higher.  For gcc <6.5 you will
+  need to set ``$CFLAGS=-std=c++11`` to enable C++11 support.
 - `clang 3.3 <https://clang.llvm.org/cxx_status.html>`_ or higher
 - `Visual Studio 2015
   <https://docs.microsoft.com/en-us/cpp/overview/visual-cpp-language-conformance?view=msvc-140>`_
@@ -266,7 +267,7 @@ will be skipped by pytest.
 .. _nbformat: https://pypi.org/project/nbformat/
 .. _pandas: https://pypi.org/project/pandas/
 .. _pikepdf: https://pypi.org/project/pikepdf/
-.. _psutil: https://pypi.org/project/psuitl/
+.. _psutil: https://pypi.org/project/psutil/
 .. _pytz: https://fonts.google.com/noto/use#faq
 .. _pytest-cov: https://pytest-cov.readthedocs.io/en/latest/
 .. _pytest-flake8: https://pypi.org/project/pytest-flake8/

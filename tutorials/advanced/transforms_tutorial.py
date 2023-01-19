@@ -479,7 +479,7 @@ plt.show()
 #   a new transform with an added offset. So above we could have done::
 #
 #      shadow_transform = transforms.offset_copy(ax.transData,
-#               fig=fig, dx, dy, units='inches')
+#               fig, dx, dy, units='inches')
 #
 #
 # .. _transformation-pipeline:
@@ -567,8 +567,9 @@ plt.show()
 # the typical separable matplotlib Axes, with one additional piece
 # ``transProjection``::
 #
-#       self.transData = self.transScale + self.transProjection + \
-#           (self.transProjectionAffine + self.transAxes)
+#        self.transData = (
+#            self.transScale + self.transShift + self.transProjection +
+#            (self.transProjectionAffine + self.transWedge + self.transAxes))
 #
 # ``transProjection`` handles the projection from the space,
 # e.g., latitude and longitude for map data, or radius and theta for polar
