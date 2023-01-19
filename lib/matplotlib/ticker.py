@@ -55,7 +55,7 @@ and you will probably want to override the autoscale method to set the
 view limits from the data limits.
 
 If you want to override the default locator, use one of the above or a custom
-locator and pass it to the x or y axis instance. The relevant methods are::
+locator and pass it to the x- or y-axis instance. The relevant methods are::
 
   ax.xaxis.set_major_locator(xmajor_locator)
   ax.xaxis.set_minor_locator(xminor_locator)
@@ -758,7 +758,7 @@ class ScalarFormatter(Formatter):
 
     def _set_order_of_magnitude(self):
         # if scientific notation is to be used, find the appropriate exponent
-        # if using an numerical offset, find the exponent after applying the
+        # if using a numerical offset, find the exponent after applying the
         # offset. When lower power limit = upper <> 0, use provided exponent.
         if not self._scientific:
             self.orderOfMagnitude = 0
@@ -2262,19 +2262,19 @@ class LogLocator(Locator):
 
     def __init__(self, base=10.0, subs=(1.0,), numdecs=4, numticks=None):
         """
-        Place ticks on the locations : subs[j] * base**i
+        Place ticks at values ``subs[j] * base**n``.
 
         Parameters
         ----------
         base : float, default: 10.0
             The base of the log used, so major ticks are placed at
-            ``base**n``, n integer.
-        subs : None or str or sequence of float, default: (1.0,)
+            ``base**n``, where ``n`` is an integer.
+        subs : None or {'auto', 'all'} or sequence of float, default: (1.0,)
             Gives the multiples of integer powers of the base at which
-            to place ticks.  The default places ticks only at
+            to place ticks.  The default of ``(1.0, )`` places ticks only at
             integer powers of the base.
-            The permitted string values are ``'auto'`` and ``'all'``,
-            both of which use an algorithm based on the axis view
+            Permitted string values are ``'auto'`` and ``'all'``.
+            Both of these use an algorithm based on the axis view
             limits to determine whether and how to put ticks between
             integer powers of the base.  With ``'auto'``, ticks are
             placed only between integer powers; with ``'all'``, the

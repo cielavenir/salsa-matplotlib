@@ -467,20 +467,12 @@ class GridSpec(GridSpecBase):
             coordinates that the whole subplots area (including labels) will
             fit into. Default (None) is the whole figure.
         """
-
-        subplotspec_list = _tight_layout.get_subplotspec_list(
-            figure.axes, grid_spec=self)
-        if None in subplotspec_list:
-            _api.warn_external("This figure includes Axes that are not "
-                               "compatible with tight_layout, so results "
-                               "might be incorrect.")
-
         if renderer is None:
             renderer = figure._get_renderer()
-
         kwargs = _tight_layout.get_tight_layout_figure(
-            figure, figure.axes, subplotspec_list, renderer,
-            pad=pad, h_pad=h_pad, w_pad=w_pad, rect=rect)
+            figure, figure.axes,
+            _tight_layout.get_subplotspec_list(figure.axes, grid_spec=self),
+            renderer, pad=pad, h_pad=h_pad, w_pad=w_pad, rect=rect)
         if kwargs:
             self.update(**kwargs)
 
@@ -546,17 +538,17 @@ class SubplotSpec:
 
     .. note::
 
-        Likely, you'll never instantiate a `SubplotSpec` yourself. Instead you
-        will typically obtain one from a `GridSpec` using item-access.
+        Likely, you will never instantiate a `SubplotSpec` yourself. Instead,
+        you will typically obtain one from a `GridSpec` using item-access.
 
     Parameters
     ----------
     gridspec : `~matplotlib.gridspec.GridSpec`
         The GridSpec, which the subplot is referencing.
     num1, num2 : int
-        The subplot will occupy the num1-th cell of the given
-        gridspec.  If num2 is provided, the subplot will span between
-        num1-th cell and num2-th cell *inclusive*.
+        The subplot will occupy the *num1*-th cell of the given
+        *gridspec*.  If *num2* is provided, the subplot will span between
+        *num1*-th cell and *num2*-th cell **inclusive**.
 
         The index starts from 0.
     """
@@ -719,7 +711,7 @@ class SubplotSpec:
             Number of rows in grid.
 
         ncols : int
-            Number or columns in grid.
+            Number of columns in grid.
 
         Returns
         -------

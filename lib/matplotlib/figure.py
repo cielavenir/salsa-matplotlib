@@ -472,9 +472,9 @@ default: %(va)s
         """
         Add an `.Artist` to the figure.
 
-        Usually artists are added to Axes objects using `.Axes.add_artist`;
-        this method can be used in the rare cases where one needs to add
-        artists directly to the figure instead.
+        Usually artists are added to `~.axes.Axes` objects using
+        `.Axes.add_artist`; this method can be used in the rare cases where
+        one needs to add artists directly to the figure instead.
 
         Parameters
         ----------
@@ -506,7 +506,7 @@ default: %(va)s
     @_docstring.dedent_interpd
     def add_axes(self, *args, **kwargs):
         """
-        Add an Axes to the figure.
+        Add an `~.axes.Axes` to the figure.
 
         Call signatures::
 
@@ -516,8 +516,9 @@ default: %(va)s
         Parameters
         ----------
         rect : tuple (left, bottom, width, height)
-            The dimensions (left, bottom, width, height) of the new Axes. All
-            quantities are in fractions of figure width and height.
+            The dimensions (left, bottom, width, height) of the new
+            `~.axes.Axes`. All quantities are in fractions of figure width and
+            height.
 
         projection : {None, 'aitoff', 'hammer', 'lambert', 'mollweide', \
 'polar', 'rectilinear', str}, optional
@@ -866,13 +867,13 @@ default: %(va)s
             axes[0, 0].plot(x, y)
             axes[1, 1].scatter(x, y)
 
-            # Share a X axis with each column of subplots
+            # Share an X-axis with each column of subplots
             fig.subplots(2, 2, sharex='col')
 
-            # Share a Y axis with each row of subplots
+            # Share a Y-axis with each row of subplots
             fig.subplots(2, 2, sharey='row')
 
-            # Share both X and Y axes with all subplots
+            # Share both X- and Y-axes with all subplots
             fig.subplots(2, 2, sharex='all', sharey='all')
 
             # Note that this is the same as
@@ -984,9 +985,12 @@ default: %(va)s
         """
         return self.clear(keep_observers=keep_observers)
 
-    # Note: in the docstring below, the newlines in the examples after the
-    # calls to legend() allow replacing it with figlegend() to generate the
-    # docstring of pyplot.figlegend.
+    # Note: the docstring below is modified with replace for the pyplot
+    # version of this function because the method name differs (plt.figlegend)
+    # the replacements are:
+    #    " legend(" -> " figlegend(" for the signatures
+    #    "fig.legend(" -> "plt.figlegend" for the code examples
+    #    "ax.plot" -> "plt.plot" for consistency in using pyplot when able
     @_docstring.dedent_interpd
     def legend(self, *args, **kwargs):
         """
@@ -1238,7 +1242,7 @@ default: %(va)s
             cbar.solids.set_edgecolor("face")
             draw()
 
-        However this has negative consequences in other circumstances, e.g.
+        However, this has negative consequences in other circumstances, e.g.
         with semi-transparent images (alpha < 1) and colorbar extensions;
         therefore, this workaround is not used by default (see issue #1188).
         """
@@ -1483,7 +1487,7 @@ default: %(va)s
             Number of rows in grid.
 
         ncols : int, default: 1
-            Number or columns in grid.
+            Number of columns in grid.
 
         Returns
         -------
@@ -1520,7 +1524,7 @@ default: %(va)s
                    width_ratios=None, height_ratios=None,
                    **kwargs):
         """
-        Add a subfigure to this figure or subfigure.
+        Add a set of subfigures to this figure or subfigure.
 
         A subfigure has the same artist methods as a figure, and is logically
         the same as a figure, but cannot print itself.
@@ -1707,7 +1711,7 @@ default: %(va)s
         Parameters
         ----------
         renderer : `.RendererBase` subclass
-            renderer that will be used to draw the figures (i.e.
+            Renderer that will be used to draw the figures (i.e.
             ``fig.canvas.get_renderer()``)
 
         bbox_extra_artists : list of `.Artist` or ``None``
@@ -2191,7 +2195,7 @@ class SubFigure(FigureBase):
         ----------
         bbox : bbox or None
             If not None, then the bbox is used for relative bounding box.
-            Otherwise it is calculated from the subplotspec.
+            Otherwise, it is calculated from the subplotspec.
         """
         if bbox is not None:
             self.bbox_relative.p0 = bbox.p0
@@ -2538,9 +2542,9 @@ class Figure(FigureBase):
             - 'none' removes layout engine.
 
             If `None`, the behavior is controlled by :rc:`figure.autolayout`
-            (which if `True` behaves as if 'tight' were passed) and
+            (which if `True` behaves as if 'tight' was passed) and
             :rc:`figure.constrained_layout.use` (which if `True` behaves as if
-            'constrained' were passed).  If both are `True`,
+            'constrained' was passed).  If both are `True`,
             :rc:`figure.autolayout` takes priority.
 
             Users and libraries can define their own layout engines and pass
@@ -2615,18 +2619,25 @@ class Figure(FigureBase):
             may only be shown briefly or not shown at all if you or your
             environment are not managing an event loop.
 
-            Proper use cases for `.Figure.show` include running this from a
-            GUI application or an IPython shell.
+            Use cases for `.Figure.show` include running this from a GUI
+            application (where there is persistently an event loop running) or
+            from a shell, like IPython, that install an input hook to allow the
+            interactive shell to accept input while the figure is also being
+            shown and interactive.  Some, but not all, GUI toolkits will
+            register an input hook on import.  See :ref:`cp_integration` for
+            more details.
 
-            If you're running a pure python shell or executing a non-GUI
-            python script, you should use `matplotlib.pyplot.show` instead,
-            which takes care of managing the event loop for you.
+            If you're in a shell without input hook integration or executing a
+            python script, you should use `matplotlib.pyplot.show` with
+            ``block=True`` instead, which takes care of starting and running
+            the event loop for you.
 
         Parameters
         ----------
         warn : bool, default: True
             If ``True`` and we are not running headless (i.e. on Linux with an
             unset DISPLAY), issue warning when called on a non-GUI backend.
+
         """
         if self.canvas.manager is None:
             raise AttributeError(
@@ -3299,7 +3310,7 @@ class Figure(FigureBase):
             clicks until the input is terminated manually.
         timeout : float, default: 30 seconds
             Number of seconds to wait before timing out. If zero or negative
-            will never timeout.
+            will never time out.
         show_clicks : bool, default: True
             If True, show a red cross at the location of each click.
         mouse_add : `.MouseButton` or None, default: `.MouseButton.LEFT`
@@ -3318,7 +3329,7 @@ class Figure(FigureBase):
         -----
         The keyboard can also be used to select points in case your mouse
         does not have one or more of the buttons.  The delete and backspace
-        keys act like right clicking (i.e., remove last point), the enter key
+        keys act like right-clicking (i.e., remove last point), the enter key
         terminates input and any other key (not already used by the window
         manager) selects a point.
         """
@@ -3429,12 +3440,6 @@ class Figure(FigureBase):
         .Figure.set_layout_engine
         .pyplot.tight_layout
         """
-        from ._tight_layout import get_subplotspec_list
-        subplotspec_list = get_subplotspec_list(self.axes)
-        if None in subplotspec_list:
-            _api.warn_external("This figure includes Axes that are not "
-                               "compatible with tight_layout, so results "
-                               "might be incorrect.")
         # note that here we do not permanently set the figures engine to
         # tight_layout but rather just perform the layout in place and remove
         # any previous engines.

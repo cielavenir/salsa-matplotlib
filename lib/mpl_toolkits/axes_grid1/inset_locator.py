@@ -78,7 +78,7 @@ class AnchoredLocatorBase(AnchoredOffsetbox):
 
         px, py = self.get_offset(width, height, 0, 0, renderer)
         bbox_canvas = Bbox.from_bounds(px, py, width, height)
-        tr = ax.figure.transFigure.inverted()
+        tr = ax.figure.transSubfigure.inverted()
         bb = TransformedBbox(bbox_canvas, tr)
 
         return bb
@@ -349,7 +349,7 @@ def inset_axes(parent_axes, width, height, loc='upper right',
         Location to place the inset axes.  Valid locations are
         'upper left', 'upper center', 'upper right',
         'center left', 'center', 'center right',
-        'lower left', 'lower center, 'lower right'.
+        'lower left', 'lower center', 'lower right'.
         For backward compatibility, numeric values are accepted as well.
         See the parameter *loc* of `.Legend` for details.
 
@@ -457,7 +457,7 @@ def zoomed_inset_axes(parent_axes, zoom, loc='upper right',
         Location to place the inset axes.  Valid locations are
         'upper left', 'upper center', 'upper right',
         'center left', 'center', 'center right',
-        'lower left', 'lower center, 'lower right'.
+        'lower left', 'lower center', 'lower right'.
         For backward compatibility, numeric values are accepted as well.
         See the parameter *loc* of `.Legend` for details.
 

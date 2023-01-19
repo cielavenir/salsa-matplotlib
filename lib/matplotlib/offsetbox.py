@@ -511,7 +511,7 @@ class PaddedBox(OffsetBox):
             The contained `.Artist`.
         pad : float
             The padding in points. This will be scaled with the renderer dpi.
-            In contrast *width* and *height* are in *pixels* and thus not
+            In contrast, *width* and *height* are in *pixels* and thus not
             scaled.
         draw_frame : bool
             Whether to draw the contained `.FancyBboxPatch`.
@@ -945,7 +945,7 @@ class AnchoredOffsetbox(OffsetBox):
             The box location.  Valid locations are
             'upper left', 'upper center', 'upper right',
             'center left', 'center', 'center right',
-            'lower left', 'lower center, 'lower right'.
+            'lower left', 'lower center', 'lower right'.
             For backward compatibility, numeric values are accepted as well.
             See the parameter *loc* of `.Legend` for details.
         pad : float, default: 0.4
@@ -1298,13 +1298,13 @@ class AnnotationBbox(martist.Artist, mtext._AnnotationBase):
             The position *(x, y)* to place the text at. The coordinate system
             is determined by *boxcoords*.
 
-        xycoords : str or `.Artist` or `.Transform` or callable or \
-(float, float), default: 'data'
+        xycoords : single or two-tuple of str or `.Artist` or `.Transform` or \
+callable, default: 'data'
             The coordinate system that *xy* is given in. See the parameter
             *xycoords* in `.Annotation` for a detailed description.
 
-        boxcoords : str or `.Artist` or `.Transform` or callable or \
-(float, float), default: value of *xycoords*
+        boxcoords : single or two-tuple of str or `.Artist` or `.Transform` \
+or callable, default: value of *xycoords*
             The coordinate system that *xybox* is given in. See the parameter
             *textcoords* in `.Annotation` for a detailed description.
 
@@ -1312,6 +1312,16 @@ class AnnotationBbox(martist.Artist, mtext._AnnotationBase):
             By default, the text is surrounded by a white `.FancyBboxPatch`
             (accessible as the ``patch`` attribute of the `.AnnotationBbox`).
             If *frameon* is set to False, this patch is made invisible.
+
+        annotation_clip: bool or None, default: None
+            Whether to clip (i.e. not draw) the annotation when the annotation
+            point *xy* is outside the axes area.
+
+            - If *True*, the annotation will be clipped when *xy* is outside
+              the axes.
+            - If *False*, the annotation will always be drawn.
+            - If *None*, the annotation will be clipped when *xy* is outside
+              the axes and *xycoords* is 'data'.
 
         pad : float, default: 0.4
             Padding around the offsetbox.
@@ -1321,8 +1331,25 @@ class AnnotationBbox(martist.Artist, mtext._AnnotationBase):
             the offset box w.r.t. the *boxcoords*.
             The lower-left corner is (0, 0) and upper-right corner is (1, 1).
 
+        bboxprops : dict, optional
+            A dictionary of properties to set for the annotation bounding box,
+            for example *boxstyle* and *alpha*.  See `.FancyBboxPatch` for
+            details.
+
+        arrowprops: dict, optional
+            Arrow properties, see `.Annotation` for description.
+
+        fontsize: float or str, optional
+            Translated to points and passed as *mutation_scale* into
+            `.FancyBboxPatch` to scale attributes of the box style (e.g. pad
+            or rounding_size).  The name is chosen in analogy to `.Text` where
+            *fontsize* defines the mutation scale as well.  If not given,
+            :rc:`legend.fontsize` is used.  See `.Text.set_fontsize` for valid
+            values.
+
         **kwargs
-            Other parameters are identical to `.Annotation`.
+            Other `AnnotationBbox` properties.  See `.AnnotationBbox.set` for
+            a list.
         """
 
         martist.Artist.__init__(self)
