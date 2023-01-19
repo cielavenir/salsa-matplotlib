@@ -9,7 +9,7 @@ Subject: [PATCH] Fix argument checking in Axes3D.quiver
 
 --- a/lib/mpl_toolkits/mplot3d/axes3d.py
 +++ b/lib/mpl_toolkits/mplot3d/axes3d.py
-@@ -1372,7 +1372,7 @@ class Axes3D(Axes):
+@@ -1377,7 +1377,7 @@ class Axes3D(Axes):
              The lightsource to use when *shade* is True.
  
          **kwargs
@@ -18,7 +18,7 @@ Subject: [PATCH] Fix argument checking in Axes3D.quiver
          """
  
          had_data = self.has_data()
-@@ -1620,7 +1620,7 @@ class Axes3D(Axes):
+@@ -1625,7 +1625,7 @@ class Axes3D(Axes):
              of the new default of ``rcount = ccount = 50``.
  
          **kwargs
@@ -27,7 +27,7 @@ Subject: [PATCH] Fix argument checking in Axes3D.quiver
          """
  
          had_data = self.has_data()
-@@ -1747,7 +1747,7 @@ class Axes3D(Axes):
+@@ -1752,7 +1752,7 @@ class Axes3D(Axes):
          lightsource : `~matplotlib.colors.LightSource`
              The lightsource to use when *shade* is True.
          **kwargs
@@ -36,7 +36,7 @@ Subject: [PATCH] Fix argument checking in Axes3D.quiver
              :class:`~mpl_toolkits.mplot3d.art3d.Poly3DCollection`
  
          Examples
-@@ -2156,7 +2156,7 @@ class Axes3D(Axes):
+@@ -2161,7 +2161,7 @@ class Axes3D(Axes):
          data : indexable object, optional
              DATA_PARAMETER_PLACEHOLDER
          **kwargs
@@ -45,7 +45,7 @@ Subject: [PATCH] Fix argument checking in Axes3D.quiver
  
          Returns
          -------
-@@ -2208,7 +2208,8 @@ class Axes3D(Axes):
+@@ -2213,7 +2213,8 @@ class Axes3D(Axes):
          data : indexable object, optional
              DATA_PARAMETER_PLACEHOLDER
          **kwargs
@@ -55,7 +55,7 @@ Subject: [PATCH] Fix argument checking in Axes3D.quiver
  
          Returns
          -------
-@@ -2417,19 +2418,16 @@ class Axes3D(Axes):
+@@ -2421,19 +2422,16 @@ class Axes3D(Axes):
          return ret
  
      @_preprocess_data()
@@ -80,7 +80,7 @@ Subject: [PATCH] Fix argument checking in Axes3D.quiver
  
          Parameters
          ----------
-@@ -2459,7 +2457,7 @@ pivot='tail', normalize=False, **kwargs)
+@@ -2463,7 +2461,7 @@ pivot='tail', normalize=False, **kwargs)
  
          **kwargs
              Any additional keyword arguments are delegated to
@@ -89,7 +89,7 @@ Subject: [PATCH] Fix argument checking in Axes3D.quiver
          """
  
          def calc_arrows(UVW, angle=15):
-@@ -2490,22 +2488,15 @@ pivot='tail', normalize=False, **kwargs)
+@@ -2494,22 +2492,15 @@ pivot='tail', normalize=False, **kwargs)
  
          had_data = self.has_data()
  
@@ -115,7 +115,7 @@ Subject: [PATCH] Fix argument checking in Axes3D.quiver
          if masks:
              # combine the masks into one
              mask = functools.reduce(np.logical_or, masks)
-@@ -2517,7 +2508,7 @@ pivot='tail', normalize=False, **kwargs)
+@@ -2521,7 +2512,7 @@ pivot='tail', normalize=False, **kwargs)
  
          if any(len(v) == 0 for v in input_args):
              # No quivers, so just make an empty collection and return early
@@ -124,7 +124,7 @@ Subject: [PATCH] Fix argument checking in Axes3D.quiver
              self.add_collection(linec)
              return linec
  
-@@ -2531,7 +2522,7 @@ pivot='tail', normalize=False, **kwargs)
+@@ -2535,7 +2526,7 @@ pivot='tail', normalize=False, **kwargs)
              shaft_dt -= length / 2
  
          XYZ = np.column_stack(input_args[:3])
@@ -133,7 +133,7 @@ Subject: [PATCH] Fix argument checking in Axes3D.quiver
  
          # Normalize rows of UVW
          norm = np.linalg.norm(UVW, axis=1)
-@@ -2560,7 +2551,7 @@ pivot='tail', normalize=False, **kwargs)
+@@ -2564,7 +2555,7 @@ pivot='tail', normalize=False, **kwargs)
          else:
              lines = []
  
