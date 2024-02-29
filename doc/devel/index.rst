@@ -1,74 +1,183 @@
 .. _developers-guide-index:
 
-############
-Contributing
-############
+##########
+Contribute
+##########
+
+.. ifconfig:: releaselevel != 'dev'
+
+   .. important::
+
+      If you plan to contribute to Matplotlib, please read the
+      `development version <https://matplotlib.org/devdocs/devel/index.html>`_
+      of this document as it will have the most up to date installation
+      instructions, workflow process, and contributing guidelines.
 
 Thank you for your interest in helping to improve Matplotlib! There are various
-ways to contribute to Matplotlib. All of them are super valuable but don't necessarily
-require writing code at all. For example:
+ways to contribute: optimizing and refactoring code, detailing unclear
+documentation and writing new examples, reporting and fixing bugs and requesting
+and implementing new features, helping the community...
 
-- contributing to the documentation
-- opening new issues for bugs
-- requesting new features
-- asking for clarification on things you find unclear
-- fixing bugs
+New contributors
+================
 
-If you have any questions on the
-process or how to fix something feel free to ask on `gitter
-<https://gitter.im/matplotlib/matplotlib>`_ for short questions and on
-`discourse <https://discourse.matplotlib.org>`_ for longer questions.
+.. grid:: 1 1 2 2
+   :class-row: sd-align-minor-center
 
-.. rst-class:: sd-d-inline-block
+   .. grid-item::
+      :class: sd-fs-5
 
-    .. button-ref:: submitting-a-bug-report
-        :class: sd-fs-6
-        :color: primary
+      :octicon:`info;1em;sd-text-info` :ref:`Where should I start? <start-contributing>`
 
-        Report a bug
+      :octicon:`question;1em;sd-text-info` :ref:`Where should I ask questions? <get_connected>`
 
-.. rst-class:: sd-d-inline-block
+      :octicon:`issue-opened;1em;sd-text-info` :ref:`What are "good-first-issues"? <new_contributors>`
 
-    .. button-ref:: request-a-new-feature
-        :class: sd-fs-6
-        :color: primary
+      :octicon:`git-pull-request;1em;sd-text-info` :ref:`How do I claim an issue? <managing_issues_prs>`
 
-        Request a feature
+      :octicon:`codespaces;1em;sd-text-info` :ref:`How do I start a pull request? <how-to-contribute>`
 
-.. rst-class:: sd-d-inline-block
+   .. grid-item::
 
-    .. button-ref:: contributing-code
-        :class: sd-fs-6
-        :color: primary
+      .. grid:: 1
+         :gutter: 1
+         :class-row: sd-fs-5
 
-        Contribute code
+         .. grid-item-card::
+            :link: request-a-new-feature
+            :link-type: ref
+            :shadow: none
 
-.. rst-class:: sd-d-inline-block
+            :octicon:`light-bulb;1em;sd-text-info` Request new feature
 
-    .. button-ref:: contributing_documentation
-        :class: sd-fs-6
-        :color: primary
+         .. grid-item-card::
+            :link: submitting-a-bug-report
+            :link-type: ref
+            :shadow: none
 
-        Write documentation
+            :octicon:`bug;1em;sd-text-info` Submit bug report
 
-.. toctree::
-   :maxdepth: 2
+         .. grid-item-card::
+            :link: contributing-code
+            :link-type: ref
+            :shadow: none
 
-   contributing.rst
-   triage.rst
-   development_setup.rst
-   testing.rst
-   documenting_mpl.rst
-   style_guide.rst
-   gitwash/index.rst
-   coding_guide.rst
-   release_guide.rst
-   dependencies.rst
-   min_dep_policy.rst
-   MEP/index
+            :octicon:`code;1em;sd-text-info` Contribute code
+
+         .. grid-item-card::
+            :link: documenting-matplotlib
+            :link-type: ref
+            :shadow: none
+
+            :octicon:`note;1em;sd-text-info` Write documentation
+
+If you are new to contributing, we recommend that you first read our
+:ref:`contributing guide<contributing>`. If you are contributing code or
+documentation, please follow our guides for setting up and managing a
+:ref:`development environment and workflow<development_environment>`.
+For code, documentation, or triage, please follow the corresponding
+:ref:`contribution guidelines <contribution_guideline>`.
+
+
+.. _development_environment:
+
+Development environment
+=======================
+
+.. grid:: 1 1 2 2
+
+   .. grid-item-card::
+      :shadow: none
+
+      **Install**
+      ^^^
+
+      .. toctree::
+         :maxdepth: 2
+
+         development_setup
+
+
+   .. grid-item-card::
+      :shadow: none
+
+      **Workflow**
+      ^^^^
+
+      .. toctree::
+         :maxdepth: 2
+
+         development_workflow
+
+      .. toctree::
+         :maxdepth: 1
+
+         troubleshooting.rst
+
+
+.. _contribution_guideline:
+
+Policies and guidelines
+=======================
+
+.. grid:: 1 1 2 2
+   :class-row: sf-fs-1
+   :gutter: 2
+
+   .. grid-item-card::
+      :shadow: none
+
+      **Code**
+      ^^^
+
+      | :ref:`coding_guidelines`
+
+      .. toctree::
+         :maxdepth: 1
+
+         coding_guide
+         testing
+
+   .. grid-item-card::
+      :shadow: none
+
+      **Documentation**
+      ^^^
+
+      .. toctree::
+         :maxdepth: 1
+
+         document
+         style_guide
+
+   .. grid-item-card::
+      :shadow: none
+
+      **Triage**
+      ^^^
+
+      | :ref:`bug_triaging`
+      | :ref:`triage_team`
+      | :ref:`triage_workflow`
+
+   .. grid-item-card::
+      :shadow: none
+
+      **Maintenance**
+      ^^^
+
+      .. toctree::
+         :maxdepth: 1
+
+         release_guide
+         communication_guide
+         min_dep_policy
+         MEP/index
 
 .. toctree::
    :hidden:
 
-   license.rst
+   contribute
+   triage
+   license
    color_changes

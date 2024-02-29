@@ -1,17 +1,13 @@
-## PR Summary
+## PR summary
 
-## PR Checklist
+## PR checklist
+<!-- Please mark any checkboxes that do not apply to this PR as [N/A].-->
 
-<!-- Please mark any checkboxes that do not apply to this PR as [N/A]. -->
-**Tests and Styling**
-- [ ] Has pytest style unit tests (and `pytest` passes).
-- [ ] Is [Flake 8](https://flake8.pycqa.org/en/latest/) compliant (install `flake8-docstrings` and run `flake8 --docstring-convention=all`).
-
-**Documentation**
-- [ ] New features are documented, with examples if plot related.
-- [ ] New features have an entry in `doc/users/next_whats_new/` (follow instructions in README.rst there).
-- [ ] API changes documented in `doc/api/next_api_changes/` (follow instructions in README.rst there).
-- [ ] Documentation is sphinx and numpydoc compliant (the docs should [build](https://matplotlib.org/devel/documenting_mpl.html#building-the-docs) without error).
+- [ ] "closes #0000" is in the body of the PR description to [link the related issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue)
+- [ ] new and changed code is [tested](https://matplotlib.org/devdocs/devel/testing.html)
+- [ ] *Plotting related* features are demonstrated in an [example](https://matplotlib.org/devdocs/devel/documenting_mpl.html#writing-examples-and-tutorials)
+- [ ] *New Features* and *API Changes* are noted with a [directive and release note](https://matplotlib.org/devdocs/devel/coding_guide.html#new-features-and-api-changes)
+- [ ] Documentation complies with [general](https://matplotlib.org/devdocs/devel/documenting_mpl.html#writing-rest-pages) and [docstring](https://matplotlib.org/devdocs/devel/documenting_mpl.html#writing-docstrings) guidelines
 
 <!--
 Thank you so much for your PR!  To help us review your contribution, please
@@ -19,10 +15,9 @@ consider the following points:
 
 - A development guide is available at https://matplotlib.org/devdocs/devel/index.html.
 
-- Help with git and github is available at
-  https://matplotlib.org/devel/gitwash/development_workflow.html.
+- Help with git and github is available at https://matplotlib.org/devdocs/devel/development_workflow.html
 
-- Do not create the PR out of main, but out of a separate branch.
+- Create a separate branch for your changes and open the PR from this branch. Please avoid working on `main`.
 
 - The PR title should summarize the changes, for example "Raise ValueError on
   non-numeric input to set_xlim".  Avoid non-descriptive titles such as
@@ -33,7 +28,7 @@ consider the following points:
   link to any relevant issues.
 
 - If you are contributing fixes to docstrings, please pay attention to
-  http://matplotlib.org/devel/documenting_mpl.html#formatting.  In particular,
+  https://matplotlib.org/stable/devel/documenting_mpl.html#formatting-conventions.  In particular,
   note the difference between using single backquotes, double backquotes, and
   asterisks in the markup.
 
