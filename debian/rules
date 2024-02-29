@@ -180,7 +180,7 @@ binary-arch: build-arch install-arch
 	dh_testdir -a
 	dh_testroot -a
 	dh_installchangelogs
-	dh_installdocs -p$(p3) -a README.rst
+	dh_installdocs -p$(p3) -a README.md
 	# make python scripts starting with '#!' executable
 	for i in `find debian -mindepth 2 -type f ! -perm 755`; do \
 		if head -1 $$i | grep -q '^#!'; then \
