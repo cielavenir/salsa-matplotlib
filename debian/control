@@ -1,8 +1,7 @@
 Source: matplotlib
 Section: python
 Priority: optional
-Maintainer: Sandro Tosi <morph@debian.org>
-Uploaders: Debian Python Team <team+python@tracker.debian.org>,
+Maintainer: Debian Python Team <team+python@tracker.debian.org>,
 Build-Depends: cm-super-minimal <!nocheck>,
                debhelper (>= 7),
                dh-python,
