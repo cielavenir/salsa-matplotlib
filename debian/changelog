@@ -1,4 +1,4 @@
-matplotlib (3.6.3-1.1) UNRELEASED; urgency=medium
+matplotlib (3.6.3-1.1) unstable; urgency=medium
 
   [ Julien Puydt ]
   * Drop wrong depends on setuptools-scm-git-archive (Closes: #1050105).
@@ -10,7 +10,7 @@ matplotlib (3.6.3-1.1) UNRELEASED; urgency=medium
   [ Sandro Tosi ]
   * orphan
 
- -- Sandro Tosi <morph@debian.org>  Sat, 02 Mar 2024 15:20:48 -0500
+ -- Sandro Tosi <morph@debian.org>  Sat, 02 Mar 2024 15:21:35 -0500
 
 matplotlib (3.6.3-1) unstable; urgency=medium
 
