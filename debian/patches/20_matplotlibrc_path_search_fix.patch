@@ -11,7 +11,7 @@ Patch-Name: 20_matplotlibrc_path_search_fix.patch
 
 --- a/lib/matplotlib/__init__.py
 +++ b/lib/matplotlib/__init__.py
-@@ -540,7 +540,11 @@ def get_cachedir():
+@@ -582,7 +582,11 @@
  @_logged_cached('matplotlib data path: %s')
  def get_data_path():
      """Return the path to Matplotlib data."""
@@ -24,7 +24,7 @@ Patch-Name: 20_matplotlibrc_path_search_fix.patch
  
  
  def matplotlib_fname():
-@@ -578,7 +582,7 @@ def matplotlib_fname():
+@@ -620,7 +624,7 @@
              yield matplotlibrc
              yield os.path.join(matplotlibrc, 'matplotlibrc')
          yield os.path.join(get_configdir(), 'matplotlibrc')
