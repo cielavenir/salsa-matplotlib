@@ -1,6 +1,6 @@
 # Circle CI configuration file
 # https://circleci.com/docs/
-
+---
 version: 2.1
 
 
@@ -59,22 +59,22 @@ commands:
               graphviz \
               fonts-crosextra-carlito \
               fonts-freefont-otf \
-              fonts-humor-sans \
               fonts-noto-cjk \
               optipng
 
   fonts-install:
     steps:
       - restore_cache:
-          key: fonts-2
+          key: fonts-4
       - run:
           name: Install custom fonts
           command: |
             mkdir -p ~/.local/share/fonts
             wget -nc https://github.com/google/fonts/blob/master/ofl/felipa/Felipa-Regular.ttf?raw=true -O ~/.local/share/fonts/Felipa-Regular.ttf || true
+            wget -nc https://github.com/ipython/xkcd-font/blob/master/xkcd-script/font/xkcd-script.ttf?raw=true -O ~/.local/share/fonts/xkcd-Script.ttf || true
             fc-cache -f -v
       - save_cache:
-          key: fonts-2
+          key: fonts-4
           paths:
             - ~/.local/share/fonts/
 
@@ -97,10 +97,8 @@ commands:
       - run:
           name: Install Python dependencies
           command: |
-            python -m pip install --no-deps --user \
-                git+https://github.com/matplotlib/mpl-sphinx-theme.git
             python -m pip install --user \
-                numpy<< parameters.numpy_version >> codecov coverage \
+                numpy<< parameters.numpy_version >> \
                 -r requirements/doc/doc-requirements.txt
 
   mpl-install:
@@ -141,6 +139,7 @@ commands:
                [ "$CIRCLE_PR_NUMBER" = "" ]; then
               export RELEASE_TAG='-t release'
             fi
+            mkdir -p logs
             make html O="-T $RELEASE_TAG -j4 -w /tmp/sphinxerrorswarnings.log"
             rm -r build/html/_sources
           working_directory: doc
@@ -154,20 +153,35 @@ commands:
       - run:
           name: Extract possible build errors and warnings
           command: |
-           (grep "WARNING\|ERROR" /tmp/sphinxerrorswarnings.log ||
-            echo "No errors or warnings")
+            (grep "WARNING\|ERROR" /tmp/sphinxerrorswarnings.log ||
+             echo "No errors or warnings")
+            # Save logs as an artifact, and convert from absolute paths to
+            # repository-relative paths.
+            sed "s~$PWD/~~" /tmp/sphinxerrorswarnings.log > \
+              doc/logs/sphinx-errors-warnings.log
           when: always
+      - store_artifacts:
+          path: doc/logs/sphinx-errors-warnings.log
 
   doc-show-deprecations:
     steps:
       - run:
           name: Extract possible deprecation warnings in examples and tutorials
           command: |
-           (grep DeprecationWarning -r -l doc/build/html/gallery ||
-            echo "No deprecation warnings in gallery")
-           (grep DeprecationWarning -r -l doc/build/html/tutorials ||
-            echo "No deprecation warnings in tutorials")
+            (grep -rl DeprecationWarning doc/build/html/gallery ||
+             echo "No deprecation warnings in gallery")
+            (grep -rl DeprecationWarning doc/build/html/plot_types ||
+             echo "No deprecation warnings in plot_types")
+            (grep -rl DeprecationWarning doc/build/html/tutorials ||
+             echo "No deprecation warnings in tutorials")
+            # Save deprecations that are from this absolute directory, and
+            # convert to repository-relative paths.
+            (grep -Ero --no-filename "$PWD/.+DeprecationWarning.+$" \
+             doc/build/html/{gallery,plot_types,tutorials} || echo) | \
+              sed "s~$PWD/~~" > doc/logs/sphinx-deprecations.log
           when: always
+      - store_artifacts:
+          path: doc/logs/sphinx-deprecations.log
 
   doc-bundle:
     steps:
@@ -183,15 +197,21 @@ commands:
       - store_artifacts:
           path: doc/build/sphinx-gallery-files.tar.gz
 
+  deploy-docs:
+    steps:
+      - run:
+          name: "Deploy new docs"
+          command: ./.circleci/deploy-docs.sh
+
 
 ##########################################
 # Here is where the real jobs are defined.
 #
 
 jobs:
-  docs-python38:
+  docs-python39:
     docker:
-      - image: cimg/python:3.8
+      - image: cimg/python:3.9
     resource_class: large
     steps:
       - checkout
@@ -218,10 +238,9 @@ jobs:
 
       - add_ssh_keys:
           fingerprints:
-            - "6b:83:76:a5:7d:bd:ce:19:a4:e3:81:e0:80:16:a4:fe"
-      - deploy:
-          name: "Deploy new docs"
-          command: ./.circleci/deploy-docs.sh
+            - "be:c3:c1:d8:fb:a1:0e:37:71:72:d7:a3:40:13:8f:14"
+
+      - deploy-docs
 
 #########################################
 # Defining workflows gets us parallelism.
@@ -233,4 +252,4 @@ workflows:
     jobs:
       # NOTE: If you rename this job, then you must update the `if` condition
       # and `circleci-jobs` option in `.github/workflows/circleci.yml`.
-      - docs-python38
+      - docs-python39

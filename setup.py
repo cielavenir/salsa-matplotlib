@@ -8,8 +8,8 @@ mplsetup.cfg.template for more information.
 # and/or pip.
 import sys
 
-py_min_version = (3, 8)  # minimal supported python version
-since_mpl_version = (3, 6)  # py_min_version is required since this mpl version
+py_min_version = (3, 9)  # minimal supported python version
+since_mpl_version = (3, 8)  # py_min_version is required since this mpl version
 
 if sys.version_info < py_min_version:
     error = """
@@ -29,10 +29,13 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from setuptools import setup, find_packages, Distribution, Extension
+from setuptools import setup, find_namespace_packages, Distribution, Extension
 import setuptools.command.build_ext
 import setuptools.command.build_py
 import setuptools.command.sdist
+
+# sys.path modified to find setupext.py during pyproject.toml builds.
+sys.path.append(str(Path(__file__).resolve().parent))
 
 import setupext
 from setupext import print_raw, print_status
@@ -68,6 +71,12 @@ def has_flag(self, flagname):
 
 class BuildExtraLibraries(setuptools.command.build_ext.build_ext):
     def finalize_options(self):
+        # If coverage is enabled then need to keep the .o and .gcno files in a
+        # non-temporary directory otherwise coverage info not collected.
+        cppflags = os.getenv('CPPFLAGS')
+        if cppflags and '--coverage' in cppflags:
+            self.build_temp = 'build'
+
         self.distribution.ext_modules[:] = [
             ext
             for package in good_packages
@@ -172,6 +181,14 @@ class BuildExtraLibraries(setuptools.command.build_ext.build_ext):
         env = self.add_optimization_flags()
         for package in good_packages:
             package.do_custom_build(env)
+        # Make sure we don't accidentally use too modern C++ constructs, even
+        # though modern compilers default to enabling them.  Enabling this for
+        # a single platform is enough; also only do this for C++-only
+        # extensions as clang refuses to compile C/ObjC with -std=c++11.
+        if sys.platform != "win32":
+            for ext in self.distribution.ext_modules[:]:
+                if not any(src.endswith((".c", ".m")) for src in ext.sources):
+                    ext.extra_compile_args.append("-std=c++11")
         return super().build_extensions()
 
     def build_extension(self, ext):
@@ -208,8 +225,9 @@ def update_matplotlibrc(path):
 class BuildPy(setuptools.command.build_py.build_py):
     def run(self):
         super().run()
-        update_matplotlibrc(
-            Path(self.build_lib, "matplotlib/mpl-data/matplotlibrc"))
+        if not getattr(self, 'editable_mode', False):
+            update_matplotlibrc(
+                Path(self.build_lib, "matplotlib/mpl-data/matplotlibrc"))
 
 
 class Sdist(setuptools.command.sdist.sdist):
@@ -218,8 +236,9 @@ class Sdist(setuptools.command.sdist.sdist):
         update_matplotlibrc(
             Path(base_dir, "lib/matplotlib/mpl-data/matplotlibrc"))
 
-
-package_data = {}  # Will be filled below by the various components.
+# Start with type hint data
+# Will be further filled below by the various components.
+package_data = {"matplotlib": ["py.typed", "**/*.pyi"]}
 
 # If the user just queries for information, don't bother figuring out which
 # packages to build or install.
@@ -271,8 +290,8 @@ setup(  # Finally, pass this all along to setuptools to do the heavy lifting.
         'Forum': 'https://discourse.matplotlib.org/',
         'Donate': 'https://numfocus.org/donate-to-matplotlib'
     },
-    long_description=Path("README.rst").read_text(encoding="utf-8"),
-    long_description_content_type="text/x-rst",
+    long_description=Path("README.md").read_text(encoding="utf-8"),
+    long_description_content_type="text/markdown",
     license="PSF",
     platforms="any",
     classifiers=[
@@ -283,16 +302,18 @@ setup(  # Finally, pass this all along to setuptools to do the heavy lifting.
         'License :: OSI Approved :: Python Software Foundation License',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Topic :: Scientific/Engineering :: Visualization',
     ],
 
     package_dir={"": "lib"},
-    packages=find_packages("lib"),
-    namespace_packages=["mpl_toolkits"],
+    packages=find_namespace_packages(
+        where="lib",
+        exclude=["*baseline_images*", "*tinypages*", "*mpl-data*", "*web_backend*"],
+    ),
     py_modules=["pylab"],
     # Dummy extension to trigger build_ext, which will swap it out with
     # real extensions that can depend on numpy for the build.
@@ -300,28 +321,38 @@ setup(  # Finally, pass this all along to setuptools to do the heavy lifting.
     package_data=package_data,
 
     python_requires='>={}'.format('.'.join(str(n) for n in py_min_version)),
-    setup_requires=[
-        "certifi>=2020.06.20",
-        "numpy>=1.19",
-        "setuptools_scm>=7",
-    ],
+    # When updating the list of dependencies, add an api_changes/development
+    # entry and also update the following places:
+    # - lib/matplotlib/__init__.py (matplotlib._check_versions())
+    # - requirements/testing/minver.txt
+    # - doc/devel/dependencies.rst
+    # - .github/workflows/tests.yml
+    # - environment.yml
     install_requires=[
         "contourpy>=1.0.1",
         "cycler>=0.10",
         "fonttools>=4.22.0",
-        "kiwisolver>=1.0.1",
-        "numpy>=1.19",
+        "kiwisolver>=1.3.1",
+        "numpy>=1.21,<2",
         "packaging>=20.0",
-        "pillow>=6.2.0",
-        "pyparsing>=2.2.1",
+        "pillow>=8",
+        "pyparsing>=2.3.1",
         "python-dateutil>=2.7",
     ] + (
         # Installing from a git checkout that is not producing a wheel.
-        ["setuptools_scm>=7"] if (
+        # setuptools_scm warns with older setuptools, which turns into errors for our
+        # test suite. However setuptools_scm does not themselves pin the version of
+        # setuptools.
+        ["setuptools_scm>=7", "setuptools>=64"] if (
             Path(__file__).with_name(".git").exists() and
             os.environ.get("CIBUILDWHEEL", "0") != "1"
         ) else []
     ),
+    extras_require={
+        ':python_version<"3.10"': [
+            "importlib-resources>=3.2.0",
+        ],
+    },
     use_scm_version={
         "version_scheme": "release-branch-semver",
         "local_scheme": "node-and-date",
