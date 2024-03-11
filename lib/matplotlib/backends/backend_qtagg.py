@@ -6,10 +6,9 @@ import ctypes
 
 from matplotlib.transforms import Bbox
 
-from .qt_compat import QT_API, _enum, _setDevicePixelRatio
-from .. import cbook
+from .qt_compat import QT_API, QtCore, QtGui
 from .backend_agg import FigureCanvasAgg
-from .backend_qt import QtCore, QtGui, _BackendQT, FigureCanvasQT
+from .backend_qt import _BackendQT, FigureCanvasQT
 from .backend_qt import (  # noqa: F401 # pylint: disable=W0611
     FigureManagerQT, NavigationToolbar2QT)
 
@@ -50,13 +49,6 @@ class FigureCanvasQTAgg(FigureCanvasAgg, FigureCanvasQT):
             bbox = Bbox([[left, bottom], [right, top]])
             buf = memoryview(self.copy_from_bbox(bbox))
 
-            fmts = _enum("QtGui.QImage.Format")
-            if hasattr(fmts, "Format_RGBA8888"):
-                fmt = fmts.Format_RGBA8888
-            else:  # Qt<=5.1 support.
-                fmt = fmts.Format_ARGB32_Premultiplied
-                buf = cbook._unmultiplied_rgba8888_to_premultiplied_argb32(buf)
-
             if QT_API == "PyQt6":
                 from PyQt6 import sip
                 ptr = int(sip.voidptr(buf))
@@ -64,8 +56,9 @@ class FigureCanvasQTAgg(FigureCanvasAgg, FigureCanvasQT):
                 ptr = buf
 
             painter.eraseRect(rect)  # clear the widget canvas
-            qimage = QtGui.QImage(ptr, buf.shape[1], buf.shape[0], fmt)
-            _setDevicePixelRatio(qimage, self.device_pixel_ratio)
+            qimage = QtGui.QImage(ptr, buf.shape[1], buf.shape[0],
+                                  QtGui.QImage.Format.Format_RGBA8888)
+            qimage.setDevicePixelRatio(self.device_pixel_ratio)
             # set origin using original QT coordinates
             origin = QtCore.QPoint(rect.left(), rect.top())
             painter.drawImage(origin, qimage)
@@ -80,7 +73,12 @@ class FigureCanvasQTAgg(FigureCanvasAgg, FigureCanvasQT):
 
     def print_figure(self, *args, **kwargs):
         super().print_figure(*args, **kwargs)
-        self.draw()
+        # In some cases, Qt will itself trigger a paint event after closing the file
+        # save dialog. When that happens, we need to be sure that the internal canvas is
+        # re-drawn. However, if the user is using an automatically-chosen Qt backend but
+        # saving with a different backend (such as pgf), we do not want to trigger a
+        # full draw in Qt, so just set the flag for next time.
+        self._draw_pending = True
 
 
 @_BackendQT.export

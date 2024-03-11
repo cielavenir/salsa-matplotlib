@@ -28,7 +28,7 @@ def get_glyphs_subset(fontfile, characters):
 
     Parameters
     ----------
-    symbol : str
+    fontfile : str
         Path to the font file
     characters : str
         Continuous set of characters to include in subset
@@ -36,8 +36,13 @@ def get_glyphs_subset(fontfile, characters):
 
     options = subset.Options(glyph_names=True, recommended_glyphs=True)
 
-    # prevent subsetting FontForge Timestamp and other tables
-    options.drop_tables += ['FFTM', 'PfEd', 'BDF']
+    # Prevent subsetting extra tables.
+    options.drop_tables += [
+        'FFTM',  # FontForge Timestamp.
+        'PfEd',  # FontForge personal table.
+        'BDF',  # X11 BDF header.
+        'meta',  # Metadata stores design/supported languages (meaningless for subsets).
+    ]
 
     # if fontfile is a ttc, specify font number
     if fontfile.endswith(".ttc"):
@@ -104,11 +109,7 @@ class RendererPDFPSBase(RendererBase):
     def get_text_width_height_descent(self, s, prop, ismath):
         # docstring inherited
         if ismath == "TeX":
-            texmanager = self.get_texmanager()
-            fontsize = prop.get_size_in_points()
-            w, h, d = texmanager.get_text_width_height_descent(
-                s, fontsize, renderer=self)
-            return w, h, d
+            return super().get_text_width_height_descent(s, prop, ismath)
         elif ismath:
             parse = self._text2path.mathtext_parser.parse(s, 72, prop)
             return parse.width, parse.height, parse.depth
