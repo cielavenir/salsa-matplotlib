@@ -13,7 +13,8 @@ Patch-Name: 70_bts720549_try_StayPuft_for_xkcd.patch
 
 --- a/lib/matplotlib/pyplot.py
 +++ b/lib/matplotlib/pyplot.py
-@@ -640,7 +640,7 @@ def xkcd(scale=1, length=100, randomness
+@@ -751,7 +751,7 @@
+ 
      from matplotlib import patheffects
      rcParams.update({
 -        'font.family': ['xkcd', 'xkcd Script', 'Comic Neue', 'Comic Sans MS'],
